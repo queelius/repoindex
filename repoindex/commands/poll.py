@@ -93,7 +93,19 @@ logger = logging.getLogger(__name__)
               help='Show summary statistics for the event window')
 @click.option('--relative-time', '-R', is_flag=True,
               help='Show relative timestamps (e.g., "2h ago") instead of absolute')
-def events_handler(event_types, github, pypi, cran, npm, cargo, docker, gem, nuget, maven, include_all, repo, since, until, watch, interval, limit, pretty, stats, relative_time):
+@click.option('--cache', is_flag=True,
+              help='Enable caching for remote API calls (15 min TTL)')
+@click.option('--cache-ttl',
+              type=int,
+              default=900,
+              help='Cache TTL in seconds (default: 900 = 15 minutes)')
+@click.option('--workers', '-W',
+              type=int,
+              default=8,
+              help='Maximum parallel workers for scanning (default: 8)')
+@click.option('--clear-cache', is_flag=True,
+              help='Clear event cache and exit')
+def events_handler(event_types, github, pypi, cran, npm, cargo, docker, gem, nuget, maven, include_all, repo, since, until, watch, interval, limit, pretty, stats, relative_time, cache, cache_ttl, workers, clear_cache):
     """
     Scan repositories for events.
 
@@ -166,16 +178,34 @@ def events_handler(event_types, github, pypi, cran, npm, cargo, docker, gem, nug
 
       # Security alerts only
       repoindex events --type security_alert --github
+
+      # Use caching for faster repeated runs with remote APIs
+      repoindex events --github --since 7d --cache
+
+      # Custom cache TTL (30 minutes)
+      repoindex events --github --cache --cache-ttl 1800
+
+      # Increase parallelism for large collections
+      repoindex events --github --workers 16
     """
     from ..config import load_config
     from ..utils import find_git_repos_from_config
     from ..events import (
-        scan_events, parse_timespec,
+        scan_events_parallel, parse_timespec, clear_event_cache,
         LOCAL_EVENT_TYPES, LOCAL_METADATA_EVENT_TYPES, GITHUB_EVENT_TYPES,
         PYPI_EVENT_TYPES, CRAN_EVENT_TYPES, NPM_EVENT_TYPES, CARGO_EVENT_TYPES,
         DOCKER_EVENT_TYPES, ALL_EVENT_TYPES
     )
     from ..render import render_table
+
+    # Handle --clear-cache flag early
+    if clear_cache:
+        count = clear_event_cache()
+        if pretty:
+            click.echo(f"Cleared {count} cached event file(s)")
+        else:
+            print(json.dumps({'cache_cleared': count}), flush=True)
+        return 0
 
     try:
         config = load_config()
@@ -205,9 +235,9 @@ def events_handler(event_types, github, pypi, cran, npm, cargo, docker, gem, nug
         types = _build_event_types(event_types, github, pypi, cran, npm, cargo, docker, gem, nuget, maven, include_all, config)
 
         if watch:
-            _run_watch_mode(repos, types, repo, interval, pretty, relative_time)
+            _run_watch_mode(repos, types, repo, interval, pretty, relative_time, cache, cache_ttl, workers)
         else:
-            _run_single_scan(repos, types, repo, since_dt, until_dt, limit, pretty, stats, relative_time)
+            _run_single_scan(repos, types, repo, since_dt, until_dt, limit, pretty, stats, relative_time, cache, cache_ttl, workers)
 
         return 0
 
@@ -282,9 +312,9 @@ def _build_event_types(event_types, github: bool, pypi: bool, cran: bool, npm: b
     return types
 
 
-def _run_single_scan(repos, types, repo_filter, since, until, limit, pretty, stats, relative_time):
-    """Run a single event scan."""
-    from ..events import scan_events
+def _run_single_scan(repos, types, repo_filter, since, until, limit, pretty, stats, relative_time, use_cache=False, cache_ttl=900, max_workers=8):
+    """Run a single event scan using parallel execution."""
+    from ..events import scan_events_parallel
     from ..render import render_table
     from rich.console import Console
     from rich.table import Table
@@ -292,13 +322,16 @@ def _run_single_scan(repos, types, repo_filter, since, until, limit, pretty, sta
     # limit=0 means unlimited
     effective_limit = limit if limit > 0 else None
 
-    events = list(scan_events(
+    events = list(scan_events_parallel(
         repos,
         types=types,
         since=since,
         until=until,
         limit=effective_limit,
-        repo_filter=repo_filter
+        repo_filter=repo_filter,
+        max_workers=max_workers,
+        use_cache=use_cache,
+        cache_ttl=cache_ttl
     ))
 
     if stats:
@@ -592,15 +625,17 @@ def _get_event_details(event) -> str:
         return str(d)[:50]
 
 
-def _run_watch_mode(repos, types, repo_filter, interval, pretty, relative_time):
+def _run_watch_mode(repos, types, repo_filter, interval, pretty, relative_time, use_cache=False, cache_ttl=900, max_workers=8):
     """Run continuous watch mode."""
-    from ..events import scan_events
+    from ..events import scan_events_parallel
     from datetime import datetime
 
     if pretty:
         click.echo(f"Watching {len(repos)} repositories for events...")
         click.echo(f"Types: {', '.join(types)}")
         click.echo(f"Interval: {interval}s")
+        if use_cache:
+            click.echo(f"Cache: enabled (TTL: {cache_ttl}s)")
         click.echo("Press Ctrl+C to stop\n")
 
     # Track seen events by ID to avoid duplicates
@@ -612,11 +647,14 @@ def _run_watch_mode(repos, types, repo_filter, interval, pretty, relative_time):
     while True:
         try:
             # Scan for events since last check
-            events = list(scan_events(
+            events = list(scan_events_parallel(
                 repos,
                 types=types,
                 since=last_check,
-                repo_filter=repo_filter
+                repo_filter=repo_filter,
+                max_workers=max_workers,
+                use_cache=use_cache,
+                cache_ttl=cache_ttl
             ))
 
             # Filter out already-seen events

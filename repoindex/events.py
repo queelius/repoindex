@@ -42,12 +42,16 @@ Total: 30 event types across multiple categories.
 repoindex is read-only: it observes and reports, external tools consume the stream.
 """
 
-from typing import Dict, Any, List, Optional, Generator
+from typing import Dict, Any, List, Optional, Generator, Callable
 from datetime import datetime, timedelta
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import re
 import json
 import logging
+import hashlib
+import os
+import time
 
 from .utils import run_command, get_remote_url, parse_repo_url
 # Import Event from domain layer for backward compatibility
@@ -76,12 +80,98 @@ MAVEN_EVENT_TYPES = ['maven_publish']
 # Default events (fast, no API calls)
 DEFAULT_EVENT_TYPES = LOCAL_EVENT_TYPES + LOCAL_METADATA_EVENT_TYPES
 
+# Remote event types (require API calls, benefit from caching and parallelization)
+REMOTE_EVENT_TYPES = (
+    GITHUB_EVENT_TYPES + PYPI_EVENT_TYPES + CRAN_EVENT_TYPES + NPM_EVENT_TYPES +
+    CARGO_EVENT_TYPES + DOCKER_EVENT_TYPES + GEM_EVENT_TYPES + NUGET_EVENT_TYPES +
+    MAVEN_EVENT_TYPES
+)
+
 # All available event types
 ALL_EVENT_TYPES = (
     LOCAL_EVENT_TYPES + LOCAL_METADATA_EVENT_TYPES + GITHUB_EVENT_TYPES +
     PYPI_EVENT_TYPES + CRAN_EVENT_TYPES + NPM_EVENT_TYPES + CARGO_EVENT_TYPES +
     DOCKER_EVENT_TYPES + GEM_EVENT_TYPES + NUGET_EVENT_TYPES + MAVEN_EVENT_TYPES
 )
+
+# =============================================================================
+# CACHING INFRASTRUCTURE
+# =============================================================================
+
+# Default cache directory
+_CACHE_DIR: Optional[Path] = None
+_CACHE_TTL_SECONDS: int = 900  # 15 minutes default
+
+def _get_cache_dir() -> Path:
+    """Get the cache directory path, creating it if needed."""
+    global _CACHE_DIR
+    if _CACHE_DIR is None:
+        _CACHE_DIR = Path.home() / '.repoindex' / 'cache'
+        _CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    return _CACHE_DIR
+
+
+def _cache_key(repo_path: str, event_type: str, since: Optional[datetime], until: Optional[datetime]) -> str:
+    """Generate a cache key for the given parameters."""
+    # Round timestamps to 5-minute intervals for better cache hits
+    since_str = ""
+    until_str = ""
+    if since:
+        # Round down to nearest 5 minutes
+        rounded_since = since.replace(second=0, microsecond=0)
+        rounded_since = rounded_since.replace(minute=(since.minute // 5) * 5)
+        since_str = rounded_since.isoformat()
+    if until:
+        rounded_until = until.replace(second=0, microsecond=0)
+        rounded_until = rounded_until.replace(minute=(until.minute // 5) * 5)
+        until_str = rounded_until.isoformat()
+
+    key_str = f"{repo_path}|{event_type}|{since_str}|{until_str}"
+    return hashlib.md5(key_str.encode()).hexdigest()
+
+
+def _cache_get(key: str, ttl_seconds: int = _CACHE_TTL_SECONDS) -> Optional[List[Dict[str, Any]]]:
+    """Get cached data if it exists and is not expired."""
+    try:
+        cache_file = _get_cache_dir() / f"{key}.json"
+        if not cache_file.exists():
+            return None
+
+        # Check if cache is expired
+        mtime = cache_file.stat().st_mtime
+        if time.time() - mtime > ttl_seconds:
+            # Cache expired, remove it
+            cache_file.unlink(missing_ok=True)
+            return None
+
+        with open(cache_file, 'r') as f:
+            return json.load(f)
+    except Exception as e:
+        logger.debug(f"Cache read error: {e}")
+        return None
+
+
+def _cache_set(key: str, events: List[Dict[str, Any]]) -> None:
+    """Store events in cache."""
+    try:
+        cache_file = _get_cache_dir() / f"{key}.json"
+        with open(cache_file, 'w') as f:
+            json.dump(events, f)
+    except Exception as e:
+        logger.debug(f"Cache write error: {e}")
+
+
+def clear_event_cache() -> int:
+    """Clear all cached event data. Returns number of files removed."""
+    cache_dir = _get_cache_dir()
+    count = 0
+    for cache_file in cache_dir.glob("*.json"):
+        try:
+            cache_file.unlink()
+            count += 1
+        except Exception:
+            pass
+    return count
 
 # Re-export Event for backward compatibility
 __all__ = [
@@ -94,11 +184,12 @@ __all__ = [
     'scan_gem_publishes', 'scan_nuget_publishes', 'scan_maven_publishes',
     'scan_version_bumps', 'scan_deps_updates',
     'scan_license_changes', 'scan_ci_config_changes', 'scan_docs_changes', 'scan_readme_changes',
-    'scan_events', 'get_recent_events', 'events_to_jsonl',
+    'scan_events', 'scan_events_parallel', 'get_recent_events', 'events_to_jsonl',
+    'clear_event_cache',
     'LOCAL_EVENT_TYPES', 'LOCAL_METADATA_EVENT_TYPES', 'GITHUB_EVENT_TYPES',
     'PYPI_EVENT_TYPES', 'CRAN_EVENT_TYPES', 'NPM_EVENT_TYPES', 'CARGO_EVENT_TYPES',
     'DOCKER_EVENT_TYPES', 'GEM_EVENT_TYPES', 'NUGET_EVENT_TYPES', 'MAVEN_EVENT_TYPES',
-    'DEFAULT_EVENT_TYPES', 'ALL_EVENT_TYPES'
+    'REMOTE_EVENT_TYPES', 'DEFAULT_EVENT_TYPES', 'ALL_EVENT_TYPES'
 ]
 
 
@@ -3028,6 +3119,214 @@ def scan_events(
         if 'readme_change' in types:
             for event in scan_readme_changes(repo_path, since, until, limit=10):
                 all_events.append(event)
+
+    # Sort by timestamp (newest first)
+    all_events.sort(key=lambda e: e.timestamp, reverse=True)
+
+    # Apply global limit
+    count = 0
+    for event in all_events:
+        yield event
+        count += 1
+        if limit and count >= limit:
+            break
+
+
+# =============================================================================
+# PARALLEL SCANNING
+# =============================================================================
+
+def _scan_repo_events(
+    repo_path: str,
+    types: List[str],
+    since: Optional[datetime],
+    until: Optional[datetime],
+    use_cache: bool = False,
+    cache_ttl: int = 900
+) -> List[Event]:
+    """
+    Scan a single repository for events.
+
+    Internal function used by scan_events_parallel for concurrent scanning.
+    Returns a list (not generator) for thread-safety.
+    """
+    events = []
+    repo_name = Path(repo_path).name
+
+    # Local git events (fast, no caching needed)
+    if 'git_tag' in types:
+        events.extend(scan_git_tags(repo_path, since, until))
+
+    if 'commit' in types:
+        events.extend(scan_commits(repo_path, since, until, limit=50))
+
+    if 'branch' in types:
+        events.extend(scan_branches(repo_path, since, until, limit=20))
+
+    if 'merge' in types:
+        events.extend(scan_merges(repo_path, since, until, limit=50))
+
+    # Local metadata events (fast, no caching needed)
+    if 'version_bump' in types:
+        events.extend(scan_version_bumps(repo_path, since, until, limit=20))
+
+    if 'deps_update' in types:
+        events.extend(scan_deps_updates(repo_path, since, until, limit=30))
+
+    if 'license_change' in types:
+        events.extend(scan_license_changes(repo_path, since, until, limit=10))
+
+    if 'ci_config_change' in types:
+        events.extend(scan_ci_config_changes(repo_path, since, until, limit=20))
+
+    if 'docs_change' in types:
+        events.extend(scan_docs_changes(repo_path, since, until, limit=20))
+
+    if 'readme_change' in types:
+        events.extend(scan_readme_changes(repo_path, since, until, limit=10))
+
+    # Remote events - check cache first if enabled
+    remote_types_to_scan = [t for t in types if t in REMOTE_EVENT_TYPES]
+
+    for event_type in remote_types_to_scan:
+        cache_key = _cache_key(repo_path, event_type, since, until) if use_cache else None
+        cached_events = None
+
+        if use_cache:
+            cached_data = _cache_get(cache_key, cache_ttl)
+            if cached_data is not None:
+                # Reconstruct Event objects from cached dicts
+                for ed in cached_data:
+                    try:
+                        ts = datetime.fromisoformat(ed['timestamp']) if isinstance(ed['timestamp'], str) else ed['timestamp']
+                        events.append(Event(
+                            type=ed['type'],
+                            timestamp=ts,
+                            repo_name=ed['repo_name'],
+                            repo_path=ed.get('repo_path', repo_path),
+                            data=ed['data']
+                        ))
+                    except Exception as e:
+                        logger.debug(f"Error reconstructing cached event: {e}")
+                continue  # Skip to next event type, we used cache
+
+        # Not cached, fetch from API
+        fetched_events = []
+
+        if event_type == 'github_release':
+            fetched_events = list(scan_github_releases(repo_path, since, until))
+        elif event_type == 'pr':
+            fetched_events = list(scan_github_prs(repo_path, since, until, limit=50))
+        elif event_type == 'issue':
+            fetched_events = list(scan_github_issues(repo_path, since, until, limit=50))
+        elif event_type == 'workflow_run':
+            fetched_events = list(scan_github_workflows(repo_path, since, until, limit=50))
+        elif event_type == 'security_alert':
+            fetched_events = list(scan_github_security_alerts(repo_path, since, until, limit=50))
+        elif event_type in ['repo_rename', 'repo_transfer', 'repo_visibility', 'repo_archive']:
+            # These come from same API call, handle together
+            all_repo_events = list(scan_github_repo_events(repo_path, since, until, limit=20))
+            fetched_events = [e for e in all_repo_events if e.type == event_type]
+        elif event_type == 'deployment':
+            fetched_events = list(scan_github_deployments(repo_path, since, until, limit=50))
+        elif event_type == 'fork':
+            fetched_events = list(scan_github_forks(repo_path, since, until, limit=50))
+        elif event_type == 'star':
+            fetched_events = list(scan_github_stars(repo_path, since, until, limit=50))
+        elif event_type == 'pypi_publish':
+            fetched_events = list(scan_pypi_publishes(repo_path, since, until))
+        elif event_type == 'cran_publish':
+            fetched_events = list(scan_cran_publishes(repo_path, since, until))
+        elif event_type == 'npm_publish':
+            fetched_events = list(scan_npm_publishes(repo_path, since, until))
+        elif event_type == 'cargo_publish':
+            fetched_events = list(scan_cargo_publishes(repo_path, since, until))
+        elif event_type == 'docker_publish':
+            fetched_events = list(scan_docker_publishes(repo_path, since, until))
+        elif event_type == 'gem_publish':
+            fetched_events = list(scan_gem_publishes(repo_path, since, until))
+        elif event_type == 'nuget_publish':
+            fetched_events = list(scan_nuget_publishes(repo_path, since, until))
+        elif event_type == 'maven_publish':
+            fetched_events = list(scan_maven_publishes(repo_path, since, until))
+
+        events.extend(fetched_events)
+
+        # Cache the results if caching enabled
+        if use_cache and cache_key and fetched_events:
+            cache_data = [{
+                'type': e.type,
+                'timestamp': e.timestamp.isoformat(),
+                'repo_name': e.repo_name,
+                'repo_path': e.repo_path,
+                'data': e.data
+            } for e in fetched_events]
+            _cache_set(cache_key, cache_data)
+
+    return events
+
+
+def scan_events_parallel(
+    repos: List[str],
+    types: Optional[List[str]] = None,
+    since: Optional[datetime] = None,
+    until: Optional[datetime] = None,
+    limit: Optional[int] = None,
+    repo_filter: Optional[str] = None,
+    max_workers: int = 8,
+    use_cache: bool = False,
+    cache_ttl: int = 900
+) -> Generator[Event, None, None]:
+    """
+    Scan multiple repositories for events using parallel execution.
+
+    This function scans repos concurrently using a thread pool, providing
+    significant speedup for remote API events across many repositories.
+
+    Args:
+        repos: List of repository paths
+        types: Event types to scan for (default: LOCAL_EVENT_TYPES)
+        since: Only events after this time
+        until: Only events before this time
+        limit: Maximum total events to return
+        repo_filter: Only scan repos matching this name
+        max_workers: Maximum concurrent threads (default: 8)
+        use_cache: Enable caching for remote API calls (default: False)
+        cache_ttl: Cache TTL in seconds (default: 900 = 15 minutes)
+
+    Yields:
+        Event objects sorted by timestamp (newest first)
+    """
+    if types is None:
+        types = LOCAL_EVENT_TYPES
+
+    # Filter repos if specified
+    if repo_filter:
+        repos = [r for r in repos if Path(r).name == repo_filter]
+
+    if not repos:
+        return
+
+    all_events = []
+
+    # Use thread pool for concurrent repo scanning
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        # Submit all repo scans
+        future_to_repo = {
+            executor.submit(
+                _scan_repo_events, repo_path, types, since, until, use_cache, cache_ttl
+            ): repo_path
+            for repo_path in repos
+        }
+
+        # Collect results as they complete
+        for future in as_completed(future_to_repo):
+            repo_path = future_to_repo[future]
+            try:
+                repo_events = future.result()
+                all_events.extend(repo_events)
+            except Exception as e:
+                logger.warning(f"Error scanning {repo_path}: {e}")
 
     # Sort by timestamp (newest first)
     all_events.sort(key=lambda e: e.timestamp, reverse=True)
