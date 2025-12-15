@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 @click.option('--type', '-t', 'event_types',
               multiple=True,
               type=click.Choice(['git_tag', 'commit']),
-              help='Event types to scan (default: git_tag)')
+              help='Filter to specific event types (default: all)')
 @click.option('--repo', '-r',
               help='Filter by repository name')
 @click.option('--since', '-s',
@@ -50,9 +50,9 @@ def events_handler(event_types, repo, since, until, watch, interval, limit, pret
     to external tools. Use --pretty for human-readable output.
 
     \b
-    Event Types:
-      git_tag    New git tags (default)
-      commit     Recent commits
+    Event Types (all shown by default, use --type to filter):
+      git_tag    Git tags (versions, releases)
+      commit     Git commits
 
     \b
     Time Specifications:
@@ -61,20 +61,20 @@ def events_handler(event_types, repo, since, until, watch, interval, limit, pret
 
     \b
     Examples:
-      # Recent git tags (last 7 days)
-      ghops events --since 7d
+      # All events in last 7 days (tags + commits)
+      repoindex events --since 7d
 
-      # All events for a specific repo
-      ghops events --repo myproject
+      # Only git tags
+      repoindex events --type git_tag --since 7d
 
-      # Watch for new tags, pipe to notification script
-      ghops events --watch | ./notify-releases.sh
+      # Only commits for a specific repo
+      repoindex events --type commit --repo myproject
+
+      # Watch for new events, pipe to notification script
+      repoindex events --watch | ./notify-releases.sh
 
       # Pretty print recent events
-      ghops events --since 1d --pretty
-
-      # Get commits too
-      ghops events --type git_tag --type commit --since 1d
+      repoindex events --since 1d --pretty
 
     \b
     Output Format (JSONL):
@@ -110,8 +110,9 @@ def events_handler(event_types, repo, since, until, watch, interval, limit, pret
         since_dt = parse_timespec(since) if since else None
         until_dt = parse_timespec(until) if until else None
 
-        # Default to git_tag if no types specified
-        types = list(event_types) if event_types else ['git_tag']
+        # Default to all event types, --type filters down
+        all_types = ['git_tag', 'commit']
+        types = list(event_types) if event_types else all_types
 
         if watch:
             _run_watch_mode(repos, types, repo, interval, pretty)
