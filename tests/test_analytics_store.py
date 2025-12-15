@@ -563,7 +563,8 @@ class TestAnalyticsDBPath:
         path = get_analytics_db_path()
 
         assert path.name == 'analytics.db'
-        assert '.repoindex' in str(path)
+        # Accept either new (.repoindex) or legacy (.ghops) path
+        assert '.repoindex' in str(path) or '.ghops' in str(path)
 
     def test_environment_override(self, monkeypatch):
         """Test overriding path via environment variable."""

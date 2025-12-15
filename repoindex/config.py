@@ -38,22 +38,36 @@ stats = {
 }
 
 def get_config_path():
-    """Get the path to the configuration file."""
+    """Get the path to the configuration file.
+
+    Checks in order:
+    1. REPOINDEX_CONFIG environment variable
+    2. ~/.repoindex/ directory (new location)
+    3. ~/.ghops/ directory (legacy location for backward compatibility)
+    """
     # Check for environment variable override
     if 'REPOINDEX_CONFIG' in os.environ:
         path = Path(os.environ['REPOINDEX_CONFIG'])
         if path.exists():
             return path
 
-    # Check ~/.repoindex/ directory
-    ghops_dir = Path.home() / '.repoindex'
+    # Check ~/.repoindex/ directory (new location)
+    repoindex_dir = Path.home() / '.repoindex'
+    for filename in ['config.json', 'config.toml', 'config.yaml', 'config.yml']:
+        path = repoindex_dir / filename
+        if path.exists() and path.stat().st_size > 10:  # Not empty/trivial
+            return path
+
+    # Check ~/.ghops/ directory (legacy location for backward compatibility)
+    ghops_dir = Path.home() / '.ghops'
     for filename in ['config.json', 'config.toml', 'config.yaml', 'config.yml']:
         path = ghops_dir / filename
         if path.exists():
+            logger.debug(f"Using legacy config from {path}")
             return path
-            
+
     # If no file exists, return default path for saving
-    return ghops_dir / 'config.json'
+    return repoindex_dir / 'config.json'
 
 def migrate_config_to_tags(config: dict) -> dict:
     """
