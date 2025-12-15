@@ -1,5 +1,5 @@
 """
-Tag domain object for ghops.
+Tag domain object for repoindex.
 
 Tags are structured metadata for organizing repositories:
 - Simple tags: "deprecated", "archived"
@@ -17,7 +17,7 @@ import re
 
 class TagSource(Enum):
     """Where a tag came from."""
-    EXPLICIT = "explicit"      # User-assigned via `ghops tag add`
+    EXPLICIT = "explicit"      # User-assigned via `repoindex tag add`
     IMPLICIT = "implicit"      # Auto-generated (lang:python, repo:name)
     PROVIDER = "provider"      # From external source (GitHub topics, etc.)
 

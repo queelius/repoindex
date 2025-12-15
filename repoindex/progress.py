@@ -1,5 +1,5 @@
 """
-Progress reporting utilities for ghops.
+Progress reporting utilities for repoindex.
 
 Provides consistent progress reporting that respects piping and redirection.
 """

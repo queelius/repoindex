@@ -1,5 +1,5 @@
 """
-Shell command for ghops.
+Shell command for repoindex.
 """
 
 import click
@@ -36,14 +36,14 @@ def shell_handler():
       exit                 - Exit shell (or Ctrl+D)
 
     Examples:
-        ghops shell
+        repoindex shell
 
-        ghops:/> ls
-        ghops:/> cd by-language/Python
-        ghops:/by-language/Python> ls
-        ghops:/by-language/Python> query "stars > 10"
-        ghops:/by-language/Python> cd /repos/ghops
-        ghops:/repos/ghops> ls
+        repoindex:/> ls
+        repoindex:/> cd by-language/Python
+        repoindex:/by-language/Python> ls
+        repoindex:/by-language/Python> query "stars > 10"
+        repoindex:/by-language/Python> cd /repos/myproject
+        repoindex:/repos/myproject> ls
     """
     try:
         from repoindex.shell import run_shell

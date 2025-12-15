@@ -1,5 +1,5 @@
 """
-Service layer for ghops.
+Service layer for repoindex.
 
 Contains business logic that orchestrates domain objects and infrastructure:
 - RepositoryService: Discovery, status, filtering

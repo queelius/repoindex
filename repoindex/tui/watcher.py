@@ -10,7 +10,7 @@ import subprocess
 import sys
 
 # Debug log file
-DEBUG_LOG = open("/tmp/ghops_watcher_debug.log", "a")
+DEBUG_LOG = open("/tmp/repoindex_watcher_debug.log", "a")
 
 def debug_log(msg: str):
     """Write to debug log."""

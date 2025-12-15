@@ -1,5 +1,5 @@
 """
-Query command for ghops.
+Query command for repoindex.
 
 Provides powerful querying capabilities over repository metadata
 using a simple, intuitive query language with fuzzy matching.
@@ -34,26 +34,26 @@ def query_handler(query_string: str, threshold: int, pretty: bool, brief: bool, 
     Examples:
         
         # Simple text search (searches everywhere)
-        ghops query "django"
-        ghops query "machine learning"
+        repoindex query "django"
+        repoindex query "machine learning"
         
         # Field queries
-        ghops query "language == 'Python'"
-        ghops query "stargazers_count > 100"
-        ghops query "license.key == 'mit'"
+        repoindex query "language == 'Python'"
+        repoindex query "stargazers_count > 100"
+        repoindex query "license.key == 'mit'"
         
         # Fuzzy matching
-        ghops query "language ~= 'pyton'"    # Matches Python!
-        ghops query "topics contains 'secrty'"  # Matches security!
+        repoindex query "language ~= 'pyton'"    # Matches Python!
+        repoindex query "topics contains 'secrty'"  # Matches security!
         
         # Boolean logic
-        ghops query "language == 'Python' and stargazers_count > 10"
-        ghops query "has_issues or has_wiki"
-        ghops query "not archived"
+        repoindex query "language == 'Python' and stargazers_count > 10"
+        repoindex query "has_issues or has_wiki"
+        repoindex query "not archived"
         
         # Tag queries
-        ghops query "tags contains 'project:active'"
-        ghops query "'tools:cli' in tags"
+        repoindex query "tags contains 'project:active'"
+        repoindex query "'tools:cli' in tags"
     """
     # Configure logging if debug mode
     if debug:

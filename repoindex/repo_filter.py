@@ -1,5 +1,5 @@
 """
-Common repository filtering utilities for ghops commands.
+Common repository filtering utilities for repoindex commands.
 
 Provides a consistent interface for filtering repositories by:
 - Directory path

@@ -1,5 +1,5 @@
 """
-Output module for ghops.
+Output module for repoindex.
 
 Provides consistent output formatting across all commands:
 - JSONL (default): Newline-delimited JSON for piping

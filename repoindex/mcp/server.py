@@ -1,12 +1,12 @@
 """
-MCP Server implementation for ghops.
+MCP Server implementation for repoindex.
 
-Implements the Model Context Protocol (MCP) to expose ghops functionality
+Implements the Model Context Protocol (MCP) to expose repoindex functionality
 to LLM tools like Claude Code.
 
 Architecture:
     MCPServer uses service layer (RepositoryService, TagService, EventService)
-    to provide consistent, well-abstracted access to ghops functionality.
+    to provide consistent, well-abstracted access to repoindex functionality.
 """
 
 import json
@@ -107,9 +107,9 @@ class MCPContext:
 @dataclass
 class MCPServer:
     """
-    ghops MCP Server.
+    repoindex MCP Server.
 
-    Exposes ghops functionality as MCP resources and tools.
+    Exposes repoindex functionality as MCP resources and tools.
     """
     resources: Dict[str, Resource] = field(default_factory=dict)
     tools: Dict[str, Tool] = field(default_factory=dict)
@@ -212,7 +212,7 @@ class MCPServer:
 
 def create_mcp_server() -> MCPServer:
     """
-    Create and configure the ghops MCP server.
+    Create and configure the repoindex MCP server.
 
     Returns:
         Configured MCPServer instance
@@ -766,7 +766,7 @@ def _run_stdio_server(server: MCPServer):
     """Run MCP server over stdio (JSON-RPC)."""
     import sys
 
-    logger.info("Starting ghops MCP server (stdio)")
+    logger.info("Starting repoindex MCP server (stdio)")
 
     # Read JSON-RPC requests from stdin, write responses to stdout
     for line in sys.stdin:
@@ -887,7 +887,7 @@ def _run_http_server(server: MCPServer, host: str = "localhost", port: int = 876
                 logger.debug(format % args)
 
         httpd = HTTPServer((host, port), MCPHandler)
-        logger.info(f"Starting ghops MCP server (HTTP) on {host}:{port}")
+        logger.info(f"Starting repoindex MCP server (HTTP) on {host}:{port}")
         httpd.serve_forever()
 
     except ImportError:

@@ -1,5 +1,5 @@
 """
-Repository domain object for ghops.
+Repository domain object for repoindex.
 
 Repository represents a git repository with its metadata.
 It's designed to be immutable and serializable for JSONL output.
@@ -133,7 +133,7 @@ class Repository:
     """
     Immutable representation of a git repository.
 
-    This is the core domain object for ghops. It contains:
+    This is the core domain object for repoindex. It contains:
     - Basic info: path, name
     - Git state: branch, clean status, remote URL
     - Derived metadata: language, license

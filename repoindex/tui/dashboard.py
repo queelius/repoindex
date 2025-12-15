@@ -85,7 +85,7 @@ class ActivityDashboard(Screen):
         Binding("r", "refresh", "Refresh", show=True),
     ]
 
-    TITLE = "ghops htop"
+    TITLE = "repoindex htop"
 
     is_paused = reactive(False)
 
@@ -168,11 +168,11 @@ class ActivityDashboard(Screen):
                 pass
 
     async def update_table(self):
-        """Update the repository table (like ghops top but real-time)."""
+        """Update the repository table (like repoindex top but real-time)."""
         import subprocess
         from datetime import datetime, timezone
 
-        # Gather repo info (use same logic as ghops top)
+        # Gather repo info (use same logic as repoindex top)
         repo_info = []
 
         for repo_path in self.repos:
@@ -202,7 +202,7 @@ class ActivityDashboard(Screen):
             )
 
     async def _get_repo_info_async(self, repo_path: str):
-        """Get repo info asynchronously (same logic as ghops top)."""
+        """Get repo info asynchronously (same logic as repoindex top)."""
         repo_name = Path(repo_path).name
 
         # Check if dirty
@@ -481,6 +481,6 @@ class ActivityDashboard(Screen):
 
     async def action_export_feed(self):
         """Export activity feed to JSON (keyboard shortcut: e)."""
-        output_file = f"ghops-activity-{Path.cwd().name}.json"
+        output_file = f"repoindex-activity-{Path.cwd().name}.json"
         await self.activity_feed.export_json(output_file)
         self.notify(f"✓ Exported to {output_file}", severity="information")

@@ -17,7 +17,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch, call, ANY
 import click
 
-from repoindex.shell.shell import GhopsShell
+from repoindex.shell.shell import RepoIndexShell
 
 
 @pytest.fixture
@@ -87,7 +87,7 @@ def shell_instance(mock_repos):
 
         mock_get_tags.return_value = []
 
-        shell = GhopsShell()
+        shell = RepoIndexShell()
         return shell
 
 
@@ -125,7 +125,7 @@ class TestShellGitRecursive:
         mock_git_status.callback = MagicMock()
 
         # Create shell and execute
-        shell = GhopsShell()
+        shell = RepoIndexShell()
         shell.do_git('-r status')
 
         # Verify get_repos_from_vfs_path was called
@@ -144,12 +144,11 @@ class TestShellGitRecursive:
     @patch('repoindex.shell.shell.get_metadata_store')
     @patch('repoindex.shell.shell.get_repository_tags')
     @patch('repoindex.git_ops.utils.get_repos_from_vfs_path')
-    @patch('repoindex.commands.git.git_pull')
-    def test_git_recursive_pull_on_vfs_path(self, mock_git_pull, mock_get_repos,
+    def test_git_recursive_pull_on_vfs_path(self, mock_get_repos,
                                              mock_get_tags, mock_metadata_store,
                                              mock_find_repos, mock_load_config,
                                              mock_repos, capsys):
-        """Test git -r pull on VFS path with multiple repos."""
+        """Test git -r pull shows deprecation message (pull removed)."""
         # Setup mocks
         mock_load_config.return_value = {
             'general': {'repository_directories': ['/tmp/repos']},
@@ -166,23 +165,18 @@ class TestShellGitRecursive:
         # Mock VFS resolution
         mock_get_repos.return_value = mock_repos
 
-        # Mock git_pull callback
-        mock_git_pull.callback = MagicMock()
-
         # Create shell
-        shell = GhopsShell()
+        shell = RepoIndexShell()
 
         # Change to specific VFS path
         shell.do_cd('/repos')
 
-        # Execute recursive pull
-        shell.do_git('-r pull')
+        # Execute git pull - should show error (command removed)
+        shell.do_git('pull')
 
-        # Verify git_pull was called for each repo
-        assert mock_git_pull.callback.call_count == len(mock_repos)
-
+        # Verify error message shown
         captured = capsys.readouterr()
-        assert "Running 'git pull'" in captured.out
+        assert 'not a supported git command' in captured.out
 
     @patch('repoindex.shell.shell.load_config')
     @patch('repoindex.shell.shell.find_git_repos_from_config')
@@ -210,7 +204,7 @@ class TestShellGitRecursive:
         mock_git_status.callback = MagicMock()
 
         # Create shell
-        shell = GhopsShell()
+        shell = RepoIndexShell()
 
         # Execute non-recursive status
         shell.do_git('status')
@@ -243,7 +237,7 @@ class TestShellGitRecursive:
         mock_get_repos.return_value = []
 
         # Create shell
-        shell = GhopsShell()
+        shell = RepoIndexShell()
 
         # Execute recursive git command
         shell.do_git('-r status')
@@ -278,7 +272,7 @@ class TestShellGitRecursive:
         mock_git_log.callback = MagicMock()
 
         # Create shell
-        shell = GhopsShell()
+        shell = RepoIndexShell()
 
         # Execute git log with flags
         shell.do_git('log --oneline -n 5')
@@ -323,7 +317,7 @@ class TestShellClone:
         mock_handler.callback = MagicMock()
 
         # Create shell
-        shell = GhopsShell()
+        shell = RepoIndexShell()
 
         # Execute clone
         shell.do_clone('user/repo')
@@ -363,7 +357,7 @@ class TestShellClone:
         mock_handler.callback = MagicMock()
 
         # Create shell
-        shell = GhopsShell()
+        shell = RepoIndexShell()
 
         # Execute clone with multiple repos
         shell.do_clone('user/repo1 user/repo2 user/repo3')
@@ -398,7 +392,7 @@ class TestShellClone:
         mock_handler.callback = MagicMock()
 
         # Create shell
-        shell = GhopsShell()
+        shell = RepoIndexShell()
 
         # Execute clone --user
         shell.do_clone('--user username')
@@ -435,7 +429,7 @@ class TestShellClone:
         mock_handler.callback = MagicMock()
 
         # Create shell
-        shell = GhopsShell()
+        shell = RepoIndexShell()
 
         # Execute clone --user with --limit
         shell.do_clone('--user username --limit 10')
@@ -471,7 +465,7 @@ class TestShellClone:
         mock_handler.callback = MagicMock()
 
         # Create shell
-        shell = GhopsShell()
+        shell = RepoIndexShell()
 
         # Execute clone with URL
         shell.do_clone('https://github.com/user/repo')
@@ -501,7 +495,7 @@ class TestShellClone:
         mock_get_tags.return_value = []
 
         # Create shell
-        shell = GhopsShell()
+        shell = RepoIndexShell()
 
         # Execute clone without args
         shell.do_clone('')
@@ -535,7 +529,7 @@ class TestShellClone:
         mock_handler.callback = MagicMock(side_effect=Exception("Clone failed"))
 
         # Create shell
-        shell = GhopsShell()
+        shell = RepoIndexShell()
 
         # Execute clone
         shell.do_clone('user/repo')
@@ -573,7 +567,7 @@ class TestShellConfig:
         mock_show_config.callback = MagicMock()
 
         # Create shell
-        shell = GhopsShell()
+        shell = RepoIndexShell()
 
         # Execute config show
         shell.do_config('show')
@@ -606,7 +600,7 @@ class TestShellConfig:
         mock_repos_list.callback = MagicMock()
 
         # Create shell
-        shell = GhopsShell()
+        shell = RepoIndexShell()
 
         # Execute config repos list
         shell.do_config('repos list')
@@ -641,7 +635,7 @@ class TestShellConfig:
         mock_repos_add.callback = MagicMock()
 
         # Create shell
-        shell = GhopsShell()
+        shell = RepoIndexShell()
 
         # Execute config repos add
         shell.do_config('repos add /path/to/repos')
@@ -681,7 +675,7 @@ class TestShellConfig:
         mock_repos_remove.callback = MagicMock()
 
         # Create shell
-        shell = GhopsShell()
+        shell = RepoIndexShell()
 
         # Execute config repos remove
         shell.do_config('repos remove /path/to/repos')
@@ -720,7 +714,7 @@ class TestShellConfig:
         mock_repos_clear.callback = MagicMock()
 
         # Create shell
-        shell = GhopsShell()
+        shell = RepoIndexShell()
 
         # Execute config repos clear
         shell.do_config('repos clear')
@@ -752,7 +746,7 @@ class TestShellConfig:
         mock_get_tags.return_value = []
 
         # Create shell
-        shell = GhopsShell()
+        shell = RepoIndexShell()
 
         # Execute config without args
         shell.do_config('')
@@ -781,7 +775,7 @@ class TestShellConfig:
         mock_get_tags.return_value = []
 
         # Create shell
-        shell = GhopsShell()
+        shell = RepoIndexShell()
 
         # Execute config with invalid subcommand
         shell.do_config('invalid')
@@ -814,7 +808,7 @@ class TestShellExport:
         mock_get_tags.return_value = []
 
         # Create shell
-        shell = GhopsShell()
+        shell = RepoIndexShell()
 
         # Execute export with any args - should show guidance
         shell.do_export('markdown')
@@ -844,7 +838,7 @@ class TestShellExport:
         mock_get_tags.return_value = []
 
         # Create shell
-        shell = GhopsShell()
+        shell = RepoIndexShell()
 
         # Execute export without args
         shell.do_export('')
@@ -855,17 +849,17 @@ class TestShellExport:
 
 
 class TestShellDocs:
-    """Test docs command (recently fixed imports)."""
+    """Test docs command (simplified detection-only)."""
 
     @patch('repoindex.shell.shell.load_config')
     @patch('repoindex.shell.shell.find_git_repos_from_config')
     @patch('repoindex.shell.shell.get_metadata_store')
     @patch('repoindex.shell.shell.get_repository_tags')
-    @patch('repoindex.commands.docs.docs_detect')
-    def test_docs_detect(self, mock_docs_detect, mock_get_tags,
-                        mock_metadata_store, mock_find_repos,
-                        mock_load_config, mock_repos):
-        """Test docs detect command."""
+    @patch('repoindex.commands.docs.get_docs_status')
+    def test_docs_detection(self, mock_get_docs_status, mock_get_tags,
+                           mock_metadata_store, mock_find_repos,
+                           mock_load_config, mock_repos, capsys):
+        """Test docs detection command."""
         # Setup mocks
         mock_load_config.return_value = {
             'general': {'repository_directories': ['/tmp/repos']},
@@ -879,177 +873,39 @@ class TestShellDocs:
 
         mock_get_tags.return_value = []
 
-        # Mock docs_detect
-        mock_docs_detect.callback = MagicMock()
+        # Mock get_docs_status
+        mock_get_docs_status.return_value = {
+            'name': 'project-a',
+            'has_docs': True,
+            'docs_tool': 'mkdocs',
+            'docs_config': 'mkdocs.yml'
+        }
 
         # Create shell
-        shell = GhopsShell()
+        shell = RepoIndexShell()
 
         # Navigate to repo
         shell.do_cd('/repos/project-a')
 
-        # Execute docs detect
-        shell.do_docs('detect')
-
-        # Verify docs_detect was called
-        mock_docs_detect.callback.assert_called_once()
-        call_args = mock_docs_detect.callback.call_args
-        assert call_args[1]['repo_path'] == mock_repos[0]
-
-    @patch('repoindex.shell.shell.load_config')
-    @patch('repoindex.shell.shell.find_git_repos_from_config')
-    @patch('repoindex.shell.shell.get_metadata_store')
-    @patch('repoindex.shell.shell.get_repository_tags')
-    @patch('repoindex.commands.docs.docs_build')
-    def test_docs_build(self, mock_docs_build, mock_get_tags,
-                       mock_metadata_store, mock_find_repos,
-                       mock_load_config, mock_repos):
-        """Test docs build command."""
-        # Setup mocks
-        mock_load_config.return_value = {
-            'general': {'repository_directories': ['/tmp/repos']},
-            'repository_tags': {}
-        }
-        mock_find_repos.return_value = mock_repos
-
-        mock_store = MagicMock()
-        mock_store.get.return_value = {'language': 'Python', 'status': {}}
-        mock_metadata_store.return_value = mock_store
-
-        mock_get_tags.return_value = []
-
-        # Mock docs_build
-        mock_docs_build.callback = MagicMock()
-
-        # Create shell
-        shell = GhopsShell()
-
-        # Navigate to repo
-        shell.do_cd('/repos/project-a')
-
-        # Execute docs build
-        shell.do_docs('build')
-
-        # Verify docs_build was called
-        mock_docs_build.callback.assert_called_once()
-        call_args = mock_docs_build.callback.call_args
-        assert call_args[1]['repo_path'] == mock_repos[0]
-
-    @patch('repoindex.shell.shell.load_config')
-    @patch('repoindex.shell.shell.find_git_repos_from_config')
-    @patch('repoindex.shell.shell.get_metadata_store')
-    @patch('repoindex.shell.shell.get_repository_tags')
-    @patch('repoindex.commands.docs.docs_deploy')
-    def test_docs_deploy(self, mock_docs_deploy, mock_get_tags,
-                        mock_metadata_store, mock_find_repos,
-                        mock_load_config, mock_repos):
-        """Test docs deploy command."""
-        # Setup mocks
-        mock_load_config.return_value = {
-            'general': {'repository_directories': ['/tmp/repos']},
-            'repository_tags': {}
-        }
-        mock_find_repos.return_value = mock_repos
-
-        mock_store = MagicMock()
-        mock_store.get.return_value = {'language': 'Python', 'status': {}}
-        mock_metadata_store.return_value = mock_store
-
-        mock_get_tags.return_value = []
-
-        # Mock docs_deploy
-        mock_docs_deploy.callback = MagicMock()
-
-        # Create shell
-        shell = GhopsShell()
-
-        # Navigate to repo
-        shell.do_cd('/repos/project-a')
-
-        # Execute docs deploy
-        shell.do_docs('deploy')
-
-        # Verify docs_deploy was called
-        mock_docs_deploy.callback.assert_called_once()
-        call_args = mock_docs_deploy.callback.call_args
-        assert call_args[1]['repo_path'] == mock_repos[0]
-        assert call_args[1]['branch'] == 'gh-pages'
-
-    @patch('repoindex.shell.shell.load_config')
-    @patch('repoindex.shell.shell.find_git_repos_from_config')
-    @patch('repoindex.shell.shell.get_metadata_store')
-    @patch('repoindex.shell.shell.get_repository_tags')
-    @patch('repoindex.git_ops.utils.get_repos_from_vfs_path')
-    @patch('repoindex.commands.docs.docs_detect')
-    def test_docs_detect_with_vfs_path(self, mock_docs_detect, mock_get_repos_from_vfs,
-                                       mock_get_tags, mock_metadata_store,
-                                       mock_find_repos, mock_load_config, mock_repos):
-        """Test docs detect with VFS path argument."""
-        # Setup mocks
-        mock_load_config.return_value = {
-            'general': {'repository_directories': ['/tmp/repos']},
-            'repository_tags': {}
-        }
-        mock_find_repos.return_value = mock_repos
-
-        mock_store = MagicMock()
-        mock_store.get.return_value = {'language': 'Python', 'status': {}}
-        mock_metadata_store.return_value = mock_store
-
-        mock_get_tags.return_value = []
-
-        # Mock docs_detect
-        mock_docs_detect.callback = MagicMock()
-
-        # Mock VFS path resolution
-        mock_get_repos_from_vfs.return_value = [mock_repos[0]]
-
-        # Create shell
-        shell = GhopsShell()
-
-        # Execute docs detect with VFS path
-        shell.do_docs('detect /repos/project-a')
-
-        # Verify docs_detect was called
-        mock_docs_detect.callback.assert_called_once()
-
-    @patch('repoindex.shell.shell.load_config')
-    @patch('repoindex.shell.shell.find_git_repos_from_config')
-    @patch('repoindex.shell.shell.get_metadata_store')
-    @patch('repoindex.shell.shell.get_repository_tags')
-    def test_docs_no_args(self, mock_get_tags, mock_metadata_store,
-                         mock_find_repos, mock_load_config, capsys):
-        """Test docs with no arguments."""
-        # Setup mocks
-        mock_load_config.return_value = {
-            'general': {'repository_directories': ['/tmp/repos']},
-            'repository_tags': {}
-        }
-        mock_find_repos.return_value = []
-
-        mock_store = MagicMock()
-        mock_metadata_store.return_value = mock_store
-
-        mock_get_tags.return_value = []
-
-        # Create shell
-        shell = GhopsShell()
-
-        # Execute docs without args
+        # Execute docs
         shell.do_docs('')
 
-        # Check error message
+        # Verify get_docs_status was called
+        mock_get_docs_status.assert_called()
+
+        # Check output
         captured = capsys.readouterr()
-        assert 'Usage:' in captured.out
+        assert 'mkdocs' in captured.out or 'project-a' in captured.out
 
     @patch('repoindex.shell.shell.load_config')
     @patch('repoindex.shell.shell.find_git_repos_from_config')
     @patch('repoindex.shell.shell.get_metadata_store')
     @patch('repoindex.shell.shell.get_repository_tags')
-    def test_docs_invalid_subcommand(self, mock_get_tags, mock_metadata_store,
-                                    mock_find_repos, mock_load_config,
-                                    mock_repos, capsys):
-        """Test docs with invalid subcommand."""
+    @patch('repoindex.commands.docs.get_docs_status')
+    def test_docs_no_docs(self, mock_get_docs_status, mock_get_tags,
+                         mock_metadata_store, mock_find_repos,
+                         mock_load_config, mock_repos, capsys):
+        """Test docs when no documentation found."""
         # Setup mocks
         mock_load_config.return_value = {
             'general': {'repository_directories': ['/tmp/repos']},
@@ -1063,18 +919,26 @@ class TestShellDocs:
 
         mock_get_tags.return_value = []
 
+        # Mock get_docs_status - no docs
+        mock_get_docs_status.return_value = {
+            'name': 'project-a',
+            'has_docs': False,
+            'docs_tool': None,
+            'docs_config': None
+        }
+
         # Create shell
-        shell = GhopsShell()
+        shell = RepoIndexShell()
 
         # Navigate to repo
         shell.do_cd('/repos/project-a')
 
-        # Execute docs with invalid subcommand
-        shell.do_docs('invalid')
+        # Execute docs
+        shell.do_docs('')
 
-        # Check error message
+        # Check output
         captured = capsys.readouterr()
-        assert 'Unknown' in captured.out
+        assert 'no documentation detected' in captured.out
 
     @patch('repoindex.shell.shell.load_config')
     @patch('repoindex.shell.shell.find_git_repos_from_config')
@@ -1101,10 +965,10 @@ class TestShellDocs:
         mock_get_repos_from_vfs.return_value = []
 
         # Create shell
-        shell = GhopsShell()
+        shell = RepoIndexShell()
 
         # Stay at root (no repo)
-        shell.do_docs('detect')
+        shell.do_docs('')
 
         # Check error message
         captured = capsys.readouterr()
@@ -1134,7 +998,7 @@ class TestShellEdgeCases:
         mock_get_tags.return_value = []
 
         # Create shell
-        shell = GhopsShell()
+        shell = RepoIndexShell()
 
         # Execute git without args
         shell.do_git('')
@@ -1166,7 +1030,7 @@ class TestShellEdgeCases:
         mock_get_tags.return_value = []
 
         # Create shell
-        shell = GhopsShell()
+        shell = RepoIndexShell()
 
         # Execute git with unsupported command
         shell.do_git('rebase')
@@ -1197,7 +1061,7 @@ class TestShellEdgeCases:
         mock_get_tags.return_value = []
 
         # Create shell
-        shell = GhopsShell()
+        shell = RepoIndexShell()
 
         # Execute clone --user without username
         shell.do_clone('--user')
@@ -1228,7 +1092,7 @@ class TestShellEdgeCases:
         mock_get_tags.return_value = []
 
         # Create shell
-        shell = GhopsShell()
+        shell = RepoIndexShell()
 
         # Execute config repos add without path
         shell.do_config('repos add')
@@ -1271,7 +1135,7 @@ class TestShellIntegration:
         mock_git_status.callback = MagicMock()
 
         # Create shell
-        shell = GhopsShell()
+        shell = RepoIndexShell()
 
         # Test from /by-language/Python
         shell.do_cd('/by-language')
@@ -1287,10 +1151,10 @@ class TestShellIntegration:
     @patch('repoindex.shell.shell.find_git_repos_from_config')
     @patch('repoindex.shell.shell.get_metadata_store')
     @patch('repoindex.shell.shell.get_repository_tags')
-    @patch('repoindex.commands.docs.docs_detect')
-    def test_docs_in_real_fs_mode(self, mock_docs_detect, mock_get_tags,
+    @patch('repoindex.commands.docs.get_docs_status')
+    def test_docs_in_real_fs_mode(self, mock_get_docs_status, mock_get_tags,
                                   mock_metadata_store, mock_find_repos,
-                                  mock_load_config, mock_repos):
+                                  mock_load_config, mock_repos, capsys):
         """Test docs command when in real filesystem mode."""
         # Setup mocks
         mock_load_config.return_value = {
@@ -1305,11 +1169,16 @@ class TestShellIntegration:
 
         mock_get_tags.return_value = []
 
-        # Mock docs_detect
-        mock_docs_detect.callback = MagicMock()
+        # Mock get_docs_status
+        mock_get_docs_status.return_value = {
+            'name': 'project-a',
+            'has_docs': True,
+            'docs_tool': 'sphinx',
+            'docs_config': 'docs/conf.py'
+        }
 
         # Create shell
-        shell = GhopsShell()
+        shell = RepoIndexShell()
 
         # Navigate into repo (enters real filesystem mode)
         shell.do_cd('/repos/project-a')
@@ -1319,9 +1188,11 @@ class TestShellIntegration:
         shell.real_fs_repo = mock_repos[0]
 
         # Execute docs command
-        shell.do_docs('detect')
+        shell.do_docs('')
 
         # Should use real_fs_repo path
-        mock_docs_detect.callback.assert_called_once()
-        call_args = mock_docs_detect.callback.call_args
-        assert call_args[1]['repo_path'] == mock_repos[0]
+        mock_get_docs_status.assert_called_once()
+
+        # Check output
+        captured = capsys.readouterr()
+        assert 'sphinx' in captured.out or 'project-a' in captured.out

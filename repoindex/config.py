@@ -16,7 +16,7 @@ logging.basicConfig(
         logging.StreamHandler(sys.stderr) # Default to stderr
     ]
 )
-logger = logging.getLogger("ghops")
+logger = logging.getLogger("repoindex")
 
 # Global stats dictionary
 stats = {

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Main entry point for ghops package when run as a module.
+Main entry point for repoindex package when run as a module.
 """
 
 import sys

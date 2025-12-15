@@ -341,7 +341,7 @@ def extract_keywords_from_packaging_files(repo_path: str) -> List[str]:
 
 
 def pypi_classifiers_to_tags(classifiers: List[str]) -> List[str]:
-    """Convert PyPI classifiers to ghops tags, preserving hierarchy where useful."""
+    """Convert PyPI classifiers to repoindex tags, preserving hierarchy where useful."""
     tags = []
     
     for classifier in classifiers:
@@ -606,7 +606,7 @@ def update_pypi_license(repo_path: str, license_key: str) -> bool:
 
 def sync_tag_to_pypi(repo_path: str, tag: str) -> bool:
     """
-    Sync a ghops tag to PyPI metadata.
+    Sync a repoindex tag to PyPI metadata.
     
     Args:
         repo_path: Path to repository

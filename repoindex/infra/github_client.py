@@ -1,5 +1,5 @@
 """
-GitHub API client infrastructure for ghops.
+GitHub API client infrastructure for repoindex.
 
 Provides a clean abstraction over GitHub API access:
 - Uses `gh` CLI when available for authentication
@@ -180,7 +180,7 @@ class GitHubClient:
         url = f"https://api.github.com/{endpoint}"
         headers = {
             'Accept': 'application/vnd.github.v3+json',
-            'User-Agent': 'ghops'
+            'User-Agent': 'repoindex'
         }
 
         if self.token:

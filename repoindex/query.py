@@ -1,5 +1,5 @@
 """
-Query engine with fuzzy matching for ghops.
+Query engine with fuzzy matching for repoindex.
 
 Provides an intuitive query language with fuzzy matching support
 for querying repository metadata.

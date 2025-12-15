@@ -1,5 +1,5 @@
 """
-Core business logic for ghops.
+Core business logic for repoindex.
 
 All functions in this module are pure and side-effect-free.
 They take data, process it, and return data (usually dicts or lists).
@@ -122,14 +122,15 @@ def get_repositories_from_path(base_dir: str, recursive: bool = False) -> Genera
                 yield os.path.abspath(repo_dir)
 
 
-def get_repository_status(base_dir: str = None, recursive: bool = False, skip_pages_check: bool = False, 
-                         deduplicate: bool = True, tag_filters: list = None, all_tags: bool = False) -> Generator[Dict, None, None]:
+def get_repository_status(base_dir: str = None, recursive: bool = False, skip_pages_check: bool = False,
+                         deduplicate: bool = True, tag_filters: list = None, all_tags: bool = False,
+                         use_github_api: bool = False) -> Generator[Dict, None, None]:
     """
     Generator that yields repository status objects.
-    
+
     This is a pure function that returns a generator of repository status dictionaries.
     It does not print, format, or interact with the terminal.
-    
+
     Args:
         base_dir: Base directory to search for repositories
         recursive: Whether to search recursively
@@ -137,7 +138,8 @@ def get_repository_status(base_dir: str = None, recursive: bool = False, skip_pa
         deduplicate: Whether to deduplicate by remote URL (default True)
         tag_filters: List of tag filters to apply
         all_tags: Whether to match all tags (True) or any (False)
-        
+        use_github_api: Whether to make GitHub API calls for visibility/fork info (default False for speed)
+
     Yields:
         Repository status dictionaries following the standard schema
     """
@@ -148,17 +150,17 @@ def get_repository_status(base_dir: str = None, recursive: bool = False, skip_pa
             if deduplicate:
                 # Need to collect and deduplicate filtered repos
                 # For now, just yield them without deduplication when filtering
-                yield from _get_repository_status_for_path(repo, skip_pages_check)
+                yield from _get_repository_status_for_path(repo, skip_pages_check, use_github_api)
             else:
-                yield from _get_repository_status_for_path(repo, skip_pages_check)
+                yield from _get_repository_status_for_path(repo, skip_pages_check, use_github_api)
     else:
         # Original behavior without filtering
         if deduplicate:
             # Collect all statuses and deduplicate
-            yield from _get_deduplicated_status(base_dir, recursive, skip_pages_check)
+            yield from _get_deduplicated_status(base_dir, recursive, skip_pages_check, use_github_api)
         else:
             # Stream without deduplication
-            yield from _get_repository_status_raw(base_dir, recursive, skip_pages_check)
+            yield from _get_repository_status_raw(base_dir, recursive, skip_pages_check, use_github_api)
 
 
 def _get_filtered_repositories(base_dir: str, recursive: bool, tag_filters: list, all_tags: bool) -> List[str]:
@@ -183,22 +185,28 @@ def _get_filtered_repositories(base_dir: str, recursive: bool, tag_filters: list
     return [r for r in repos if os.path.abspath(r) in filtered_paths]
 
 
-def _get_repository_status_for_path(repo_path: str, skip_pages_check: bool = False) -> Generator[Dict, None, None]:
-    """Get status for a single repository path."""
+def _get_repository_status_for_path(repo_path: str, skip_pages_check: bool = False, use_github_api: bool = False) -> Generator[Dict, None, None]:
+    """Get status for a single repository path.
+
+    Args:
+        repo_path: Path to the repository
+        skip_pages_check: Whether to skip GitHub Pages checking
+        use_github_api: Whether to make GitHub API calls (default False for speed)
+    """
     config = load_config()
     check_pypi = config.get('pypi', {}).get('check_by_default', True)
-    
+
     try:
         # Get name from the repository path
         repo_name = os.path.basename(repo_path)
-        
+
         # Get git status
         status_info = get_git_status(repo_path)
-        
+
         # Check for uncommitted changes
         result, _ = run_command("git status --porcelain", cwd=repo_path, capture_output=True, check=False)
         has_uncommitted = bool(result and result.strip())
-        
+
         # Check for unpushed commits (only if there's an upstream branch)
         has_unpushed = False
         has_upstream = False
@@ -220,7 +228,7 @@ def _get_repository_status_for_path(repo_path: str, skip_pages_check: bool = Fal
                     check=False
                 )
                 has_unpushed = bool(result and result.strip())
-        
+
         # Build status object
         repo_status = {
             "path": repo_path,
@@ -235,7 +243,7 @@ def _get_repository_status_for_path(repo_path: str, skip_pages_check: bool = Fal
                 "unpushed_commits": has_unpushed
             }
         }
-        
+
         # Get remote URL
         remote_url = get_remote_url(repo_path)
         if remote_url:
@@ -247,12 +255,12 @@ def _get_repository_status_for_path(repo_path: str, skip_pages_check: bool = Fal
             if owner:
                 repo_status["remote"]["owner"] = owner
                 repo_status["remote"]["name"] = repo_parsed
-        
+
         # Get license info
         license_info = get_license_info(repo_path)
         if license_info:
             repo_status["license"] = license_info
-        
+
         # Get package info if enabled
         if check_pypi:
             package_info = detect_pypi_package(repo_path)
@@ -265,41 +273,52 @@ def _get_repository_status_for_path(repo_path: str, skip_pages_check: bool = Fal
                     )
                     package_info['outdated'] = is_outdated
                 repo_status["package"] = package_info
-        
-        # Get GitHub info (if not skipping)
+
+        # Get GitHub info - use metadata store by default for speed
         if remote_url and ("github.com" in remote_url or "github" in remote_url.lower()):
-            # Cache imports removed
             from .utils import detect_github_pages_locally
-            
+            from .metadata import get_metadata_store
+
             github_info = {}
-            
-            # Get repository visibility directly from GitHub CLI (cache removed)
             owner, repo_parsed = parse_repo_url(remote_url)
+
+            # Try metadata store first (fast)
             if owner and repo_parsed:
-                # Try to get it from GitHub CLI
-                try:
-                    result, _ = run_command(
-                        f"gh repo view {owner}/{repo_parsed} --json name,visibility,isFork",
-                        capture_output=True,
-                        check=False
-                    )
-                    if result:
-                        data = json.loads(result)
-                        github_info["is_private"] = data.get('visibility', '').lower() == 'private'
-                        github_info["is_fork"] = data.get('isFork', False)
-                        # Cache call removed
-                except (json.JSONDecodeError, Exception):
-                    github_info["is_private"] = None
-                    github_info["is_fork"] = None
-            
+                store = get_metadata_store()
+                stored_metadata = store.get(repo_path)
+
+                if stored_metadata:
+                    # Use cached GitHub info from metadata store
+                    if stored_metadata.get("private") is not None:
+                        github_info["is_private"] = stored_metadata.get("private", False)
+                    if stored_metadata.get("fork") is not None:
+                        github_info["is_fork"] = stored_metadata.get("fork", False)
+                    if stored_metadata.get("has_pages"):
+                        github_info["pages_url"] = f"https://{owner}.github.io/{repo_parsed}"
+
+                # Only make API calls if explicitly requested (--github flag)
+                if use_github_api:
+                    try:
+                        result, _ = run_command(
+                            f"gh repo view {owner}/{repo_parsed} --json name,visibility,isFork",
+                            capture_output=True,
+                            check=False
+                        )
+                        if result:
+                            data = json.loads(result)
+                            github_info["is_private"] = data.get('visibility', '').lower() == 'private'
+                            github_info["is_fork"] = data.get('isFork', False)
+                    except (json.JSONDecodeError, Exception):
+                        pass
+
             # Check for GitHub Pages (if not skipping)
             if not skip_pages_check:
-                # Try local detection first
+                # Try local detection first (fast)
                 pages_info = detect_github_pages_locally(repo_path)
                 if pages_info and pages_info.get('likely_enabled'):
                     github_info["pages_url"] = pages_info.get('pages_url')
-                elif owner and repo_parsed:
-                    # Try GitHub API directly (cache removed)
+                # Only use API if explicitly requested
+                elif use_github_api and owner and repo_parsed:
                     pages_result, _ = run_command(
                         f"gh api repos/{owner}/{repo_parsed}/pages --silent",
                         capture_output=True,
@@ -309,27 +328,22 @@ def _get_repository_status_for_path(repo_path: str, skip_pages_check: bool = Fal
                         try:
                             pages_data = json.loads(pages_result)
                             github_info["pages_url"] = pages_data.get('html_url')
-                            # Cache call removed
                         except json.JSONDecodeError:
-                            # Cache call removed
                             pass
-                    else:
-                        # Cache call removed
-                        pass
-            
+
             if github_info:
                 repo_status["github"] = github_info
-        
+
         # Add tags (both explicit and implicit)
         from .commands.catalog import get_implicit_tags, get_repository_tags
-        
+
         # Get all tags for this repository
         all_tags = get_repository_tags(repo_path, repo_info=repo_status)
         if all_tags:
             repo_status["tags"] = all_tags
-        
+
         yield repo_status
-        
+
     except Exception as e:
         # Return error object
         yield {
@@ -342,50 +356,57 @@ def _get_repository_status_for_path(repo_path: str, skip_pages_check: bool = Fal
         }
 
 
-def _get_repository_status_raw(base_dir: str, recursive: bool = False, skip_pages_check: bool = False) -> Generator[Dict, None, None]:
-    """Raw status generator without deduplication."""
+def _get_repository_status_raw(base_dir: str, recursive: bool = False, skip_pages_check: bool = False, use_github_api: bool = False) -> Generator[Dict, None, None]:
+    """Raw status generator without deduplication.
+
+    Args:
+        base_dir: Base directory to search
+        recursive: Whether to search recursively
+        skip_pages_check: Whether to skip GitHub Pages checking
+        use_github_api: Whether to make GitHub API calls (default False for speed)
+    """
     config = load_config()
     check_pypi = config.get('pypi', {}).get('check_by_default', True)
-    
+
     for repo_path in get_repositories_from_path(base_dir, recursive):
         try:
             # Get name from the repository path
             repo_name = os.path.basename(repo_path)
-            
+
             # Get git status
             status_info = get_git_status(repo_path)
-            
+
             # Check for uncommitted changes
             result, _ = run_command("git status --porcelain", cwd=repo_path, capture_output=True, check=False)
             has_uncommitted = bool(result and result.strip())
-            
+
             # Check for unpushed commits (only if there's an upstream branch)
             has_unpushed = False
             has_upstream = False
             if status_info.get('current_branch') and status_info.get('current_branch') != 'N/A':
                 # Check if there's an upstream branch
                 upstream_check, _ = run_command(
-                    "git rev-parse --abbrev-ref @{u}", 
-                    cwd=repo_path, 
-                    capture_output=True, 
-                    check=False, 
+                    "git rev-parse --abbrev-ref @{u}",
+                    cwd=repo_path,
+                    capture_output=True,
+                    check=False,
                     log_stderr=False
                 )
                 if upstream_check and not upstream_check.startswith("fatal:"):
                     has_upstream = True
                     result, _ = run_command(
-                        "git cherry -v", 
-                        cwd=repo_path, 
-                        capture_output=True, 
-                        check=False, 
+                        "git cherry -v",
+                        cwd=repo_path,
+                        capture_output=True,
+                        check=False,
                         log_stderr=False
                     )
                     has_unpushed = bool(result and result.strip())
-            
+
             # Get remote information
             remote_url = get_git_remote_url(repo_path)
             owner, repo_name_parsed = parse_repo_url(remote_url) if remote_url else (None, None)
-            
+
             # Build status object
             repo_status = {
                 "path": os.path.abspath(repo_path),
@@ -400,7 +421,7 @@ def _get_repository_status_raw(base_dir: str, recursive: bool = False, skip_page
                     "unpushed_commits": has_unpushed
                 }
             }
-            
+
             # Add remote information if available
             if remote_url:
                 repo_status["remote"] = {
@@ -408,7 +429,7 @@ def _get_repository_status_raw(base_dir: str, recursive: bool = False, skip_page
                     "owner": owner,
                     "name": repo_name_parsed
                 }
-            
+
             # Add license information
             license_info = get_license_info(repo_path)
             if license_info:
@@ -420,7 +441,7 @@ def _get_repository_status_raw(base_dir: str, recursive: bool = False, skip_page
                         "type": license_info,
                         "file": "LICENSE"
                     }
-            
+
             # Add package information if PyPI checking is enabled
             if check_pypi:
                 pypi_data = detect_pypi_package(repo_path)
@@ -434,7 +455,7 @@ def _get_repository_status_raw(base_dir: str, recursive: bool = False, skip_page
                         local_version = pypi_data.get('local_version')
                         if local_version and version and local_version != version:
                             outdated = True
-                    
+
                     repo_status["package"] = {
                         "type": "python",
                         "name": pypi_data.get('package_name'),
@@ -443,44 +464,53 @@ def _get_repository_status_raw(base_dir: str, recursive: bool = False, skip_page
                         "registry": "pypi",
                         "outdated": outdated
                     }
-            
-            # Add GitHub information if available
-            if owner and repo_name_parsed and not skip_pages_check:
-                # Cache imports removed
+
+            # Add GitHub information if available - use metadata store by default
+            if owner and repo_name_parsed:
+                from .utils import detect_github_pages_locally
+                from .metadata import get_metadata_store
+
                 github_info = {}
-                
-                # Check GitHub Pages directly (cache removed)
-                pages_result, _ = run_command(
-                    f"gh api repos/{owner}/{repo_name_parsed}/pages",
-                    capture_output=True,
-                    check=False,
-                    log_stderr=False
-                )
-                
-                if pages_result:
-                    try:
-                        pages_data = json.loads(pages_result)
-                        github_info["pages_url"] = pages_data.get('html_url')
-                        # Cache call removed
-                    except json.JSONDecodeError:
-                        # Cache call removed (API call succeeded but no valid JSON)
-                        pass
-                else:
-                    # Cache call removed (no Pages or API error)
-                    pass
-                
-                # If API failed or no result, try local detection
-                if not github_info.get("pages_url"):
-                    from .utils import detect_github_pages_locally
+
+                # Try metadata store first (fast)
+                store = get_metadata_store()
+                stored_metadata = store.get(repo_path)
+
+                if stored_metadata:
+                    # Use cached GitHub info from metadata store
+                    if stored_metadata.get("private") is not None:
+                        github_info["is_private"] = stored_metadata.get("private", False)
+                    if stored_metadata.get("fork") is not None:
+                        github_info["is_fork"] = stored_metadata.get("fork", False)
+                    if stored_metadata.get("has_pages"):
+                        github_info["pages_url"] = f"https://{owner}.github.io/{repo_name_parsed}"
+
+                # Check for GitHub Pages
+                if not skip_pages_check:
+                    # Try local detection first (fast)
                     pages_info = detect_github_pages_locally(repo_path)
                     if pages_info and pages_info.get('likely_enabled'):
                         github_info["pages_url"] = pages_info.get('pages_url')
-                
+                    # Only use API if explicitly requested
+                    elif use_github_api:
+                        pages_result, _ = run_command(
+                            f"gh api repos/{owner}/{repo_name_parsed}/pages",
+                            capture_output=True,
+                            check=False,
+                            log_stderr=False
+                        )
+                        if pages_result:
+                            try:
+                                pages_data = json.loads(pages_result)
+                                github_info["pages_url"] = pages_data.get('html_url')
+                            except json.JSONDecodeError:
+                                pass
+
                 if github_info:
                     repo_status["github"] = github_info
-            
+
             yield repo_status
-            
+
         except Exception as e:
             # Yield error object
             yield {
@@ -493,14 +523,21 @@ def _get_repository_status_raw(base_dir: str, recursive: bool = False, skip_page
             }
 
 
-def _get_deduplicated_status(base_dir: str, recursive: bool = False, skip_pages_check: bool = False) -> Generator[Dict, None, None]:
-    """Get deduplicated repository status with symlink detection."""
+def _get_deduplicated_status(base_dir: str, recursive: bool = False, skip_pages_check: bool = False, use_github_api: bool = False) -> Generator[Dict, None, None]:
+    """Get deduplicated repository status with symlink detection.
+
+    Args:
+        base_dir: Base directory to search
+        recursive: Whether to search recursively
+        skip_pages_check: Whether to skip GitHub Pages checking
+        use_github_api: Whether to make GitHub API calls (default False for speed)
+    """
     from collections import defaultdict
     from pathlib import Path
-    
+
     # Group repos by remote URL
     remotes = defaultdict(list)
-    
+
     # First, collect all repos and their paths
     for repo_path in get_repositories_from_path(base_dir, recursive):
         remote_url = get_remote_url(repo_path)
@@ -509,12 +546,12 @@ def _get_deduplicated_status(base_dir: str, recursive: bool = False, skip_pages_
         else:
             # No remote URL, treat as unique
             remotes[f"local:{repo_path}"].append(repo_path)
-    
+
     # Process each group
     for remote_url, paths in remotes.items():
         if len(paths) == 1:
             # Single instance, just get status
-            for status in _get_repository_status_raw(paths[0], False, skip_pages_check):
+            for status in _get_repository_status_raw(paths[0], False, skip_pages_check, use_github_api):
                 yield status
         else:
             # Multiple paths - check if they're symlinks or duplicates
@@ -529,12 +566,12 @@ def _get_deduplicated_status(base_dir: str, recursive: bool = False, skip_pages_
                     inodes[inode]["links"].append(path_str)
                 except FileNotFoundError:
                     continue
-            
+
             # Get status for each unique inode
             for inode, data in inodes.items():
                 # Use the first path (sorted) for getting status
                 sorted_links = sorted(data["links"])
-                for status in _get_repository_status_raw(sorted_links[0], False, skip_pages_check):
+                for status in _get_repository_status_raw(sorted_links[0], False, skip_pages_check, use_github_api):
                     # Add deduplication info
                     status["all_paths"] = sorted_links
                     status["primary_path"] = data["primary"]

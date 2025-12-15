@@ -8,10 +8,10 @@ from typing import Optional
 from .dashboard import ActivityDashboard
 
 
-class GhopsApp(App):
+class RepoIndexApp(App):
     """Simple htop-style activity monitor."""
 
-    TITLE = "ghops htop - Repository Activity Monitor"
+    TITLE = "repoindex htop - Repository Activity Monitor"
 
     def __init__(self, config_path: Optional[str] = None):
         """Initialize app.
@@ -52,5 +52,5 @@ def run_tui(config_path: Optional[str] = None) -> None:
     Args:
         config_path: Path to configuration file
     """
-    app = GhopsApp(config_path)
+    app = RepoIndexApp(config_path)
     app.run()

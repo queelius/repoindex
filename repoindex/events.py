@@ -8,14 +8,20 @@ Local events (fast, default):
 - commit: Git commits
 - branch: Branch creation/deletion (from reflog)
 - merge: Merge commits
+- version_bump: Changes to version files (pyproject.toml, package.json, etc.)
+- deps_update: Dependency file changes (requirements.txt, lock files, etc.)
 
 Remote events (opt-in, rate-limited):
 - github_release: GitHub releases (--github)
 - pr: Pull requests (--github)
 - issue: Issues (--github)
 - workflow_run: GitHub Actions (--github)
+- security_alert: GitHub Dependabot security alerts (--github)
 - pypi_publish: PyPI releases (--pypi)
 - cran_publish: CRAN releases (--cran)
+- npm_publish: npm releases (--npm)
+- cargo_publish: crates.io releases (--cargo)
+- docker_publish: Docker Hub image pushes (--docker)
 
 repoindex is read-only: it observes and reports, external tools consume the stream.
 """
@@ -35,18 +41,31 @@ logger = logging.getLogger(__name__)
 
 # Event type categories
 LOCAL_EVENT_TYPES = ['git_tag', 'commit', 'branch', 'merge']
-GITHUB_EVENT_TYPES = ['github_release', 'pr', 'issue', 'workflow_run']
+LOCAL_METADATA_EVENT_TYPES = ['version_bump', 'deps_update']
+GITHUB_EVENT_TYPES = ['github_release', 'pr', 'issue', 'workflow_run', 'security_alert']
 PYPI_EVENT_TYPES = ['pypi_publish']
 CRAN_EVENT_TYPES = ['cran_publish']
-ALL_EVENT_TYPES = LOCAL_EVENT_TYPES + GITHUB_EVENT_TYPES + PYPI_EVENT_TYPES + CRAN_EVENT_TYPES
+NPM_EVENT_TYPES = ['npm_publish']
+CARGO_EVENT_TYPES = ['cargo_publish']
+DOCKER_EVENT_TYPES = ['docker_publish']
+
+ALL_EVENT_TYPES = (
+    LOCAL_EVENT_TYPES + LOCAL_METADATA_EVENT_TYPES + GITHUB_EVENT_TYPES +
+    PYPI_EVENT_TYPES + CRAN_EVENT_TYPES + NPM_EVENT_TYPES + CARGO_EVENT_TYPES + DOCKER_EVENT_TYPES
+)
 
 # Re-export Event for backward compatibility
 __all__ = [
     'Event', 'parse_timespec', 'scan_git_tags', 'scan_commits', 'scan_branches',
     'scan_merges', 'scan_github_releases', 'scan_github_prs', 'scan_github_issues',
-    'scan_github_workflows', 'scan_pypi_publishes', 'scan_cran_publishes',
+    'scan_github_workflows', 'scan_github_security_alerts',
+    'scan_pypi_publishes', 'scan_cran_publishes',
+    'scan_npm_publishes', 'scan_cargo_publishes', 'scan_docker_publishes',
+    'scan_version_bumps', 'scan_deps_updates',
     'scan_events', 'get_recent_events', 'events_to_jsonl',
-    'LOCAL_EVENT_TYPES', 'GITHUB_EVENT_TYPES', 'PYPI_EVENT_TYPES', 'CRAN_EVENT_TYPES', 'ALL_EVENT_TYPES'
+    'LOCAL_EVENT_TYPES', 'LOCAL_METADATA_EVENT_TYPES', 'GITHUB_EVENT_TYPES',
+    'PYPI_EVENT_TYPES', 'CRAN_EVENT_TYPES', 'NPM_EVENT_TYPES', 'CARGO_EVENT_TYPES',
+    'DOCKER_EVENT_TYPES', 'ALL_EVENT_TYPES'
 ]
 
 
@@ -1044,6 +1063,626 @@ def scan_cran_publishes(
             continue
 
 
+# =============================================================================
+# NPM EVENT SCANNING (opt-in)
+# =============================================================================
+
+def scan_npm_publishes(
+    repo_path: str,
+    since: Optional[datetime] = None,
+    until: Optional[datetime] = None,
+    limit: Optional[int] = None
+) -> Generator[Event, None, None]:
+    """
+    Scan npm registry for package releases related to a repository.
+
+    Looks for package.json to determine package name.
+
+    Args:
+        repo_path: Path to git repository
+        since: Only releases after this time
+        until: Only releases before this time
+        limit: Maximum releases to return
+
+    Yields:
+        Event objects for npm releases
+    """
+    import requests
+
+    repo_path = str(Path(repo_path).resolve())
+    repo_name = Path(repo_path).name
+
+    # Check for package.json
+    package_json_path = Path(repo_path) / 'package.json'
+    if not package_json_path.exists():
+        return
+
+    # Parse package.json for package name
+    package_name = None
+    try:
+        import json
+        with open(package_json_path) as f:
+            pkg = json.load(f)
+        package_name = pkg.get('name')
+        # Skip private packages
+        if pkg.get('private'):
+            return
+    except Exception:
+        return
+
+    if not package_name:
+        return
+
+    # Query npm registry
+    try:
+        response = requests.get(f'https://registry.npmjs.org/{package_name}', timeout=10)
+        if response.status_code != 200:
+            return
+
+        data = response.json()
+    except Exception:
+        return
+
+    count = 0
+    time_info = data.get('time', {})
+
+    # Sort by publish time (newest first)
+    version_times = []
+    for version, time_str in time_info.items():
+        if version in ('created', 'modified'):
+            continue
+        try:
+            release_date = datetime.fromisoformat(time_str.replace('Z', '+00:00'))
+            if release_date.tzinfo:
+                release_date = release_date.replace(tzinfo=None)
+            version_times.append((version, release_date))
+        except (ValueError, TypeError):
+            continue
+
+    version_times.sort(key=lambda x: x[1], reverse=True)
+
+    for version, release_date in version_times:
+        # Apply time filters
+        if since and release_date < since:
+            continue
+        if until and release_date > until:
+            continue
+
+        yield Event(
+            type='npm_publish',
+            timestamp=release_date,
+            repo_name=repo_name,
+            repo_path=repo_path,
+            data={
+                'package': package_name,
+                'version': version,
+                'url': f'https://www.npmjs.com/package/{package_name}/v/{version}'
+            }
+        )
+
+        count += 1
+        if limit and count >= limit:
+            break
+
+
+# =============================================================================
+# CARGO (RUST) EVENT SCANNING (opt-in)
+# =============================================================================
+
+def scan_cargo_publishes(
+    repo_path: str,
+    since: Optional[datetime] = None,
+    until: Optional[datetime] = None,
+    limit: Optional[int] = None
+) -> Generator[Event, None, None]:
+    """
+    Scan crates.io for Rust package releases related to a repository.
+
+    Looks for Cargo.toml to determine package name.
+
+    Args:
+        repo_path: Path to git repository
+        since: Only releases after this time
+        until: Only releases before this time
+        limit: Maximum releases to return
+
+    Yields:
+        Event objects for crates.io releases
+    """
+    import requests
+
+    repo_path = str(Path(repo_path).resolve())
+    repo_name = Path(repo_path).name
+
+    # Check for Cargo.toml
+    cargo_path = Path(repo_path) / 'Cargo.toml'
+    if not cargo_path.exists():
+        return
+
+    # Parse Cargo.toml for package name
+    package_name = None
+    try:
+        import tomllib
+        with open(cargo_path, 'rb') as f:
+            cargo = tomllib.load(f)
+        package_name = cargo.get('package', {}).get('name')
+    except Exception:
+        # Try basic regex parsing
+        try:
+            content = cargo_path.read_text()
+            match = re.search(r'^name\s*=\s*["\']([^"\']+)["\']', content, re.MULTILINE)
+            if match:
+                package_name = match.group(1)
+        except Exception:
+            return
+
+    if not package_name:
+        return
+
+    # Query crates.io API
+    try:
+        headers = {'User-Agent': 'repoindex (https://github.com/queelius/repoindex)'}
+        response = requests.get(
+            f'https://crates.io/api/v1/crates/{package_name}/versions',
+            headers=headers,
+            timeout=10
+        )
+        if response.status_code != 200:
+            return
+
+        data = response.json()
+    except Exception:
+        return
+
+    count = 0
+    versions = data.get('versions', [])
+
+    for v in versions:
+        try:
+            created_at = v.get('created_at')
+            if not created_at:
+                continue
+
+            release_date = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+            if release_date.tzinfo:
+                release_date = release_date.replace(tzinfo=None)
+
+            # Apply time filters
+            if since and release_date < since:
+                continue
+            if until and release_date > until:
+                continue
+
+            version = v.get('num', '')
+
+            yield Event(
+                type='cargo_publish',
+                timestamp=release_date,
+                repo_name=repo_name,
+                repo_path=repo_path,
+                data={
+                    'package': package_name,
+                    'version': version,
+                    'downloads': v.get('downloads', 0),
+                    'yanked': v.get('yanked', False),
+                    'url': f'https://crates.io/crates/{package_name}/{version}'
+                }
+            )
+
+            count += 1
+            if limit and count >= limit:
+                break
+
+        except (ValueError, TypeError) as e:
+            logger.debug(f"Error parsing crates.io release: {e}")
+            continue
+
+
+# =============================================================================
+# DOCKER EVENT SCANNING (opt-in)
+# =============================================================================
+
+def scan_docker_publishes(
+    repo_path: str,
+    since: Optional[datetime] = None,
+    until: Optional[datetime] = None,
+    limit: Optional[int] = None
+) -> Generator[Event, None, None]:
+    """
+    Scan Docker Hub for image tags related to a repository.
+
+    Attempts to derive Docker Hub namespace from GitHub remote URL.
+
+    Args:
+        repo_path: Path to git repository
+        since: Only tags after this time
+        until: Only tags before this time
+        limit: Maximum tags to return
+
+    Yields:
+        Event objects for Docker Hub tags
+    """
+    import requests
+
+    repo_path = str(Path(repo_path).resolve())
+    repo_name = Path(repo_path).name
+
+    # Check for Dockerfile
+    dockerfile_path = Path(repo_path) / 'Dockerfile'
+    if not dockerfile_path.exists():
+        return
+
+    # Try to derive Docker Hub namespace from GitHub remote
+    remote_url = get_remote_url(repo_path)
+    if not remote_url:
+        return
+
+    owner, name = parse_repo_url(remote_url)
+    if not owner or not name:
+        return
+
+    # Try common Docker Hub naming patterns
+    # 1. owner/repo (most common)
+    # 2. repo (official images, unlikely for user repos)
+    docker_image = f"{owner}/{name}".lower()
+
+    # Query Docker Hub API
+    try:
+        response = requests.get(
+            f'https://hub.docker.com/v2/repositories/{docker_image}/tags?page_size=100',
+            timeout=10
+        )
+        if response.status_code != 200:
+            return
+
+        data = response.json()
+    except Exception:
+        return
+
+    count = 0
+    tags = data.get('results', [])
+
+    for tag in tags:
+        try:
+            last_updated = tag.get('last_updated')
+            if not last_updated:
+                continue
+
+            tag_date = datetime.fromisoformat(last_updated.replace('Z', '+00:00'))
+            if tag_date.tzinfo:
+                tag_date = tag_date.replace(tzinfo=None)
+
+            # Apply time filters
+            if since and tag_date < since:
+                continue
+            if until and tag_date > until:
+                continue
+
+            tag_name = tag.get('name', '')
+
+            yield Event(
+                type='docker_publish',
+                timestamp=tag_date,
+                repo_name=repo_name,
+                repo_path=repo_path,
+                data={
+                    'image': docker_image,
+                    'tag': tag_name,
+                    'size': tag.get('full_size', 0),
+                    'digest': tag.get('digest', ''),
+                    'url': f'https://hub.docker.com/r/{docker_image}/tags?name={tag_name}'
+                }
+            )
+
+            count += 1
+            if limit and count >= limit:
+                break
+
+        except (ValueError, TypeError) as e:
+            logger.debug(f"Error parsing Docker Hub tag: {e}")
+            continue
+
+
+# =============================================================================
+# LOCAL METADATA EVENT SCANNING (fast, no API)
+# =============================================================================
+
+def scan_version_bumps(
+    repo_path: str,
+    since: Optional[datetime] = None,
+    until: Optional[datetime] = None,
+    limit: Optional[int] = None
+) -> Generator[Event, None, None]:
+    """
+    Scan git history for version bump events.
+
+    Detects changes to version files: pyproject.toml, package.json, Cargo.toml, etc.
+
+    Args:
+        repo_path: Path to git repository
+        since: Only events after this time
+        until: Only events before this time
+        limit: Maximum events to return
+
+    Yields:
+        Event objects for version bumps
+    """
+    repo_path = str(Path(repo_path).resolve())
+    repo_name = Path(repo_path).name
+
+    # Version files to track
+    version_files = [
+        'pyproject.toml', 'setup.py', 'setup.cfg',
+        'package.json',
+        'Cargo.toml',
+        'version.txt', 'VERSION',
+        'pom.xml',
+        '*.gemspec'
+    ]
+
+    # Build git log command to find commits touching version files
+    file_patterns = ' '.join([f'"{f}"' for f in version_files])
+    cmd = f'git log --format="%H|%aI|%an|%s" --all -- {file_patterns}'
+
+    if since:
+        cmd += f' --since="{since.isoformat()}"'
+    if until:
+        cmd += f' --until="{until.isoformat()}"'
+
+    output, returncode = run_command(cmd, cwd=repo_path, capture_output=True, check=False, log_stderr=False)
+
+    if returncode != 0 or not output:
+        return
+
+    count = 0
+    for line in output.strip().split('\n'):
+        if not line or '|' not in line:
+            continue
+
+        parts = line.split('|', 3)
+        if len(parts) < 4:
+            continue
+
+        commit_hash = parts[0].strip()
+        date_str = parts[1].strip()
+        author = parts[2].strip()
+        message = parts[3].strip()
+
+        # Check if message suggests version bump
+        version_keywords = ['version', 'bump', 'release', 'v0.', 'v1.', 'v2.', 'v3.']
+        is_version_commit = any(kw.lower() in message.lower() for kw in version_keywords)
+
+        if not is_version_commit:
+            # Also check if the commit actually changed a version number
+            diff_cmd = f'git show {commit_hash} --format="" -- {file_patterns}'
+            diff_output, _ = run_command(diff_cmd, cwd=repo_path, capture_output=True, check=False, log_stderr=False)
+            if diff_output and re.search(r'[+-].*version.*["\']?\d+\.\d+', diff_output, re.IGNORECASE):
+                is_version_commit = True
+
+        if not is_version_commit:
+            continue
+
+        try:
+            commit_date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+            if commit_date.tzinfo:
+                commit_date = commit_date.replace(tzinfo=None)
+        except (ValueError, AttributeError):
+            commit_date = datetime.now()
+
+        # Try to extract version from commit message
+        version_match = re.search(r'v?(\d+\.\d+(?:\.\d+)?)', message)
+        version = version_match.group(1) if version_match else None
+
+        yield Event(
+            type='version_bump',
+            timestamp=commit_date,
+            repo_name=repo_name,
+            repo_path=repo_path,
+            data={
+                'hash': commit_hash[:8],
+                'author': author,
+                'message': message[:100],
+                'version': version
+            }
+        )
+
+        count += 1
+        if limit and count >= limit:
+            break
+
+
+def scan_deps_updates(
+    repo_path: str,
+    since: Optional[datetime] = None,
+    until: Optional[datetime] = None,
+    limit: Optional[int] = None
+) -> Generator[Event, None, None]:
+    """
+    Scan git history for dependency update events.
+
+    Detects changes to dependency files: requirements.txt, package-lock.json, etc.
+
+    Args:
+        repo_path: Path to git repository
+        since: Only events after this time
+        until: Only events before this time
+        limit: Maximum events to return
+
+    Yields:
+        Event objects for dependency updates
+    """
+    repo_path = str(Path(repo_path).resolve())
+    repo_name = Path(repo_path).name
+
+    # Dependency files to track
+    deps_files = [
+        'requirements.txt', 'requirements-*.txt', 'requirements/*.txt',
+        'Pipfile.lock', 'poetry.lock',
+        'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml',
+        'Cargo.lock',
+        'Gemfile.lock',
+        'go.sum',
+        'composer.lock'
+    ]
+
+    # Build git log command
+    file_patterns = ' '.join([f'"{f}"' for f in deps_files])
+    cmd = f'git log --format="%H|%aI|%an|%s" --all -- {file_patterns}'
+
+    if since:
+        cmd += f' --since="{since.isoformat()}"'
+    if until:
+        cmd += f' --until="{until.isoformat()}"'
+
+    output, returncode = run_command(cmd, cwd=repo_path, capture_output=True, check=False, log_stderr=False)
+
+    if returncode != 0 or not output:
+        return
+
+    count = 0
+    for line in output.strip().split('\n'):
+        if not line or '|' not in line:
+            continue
+
+        parts = line.split('|', 3)
+        if len(parts) < 4:
+            continue
+
+        commit_hash = parts[0].strip()
+        date_str = parts[1].strip()
+        author = parts[2].strip()
+        message = parts[3].strip()
+
+        try:
+            commit_date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+            if commit_date.tzinfo:
+                commit_date = commit_date.replace(tzinfo=None)
+        except (ValueError, AttributeError):
+            commit_date = datetime.now()
+
+        # Detect if this is likely a dependabot/renovate commit
+        is_automated = any(bot in author.lower() for bot in ['dependabot', 'renovate', 'greenkeeper', 'snyk'])
+
+        # Get files changed
+        files_cmd = f'git show {commit_hash} --name-only --format=""'
+        files_output, _ = run_command(files_cmd, cwd=repo_path, capture_output=True, check=False, log_stderr=False)
+        files_changed = [f.strip() for f in files_output.strip().split('\n') if f.strip()] if files_output else []
+
+        yield Event(
+            type='deps_update',
+            timestamp=commit_date,
+            repo_name=repo_name,
+            repo_path=repo_path,
+            data={
+                'hash': commit_hash[:8],
+                'author': author,
+                'message': message[:100],
+                'automated': is_automated,
+                'files': files_changed[:5]  # Limit to first 5 files
+            }
+        )
+
+        count += 1
+        if limit and count >= limit:
+            break
+
+
+# =============================================================================
+# GITHUB SECURITY ALERTS (opt-in, uses gh CLI)
+# =============================================================================
+
+def scan_github_security_alerts(
+    repo_path: str,
+    since: Optional[datetime] = None,
+    until: Optional[datetime] = None,
+    limit: Optional[int] = None
+) -> Generator[Event, None, None]:
+    """
+    Scan GitHub Dependabot security alerts for a repository.
+
+    Requires: gh CLI installed and authenticated with appropriate permissions.
+
+    Args:
+        repo_path: Path to git repository
+        since: Only alerts after this time
+        until: Only alerts before this time
+        limit: Maximum alerts to return
+
+    Yields:
+        Event objects for security alerts
+    """
+    repo_path = str(Path(repo_path).resolve())
+    repo_name = Path(repo_path).name
+
+    info = _get_github_repo_info(repo_path)
+    if not info:
+        return
+
+    owner, name = info
+
+    # Use gh CLI to get Dependabot alerts
+    cmd = f'gh api repos/{owner}/{name}/dependabot/alerts --paginate'
+
+    output, returncode = run_command(cmd, cwd=repo_path, capture_output=True, check=False, log_stderr=False)
+
+    if returncode != 0 or not output:
+        return
+
+    try:
+        alerts = json.loads(output)
+    except json.JSONDecodeError:
+        return
+
+    count = 0
+    for alert in alerts:
+        try:
+            created_at = alert.get('created_at')
+            if not created_at:
+                continue
+
+            alert_date = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+            if alert_date.tzinfo:
+                alert_date = alert_date.replace(tzinfo=None)
+
+            # Apply time filters
+            if since and alert_date < since:
+                continue
+            if until and alert_date > until:
+                continue
+
+            security_advisory = alert.get('security_advisory', {})
+            dependency = alert.get('dependency', {})
+            package_info = dependency.get('package', {})
+
+            severity = security_advisory.get('severity', 'unknown')
+
+            yield Event(
+                type='security_alert',
+                timestamp=alert_date,
+                repo_name=repo_name,
+                repo_path=repo_path,
+                data={
+                    'number': alert.get('number'),
+                    'state': alert.get('state', ''),
+                    'severity': severity,
+                    'package': package_info.get('name', ''),
+                    'ecosystem': package_info.get('ecosystem', ''),
+                    'vulnerable_version': dependency.get('manifest_path', ''),
+                    'cve': security_advisory.get('cve_id', ''),
+                    'summary': security_advisory.get('summary', '')[:100],
+                    'url': alert.get('html_url', '')
+                }
+            )
+
+            count += 1
+            if limit and count >= limit:
+                break
+
+        except (KeyError, TypeError, ValueError) as e:
+            logger.debug(f"Error parsing security alert: {e}")
+            continue
+
+
 def scan_events(
     repos: List[str],
     types: Optional[List[str]] = None,
@@ -1122,6 +1761,35 @@ def scan_events(
         # CRAN events (opt-in)
         if 'cran_publish' in types:
             for event in scan_cran_publishes(repo_path, since, until):
+                all_events.append(event)
+
+        # npm events (opt-in)
+        if 'npm_publish' in types:
+            for event in scan_npm_publishes(repo_path, since, until):
+                all_events.append(event)
+
+        # Cargo/Rust events (opt-in)
+        if 'cargo_publish' in types:
+            for event in scan_cargo_publishes(repo_path, since, until):
+                all_events.append(event)
+
+        # Docker events (opt-in)
+        if 'docker_publish' in types:
+            for event in scan_docker_publishes(repo_path, since, until):
+                all_events.append(event)
+
+        # Local metadata events (fast, no API)
+        if 'version_bump' in types:
+            for event in scan_version_bumps(repo_path, since, until, limit=20):
+                all_events.append(event)
+
+        if 'deps_update' in types:
+            for event in scan_deps_updates(repo_path, since, until, limit=30):
+                all_events.append(event)
+
+        # GitHub security alerts (opt-in, requires permissions)
+        if 'security_alert' in types:
+            for event in scan_github_security_alerts(repo_path, since, until, limit=50):
                 all_events.append(event)
 
     # Sort by timestamp (newest first)

@@ -1,5 +1,5 @@
 """
-Shared utility functions for ghops.
+Shared utility functions for repoindex.
 """
 import subprocess
 import os

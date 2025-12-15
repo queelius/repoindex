@@ -1,5 +1,5 @@
 """
-SQLite-based analytics store for ghops.
+SQLite-based analytics store for repoindex.
 
 Tracks published posts, metrics over time, and event history.
 Uses raw SQLite queries (no ORM) for simplicity and performance.

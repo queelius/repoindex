@@ -179,12 +179,12 @@ def update_repos_handler(dir, recursive, auto_commit, commit_message, dry_run, t
     Examples:
     
     \b
-        ghops update                    # Update all repos from config
-        ghops update -d .               # Update current repo only
-        ghops update -d . -r            # Update all repos under current
-        ghops update --auto-commit      # Commit changes before pulling
-        ghops update --dry-run          # Preview changes without applying
-        ghops update -t type:work       # Update only work repos
+        repoindex update                    # Update all repos from config
+        repoindex update -d .               # Update current repo only
+        repoindex update -d . -r            # Update all repos under current
+        repoindex update --auto-commit      # Commit changes before pulling
+        repoindex update --dry-run          # Preview changes without applying
+        repoindex update -t type:work       # Update only work repos
     """
     # Auto-detect table mode if not specified
     if table is None:

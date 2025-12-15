@@ -1,5 +1,5 @@
 """
-Rendering functions for ghops output.
+Rendering functions for repoindex output.
 
 This module handles all pretty-printing and table formatting.
 Core functions return data, this module makes it human-readable.

@@ -903,7 +903,7 @@ def audit_cmd():
 @click.option("--dry-run", is_flag=True, help="Show what would be done")
 @click.option("--pretty", is_flag=True, help="Display as formatted table")
 def audit_license_handler(dir, recursive, tag_filters, all_tags, query,
-                         fix, license_type, author, email, year, force, dry_run, pretty):
+                         license_type, author, email, year, pretty):
     """Audit repository licenses."""
     config = load_config()
     
@@ -934,13 +934,13 @@ def audit_license_handler(dir, recursive, tag_filters, all_tags, query,
     audits = audit_repositories(
         check_type="license",
         repos=repos,
-        fix=fix,
+        fix=False,
         license_type=license_type,
         author=author,
         email=email,
         year=year,
-        force=force,
-        dry_run=dry_run
+        force=False,
+        dry_run=False
     )
     
     if pretty:
@@ -982,7 +982,7 @@ def audit_license_handler(dir, recursive, tag_filters, all_tags, query,
 @click.option("--dry-run", is_flag=True, help="Show what would be done")
 @click.option("--pretty", is_flag=True, help="Display as formatted table")
 def audit_readme_handler(dir, recursive, tag_filters, all_tags, query,
-                        fix, dry_run, pretty):
+                        pretty):
     """Audit repository READMEs."""
     config = load_config()
     
@@ -1007,8 +1007,8 @@ def audit_readme_handler(dir, recursive, tag_filters, all_tags, query,
     audits = audit_repositories(
         check_type="readme",
         repos=repos,
-        fix=fix,
-        dry_run=dry_run
+        fix=False,
+        dry_run=False
     )
     
     if pretty:
@@ -1056,7 +1056,7 @@ def audit_readme_handler(dir, recursive, tag_filters, all_tags, query,
 @click.option("--pretty", is_flag=True, help="Display as formatted table")
 @click.pass_context
 def all(ctx, dir, recursive, tag_filters, all_tags, query,
-        fix, license_type, author, email, year, force, dry_run, pretty):
+        license_type, author, email, year, pretty):
     """Run all audits on repositories."""
     config = load_config()
     
@@ -1087,13 +1087,13 @@ def all(ctx, dir, recursive, tag_filters, all_tags, query,
     audits = audit_repositories(
         check_type="all",
         repos=repos,
-        fix=fix,
+        fix=False,
         license_type=license_type,
         author=author,
         email=email,
         year=year,
-        force=force,
-        dry_run=dry_run
+        force=False,
+        dry_run=False
     )
     
     if pretty:
@@ -1153,7 +1153,7 @@ def all(ctx, dir, recursive, tag_filters, all_tags, query,
 @click.option("--dry-run", is_flag=True, help="Show what would be done")
 @click.option("--pretty", is_flag=True, help="Display as formatted table")
 def audit_security_handler(dir, recursive, tag_filters, all_tags, query,
-                          fix, dry_run, pretty):
+                          pretty):
     """Audit repositories for security issues."""
     config = load_config()
     
@@ -1178,8 +1178,8 @@ def audit_security_handler(dir, recursive, tag_filters, all_tags, query,
     audits = audit_repositories(
         check_type="security",
         repos=repos,
-        fix=fix,
-        dry_run=dry_run
+        fix=False,
+        dry_run=False
     )
     
     if pretty:
@@ -1221,7 +1221,7 @@ def audit_security_handler(dir, recursive, tag_filters, all_tags, query,
 @click.option("--dry-run", is_flag=True, help="Show what would be done")
 @click.option("--pretty", is_flag=True, help="Display as formatted table")
 def audit_deps_handler(dir, recursive, tag_filters, all_tags, query,
-                      fix, dry_run, pretty):
+                      pretty):
     """Audit repository dependencies."""
     config = load_config()
     
@@ -1246,8 +1246,8 @@ def audit_deps_handler(dir, recursive, tag_filters, all_tags, query,
     audits = audit_repositories(
         check_type="dependencies",
         repos=repos,
-        fix=fix,
-        dry_run=dry_run
+        fix=False,
+        dry_run=False
     )
     
     if pretty:
@@ -1289,7 +1289,7 @@ def audit_deps_handler(dir, recursive, tag_filters, all_tags, query,
 @click.option("--dry-run", is_flag=True, help="Show what would be done")
 @click.option("--pretty", is_flag=True, help="Display as formatted table")
 def audit_ci_handler(dir, recursive, tag_filters, all_tags, query,
-                    fix, dry_run, pretty):
+                    pretty):
     """Audit repository CI/CD configuration."""
     config = load_config()
     
@@ -1314,8 +1314,8 @@ def audit_ci_handler(dir, recursive, tag_filters, all_tags, query,
     audits = audit_repositories(
         check_type="ci",
         repos=repos,
-        fix=fix,
-        dry_run=dry_run
+        fix=False,
+        dry_run=False
     )
     
     if pretty:
@@ -1357,7 +1357,7 @@ def audit_ci_handler(dir, recursive, tag_filters, all_tags, query,
 @click.option("--dry-run", is_flag=True, help="Show what would be done")
 @click.option("--pretty", is_flag=True, help="Display as formatted table")
 def audit_docs_handler(dir, recursive, tag_filters, all_tags, query,
-                      fix, dry_run, pretty):
+                      pretty):
     """Audit repository documentation."""
     config = load_config()
     
@@ -1382,8 +1382,8 @@ def audit_docs_handler(dir, recursive, tag_filters, all_tags, query,
     audits = audit_repositories(
         check_type="documentation",
         repos=repos,
-        fix=fix,
-        dry_run=dry_run
+        fix=False,
+        dry_run=False
     )
     
     if pretty:

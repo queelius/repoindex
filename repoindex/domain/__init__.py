@@ -1,5 +1,5 @@
 """
-Domain layer for ghops.
+Domain layer for repoindex.
 
 Contains pure domain objects with no I/O or side effects:
 - Repository: Represents a git repository with metadata

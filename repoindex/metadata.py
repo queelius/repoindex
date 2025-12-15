@@ -1,5 +1,5 @@
 """
-Metadata store for ghops repositories.
+Metadata store for repoindex repositories.
 
 Provides a single source of truth for repository metadata,
 replacing the distributed caching system with a unified store.

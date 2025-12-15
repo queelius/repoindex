@@ -1,7 +1,7 @@
 """
-MCP (Model Context Protocol) server for ghops.
+MCP (Model Context Protocol) server for repoindex.
 
-Exposes ghops as an MCP server for integration with LLM tools like Claude Code.
+Exposes repoindex as an MCP server for integration with LLM tools like Claude Code.
 
 Resources (read-only data):
     repo://list                 - All repositories with basic metadata

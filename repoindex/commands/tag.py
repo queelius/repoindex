@@ -1,5 +1,5 @@
 """
-Tag management commands for ghops.
+Tag management commands for repoindex.
 
 Provides CLI parity with the shell's filesystem-like tag operations.
 """
@@ -45,9 +45,9 @@ def tag_add(repository, tags):
     TAGS: One or more tags to add (supports hierarchical tags)
 
     Examples:
-        ghops tag add myproject alex/beta
-        ghops tag add myproject topic:ml/research work/active
-        ghops tag add /path/to/repo client/acme/backend
+        repoindex tag add myproject alex/beta
+        repoindex tag add myproject topic:ml/research work/active
+        repoindex tag add /path/to/repo client/acme/backend
     """
     config = load_config()
 
@@ -106,8 +106,8 @@ def tag_remove(repository, tags):
     TAGS: One or more tags to remove
 
     Examples:
-        ghops tag remove myproject alex/beta
-        ghops tag remove myproject topic:ml/research work/active
+        repoindex tag remove myproject alex/beta
+        repoindex tag remove myproject topic:ml/research work/active
     """
     config = load_config()
 
@@ -168,8 +168,8 @@ def tag_move(repository, old_tag, new_tag):
     This is equivalent to removing old_tag and adding new_tag.
 
     Examples:
-        ghops tag move myproject alex/beta alex/production
-        ghops tag move myproject topic:ml topic:nlp
+        repoindex tag move myproject alex/beta alex/production
+        repoindex tag move myproject topic:ml topic:nlp
     """
     config = load_config()
 
@@ -215,10 +215,10 @@ def tag_list(tag_filter, json_output, repository):
     """List tags and their repositories.
 
     Examples:
-        ghops tag list                      # List all tags
-        ghops tag list -t "alex/*"          # List alex/* tags
-        ghops tag list -t "topic:ml"        # List topic:ml tag
-        ghops tag list -r myproject         # Show tags for myproject
+        repoindex tag list                      # List all tags
+        repoindex tag list -t "alex/*"          # List alex/* tags
+        repoindex tag list -t "topic:ml"        # List topic:ml tag
+        repoindex tag list -r myproject         # Show tags for myproject
     """
     config = load_config()
 
@@ -288,9 +288,9 @@ def tag_tree(tag_prefix):
     """Show tag hierarchy as a tree.
 
     Examples:
-        ghops tag tree                 # Show full tag hierarchy
-        ghops tag tree -t alex         # Show alex/* hierarchy
-        ghops tag tree -t topic        # Show topic:* hierarchy
+        repoindex tag tree                 # Show full tag hierarchy
+        repoindex tag tree -t alex         # Show alex/* hierarchy
+        repoindex tag tree -t topic        # Show topic:* hierarchy
     """
     config = load_config()
     repo_tags = config.get("repository_tags", {})

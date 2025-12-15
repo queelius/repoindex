@@ -1,5 +1,5 @@
 """
-Main shell implementation for ghops.
+Main shell implementation for repoindex.
 
 Provides an interactive shell with VFS navigation and query commands.
 Supports hierarchical tag-based virtual filesystem.
@@ -18,12 +18,12 @@ from ..metadata import get_metadata_store
 from ..commands.catalog import get_repository_tags
 
 
-class GhopsShell(cmd.Cmd):
-    """Interactive shell for ghops repository management."""
+class RepoIndexShell(cmd.Cmd):
+    """Interactive shell for repoindex repository management."""
 
     intro = """
 ╔═══════════════════════════════════════════════════════════════════╗
-║                     ghops Interactive Shell                       ║
+║                     repoindex Interactive Shell                       ║
 ║                                                                   ║
 ║  Navigate repositories with hierarchical tag filesystem          ║
 ║  - /repos/           All repositories                            ║
@@ -34,7 +34,7 @@ class GhopsShell(cmd.Cmd):
 ║                                                                   ║
 ║  VFS: cd, ls, pwd, cp, mv, rm, mkdir, refresh                    ║
 ║  Files: cat, head, tail, grep (within repos)                     ║
-║  Git: git [-r] <cmd> - status, log, diff, pull, push (-r = all)  ║
+║  Git: git [-r] <cmd> - status, log, diff (read-only) (-r = all)  ║
 ║  Commands: status, top, query, publish, clone, config            ║
 ║  Advanced: export, docs                                          ║
 ║  Shell: !<command> to run bash commands in current directory     ║
@@ -62,7 +62,7 @@ class GhopsShell(cmd.Cmd):
 
     def update_prompt(self):
         """Update the shell prompt based on current directory."""
-        self.prompt = f"ghops:{self.cwd}> "
+        self.prompt = f"repoindex:{self.cwd}> "
 
     def _build_vfs(self) -> Dict[str, Any]:
         """Build the virtual filesystem structure with hierarchical tags.
@@ -547,7 +547,7 @@ class GhopsShell(cmd.Cmd):
 
         Examples:
             status                    # Status of all repos
-            status /repos/ghops       # Status of specific repo
+            status /repos/repoindex       # Status of specific repo
             status --refresh          # Refresh metadata first
         """
         # Parse arguments
@@ -586,164 +586,226 @@ class GhopsShell(cmd.Cmd):
         except Exception as e:
             print(f"status: error: {e}")
 
-    def do_top(self, arg):
-        """Show repository activity monitor.
+    def do_events(self, arg):
+        """Scan repositories for events.
 
-        Usage: top [--hours N] [--limit N]
+        Usage: events [options]
+
+        Options:
+            --since TIME     Events after this time (e.g., 1h, 7d, 2024-01-01)
+            --type TYPE      Filter by event type:
+                             Local: git_tag, commit, branch, merge, version_bump, deps_update
+                             GitHub: github_release, pr, issue, workflow_run, security_alert
+                             Registries: pypi_publish, cran_publish, npm_publish, cargo_publish, docker_publish
+            --github         Include GitHub events (releases, PRs, issues, security alerts)
+            --pypi           Include PyPI publish events
+            --cran           Include CRAN publish events
+            --npm            Include npm publish events
+            --cargo          Include Cargo (crates.io) publish events
+            --docker         Include Docker Hub publish events
+            --all            Include all event types
+            --stats          Show summary statistics
+            --relative-time  Show relative timestamps (e.g., "2h ago")
+            --limit N        Maximum events (default: 50)
 
         Examples:
-            top                      # Last 24 hours, 20 commits
-            top --hours 48           # Last 48 hours
-            top --limit 10           # Show only 10 commits
-
-        Note: Use Ctrl+C to stop if in watch mode
+            events                         # Local events, last 7 days
+            events --since 1d              # Events in last day
+            events --type git_tag          # Only git tags
+            events --github --since 7d     # Include GitHub events
+            events --npm --cargo           # npm and Cargo publishes
+            events --type security_alert   # Security alerts only
+            events --stats                 # Show event statistics
+            events --relative-time         # Show "2h ago" style times
         """
         # Parse arguments
         args = arg.split()
-        hours = 24
-        limit = 20
+        since = '7d'  # Default to 7 days
+        event_types = []
+        limit = 50
+        github = False
+        pypi = False
+        cran = False
+        npm = False
+        cargo = False
+        docker = False
+        include_all = False
+        stats = False
+        relative_time = False
 
         i = 0
         while i < len(args):
-            if args[i] == '--hours' and i + 1 < len(args):
-                try:
-                    hours = int(args[i + 1])
-                    i += 2
-                except ValueError:
-                    print(f"top: invalid hours value: {args[i + 1]}")
-                    return
+            if args[i] == '--since' and i + 1 < len(args):
+                since = args[i + 1]
+                i += 2
+            elif args[i] == '--type' and i + 1 < len(args):
+                event_types.append(args[i + 1])
+                i += 2
             elif args[i] == '--limit' and i + 1 < len(args):
                 try:
                     limit = int(args[i + 1])
                     i += 2
                 except ValueError:
-                    print(f"top: invalid limit value: {args[i + 1]}")
+                    print(f"events: invalid limit value: {args[i + 1]}")
                     return
+            elif args[i] == '--github':
+                github = True
+                i += 1
+            elif args[i] == '--pypi':
+                pypi = True
+                i += 1
+            elif args[i] == '--cran':
+                cran = True
+                i += 1
+            elif args[i] == '--npm':
+                npm = True
+                i += 1
+            elif args[i] == '--cargo':
+                cargo = True
+                i += 1
+            elif args[i] == '--docker':
+                docker = True
+                i += 1
+            elif args[i] in ('--all', '-a'):
+                include_all = True
+                i += 1
+            elif args[i] == '--stats':
+                stats = True
+                i += 1
+            elif args[i] in ('--relative-time', '-R'):
+                relative_time = True
+                i += 1
             else:
                 i += 1
 
-        # Import and call top display generator
-        from ..commands.top import generate_top_display
-        from rich.console import Console
+        # Import events handler and run
+        from ..commands.poll import events_handler
+        import click
 
         try:
-            console = Console()
-            display = generate_top_display(self.config, hours, limit)
-            console.print(display)
+            events_handler.callback(
+                event_types=tuple(event_types) if event_types else (),
+                github=github,
+                pypi=pypi,
+                cran=cran,
+                npm=npm,
+                cargo=cargo,
+                docker=docker,
+                include_all=include_all,
+                repo=None,
+                since=since,
+                until=None,
+                watch=False,  # No watch mode in shell
+                interval=300,
+                limit=limit,
+                pretty=True,  # Shell always uses pretty mode
+                stats=stats,
+                relative_time=relative_time
+            )
         except KeyboardInterrupt:
-            print("\n[yellow]Stopped[/yellow]")
+            print("\nInterrupted")
         except Exception as e:
-            print(f"top: error: {e}")
+            print(f"events: error: {e}")
+
+    # Alias for backward compatibility
+    def do_top(self, arg):
+        """[Deprecated] Use 'events' instead."""
+        print("'top' is deprecated. Use 'events' instead.")
+        print("Examples:")
+        print("  events --since 24h          # Last 24 hours")
+        print("  events --type commit        # Only commits")
+        print("  events --stats              # Show statistics")
 
     def do_publish(self, arg):
         """Package publishing is handled by external tools.
 
-        ghops focuses on metadata and events - not publishing.
+        repoindex focuses on metadata and events - not publishing.
 
         Use your package manager directly:
         - Python: twine upload dist/*
         - npm: npm publish
         - Rust: cargo publish
 
-        ghops can detect when packages are published via the events system.
+        repoindex can detect when packages are published via the events system.
         """
         print("Package publishing is handled by external tools.")
         print()
-        print("ghops focuses on metadata and events - not publishing.")
+        print("repoindex focuses on metadata and events - not publishing.")
         print("Use your package manager directly:")
         print("  - Python: twine upload dist/*")
         print("  - npm: npm publish")
         print("  - Rust: cargo publish")
         print()
-        print("Tip: ghops can detect when packages are published via 'poll' command.")
+        print("Tip: repoindex can detect when packages are published via 'events' command.")
 
     def do_export(self, arg):
         """Export repository metadata as JSON.
 
         Usage: export [path]
 
-        ghops provides metadata via the VFS - export as JSONL for integration.
+        repoindex provides metadata via the VFS - export as JSONL for integration.
 
         Examples:
             ls /repos --json          # List repos as JSON
             cat /repos/myproject      # View repo metadata as JSON
             ls /by-language/Python    # List Python repos
 
-        For portfolio generation, use external tools that consume ghops data.
+        For portfolio generation, use external tools that consume repoindex data.
         """
-        print("Export via the VFS - ghops metadata is available as JSON.")
+        print("Export via the VFS - repoindex metadata is available as JSON.")
         print()
         print("Examples:")
         print("  ls /repos --json          # List repos as JSON")
         print("  cat /repos/myproject      # View repo metadata as JSON")
         print("  ls /by-language/Python    # List Python repos")
         print()
-        print("For portfolio generation, use external tools that consume ghops data.")
+        print("For portfolio generation, use external tools that consume repoindex data.")
 
     def do_docs(self, arg):
-        """Manage project documentation.
+        """Detect documentation tools in repositories.
 
-        Usage: docs <subcommand> [path]
+        Usage: docs [path]
 
-        Subcommands:
-            detect       Detect documentation systems
-            build        Build documentation
-            deploy       Deploy to GitHub Pages
+        Shows which documentation tools (mkdocs, sphinx, jekyll, etc.)
+        are used in repositories.
 
         Examples:
-            docs detect              # Detect docs in current repo
-            docs build               # Build documentation
-            docs deploy              # Deploy to GitHub Pages
+            docs                     # Detect docs in current repo/path
+            docs /repos/myproject    # Check specific repo
+            docs /by-tag/work        # Check repos with tag
         """
-        if not arg:
-            print("Usage: docs <detect|build|deploy> [path]")
-            return
+        # Import docs detection function
+        from ..commands.docs import get_docs_status
+        import json
 
-        # Import docs handlers
-        from ..commands.docs import docs_detect, docs_build, docs_deploy
-        import click
-
-        # Parse subcommand
-        parts = arg.split(maxsplit=1)
-        subcommand = parts[0]
-        rest = parts[1] if len(parts) > 1 else None
-
-        # Determine repo path
-        if rest and rest.startswith('/'):
-            # VFS path - need to resolve to real path
-            repo_paths = self._resolve_vfs_path_to_repos(rest)
+        # Determine what to scan
+        if arg and arg.startswith('/'):
+            # VFS path - resolve to repos
+            repo_paths = self._resolve_vfs_path_to_repos(arg)
             if not repo_paths:
-                print(f"No repository found at: {rest}")
+                print(f"No repository found at: {arg}")
                 return
-            repo_path = repo_paths[0]  # Use first repo if multiple
         elif self.in_real_fs and self.real_fs_repo:
-            repo_path = self.real_fs_repo
+            repo_paths = [self.real_fs_repo]
         else:
-            # Current VFS directory - resolve to real path
+            # Current VFS directory - resolve to repos
             repo_paths = self._resolve_vfs_path_to_repos(str(self.cwd))
             if not repo_paths:
                 print(f"No repository in current directory")
                 return
-            repo_path = repo_paths[0]
 
-        try:
-            if subcommand == 'detect':
-                docs_detect.callback(repo_path=repo_path)
-            elif subcommand == 'build':
-                docs_build.callback(repo_path=repo_path, dir=None, recursive=False,
-                                   tag_filters=None, all_tags=False, query=None,
-                                   tool=None, dry_run=False)
-            elif subcommand == 'deploy':
-                docs_deploy.callback(repo_path=repo_path, branch='gh-pages',
-                                    message=None, dry_run=False)
+        # Show docs detection for each repo
+        for repo_path in repo_paths:
+            status = get_docs_status(repo_path)
+            if status.get('has_docs'):
+                tool = status.get('docs_tool', 'unknown')
+                config = status.get('docs_config', 'N/A')
+                pages_url = status.get('pages_url', '')
+                print(f"{status['name']}: {tool} (config: {config})")
+                if pages_url:
+                    print(f"  Pages: {pages_url}")
             else:
-                print(f"Unknown docs subcommand: {subcommand}")
-                print("Available: detect, build, deploy")
-
-        except click.Abort:
-            pass
-        except Exception as e:
-            print(f"docs {subcommand}: error: {e}")
+                print(f"{status['name']}: no documentation detected")
 
     def do_config(self, arg):
         """Configuration management.
@@ -1234,7 +1296,7 @@ class GhopsShell(cmd.Cmd):
         """Resolve a VFS path to repository paths.
 
         Args:
-            vfs_path: VFS path (e.g., /repos/ghops or /by-tag/alex/beta)
+            vfs_path: VFS path (e.g., /repos/repoindex or /by-tag/alex/beta)
 
         Returns:
             List of repository absolute paths
@@ -1577,21 +1639,21 @@ class GhopsShell(cmd.Cmd):
 
         Usage: git [-r] <subcommand> [args]
 
-        Supports: status, log, diff, pull, push
+        Supports: status, log, diff (read-only)
 
         Options:
             -r    Recursive - run on all repos in current VFS path
 
         Examples:
             git status                    # Status of current repo
-            git -r pull                   # Pull all repos in current path
             git log --oneline -n 5        # Log of current repo
+            git -r status                 # Status of all repos in VFS path
             cd /by-tag/work
-            git -r status                 # Status of all repos tagged 'work'
+            git -r diff                   # Diff all repos tagged 'work'
         """
         if not arg:
             print("Usage: git [-r] <subcommand> [args]")
-            print("Supported: status, log, diff, pull, push")
+            print("Supported: status, log, diff (read-only)")
             print("Use -r for recursive operation on all repos in current VFS path")
             return
 
@@ -1645,12 +1707,12 @@ class GhopsShell(cmd.Cmd):
         """Execute a git command on a single repository.
 
         Args:
-            subcommand: Git subcommand (status, log, diff, pull, push)
+            subcommand: Git subcommand (status, log, diff (read-only))
             rest_args: Additional arguments for the command
             vfs_path: VFS path to the repository
         """
-        # Import the git command handlers
-        from ..commands.git import git_status, git_log, git_diff, git_pull, git_push
+        # Import the git command handlers (read-only operations only)
+        from ..commands.git import git_status, git_log, git_diff
         import click
 
         try:
@@ -1686,25 +1748,9 @@ class GhopsShell(cmd.Cmd):
                 cached = '--cached' in rest_args or '--staged' in rest_args
                 git_diff.callback(vfs_path, name_only, name_status, stat, cached, False)
 
-            elif subcommand == 'pull':
-                # Parse flags
-                rebase = '--rebase' in rest_args
-                ff_only = '--ff-only' in rest_args
-                force = '-f' in rest_args or '--force' in rest_args
-                git_pull.callback(vfs_path, rebase, ff_only, force, False)
-
-            elif subcommand == 'push':
-                # Parse flags
-                push_all = '--all' in rest_args
-                tags = '--tags' in rest_args
-                force = '-f' in rest_args or '--force' in rest_args
-                dry_run = '--dry-run' in rest_args
-                yes = '-y' in rest_args or '--yes' in rest_args
-                git_push.callback(vfs_path, push_all, tags, force, dry_run, yes, False)
-
             else:
                 print(f"git: '{subcommand}' is not a supported git command")
-                print("Supported: status, log, diff, pull, push")
+                print("Supported: status, log, diff")
 
         except click.Abort:
             # User cancelled
@@ -1885,7 +1931,7 @@ class GhopsShell(cmd.Cmd):
 def run_shell():
     """Run the interactive shell."""
     try:
-        shell = GhopsShell()
+        shell = RepoIndexShell()
         shell.cmdloop()
     except KeyboardInterrupt:
         print("\n\nInterrupted. Goodbye!")

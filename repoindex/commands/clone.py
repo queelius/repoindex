@@ -320,7 +320,7 @@ def clone_repositories(repos: List[Dict[str, Any]], target_dir: str,
 @click.option("--visibility", type=click.Choice(["all", "public", "private"]), default="all", help="Repository visibility filter")
 @click.option("--dry-run", is_flag=True, help="Preview operations without making changes")
 @click.option("--table/--no-table", default=None, help="Display as formatted table (auto-detected by default)")
-@click.option("--add-to-config", is_flag=True, help="Add cloned directory to ghops repository directories")
+@click.option("--add-to-config", is_flag=True, help="Add cloned directory to repoindex repository directories")
 @click.option("--no-add-to-config", is_flag=True, help="Don't add to config (useful if it becomes default)")
 @click.option("--tag", "-t", "tags", multiple=True, help="Tags for repositories (e.g., org:torvalds, lang:python)")
 @click.option("--import-github-tags", is_flag=True, default=True, help="Import GitHub topics and metadata as tags")
@@ -348,11 +348,11 @@ def clone_handler(target, users, target_dir, ignore, limit, visibility, dry_run,
     Examples:
 
     \\b
-        ghops clone torvalds                          # Clone all repos from torvalds
-        ghops clone https://github.com/user/repo.git  # Clone single repo
-        ghops clone --users user1 user2               # Clone from multiple users
-        ghops clone -d ~/projects                     # Clone to specific directory
-        ghops clone --tag org:company --add-to-config # Clone and add to config with tags
+        repoindex clone torvalds                          # Clone all repos from torvalds
+        repoindex clone https://github.com/user/repo.git  # Clone single repo
+        repoindex clone --users user1 user2               # Clone from multiple users
+        repoindex clone -d ~/projects                     # Clone to specific directory
+        repoindex clone --tag org:company --add-to-config # Clone and add to config with tags
     """
     # Auto-detect table mode if not specified
     if table is None:

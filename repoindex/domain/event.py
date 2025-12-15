@@ -1,5 +1,5 @@
 """
-Event domain object for ghops.
+Event domain object for repoindex.
 
 Events represent something that happened in or related to a repository:
 - git_tag: New git tag created

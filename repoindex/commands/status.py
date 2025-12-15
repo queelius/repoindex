@@ -28,10 +28,11 @@ from ..exit_codes import NoReposFoundError
 @click.option('-t', '--tag', 'tag_filters', multiple=True, help='[DEPRECATED] Use VFS path like /by-tag/work instead')
 @click.option('--all-tags', is_flag=True, help='Match all tags (default: match any)')
 @click.option('--refresh', is_flag=True, help='Refresh metadata before showing status')
+@click.option('--github', is_flag=True, help='Use GitHub API for fresh visibility/fork info (slower)')
 @click.option('--table/--no-table', default=None, help='Display as formatted table (auto-detected by default)')
 @add_common_options('verbose', 'quiet')
 @standard_command(streaming=True)
-def status_handler(vfs_path, dir, recursive, no_pages, no_pypi, no_dedup, tag_filters, all_tags, refresh, table, progress, quiet, **kwargs):
+def status_handler(vfs_path, dir, recursive, no_pages, no_pypi, no_dedup, tag_filters, all_tags, refresh, github, table, progress, quiet, **kwargs):
     """Show repository status.
 
     VFS_PATH: Virtual filesystem path (default: / for all repos)
@@ -39,6 +40,7 @@ def status_handler(vfs_path, dir, recursive, no_pages, no_pypi, no_dedup, tag_fi
     \b
     Shows comprehensive status from the metadata store (fast).
     Use --refresh to update metadata before displaying.
+    Use --github to fetch fresh GitHub API data (slower).
 
     Output format:
     - Interactive terminal: Table format by default
@@ -51,16 +53,17 @@ def status_handler(vfs_path, dir, recursive, no_pages, no_pypi, no_dedup, tag_fi
     Examples:
 
     \b
-        ghops status                       # All repos (from config)
-        ghops status /by-tag/work/active   # Active work repos
-        ghops status /by-language/Python   # Python projects
-        ghops status /repos/myproject      # Single repo
-        ghops status / --refresh           # Refresh all, then show
-        ghops status --no-table            # Force JSONL output
+        repoindex status                       # All repos (fast, from cache)
+        repoindex status /by-tag/work/active   # Active work repos
+        repoindex status /by-language/Python   # Python projects
+        repoindex status /repos/myproject      # Single repo
+        repoindex status / --refresh           # Refresh metadata, then show
+        repoindex status --github              # Use fresh GitHub API data
+        repoindex status --no-table            # Force JSONL output
 
         # Deprecated (still work):
-        ghops status -d ~/projects         # Use: ghops status /repos
-        ghops status -t lang:python        # Use: ghops status /by-language/Python
+        repoindex status -d ~/projects         # Use: repoindex status /repos
+        repoindex status -t lang:python        # Use: repoindex status /by-language/Python
     """
     # Auto-detect table mode if not specified
     if table is None:
@@ -70,11 +73,11 @@ def status_handler(vfs_path, dir, recursive, no_pages, no_pypi, no_dedup, tag_fi
     # Show deprecation warnings
     if dir is not None:
         import sys
-        print("⚠️  Warning: -d/--dir is deprecated, use VFS path instead: ghops status /repos", file=sys.stderr)
+        print("⚠️  Warning: -d/--dir is deprecated, use VFS path instead: repoindex status /repos", file=sys.stderr)
 
     if tag_filters:
         import sys
-        print("⚠️  Warning: -t/--tag is deprecated, use VFS path instead: ghops status /by-tag/...", file=sys.stderr)
+        print("⚠️  Warning: -t/--tag is deprecated, use VFS path instead: repoindex status /by-tag/...", file=sys.stderr)
 
     # Override config if flags are provided
     if no_pypi:
@@ -142,7 +145,7 @@ def status_handler(vfs_path, dir, recursive, no_pages, no_pypi, no_dedup, tag_fi
         # VFS path was provided - use the filtered repo list
         def repos_from_vfs_paths():
             for repo_path in repo_paths:
-                yield from _get_repository_status_for_path(repo_path, skip_pages_check=no_pages)
+                yield from _get_repository_status_for_path(repo_path, skip_pages_check=no_pages, use_github_api=github)
         repos_generator = repos_from_vfs_paths()
     else:
         # Use standard discovery
@@ -152,7 +155,8 @@ def status_handler(vfs_path, dir, recursive, no_pages, no_pypi, no_dedup, tag_fi
             skip_pages_check=no_pages,
             deduplicate=not no_dedup,
             tag_filters=tag_filters,
-            all_tags=all_tags
+            all_tags=all_tags,
+            use_github_api=github
         )
     
     if table:

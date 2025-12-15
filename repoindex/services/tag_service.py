@@ -1,5 +1,5 @@
 """
-Tag service for ghops.
+Tag service for repoindex.
 
 Provides tag management operations:
 - Add/remove tags from repositories

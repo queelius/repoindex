@@ -1,5 +1,5 @@
 """
-Infrastructure layer for ghops.
+Infrastructure layer for repoindex.
 
 Contains abstractions for external systems:
 - GitClient: Git command execution

@@ -9,7 +9,7 @@ import os
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from repoindex.shell.shell import GhopsShell
+from repoindex.shell.shell import RepoIndexShell
 
 
 @pytest.fixture
@@ -64,7 +64,7 @@ class TestShellVFSHierarchicalTags:
 
     def test_parse_tag_levels_simple(self):
         """Test parsing simple tags into levels."""
-        shell = GhopsShell.__new__(GhopsShell)
+        shell = RepoIndexShell.__new__(RepoIndexShell)
 
         # Simple tag without hierarchy
         assert shell._parse_tag_levels('deprecated') == ['deprecated']
@@ -82,7 +82,7 @@ class TestShellVFSHierarchicalTags:
 
     def test_path_to_tag_conversion(self):
         """Test converting VFS paths to tags."""
-        shell = GhopsShell.__new__(GhopsShell)
+        shell = RepoIndexShell.__new__(RepoIndexShell)
 
         # Simple hierarchical tag
         assert shell._path_to_tag('/by-tag/alex/beta') == 'alex/beta'
@@ -125,7 +125,7 @@ class TestShellVFSHierarchicalTags:
         ]
 
         # Create shell
-        shell = GhopsShell()
+        shell = RepoIndexShell()
 
         # Verify VFS structure
         assert '/' in shell.vfs
@@ -172,7 +172,7 @@ class TestShellVFSHierarchicalTags:
         mock_get_tags.return_value = []
 
         # Create shell
-        shell = GhopsShell()
+        shell = RepoIndexShell()
 
         # Execute cp command
         repo_name = Path(mock_repos[0]).name
@@ -219,7 +219,7 @@ class TestShellVFSHierarchicalTags:
         ]
 
         # Create shell
-        shell = GhopsShell()
+        shell = RepoIndexShell()
 
         # Execute mv command
         repo_name = Path(mock_repos[0]).name
@@ -267,7 +267,7 @@ class TestShellVFSHierarchicalTags:
         ]
 
         # Create shell
-        shell = GhopsShell()
+        shell = RepoIndexShell()
 
         # Execute rm command
         repo_name = Path(mock_repos[0]).name
@@ -306,7 +306,7 @@ class TestShellVFSHierarchicalTags:
         ]
 
         # Create shell
-        shell = GhopsShell()
+        shell = RepoIndexShell()
 
         # List /by-tag/ with --json flag for testing
         shell.do_ls('/by-tag --json')
@@ -346,7 +346,7 @@ class TestShellVFSHierarchicalTags:
         ]
 
         # Create shell
-        shell = GhopsShell()
+        shell = RepoIndexShell()
 
         # List /by-tag/ without flags (should get Rich table output)
         shell.do_ls('/by-tag')
@@ -382,7 +382,7 @@ class TestShellVFSHierarchicalTags:
         ]
 
         # Create shell
-        shell = GhopsShell()
+        shell = RepoIndexShell()
 
         # Navigate into hierarchy
         shell.do_cd('/by-tag')
@@ -417,7 +417,7 @@ class TestShellVFSEdgeCases:
         mock_store.get.return_value = {'language': 'Python', 'status': {}}
         mock_metadata_store.return_value = mock_store
 
-        shell = GhopsShell()
+        shell = RepoIndexShell()
 
         # Try to cp to non-tag location
         repo_name = Path(mock_repos[0]).name
@@ -441,7 +441,7 @@ class TestShellVFSEdgeCases:
         mock_store = MagicMock()
         mock_metadata_store.return_value = mock_store
 
-        shell = GhopsShell()
+        shell = RepoIndexShell()
 
         # Create new tag namespace
         shell.do_mkdir('-p /by-tag/work/client/acme')
@@ -451,7 +451,7 @@ class TestShellVFSEdgeCases:
 
     def test_empty_tag_handling(self):
         """Test handling of empty tags."""
-        shell = GhopsShell.__new__(GhopsShell)
+        shell = RepoIndexShell.__new__(RepoIndexShell)
 
         # Empty string
         assert shell._parse_tag_levels('') == []

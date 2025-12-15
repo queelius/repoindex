@@ -6,11 +6,15 @@ repoindex is read-only: it observes and reports, external tools consume the stre
 
 Local events (default, fast):
 - git_tag, commit, branch, merge
+- version_bump, deps_update (local metadata changes)
 
 Remote events (opt-in, uses APIs):
-- --github: github_release, pr, issue, workflow_run
+- --github: github_release, pr, issue, workflow_run, security_alert
 - --pypi: pypi_publish
 - --cran: cran_publish
+- --npm: npm_publish
+- --cargo: cargo_publish
+- --docker: docker_publish
 """
 
 import click
@@ -28,17 +32,27 @@ logger = logging.getLogger(__name__)
 @click.option('--type', '-t', 'event_types',
               multiple=True,
               type=click.Choice([
+                  # Local events (fast)
                   'git_tag', 'commit', 'branch', 'merge',
-                  'github_release', 'pr', 'issue', 'workflow_run',
-                  'pypi_publish', 'cran_publish'
+                  'version_bump', 'deps_update',
+                  # GitHub events (opt-in)
+                  'github_release', 'pr', 'issue', 'workflow_run', 'security_alert',
+                  # Registry events (opt-in)
+                  'pypi_publish', 'cran_publish', 'npm_publish', 'cargo_publish', 'docker_publish'
               ]),
               help='Filter to specific event types')
 @click.option('--github', '-g', is_flag=True,
-              help='Include GitHub events (releases, PRs, issues, workflows)')
+              help='Include GitHub events (releases, PRs, issues, workflows, security alerts)')
 @click.option('--pypi', is_flag=True,
               help='Include PyPI publish events')
 @click.option('--cran', is_flag=True,
               help='Include CRAN publish events')
+@click.option('--npm', is_flag=True,
+              help='Include npm publish events')
+@click.option('--cargo', is_flag=True,
+              help='Include Cargo (crates.io) publish events')
+@click.option('--docker', is_flag=True,
+              help='Include Docker Hub publish events')
 @click.option('--all', '-a', 'include_all', is_flag=True,
               help='Include all event types (local + remote)')
 @click.option('--repo', '-r',
@@ -59,7 +73,11 @@ logger = logging.getLogger(__name__)
               help='Maximum events to output (default: 50)')
 @click.option('--pretty', '-p', is_flag=True,
               help='Human-readable table output (default: JSONL)')
-def events_handler(event_types, github, pypi, cran, include_all, repo, since, until, watch, interval, limit, pretty):
+@click.option('--stats', is_flag=True,
+              help='Show summary statistics for the event window')
+@click.option('--relative-time', '-R', is_flag=True,
+              help='Show relative timestamps (e.g., "2h ago") instead of absolute')
+def events_handler(event_types, github, pypi, cran, npm, cargo, docker, include_all, repo, since, until, watch, interval, limit, pretty, stats, relative_time):
     """
     Scan repositories for events.
 
@@ -67,16 +85,21 @@ def events_handler(event_types, github, pypi, cran, include_all, repo, since, un
 
     \b
     Local Events (default, fast):
-      git_tag    Git tags (versions, releases)
-      commit     Git commits
-      branch     Branch creation (from reflog)
-      merge      Merge commits
+      git_tag       Git tags (versions, releases)
+      commit        Git commits
+      branch        Branch creation (from reflog)
+      merge         Merge commits
+      version_bump  Changes to version files (pyproject.toml, package.json, etc.)
+      deps_update   Dependency file changes (requirements.txt, lock files, etc.)
 
     \b
     Remote Events (opt-in, rate-limited):
-      --github   GitHub releases, PRs, issues, workflow runs
+      --github   GitHub releases, PRs, issues, workflow runs, security alerts
       --pypi     PyPI package publishes
       --cran     CRAN package publishes
+      --npm      npm package publishes
+      --cargo    Cargo (crates.io) publishes
+      --docker   Docker Hub image publishes
       --all      All event types
 
     \b
@@ -98,20 +121,34 @@ def events_handler(event_types, github, pypi, cran, include_all, repo, since, un
       # Include PyPI publishes
       repoindex events --pypi --since 30d
 
+      # Include npm publishes
+      repoindex events --npm --since 30d
+
       # All events (local + remote)
       repoindex events --all --since 7d
 
       # Watch for new events
       repoindex events --watch --github
 
-      # Pretty print
+      # Pretty print with colors
       repoindex events --since 1d --pretty
+
+      # Show statistics summary
+      repoindex events --since 7d --stats --pretty
+
+      # Relative timestamps ("2h ago" style)
+      repoindex events --since 1d --pretty --relative-time
+
+      # Security alerts only
+      repoindex events --type security_alert --github
     """
     from ..config import load_config
     from ..utils import find_git_repos_from_config
     from ..events import (
         scan_events, parse_timespec,
-        LOCAL_EVENT_TYPES, GITHUB_EVENT_TYPES, PYPI_EVENT_TYPES, CRAN_EVENT_TYPES, ALL_EVENT_TYPES
+        LOCAL_EVENT_TYPES, LOCAL_METADATA_EVENT_TYPES, GITHUB_EVENT_TYPES,
+        PYPI_EVENT_TYPES, CRAN_EVENT_TYPES, NPM_EVENT_TYPES, CARGO_EVENT_TYPES,
+        DOCKER_EVENT_TYPES, ALL_EVENT_TYPES
     )
     from ..render import render_table
 
@@ -140,12 +177,12 @@ def events_handler(event_types, github, pypi, cran, include_all, repo, since, un
         until_dt = parse_timespec(until) if until else None
 
         # Build list of event types to scan
-        types = _build_event_types(event_types, github, pypi, cran, include_all)
+        types = _build_event_types(event_types, github, pypi, cran, npm, cargo, docker, include_all)
 
         if watch:
-            _run_watch_mode(repos, types, repo, interval, pretty)
+            _run_watch_mode(repos, types, repo, interval, pretty, relative_time)
         else:
-            _run_single_scan(repos, types, repo, since_dt, until_dt, limit, pretty)
+            _run_single_scan(repos, types, repo, since_dt, until_dt, limit, pretty, stats, relative_time)
 
         return 0
 
@@ -171,9 +208,13 @@ def events_handler(event_types, github, pypi, cran, include_all, repo, since, un
         return 1
 
 
-def _build_event_types(event_types, github: bool, pypi: bool, cran: bool, include_all: bool) -> List[str]:
+def _build_event_types(event_types, github: bool, pypi: bool, cran: bool, npm: bool, cargo: bool, docker: bool, include_all: bool) -> List[str]:
     """Build the list of event types based on flags."""
-    from ..events import LOCAL_EVENT_TYPES, GITHUB_EVENT_TYPES, PYPI_EVENT_TYPES, CRAN_EVENT_TYPES, ALL_EVENT_TYPES
+    from ..events import (
+        LOCAL_EVENT_TYPES, LOCAL_METADATA_EVENT_TYPES, GITHUB_EVENT_TYPES,
+        PYPI_EVENT_TYPES, CRAN_EVENT_TYPES, NPM_EVENT_TYPES, CARGO_EVENT_TYPES,
+        DOCKER_EVENT_TYPES, ALL_EVENT_TYPES
+    )
 
     # If specific types were provided via --type, use those
     if event_types:
@@ -183,8 +224,8 @@ def _build_event_types(event_types, github: bool, pypi: bool, cran: bool, includ
     if include_all:
         return ALL_EVENT_TYPES.copy()
 
-    # Start with local types (default)
-    types = LOCAL_EVENT_TYPES.copy()
+    # Start with local types (default includes basic git + local metadata events)
+    types = LOCAL_EVENT_TYPES.copy() + LOCAL_METADATA_EVENT_TYPES.copy()
 
     # Add remote types based on flags
     if github:
@@ -193,14 +234,22 @@ def _build_event_types(event_types, github: bool, pypi: bool, cran: bool, includ
         types.extend(PYPI_EVENT_TYPES)
     if cran:
         types.extend(CRAN_EVENT_TYPES)
+    if npm:
+        types.extend(NPM_EVENT_TYPES)
+    if cargo:
+        types.extend(CARGO_EVENT_TYPES)
+    if docker:
+        types.extend(DOCKER_EVENT_TYPES)
 
     return types
 
 
-def _run_single_scan(repos, types, repo_filter, since, until, limit, pretty):
+def _run_single_scan(repos, types, repo_filter, since, until, limit, pretty, stats, relative_time):
     """Run a single event scan."""
     from ..events import scan_events
     from ..render import render_table
+    from rich.console import Console
+    from rich.table import Table
 
     events = list(scan_events(
         repos,
@@ -211,29 +260,178 @@ def _run_single_scan(repos, types, repo_filter, since, until, limit, pretty):
         repo_filter=repo_filter
     ))
 
+    if stats:
+        _print_stats(events, since, until, pretty)
+        if not pretty:
+            return  # Stats only in JSONL mode
+
     if pretty:
         if not events:
             click.echo("No events found")
             return
 
+        console = Console()
         click.echo(f"\nFound {len(events)} event(s):\n")
 
-        headers = ['type', 'repo', 'timestamp', 'details']
-        rows = []
+        # Use rich table for color coding
+        table = Table(show_header=True, header_style="bold")
+        table.add_column("Type", style="dim")
+        table.add_column("Repository", style="cyan")
+        table.add_column("Time", style="yellow")
+        table.add_column("Details")
+
         for e in events:
             details = _get_event_details(e)
-            rows.append([
-                e.type,
-                e.repo_name,
-                e.timestamp.strftime('%Y-%m-%d %H:%M'),
-                details
-            ])
+            time_str = _format_time(e.timestamp, relative_time)
+            type_styled = _style_event_type(e.type)
+            table.add_row(type_styled, e.repo_name, time_str, details)
 
-        render_table(headers, rows)
+        console.print(table)
     else:
         # JSONL output
         for event in events:
             print(event.to_jsonl(), flush=True)
+
+
+def _format_time(timestamp, relative: bool = False) -> str:
+    """Format a timestamp, optionally as relative time."""
+    from datetime import datetime
+
+    if not relative:
+        return timestamp.strftime('%Y-%m-%d %H:%M')
+
+    now = datetime.now()
+    delta = now - timestamp
+
+    seconds = int(delta.total_seconds())
+
+    if seconds < 60:
+        return "just now"
+    elif seconds < 3600:
+        mins = seconds // 60
+        return f"{mins}m ago"
+    elif seconds < 86400:
+        hours = seconds // 3600
+        return f"{hours}h ago"
+    elif seconds < 604800:
+        days = seconds // 86400
+        return f"{days}d ago"
+    elif seconds < 2592000:
+        weeks = seconds // 604800
+        return f"{weeks}w ago"
+    else:
+        months = seconds // 2592000
+        return f"{months}mo ago"
+
+
+def _style_event_type(event_type: str) -> str:
+    """Return a colored/styled event type string for Rich."""
+    # Color mapping for different event types
+    colors = {
+        # Local git events
+        'git_tag': '[bold green]git_tag[/bold green]',
+        'commit': '[blue]commit[/blue]',
+        'branch': '[cyan]branch[/cyan]',
+        'merge': '[magenta]merge[/magenta]',
+        # Local metadata events
+        'version_bump': '[bold yellow]version_bump[/bold yellow]',
+        'deps_update': '[dim yellow]deps_update[/dim yellow]',
+        # GitHub events
+        'github_release': '[bold yellow]github_release[/bold yellow]',
+        'pr': '[green]pr[/green]',
+        'issue': '[red]issue[/red]',
+        'workflow_run': '[dim]workflow_run[/dim]',
+        'security_alert': '[bold red]security_alert[/bold red]',
+        # Registry events
+        'pypi_publish': '[bold cyan]pypi_publish[/bold cyan]',
+        'cran_publish': '[bold blue]cran_publish[/bold blue]',
+        'npm_publish': '[bold magenta]npm_publish[/bold magenta]',
+        'cargo_publish': '[bold #ff6600]cargo_publish[/bold #ff6600]',
+        'docker_publish': '[bold #0db7ed]docker_publish[/bold #0db7ed]',
+    }
+    return colors.get(event_type, event_type)
+
+
+def _print_stats(events, since, until, pretty: bool):
+    """Print summary statistics for the events."""
+    from collections import Counter
+    from datetime import datetime
+    from rich.console import Console
+    from rich.panel import Panel
+    from rich.table import Table
+
+    if not events:
+        if pretty:
+            click.echo("No events found in time window")
+        else:
+            print(json.dumps({'stats': {'total': 0}}), flush=True)
+        return
+
+    # Calculate statistics
+    type_counts = Counter(e.type for e in events)
+    repo_counts = Counter(e.repo_name for e in events)
+
+    # Time window
+    earliest = min(e.timestamp for e in events)
+    latest = max(e.timestamp for e in events)
+
+    # Top repos
+    top_repos = repo_counts.most_common(5)
+
+    if pretty:
+        console = Console()
+
+        # Build stats display
+        console.print("\n[bold]Event Statistics[/bold]")
+        console.print(f"  Time window: {earliest.strftime('%Y-%m-%d %H:%M')} to {latest.strftime('%Y-%m-%d %H:%M')}")
+        console.print(f"  Total events: [bold]{len(events)}[/bold]")
+        console.print(f"  Unique repos: {len(repo_counts)}")
+        console.print()
+
+        # Events by type table
+        type_table = Table(title="Events by Type", show_header=True)
+        type_table.add_column("Type")
+        type_table.add_column("Count", justify="right")
+        type_table.add_column("Bar")
+
+        max_count = max(type_counts.values()) if type_counts else 1
+        for event_type, count in sorted(type_counts.items(), key=lambda x: -x[1]):
+            bar_len = int(20 * count / max_count)
+            bar = "[green]" + "█" * bar_len + "[/green]"
+            type_table.add_row(_style_event_type(event_type), str(count), bar)
+
+        console.print(type_table)
+        console.print()
+
+        # Top repos table
+        if top_repos:
+            repo_table = Table(title="Most Active Repositories", show_header=True)
+            repo_table.add_column("Repository", style="cyan")
+            repo_table.add_column("Events", justify="right")
+            repo_table.add_column("Bar")
+
+            max_repo = top_repos[0][1] if top_repos else 1
+            for repo, count in top_repos:
+                bar_len = int(20 * count / max_repo)
+                bar = "[blue]" + "█" * bar_len + "[/blue]"
+                repo_table.add_row(repo, str(count), bar)
+
+            console.print(repo_table)
+
+        console.print()
+    else:
+        # JSONL stats output
+        stats = {
+            'stats': {
+                'total': len(events),
+                'unique_repos': len(repo_counts),
+                'earliest': earliest.isoformat(),
+                'latest': latest.isoformat(),
+                'by_type': dict(type_counts),
+                'top_repos': [{'repo': r, 'count': c} for r, c in top_repos]
+            }
+        }
+        print(json.dumps(stats), flush=True)
 
 
 def _get_event_details(event) -> str:
@@ -250,6 +448,15 @@ def _get_event_details(event) -> str:
     elif e.type == 'merge':
         branch = d.get('merged_branch', '')
         return f"Merged {branch}" if branch else d.get('message', '')[:40]
+    elif e.type == 'version_bump':
+        version = d.get('version', '')
+        version_str = f" → v{version}" if version else ""
+        return f"{d.get('hash', '')[:8]}{version_str} - {d.get('message', '')[:30]}"
+    elif e.type == 'deps_update':
+        files = d.get('files', [])
+        auto = " [auto]" if d.get('automated') else ""
+        files_str = ', '.join(files[:2]) if files else ''
+        return f"{d.get('hash', '')[:8]}{auto} {files_str}"
     elif e.type == 'github_release':
         return f"{d.get('tag', '')} - {d.get('name', '')[:30]}"
     elif e.type == 'pr':
@@ -260,15 +467,27 @@ def _get_event_details(event) -> str:
     elif e.type == 'workflow_run':
         conclusion = d.get('conclusion', d.get('status', ''))
         return f"{d.get('name', '')[:20]} [{conclusion}]"
+    elif e.type == 'security_alert':
+        severity = d.get('severity', 'unknown')
+        pkg = d.get('package', '')
+        state = d.get('state', '')
+        return f"[{severity}] {pkg} [{state}] - {d.get('summary', '')[:25]}"
     elif e.type == 'pypi_publish':
         return f"{d.get('package', '')} v{d.get('version', '')}"
     elif e.type == 'cran_publish':
         return f"{d.get('package', '')} v{d.get('version', '')}"
+    elif e.type == 'npm_publish':
+        return f"{d.get('package', '')} v{d.get('version', '')}"
+    elif e.type == 'cargo_publish':
+        yanked = " [yanked]" if d.get('yanked') else ""
+        return f"{d.get('package', '')} v{d.get('version', '')}{yanked}"
+    elif e.type == 'docker_publish':
+        return f"{d.get('image', '')}:{d.get('tag', '')}"
     else:
         return str(d)[:50]
 
 
-def _run_watch_mode(repos, types, repo_filter, interval, pretty):
+def _run_watch_mode(repos, types, repo_filter, interval, pretty, relative_time):
     """Run continuous watch mode."""
     from ..events import scan_events
     from datetime import datetime
@@ -303,7 +522,7 @@ def _run_watch_mode(repos, types, repo_filter, interval, pretty):
                 seen_ids.add(event.id)
 
                 if pretty:
-                    _print_event_pretty(event)
+                    _print_event_pretty(event, relative_time)
                 else:
                     print(event.to_jsonl(), flush=True)
 
@@ -319,25 +538,39 @@ def _run_watch_mode(repos, types, repo_filter, interval, pretty):
             break
 
 
-def _print_event_pretty(event):
-    """Print a single event in pretty format."""
-    timestamp = event.timestamp.strftime('%Y-%m-%d %H:%M:%S')
+def _print_event_pretty(event, relative_time: bool = False):
+    """Print a single event in pretty format with colors."""
+    from rich.console import Console
+
+    console = Console()
+    time_str = _format_time(event.timestamp, relative_time)
     d = event.data
 
     emoji_map = {
+        # Local git events
         'git_tag': '🏷️ ',
         'commit': '📝',
         'branch': '🌿',
         'merge': '🔀',
+        # Local metadata events
+        'version_bump': '⬆️ ',
+        'deps_update': '📋',
+        # GitHub events
         'github_release': '🚀',
         'pr': '🔃',
         'issue': '🐛',
         'workflow_run': '⚙️ ',
+        'security_alert': '🔒',
+        # Registry events
         'pypi_publish': '📦',
         'cran_publish': '📊',
+        'npm_publish': '📦',
+        'cargo_publish': '🦀',
+        'docker_publish': '🐳',
     }
 
     emoji = emoji_map.get(event.type, '📌')
     details = _get_event_details(event)
+    type_styled = _style_event_type(event.type)
 
-    click.echo(f"[{timestamp}] {emoji} {event.type:15} {event.repo_name}: {details}")
+    console.print(f"[dim][{time_str}][/dim] {emoji} {type_styled:30} [cyan]{event.repo_name}[/cyan]: {details}")

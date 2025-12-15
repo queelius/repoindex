@@ -1,12 +1,12 @@
 """
-TUI (Text User Interface) for ghops - simplified activity dashboard only.
+TUI (Text User Interface) for repoindex - simplified activity dashboard only.
 """
 
-from .app import GhopsApp, run_tui
+from .app import RepoIndexApp, run_tui
 from .dashboard import ActivityDashboard
 
 __all__ = [
-    'GhopsApp',
+    'RepoIndexApp',
     'run_tui',
     'ActivityDashboard',
 ]

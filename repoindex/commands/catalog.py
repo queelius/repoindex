@@ -1,5 +1,5 @@
 """
-Catalog management commands for ghops.
+Catalog management commands for repoindex.
 
 Provides virtual organization of repositories through metadata-based catalogs.
 Supports creating symlink directories, searching, and filtering repositories.
@@ -399,10 +399,10 @@ def catalog_import_github(tag_filters, match_all, dry_run, quiet, progress, **kw
     Examples:
     
     \b
-        ghops catalog import-github  # Import for all repos
-        ghops catalog import-github -t org:torvalds  # Only for specific org
-        ghops catalog import-github --dry-run  # Preview changes
-        ghops catalog import-github -q  # Progress only, no JSON output
+        repoindex catalog import-github  # Import for all repos
+        repoindex catalog import-github -t org:torvalds  # Only for specific org
+        repoindex catalog import-github --dry-run  # Preview changes
+        repoindex catalog import-github -q  # Progress only, no JSON output
     """
     from ..tags import github_metadata_to_tags, merge_tags
     from ..utils import get_github_repo_info
@@ -582,16 +582,16 @@ def catalog_tag(new_tags, remove_tags, directory, tag_filters, match_all, sync_p
     
     Examples:
         # Tag all repos in a directory
-        ghops catalog tag -t type:work -t priority:high -d ~/work
+        repoindex catalog tag -t type:work -t priority:high -d ~/work
         
         # Tag repos matching a filter
-        ghops catalog tag -t deprecated -f lang:perl
+        repoindex catalog tag -t deprecated -f lang:perl
         
         # Remove tags
-        ghops catalog tag --remove deprecated -f lang:perl
+        repoindex catalog tag --remove deprecated -f lang:perl
         
         # Tag specific repos by combining filters
-        ghops catalog tag -t needs:review -f org:mycompany -f "stars:0" --all
+        repoindex catalog tag -t needs:review -f org:mycompany -f "stars:0" --all
     """
     from ..tags import merge_tags, parse_tag
     
@@ -786,10 +786,10 @@ def catalog_link(tag_filters, match_all, target_dir, dry_run, pretty):
     Create directory with symlinks to repositories matching tag filters.
     
     Examples:
-        ghops catalog link -t lang:python ~/organized/python-projects
-        ghops catalog link -t org:torvalds ~/organized/torvalds
-        ghops catalog link -t type:work -t lang:go --all ~/organized/go-work
-        ghops catalog link -t "org:*" ~/organized/by-org  # Wildcard matching
+        repoindex catalog link -t lang:python ~/organized/python-projects
+        repoindex catalog link -t org:torvalds ~/organized/torvalds
+        repoindex catalog link -t type:work -t lang:go --all ~/organized/go-work
+        repoindex catalog link -t "org:*" ~/organized/by-org  # Wildcard matching
     """
     config = load_config()
     
@@ -851,7 +851,7 @@ def catalog_list(pretty):
     
     if not repo_tags:
         if pretty:
-            console.print("[yellow]No repositories have tags. Use 'ghops get --tag' or 'ghops catalog tag' to add tags.[/yellow]")
+            console.print("[yellow]No repositories have tags. Use 'repoindex get --tag' or 'repoindex catalog tag' to add tags.[/yellow]")
         else:
             print(json.dumps({"tags": {}}), flush=True)
         return
@@ -926,10 +926,10 @@ def catalog_show(tag_filters, match_all, pretty):
     Show repositories matching tag filters.
     
     Examples:
-        ghops catalog show -t lang:python
-        ghops catalog show -t org:torvalds
-        ghops catalog show -t type:work -t has:tests --all
-        ghops catalog show -t "topic:*"  # Show all repos with any topic
+        repoindex catalog show -t lang:python
+        repoindex catalog show -t org:torvalds
+        repoindex catalog show -t type:work -t has:tests --all
+        repoindex catalog show -t "topic:*"  # Show all repos with any topic
     """
     config = load_config()
     
@@ -993,9 +993,9 @@ def catalog_search(tag_filters, match_all, pretty):
     This is an alias for 'catalog show' with the same functionality.
     
     Examples:
-        ghops catalog search -t lang:python -t has:tests
-        ghops catalog search -t org:torvalds -t "stars:100+" --all
-        ghops catalog search -t "topic:*security*"  # Wildcard search
+        repoindex catalog search -t lang:python -t has:tests
+        repoindex catalog search -t org:torvalds -t "stars:100+" --all
+        repoindex catalog search -t "topic:*security*"  # Wildcard search
     """
     # Just delegate to catalog show
     from click import Context
@@ -1017,10 +1017,10 @@ def catalog_purge(dry_run, yes, tag_filters, older_than, pretty):
     For missing repositories, it can either prompt for removal or auto-remove with --yes.
     
     Examples:
-        ghops catalog purge                    # Interactive removal
-        ghops catalog purge --dry-run          # Show what would be removed
-        ghops catalog purge --yes              # Remove all without prompting
-        ghops catalog purge -t "project:*"     # Only purge specific tags
+        repoindex catalog purge                    # Interactive removal
+        repoindex catalog purge --dry-run          # Show what would be removed
+        repoindex catalog purge --yes              # Remove all without prompting
+        repoindex catalog purge -t "project:*"     # Only purge specific tags
     """
     from ..config import load_config, save_config
     from ..utils import is_git_repo
@@ -1177,9 +1177,9 @@ def catalog_explain(namespace):
     With a namespace argument, shows details for that namespace.
     
     Examples:
-        ghops catalog explain
-        ghops catalog explain lang
-        ghops catalog explain status
+        repoindex catalog explain
+        repoindex catalog explain lang
+        repoindex catalog explain status
     """
     TAG_NAMESPACE_DOCS = {
         "lang": "Programming language detected in the repository",
@@ -1315,12 +1315,12 @@ Tags are generated from multiple sources:
         
         console.print("\n[bold]Using Tags:[/bold]")
         console.print("-" * 50)
-        console.print("  Filter by tags:     [dim]ghops list --tag lang:python[/dim]")
-        console.print("  Multiple tags:      [dim]ghops list --tag lang:python --tag license:mit[/dim]")
-        console.print("  Exclude tags:       [dim]ghops list --tag '!status:inactive'[/dim]")
-        console.print("  Wildcard matching:  [dim]ghops list --tag 'topic:web*'[/dim]")
-        console.print("  Query language:     [dim]ghops list --query \"'python' in tags\"[/dim]")
-        console.print("  Catalog commands:   [dim]ghops catalog show -t lang:python[/dim]")
+        console.print("  Filter by tags:     [dim]repoindex list --tag lang:python[/dim]")
+        console.print("  Multiple tags:      [dim]repoindex list --tag lang:python --tag license:mit[/dim]")
+        console.print("  Exclude tags:       [dim]repoindex list --tag '!status:inactive'[/dim]")
+        console.print("  Wildcard matching:  [dim]repoindex list --tag 'topic:web*'[/dim]")
+        console.print("  Query language:     [dim]repoindex list --query \"'python' in tags\"[/dim]")
+        console.print("  Catalog commands:   [dim]repoindex catalog show -t lang:python[/dim]")
         
         console.print("\n[dim]For details on a specific namespace:[/dim]")
-        console.print("  ghops catalog explain <namespace>")
+        console.print("  repoindex catalog explain <namespace>")

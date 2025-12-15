@@ -20,7 +20,7 @@ console = Console()
 def config_repos():
     """Manage repository directories in configuration.
 
-    These commands modify the list of directories where ghops
+    These commands modify the list of directories where repoindex
     searches for git repositories.
     """
     pass
@@ -37,9 +37,9 @@ def repos_add(path, refresh):
     Examples:
 
     \b
-        ghops config repos add ~/github/**
-        ghops config repos add ~/projects --refresh
-        ghops config repos add /absolute/path/to/repos
+        repoindex config repos add ~/github/**
+        repoindex config repos add ~/projects --refresh
+        repoindex config repos add /absolute/path/to/repos
     """
     config = load_config()
 
@@ -91,8 +91,8 @@ def repos_remove(path):
     Examples:
 
     \b
-        ghops config repos remove ~/github/**
-        ghops config repos remove ~/old-projects
+        repoindex config repos remove ~/github/**
+        repoindex config repos remove ~/old-projects
     """
     config = load_config()
 
@@ -130,8 +130,8 @@ def repos_list(json_output):
     Examples:
 
     \b
-        ghops config repos list
-        ghops config repos list --json
+        repoindex config repos list
+        repoindex config repos list --json
     """
     config = load_config()
 
@@ -187,8 +187,8 @@ def repos_clear(yes):
     Examples:
 
     \b
-        ghops config repos clear
-        ghops config repos clear --yes
+        repoindex config repos clear
+        repoindex config repos clear --yes
     """
     config = load_config()
 

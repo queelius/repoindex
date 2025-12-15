@@ -1,5 +1,5 @@
 """
-Repository service for ghops.
+Repository service for repoindex.
 
 Provides high-level operations for repository discovery, status, and filtering.
 This is the primary API for working with repositories.

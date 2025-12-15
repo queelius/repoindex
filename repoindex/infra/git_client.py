@@ -1,5 +1,5 @@
 """
-Git client infrastructure for ghops.
+Git client infrastructure for repoindex.
 
 Provides a clean abstraction over git command execution.
 All git operations go through this client, making them:

@@ -1,5 +1,5 @@
 """
-Metadata store management commands for ghops.
+Metadata store management commands for repoindex.
 """
 
 import click
@@ -211,7 +211,7 @@ def show_metadata(repo_selector: str, pretty: bool):
     
     REPO_SELECTOR can be:
     - A path to a repository
-    - A tag selector (e.g., "repo:ghops", "lang:python")
+    - A tag selector (e.g., "repo:repoindex", "lang:python")
     """
     store = get_metadata_store()
     

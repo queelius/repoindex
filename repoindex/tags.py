@@ -1,5 +1,5 @@
 """
-Tag management utilities for ghops.
+Tag management utilities for repoindex.
 
 Tags are key:value pairs or simple strings that provide flexible metadata.
 Examples:

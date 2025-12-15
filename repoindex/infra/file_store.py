@@ -1,5 +1,5 @@
 """
-File store infrastructure for ghops.
+File store infrastructure for repoindex.
 
 Provides JSON/YAML file persistence with:
 - Atomic writes (write to temp, then rename)

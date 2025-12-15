@@ -1,5 +1,5 @@
 """
-Output format utilities for ghops CLI commands.
+Output format utilities for repoindex CLI commands.
 
 Provides functions to format data as CSV, TSV, YAML, JSON, and JSONL.
 """

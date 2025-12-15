@@ -1,5 +1,5 @@
 """
-Git command replication for ghops.
+Git command replication for repoindex.
 
 Provides familiar git commands that work with the VFS and can operate
 on multiple repositories simultaneously.
@@ -34,14 +34,14 @@ def git_cmd():
 
     \b
         # CLI mode
-        ghops git status /by-tag/work/active
-        ghops git log /repos/myproject --oneline -5
-        ghops git pull /by-tag/needs-update
+        repoindex git status /by-tag/work/active
+        repoindex git log /repos/myproject --oneline -5
+        repoindex git pull /by-tag/needs-update
 
     \b
         # Shell mode (from shell prompt)
-        ghops:/by-tag/work/active> git status
-        ghops:/repos/myproject> git log --oneline -5
+        repoindex:/by-tag/work/active> git status
+        repoindex:/repos/myproject> git log --oneline -5
     """
     pass
 
@@ -63,9 +63,9 @@ def git_status(vfs_path, short, dirty_only, json_output):
     Examples:
 
     \b
-        ghops git status /by-tag/work/active
-        ghops git status /repos/myproject
-        ghops git status --dirty-only /by-language/Python
+        repoindex git status /by-tag/work/active
+        repoindex git status /repos/myproject
+        repoindex git status --dirty-only /by-language/Python
     """
     # Get all repos from VFS path
     repos = get_repos_from_vfs_path(vfs_path)
@@ -277,9 +277,9 @@ def git_log(vfs_path, oneline, max_count, since, author, graph, all_branches, js
     Examples:
 
     \b
-        ghops git log /repos/myproject --oneline -n 5
-        ghops git log /by-tag/work/active --since="1 week ago"
-        ghops git log /by-language/Python --author="john"
+        repoindex git log /repos/myproject --oneline -n 5
+        repoindex git log /by-tag/work/active --since="1 week ago"
+        repoindex git log /by-language/Python --author="john"
     """
     # Get all repos from VFS path
     repos = get_repos_from_vfs_path(vfs_path)
@@ -432,10 +432,10 @@ def git_diff(vfs_path, name_only, name_status, stat, cached, json_output):
     Examples:
 
     \b
-        ghops git diff /repos/myproject
-        ghops git diff /by-tag/work/active --stat
-        ghops git diff /by-language/Python --name-only
-        ghops git diff --cached /repos/myproject
+        repoindex git diff /repos/myproject
+        repoindex git diff /by-tag/work/active --stat
+        repoindex git diff /by-language/Python --name-only
+        repoindex git diff --cached /repos/myproject
     """
     # Get all repos from VFS path
     repos = get_repos_from_vfs_path(vfs_path)
@@ -585,7 +585,7 @@ def show_diff_summary(results: List[Dict[str, Any]], name_only: bool = False,
         else:
             # For full diff, just show that changes exist
             console.print(f"  [yellow]Repository has uncommitted changes[/yellow]")
-            console.print(f"  [dim]Run 'ghops git diff /repos/{repo_name}' for full diff[/dim]")
+            console.print(f"  [dim]Run 'repoindex git diff /repos/{repo_name}' for full diff[/dim]")
 
     # Summary
     total_repos = len(results)
@@ -595,351 +595,3 @@ def show_diff_summary(results: List[Dict[str, Any]], name_only: bool = False,
     else:
         console.print(f"\n[cyan]Total: {total_repos} repositories with changes[/cyan]")
 
-
-@git_cmd.command('pull')
-@click.argument('vfs_path', default='/repos', required=False)
-@click.option('--rebase', is_flag=True, help='Rebase instead of merge')
-@click.option('--ff-only', is_flag=True, help='Only fast-forward merges')
-@click.option('--force', '-f', is_flag=True, help='Skip confirmation for multiple repos')
-@click.option('--json', 'json_output', is_flag=True, help='Output as JSONL')
-def git_pull(vfs_path, rebase, ff_only, force, json_output):
-    """Pull updates from remote for repositories.
-
-    VFS_PATH: Virtual filesystem path (default: /repos)
-
-    Pulls updates for all repositories at the given VFS path.
-
-    Examples:
-
-    \b
-        ghops git pull /repos/myproject
-        ghops git pull /by-tag/work/active
-        ghops git pull /by-language/Python --rebase
-    """
-    # Get all repos from VFS path
-    repos = get_repos_from_vfs_path(vfs_path)
-
-    if not repos:
-        click.echo(f"No repositories found at: {vfs_path}", err=True)
-        raise click.Abort()
-
-    # Confirmation for multiple repos
-    if len(repos) > 1 and not force and not json_output:
-        console.print(f"[yellow]About to pull updates for {len(repos)} repositories[/yellow]")
-        if not click.confirm("Continue?", default=True):
-            console.print("[red]Aborted[/red]")
-            return
-
-    # Build git pull command
-    git_args = ['pull']
-
-    if rebase:
-        git_args.append('--rebase')
-    if ff_only:
-        git_args.append('--ff-only')
-
-    # Run git pull on each repo
-    results = []
-    for repo_path in repos:
-        repo_name = Path(repo_path).name
-
-        # Check for uncommitted changes first
-        status_output, _ = run_git(repo_path, ['status', '--porcelain'])
-        has_uncommitted = status_output and status_output.strip()
-
-        if has_uncommitted:
-            results.append({
-                'repo': repo_name,
-                'path': repo_path,
-                'status': 'skipped',
-                'message': 'Repository has uncommitted changes'
-            })
-            continue
-
-        # Check for upstream branch
-        upstream_check, returncode = run_git(repo_path, ['rev-parse', '--abbrev-ref', '@{u}'])
-        if returncode != 0:
-            results.append({
-                'repo': repo_name,
-                'path': repo_path,
-                'status': 'skipped',
-                'message': 'No upstream branch configured'
-            })
-            continue
-
-        # Perform pull
-        output, returncode = run_git(repo_path, git_args)
-
-        if returncode == 0:
-            # Check if anything was updated
-            if 'Already up to date' in output or 'Already up-to-date' in output:
-                status = 'up-to-date'
-                message = 'Already up to date'
-            else:
-                status = 'success'
-                message = 'Updated successfully'
-        else:
-            status = 'error'
-            message = output.strip() if output else 'Failed to pull'
-
-        results.append({
-            'repo': repo_name,
-            'path': repo_path,
-            'status': status,
-            'message': message,
-            'output': output.strip() if output else ''
-        })
-
-    # Output results
-    if json_output:
-        for result in results:
-            print(json.dumps(result))
-    else:
-        show_pull_results(results)
-
-
-def show_pull_results(results: List[Dict[str, Any]]):
-    """Show pull results."""
-    from rich.table import Table
-
-    table = Table(show_header=True, header_style="bold cyan", title="Pull Results")
-    table.add_column("Repository", style="green", width=30)
-    table.add_column("Status", style="white", width=15)
-    table.add_column("Message", style="dim")
-
-    for result in results:
-        repo = result['repo']
-        status = result['status']
-        message = result['message']
-
-        # Color status
-        status_colors = {
-            'success': 'green',
-            'up-to-date': 'blue',
-            'skipped': 'yellow',
-            'error': 'red'
-        }
-        status_color = status_colors.get(status, 'white')
-        status_icon = {
-            'success': '✓',
-            'up-to-date': '→',
-            'skipped': '⊘',
-            'error': '✗'
-        }.get(status, '?')
-
-        table.add_row(
-            repo,
-            f"[{status_color}]{status_icon} {status}[/{status_color}]",
-            message[:60] if len(message) > 60 else message
-        )
-
-    console.print(table)
-
-    # Summary
-    total = len(results)
-    success = sum(1 for r in results if r['status'] == 'success')
-    up_to_date = sum(1 for r in results if r['status'] == 'up-to-date')
-    skipped = sum(1 for r in results if r['status'] == 'skipped')
-    errors = sum(1 for r in results if r['status'] == 'error')
-
-    summary = f"\n[cyan]Total: {total} repositories"
-    if success > 0:
-        summary += f" • [green]{success} updated[/green]"
-    if up_to_date > 0:
-        summary += f" • [blue]{up_to_date} up-to-date[/blue]"
-    if skipped > 0:
-        summary += f" • [yellow]{skipped} skipped[/yellow]"
-    if errors > 0:
-        summary += f" • [red]{errors} errors[/red]"
-    summary += "[/cyan]"
-
-    console.print(summary)
-
-
-@git_cmd.command('push')
-@click.argument('vfs_path', default='/repos', required=False)
-@click.option('--all', 'push_all', is_flag=True, help='Push all branches')
-@click.option('--tags', is_flag=True, help='Push tags')
-@click.option('--force', '-f', is_flag=True, help='Force push (use with caution!)')
-@click.option('--dry-run', is_flag=True, help='Show what would be pushed')
-@click.option('--yes', '-y', is_flag=True, help='Skip confirmation for multiple repos')
-@click.option('--json', 'json_output', is_flag=True, help='Output as JSONL')
-def git_push(vfs_path, push_all, tags, force, dry_run, yes, json_output):
-    """Push commits to remote for repositories.
-
-    VFS_PATH: Virtual filesystem path (default: /repos)
-
-    Pushes commits for all repositories at the given VFS path.
-
-    Examples:
-
-    \b
-        ghops git push /repos/myproject
-        ghops git push /by-tag/work/active
-        ghops git push /by-language/Python --tags
-        ghops git push /repos/myproject --dry-run
-    """
-    # Get all repos from VFS path
-    repos = get_repos_from_vfs_path(vfs_path)
-
-    if not repos:
-        click.echo(f"No repositories found at: {vfs_path}", err=True)
-        raise click.Abort()
-
-    # Extra warning for force push
-    if force and not yes and not json_output:
-        console.print("[red bold]⚠️  WARNING: Force push can overwrite remote commits![/red bold]")
-        if not click.confirm("Are you sure you want to force push?", default=False):
-            console.print("[red]Aborted[/red]")
-            return
-
-    # Confirmation for multiple repos
-    if len(repos) > 1 and not yes and not json_output:
-        action = "dry-run push" if dry_run else "push"
-        console.print(f"[yellow]About to {action} for {len(repos)} repositories[/yellow]")
-        if not click.confirm("Continue?", default=True):
-            console.print("[red]Aborted[/red]")
-            return
-
-    # Build git push command
-    git_args = ['push']
-
-    if dry_run:
-        git_args.append('--dry-run')
-    if force:
-        git_args.append('--force')
-    if push_all:
-        git_args.append('--all')
-    if tags:
-        git_args.append('--tags')
-
-    # Run git push on each repo
-    results = []
-    for repo_path in repos:
-        repo_name = Path(repo_path).name
-
-        # Check for upstream branch
-        upstream_check, returncode = run_git(repo_path, ['rev-parse', '--abbrev-ref', '@{u}'])
-        if returncode != 0 and not push_all and not tags:
-            results.append({
-                'repo': repo_name,
-                'path': repo_path,
-                'status': 'skipped',
-                'message': 'No upstream branch configured'
-            })
-            continue
-
-        # Check if there are commits to push
-        if not push_all and not tags and not dry_run:
-            ahead_output, _ = run_git(repo_path, ['rev-list', '@{u}..HEAD', '--count'])
-            if ahead_output and ahead_output.strip() == '0':
-                results.append({
-                    'repo': repo_name,
-                    'path': repo_path,
-                    'status': 'up-to-date',
-                    'message': 'Already up to date'
-                })
-                continue
-
-        # Perform push
-        output, returncode = run_git(repo_path, git_args)
-
-        if returncode == 0:
-            # Check if anything was pushed
-            if dry_run:
-                status = 'dry-run'
-                message = 'Dry run completed'
-            elif 'Everything up-to-date' in output:
-                status = 'up-to-date'
-                message = 'Already up to date'
-            else:
-                status = 'success'
-                message = 'Pushed successfully'
-        else:
-            status = 'error'
-            # Extract meaningful error message
-            if 'rejected' in output.lower():
-                message = 'Push rejected (try pull first)'
-            elif 'no upstream' in output.lower():
-                message = 'No upstream branch'
-            else:
-                message = output.strip()[:100] if output else 'Failed to push'
-
-        results.append({
-            'repo': repo_name,
-            'path': repo_path,
-            'status': status,
-            'message': message,
-            'output': output.strip() if output else ''
-        })
-
-    # Output results
-    if json_output:
-        for result in results:
-            print(json.dumps(result))
-    else:
-        show_push_results(results, dry_run)
-
-
-def show_push_results(results: List[Dict[str, Any]], dry_run: bool = False):
-    """Show push results."""
-    from rich.table import Table
-
-    title = "Push Dry Run Results" if dry_run else "Push Results"
-    table = Table(show_header=True, header_style="bold cyan", title=title)
-    table.add_column("Repository", style="green", width=30)
-    table.add_column("Status", style="white", width=15)
-    table.add_column("Message", style="dim")
-
-    for result in results:
-        repo = result['repo']
-        status = result['status']
-        message = result['message']
-
-        # Color status
-        status_colors = {
-            'success': 'green',
-            'up-to-date': 'blue',
-            'skipped': 'yellow',
-            'error': 'red',
-            'dry-run': 'cyan'
-        }
-        status_color = status_colors.get(status, 'white')
-        status_icon = {
-            'success': '✓',
-            'up-to-date': '→',
-            'skipped': '⊘',
-            'error': '✗',
-            'dry-run': '?'
-        }.get(status, '?')
-
-        table.add_row(
-            repo,
-            f"[{status_color}]{status_icon} {status}[/{status_color}]",
-            message[:60] if len(message) > 60 else message
-        )
-
-    console.print(table)
-
-    # Summary
-    total = len(results)
-    success = sum(1 for r in results if r['status'] == 'success')
-    up_to_date = sum(1 for r in results if r['status'] == 'up-to-date')
-    skipped = sum(1 for r in results if r['status'] == 'skipped')
-    errors = sum(1 for r in results if r['status'] == 'error')
-    dry_run_count = sum(1 for r in results if r['status'] == 'dry-run')
-
-    summary = f"\n[cyan]Total: {total} repositories"
-    if success > 0:
-        summary += f" • [green]{success} pushed[/green]"
-    if up_to_date > 0:
-        summary += f" • [blue]{up_to_date} up-to-date[/blue]"
-    if skipped > 0:
-        summary += f" • [yellow]{skipped} skipped[/yellow]"
-    if errors > 0:
-        summary += f" • [red]{errors} errors[/red]"
-    if dry_run_count > 0:
-        summary += f" • [cyan]{dry_run_count} dry-run[/cyan]"
-    summary += "[/cyan]"
-
-    console.print(summary)

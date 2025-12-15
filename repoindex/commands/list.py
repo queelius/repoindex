@@ -175,12 +175,12 @@ def get_repo_metadata(repo_path, remote_url, skip_github_info=False, skip_pages_
 
 
 @click.command("list")
-@click.option("-d", "--dir", help="[DEPRECATED] Use: ghops fs ls /repos or ghops status /")
+@click.option("-d", "--dir", help="[DEPRECATED] Use: repoindex fs ls /repos or repoindex status /")
 @click.option("--recursive", is_flag=True, help="Search subdirectories for git repos")
 @click.option("--no-dedup", is_flag=True, help="Show all instances including duplicates and soft links")
 @click.option("--no-github", is_flag=True, help="Skip GitHub API calls for faster listing")
 @click.option("--no-pages", is_flag=True, help="Skip GitHub Pages check for faster results")
-@click.option("-t", "--tag", "tag_filters", multiple=True, help="[DEPRECATED] Use VFS paths like: ghops fs ls /by-tag/work")
+@click.option("-t", "--tag", "tag_filters", multiple=True, help="[DEPRECATED] Use VFS paths like: repoindex fs ls /by-tag/work")
 @click.option("--all-tags", is_flag=True, help="Match all tags (default: match any)")
 @click.option("--table/--no-table", default=None, help="Display as formatted table (auto-detected by default)")
 @add_common_options('verbose', 'quiet', 'format', 'fields')
@@ -190,9 +190,9 @@ def list_repos_handler(dir, recursive, no_dedup, no_github, no_pages, tag_filter
     [DEPRECATED] List available repositories.
 
     ⚠️  This command is deprecated. Use instead:
-    - ghops fs ls -l /            For list with metadata
-    - ghops status /              For comprehensive status
-    - ghops fs ls /by-tag/work    For tagged repos
+    - repoindex fs ls -l /            For list with metadata
+    - repoindex status /              For comprehensive status
+    - repoindex fs ls /by-tag/work    For tagged repos
 
     \b
     This command still works but will be removed in a future version.
@@ -201,19 +201,19 @@ def list_repos_handler(dir, recursive, no_dedup, no_github, no_pages, tag_filter
 
     \b
         # OLD (deprecated):
-        ghops list
-        ghops list -t lang:python
-        ghops list -d ~/projects
+        repoindex list
+        repoindex list -t lang:python
+        repoindex list -d ~/projects
 
         # NEW (recommended):
-        ghops fs ls -l /
-        ghops fs ls /by-language/Python
-        ghops status /
+        repoindex fs ls -l /
+        repoindex fs ls /by-language/Python
+        repoindex status /
     """
     import sys
-    print("⚠️  Warning: 'ghops list' is deprecated.", file=sys.stderr)
-    print("   Use 'ghops fs ls -l /' for fast listing with metadata", file=sys.stderr)
-    print("   Or 'ghops status /' for comprehensive status", file=sys.stderr)
+    print("⚠️  Warning: 'repoindex list' is deprecated.", file=sys.stderr)
+    print("   Use 'repoindex fs ls -l /' for fast listing with metadata", file=sys.stderr)
+    print("   Or 'repoindex status /' for comprehensive status", file=sys.stderr)
     print(file=sys.stderr)
     config = load_config()
     
@@ -261,8 +261,8 @@ def list_repos_handler(dir, recursive, no_dedup, no_github, no_pages, tag_filter
             if coverage < 50:
                 import sys
                 print(f"⚠️  Metadata coverage: {coverage:.0f}% ({in_store}/{len(repos)} repos)", file=sys.stderr)
-                print(f"   For faster results, refresh metadata: ghops metadata refresh --github", file=sys.stderr)
-                print(f"   Or skip GitHub info: ghops list --no-github", file=sys.stderr)
+                print(f"   For faster results, refresh metadata: repoindex metadata refresh --github", file=sys.stderr)
+                print(f"   Or skip GitHub info: repoindex list --no-github", file=sys.stderr)
         except Exception:
             pass  # Don't fail if metadata check fails
 

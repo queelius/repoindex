@@ -141,11 +141,11 @@ def top_handler(hours, limit, json_output, watch, interval):
     Displays a top-style view of recent commits, authors, and activity.
 
     Examples:
-        ghops top                    # Last 24 hours
-        ghops top --hours 48         # Last 48 hours
-        ghops top --limit 10         # Show only 10 recent commits
-        ghops top --watch            # Watch mode (refresh every 10s)
-        ghops top --json             # JSONL output
+        repoindex top                    # Last 24 hours
+        repoindex top --hours 48         # Last 48 hours
+        repoindex top --limit 10         # Show only 10 recent commits
+        repoindex top --watch            # Watch mode (refresh every 10s)
+        repoindex top --json             # JSONL output
     """
     config = load_config()
 

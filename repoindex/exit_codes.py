@@ -1,5 +1,5 @@
 """
-Standard exit codes for ghops commands.
+Standard exit codes for repoindex commands.
 
 Following Unix/POSIX conventions for command-line tools.
 """

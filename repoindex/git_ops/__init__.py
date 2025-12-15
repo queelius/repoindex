@@ -1,5 +1,5 @@
 """
-Git operations module for ghops.
+Git operations module for repoindex.
 
 Provides utilities for executing git commands on single or multiple repositories.
 """

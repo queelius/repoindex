@@ -1,5 +1,5 @@
 """
-Virtual filesystem commands for ghops.
+Virtual filesystem commands for repoindex.
 
 Provides stateless VFS operations using absolute paths.
 These commands complement the shell's interactive VFS navigation
@@ -94,7 +94,7 @@ def list_repository_contents(repo_path: str, json_output: bool = False):
 def fs_cmd():
     """Virtual filesystem operations.
 
-    Access the ghops virtual filesystem using absolute paths.
+    Access the repoindex virtual filesystem using absolute paths.
     The VFS organizes repositories by:
 
     \b
@@ -109,10 +109,10 @@ def fs_cmd():
     Examples:
 
     \b
-        ghops fs ls /by-tag/alex/beta
-        ghops fs tree /by-tag
-        ghops fs find --language Python
-        ghops fs info /repos/myproject
+        repoindex fs ls /by-tag/alex/beta
+        repoindex fs tree /by-tag
+        repoindex fs find --language Python
+        repoindex fs info /repos/myproject
     """
     pass
 
@@ -271,10 +271,10 @@ def fs_ls(path, long, all, refresh, json_output):
     Examples:
 
     \b
-        ghops fs ls /                    # Basic list
-        ghops fs ls -l /by-tag/work      # With metadata
-        ghops fs ls -la /by-language     # All metadata
-        ghops fs ls --refresh /repos     # Refresh first
+        repoindex fs ls /                    # Basic list
+        repoindex fs ls -l /by-tag/work      # With metadata
+        repoindex fs ls -la /by-language     # All metadata
+        repoindex fs ls --refresh /repos     # Refresh first
     """
     config = load_config()
 
@@ -369,8 +369,8 @@ def fs_tree(path, max_depth):
     Examples:
 
     \b
-        ghops fs tree /by-tag
-        ghops fs tree /by-language --max-depth 2
+        repoindex fs tree /by-tag
+        repoindex fs tree /by-language --max-depth 2
     """
     config = load_config()
     vfs = build_vfs_structure(config)
@@ -414,9 +414,9 @@ def fs_find(language, tag, status, json_output):
     Examples:
 
     \b
-        ghops fs find --language Python
-        ghops fs find --tag alex/beta
-        ghops fs find --status dirty
+        repoindex fs find --language Python
+        repoindex fs find --tag alex/beta
+        repoindex fs find --status dirty
     """
     config = load_config()
     vfs = build_vfs_structure(config)
@@ -506,8 +506,8 @@ def fs_info(path, json_output):
     Examples:
 
     \b
-        ghops fs info /repos/myproject
-        ghops fs info /by-tag/alex/beta
+        repoindex fs info /repos/myproject
+        repoindex fs info /by-tag/alex/beta
     """
     config = load_config()
     vfs = build_vfs_structure(config)
