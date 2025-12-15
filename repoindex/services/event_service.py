@@ -1,17 +1,25 @@
 """
-Event service for ghops.
+Event service for repoindex.
 
 Provides stateless event scanning across repositories.
-This is a thin wrapper around the events module that works with
-Repository domain objects.
+Delegates to the events module scanner functions.
+
+Local events (fast, default):
+- git_tag, commit, branch, merge
+
+Remote events (opt-in):
+- github_release, pr, issue, workflow_run (--github)
+- pypi_publish (--pypi)
+- cran_publish (--cran)
 """
 
-from typing import Generator, List, Optional, Iterable
+from typing import Generator, List, Optional, Iterable, Union
 from datetime import datetime, timedelta
 import logging
 
 from ..domain import Repository, Event
 from ..infra import GitClient
+from .. import events as events_module
 
 logger = logging.getLogger(__name__)
 
@@ -25,9 +33,26 @@ class EventService:
 
     Example:
         service = EventService()
-        for event in service.scan(repos, since=datetime.now() - timedelta(days=7)):
+
+        # Scan with defaults (local events only)
+        for event in service.scan(repos, since="7d"):
             print(f"{event.type}: {event.repo_name}")
+
+        # Include GitHub events
+        for event in service.scan(repos, since="7d", github=True):
+            print(f"{event.type}: {event.data}")
+
+        # Include everything
+        for event in service.scan(repos, since="7d", all_types=True):
+            print(event.to_jsonl())
     """
+
+    # Event type categories (exposed for users)
+    LOCAL_TYPES = events_module.LOCAL_EVENT_TYPES
+    GITHUB_TYPES = events_module.GITHUB_EVENT_TYPES
+    PYPI_TYPES = events_module.PYPI_EVENT_TYPES
+    CRAN_TYPES = events_module.CRAN_EVENT_TYPES
+    ALL_TYPES = events_module.ALL_EVENT_TYPES
 
     def __init__(self, git_client: Optional[GitClient] = None):
         """
@@ -42,105 +67,86 @@ class EventService:
         self,
         repos: Iterable[Repository],
         types: Optional[List[str]] = None,
-        since: Optional[datetime] = None,
-        until: Optional[datetime] = None,
+        since: Optional[Union[datetime, str]] = None,
+        until: Optional[Union[datetime, str]] = None,
         limit: Optional[int] = None,
-        repo_filter: Optional[str] = None
+        repo_filter: Optional[str] = None,
+        github: bool = False,
+        pypi: bool = False,
+        cran: bool = False,
+        all_types: bool = False
     ) -> Generator[Event, None, None]:
         """
         Scan repositories for events.
 
         Args:
             repos: Repositories to scan
-            types: Event types to scan for (default: ['git_tag'])
-            since: Only events after this time
-            until: Only events before this time
+            types: Specific event types (overrides flags if provided)
+            since: Events after this time (datetime or string like "7d")
+            until: Events before this time
             limit: Maximum total events to return
             repo_filter: Only scan repos matching this name
+            github: Include GitHub events (releases, PRs, issues, workflows)
+            pypi: Include PyPI publish events
+            cran: Include CRAN publish events
+            all_types: Include all event types
 
         Yields:
             Event objects sorted by timestamp (newest first)
         """
-        if types is None:
-            types = ['git_tag']
+        # Parse time specs if strings
+        since_dt = self._parse_time(since) if since else None
+        until_dt = self._parse_time(until) if until else None
 
-        all_events = []
+        # Build types list from flags
+        scan_types = self._build_types(types, github, pypi, cran, all_types)
 
-        for repo in repos:
-            # Apply repo filter
-            if repo_filter and repo.name != repo_filter:
-                continue
+        # Convert repos to list of paths for the events module
+        repos_list = list(repos)
+        repo_paths = [r.path for r in repos_list]
 
-            # Scan for each type
-            if 'git_tag' in types:
-                for event in self._scan_tags(repo, since, until):
-                    all_events.append(event)
+        # Use the events module scanner
+        yield from events_module.scan_events(
+            repo_paths,
+            types=scan_types,
+            since=since_dt,
+            until=until_dt,
+            limit=limit,
+            repo_filter=repo_filter
+        )
 
-            if 'commit' in types:
-                # Limit commits per repo to avoid explosion
-                for event in self._scan_commits(repo, since, until, limit=50):
-                    all_events.append(event)
+    def _parse_time(self, spec: Union[datetime, str]) -> datetime:
+        """Parse time specification."""
+        if isinstance(spec, datetime):
+            return spec
+        return events_module.parse_timespec(spec)
 
-        # Sort by timestamp (newest first)
-        all_events.sort(key=lambda e: e.timestamp, reverse=True)
-
-        # Apply global limit
-        count = 0
-        for event in all_events:
-            yield event
-            count += 1
-            if limit and count >= limit:
-                break
-
-    def _scan_tags(
+    def _build_types(
         self,
-        repo: Repository,
-        since: Optional[datetime] = None,
-        until: Optional[datetime] = None
-    ) -> Generator[Event, None, None]:
-        """Scan repository for git tags."""
-        tags = self.git.tags(repo.path, since=since)
+        types: Optional[List[str]],
+        github: bool,
+        pypi: bool,
+        cran: bool,
+        all_types: bool
+    ) -> List[str]:
+        """Build list of event types from flags."""
+        if types:
+            return list(types)
 
-        for tag in tags:
-            if until and tag.date > until:
-                continue
+        if all_types:
+            return self.ALL_TYPES.copy()
 
-            yield Event(
-                type='git_tag',
-                timestamp=tag.date,
-                repo_name=repo.name,
-                repo_path=repo.path,
-                data={
-                    'tag': tag.name,
-                    'commit': tag.commit,
-                    'tagger': tag.tagger,
-                    'message': tag.message
-                }
-            )
+        # Start with local types (default)
+        result = self.LOCAL_TYPES.copy()
 
-    def _scan_commits(
-        self,
-        repo: Repository,
-        since: Optional[datetime] = None,
-        until: Optional[datetime] = None,
-        limit: int = 50
-    ) -> Generator[Event, None, None]:
-        """Scan repository for commits."""
-        commits = self.git.log(repo.path, since=since, until=until, limit=limit)
+        if github:
+            result.extend(self.GITHUB_TYPES)
+        if pypi:
+            result.extend(self.PYPI_TYPES)
+        if cran:
+            result.extend(self.CRAN_TYPES)
 
-        for commit in commits:
-            yield Event(
-                type='commit',
-                timestamp=commit.date,
-                repo_name=repo.name,
-                repo_path=repo.path,
-                data={
-                    'hash': commit.hash,
-                    'author': commit.author,
-                    'email': commit.email,
-                    'message': commit.message
-                }
-            )
+        return result
 
     def scan_from_paths(
         self,
