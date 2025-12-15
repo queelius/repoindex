@@ -3,13 +3,13 @@ requires = [ "hatchling",]
 build-backend = "hatchling.build"
 
 [project]
-name = "ghops"
-version = "0.8.2"
-description = "A CLI tool for managing GitHub repos"
+name = "repoindex"
+version = "0.9.0"
+description = "A collection-aware metadata index for git repositories"
 readme = "README.md"
 license-files = [ "LICEN[CS]E.*",]
 requires-python = ">=3.7"
-keywords = [ "git", "github", "automation", "cli", "devops",]
+keywords = [ "git", "github", "repository", "metadata", "index", "cli", "mcp",]
 classifiers = [ "Development Status :: 4 - Beta", "Topic :: Software Development :: Version Control :: Git", "Operating System :: OS Independent", "Programming Language :: Python :: 3",]
 dependencies = [ "pathlib", "toml", "requests>=2.25.0", "packaging>=21.0", "click>=8.0.0", "rich>=13.0.0", "tweepy", "rapidfuzz", "pyyaml>=5.0.0",]
 [[project.authors]]
@@ -31,18 +31,18 @@ tui = [ "textual>=0.40.0", "textual-dev>=1.0.0", "watchdog>=3.0.0",]
 all = [ "numpy>=1.20.0", "scikit-learn>=1.0.0", "scipy>=1.7.0", "textual>=0.40.0", "textual-dev>=1.0.0", "weasyprint>=54.0", "watchdog>=3.0.0",]
 
 [project.scripts]
-ghops = "ghops.cli:main"
+repoindex = "repoindex.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/queelius/ghops"
-Source = "https://github.com/queelius/ghops"
-Issues = "https://github.com/queelius/ghops/issues"
+Homepage = "https://github.com/queelius/repoindex"
+Source = "https://github.com/queelius/repoindex"
+Issues = "https://github.com/queelius/repoindex/issues"
 
 [tool.setuptools]
-packages = [ "ghops", "ghops.commands", "ghops.integrations",]
+packages = [ "repoindex", "repoindex.commands", "repoindex.integrations",]
 
 [tool.setuptools.package-data]
-ghops = [ "py.typed",]
+repoindex = [ "py.typed",]
 
 [tool.setuptools.exclude-package-data]
 "*" = [ "tests", "tests.*", "*.tests", "*.tests.*", "test_*",]

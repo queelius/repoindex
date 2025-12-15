@@ -8,7 +8,7 @@ import shutil
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-from ghops.utils import (
+from repoindex.utils import (
     run_command, 
     find_git_repos, 
     get_git_status, 
@@ -117,7 +117,7 @@ class TestGetGitStatus(unittest.TestCase):
         os.chdir("/")
         shutil.rmtree(self.temp_dir)
 
-    @patch('ghops.utils.run_command')
+    @patch('repoindex.utils.run_command')
     def test_get_git_status_clean_repo(self, mock_run_command):
         """Test get_git_status with clean repository"""
         mock_run_command.side_effect = [
@@ -131,7 +131,7 @@ class TestGetGitStatus(unittest.TestCase):
         self.assertEqual(result['status'], 'clean')
         self.assertEqual(result['current_branch'], 'main')
 
-    @patch('ghops.utils.run_command')
+    @patch('repoindex.utils.run_command')
     def test_get_git_status_modified_files(self, mock_run_command):
         """Test get_git_status with modified files"""
         mock_run_command.side_effect = [
@@ -146,7 +146,7 @@ class TestGetGitStatus(unittest.TestCase):
         self.assertIn('modified', result['status'])
         self.assertIn('untracked', result['status'])
 
-    @patch('ghops.utils.run_command')
+    @patch('repoindex.utils.run_command')
     def test_get_git_status_error(self, mock_run_command):
         """Test get_git_status with command failure"""
         mock_run_command.side_effect = Exception("Git command failed")
@@ -156,7 +156,7 @@ class TestGetGitStatus(unittest.TestCase):
         self.assertEqual(result['status'], 'error')
         self.assertEqual(result['current_branch'], 'unknown')
 
-    @patch('ghops.utils.run_command')
+    @patch('repoindex.utils.run_command')
     def test_get_git_status_various_changes(self, mock_run_command):
         """Test get_git_status with various types of changes"""
         mock_run_command.side_effect = [
@@ -179,7 +179,7 @@ if __name__ == '__main__':
     unittest.main()
 
 import pytest
-from ghops.utils import find_git_repos
+from repoindex.utils import find_git_repos
 
 
 @pytest.fixture
@@ -247,3 +247,479 @@ def test_find_git_repos_handles_string_and_list_input(mock_git_repos):
     repos_list = find_git_repos(["/test"], recursive=True)
     assert sorted(repos_str) == sorted(repos_list)
     assert sorted(repos_str) == ["/test/level2/repo3", "/test/repo1", "/test/repo2"]
+
+
+# ============================================================================
+# Tests for parse_repo_url
+# ============================================================================
+
+from repoindex.utils import parse_repo_url
+
+
+class TestParseRepoUrl:
+    """Tests for parse_repo_url function."""
+
+    def test_https_url(self):
+        """Parse HTTPS GitHub URL."""
+        owner, repo = parse_repo_url("https://github.com/octocat/Hello-World.git")
+        assert owner == "octocat"
+        assert repo == "Hello-World"
+
+    def test_https_url_no_git_suffix(self):
+        """Parse HTTPS URL without .git suffix."""
+        owner, repo = parse_repo_url("https://github.com/octocat/Hello-World")
+        assert owner == "octocat"
+        assert repo == "Hello-World"
+
+    def test_ssh_url(self):
+        """Parse SSH GitHub URL."""
+        owner, repo = parse_repo_url("git@github.com:octocat/Hello-World.git")
+        assert owner == "octocat"
+        assert repo == "Hello-World"
+
+    def test_ssh_url_no_git_suffix(self):
+        """Parse SSH URL without .git suffix."""
+        owner, repo = parse_repo_url("git@github.com:octocat/Hello-World")
+        assert owner == "octocat"
+        assert repo == "Hello-World"
+
+    def test_empty_url(self):
+        """Empty URL returns None, None."""
+        owner, repo = parse_repo_url("")
+        assert owner is None
+        assert repo is None
+
+    def test_none_url(self):
+        """None URL returns None, None."""
+        owner, repo = parse_repo_url(None)
+        assert owner is None
+        assert repo is None
+
+    def test_invalid_url(self):
+        """Invalid URL returns None, None."""
+        owner, repo = parse_repo_url("https://gitlab.com/user/repo")
+        assert owner is None
+        assert repo is None
+
+    def test_url_with_subdirectory(self):
+        """URL parsing handles repo names correctly."""
+        owner, repo = parse_repo_url("https://github.com/org-name/my-project.git")
+        assert owner == "org-name"
+        assert repo == "my-project"
+
+
+# ============================================================================
+# Tests for get_git_remote_url
+# ============================================================================
+
+from repoindex.utils import get_git_remote_url
+
+
+class TestGetGitRemoteUrl:
+    """Tests for get_git_remote_url function."""
+
+    @patch('repoindex.utils.run_command')
+    def test_returns_url_on_success(self, mock_run):
+        """Returns remote URL when git command succeeds."""
+        mock_run.return_value = ("https://github.com/user/repo.git", 0)
+        url = get_git_remote_url("/path/to/repo")
+        assert url == "https://github.com/user/repo.git"
+
+    @patch('repoindex.utils.run_command')
+    def test_returns_none_on_empty_result(self, mock_run):
+        """Returns None when git command returns empty."""
+        mock_run.return_value = ("", 0)
+        url = get_git_remote_url("/path/to/repo")
+        assert url is None
+
+    @patch('repoindex.utils.run_command')
+    def test_returns_none_on_exception(self, mock_run):
+        """Returns None when git command raises exception."""
+        mock_run.side_effect = Exception("Git error")
+        url = get_git_remote_url("/path/to/repo")
+        assert url is None
+
+    @patch('repoindex.utils.run_command')
+    def test_custom_remote_name(self, mock_run):
+        """Works with custom remote name."""
+        mock_run.return_value = ("https://github.com/upstream/repo.git", 0)
+        url = get_git_remote_url("/path/to/repo", remote_name="upstream")
+        mock_run.assert_called_once()
+        call_args = mock_run.call_args
+        assert "upstream" in call_args[0][0]
+
+
+# ============================================================================
+# Tests for check_github_repo_status
+# ============================================================================
+
+from repoindex.utils import check_github_repo_status
+
+
+class TestCheckGithubRepoStatus:
+    """Tests for check_github_repo_status function."""
+
+    @patch('repoindex.utils.run_command')
+    def test_public_repo(self, mock_run):
+        """Returns correct status for public repo."""
+        mock_run.return_value = ('{"name": "repo", "visibility": "public", "isFork": false}', 0)
+        result = check_github_repo_status("owner", "repo")
+        assert result['exists'] is True
+        assert result['visibility'] == "Public"
+        assert result['is_fork'] is False
+
+    @patch('repoindex.utils.run_command')
+    def test_private_repo(self, mock_run):
+        """Returns correct status for private repo."""
+        mock_run.return_value = ('{"name": "repo", "visibility": "private", "isFork": false}', 0)
+        result = check_github_repo_status("owner", "repo")
+        assert result['exists'] is True
+        assert result['visibility'] == "Private"
+
+    @patch('repoindex.utils.run_command')
+    def test_fork_repo(self, mock_run):
+        """Returns correct status for forked repo."""
+        mock_run.return_value = ('{"name": "repo", "visibility": "public", "isFork": true}', 0)
+        result = check_github_repo_status("owner", "repo")
+        assert result['is_fork'] is True
+
+    @patch('repoindex.utils.run_command')
+    def test_nonexistent_repo(self, mock_run):
+        """Returns not exists for missing repo."""
+        mock_run.return_value = ("", 1)
+        result = check_github_repo_status("owner", "nonexistent")
+        assert result['exists'] is False
+        assert result['visibility'] == "N/A"
+
+    def test_empty_owner(self):
+        """Returns not exists for empty owner."""
+        result = check_github_repo_status("", "repo")
+        assert result['exists'] is False
+
+    def test_empty_repo(self):
+        """Returns not exists for empty repo."""
+        result = check_github_repo_status("owner", "")
+        assert result['exists'] is False
+
+    @patch('repoindex.utils.run_command')
+    def test_invalid_json_response(self, mock_run):
+        """Handles invalid JSON response."""
+        mock_run.return_value = ("not valid json", 0)
+        result = check_github_repo_status("owner", "repo")
+        assert result['exists'] is False
+
+
+# ============================================================================
+# Tests for get_license_info
+# ============================================================================
+
+from repoindex.utils import get_license_info
+
+
+class TestGetLicenseInfo:
+    """Tests for get_license_info function."""
+
+    def test_mit_license(self, fs):
+        """Detects MIT license."""
+        fs.create_file("/repo/LICENSE", contents="MIT License\n\nCopyright (c) 2024")
+        result = get_license_info("/repo")
+        assert result == "MIT"
+
+    def test_apache_license(self, fs):
+        """Detects Apache license."""
+        fs.create_file("/repo/LICENSE", contents="Apache License\nVersion 2.0")
+        result = get_license_info("/repo")
+        assert result == "Apache-2.0"
+
+    def test_gpl3_license(self, fs):
+        """Detects GPL-3.0 license."""
+        fs.create_file("/repo/LICENSE", contents="GNU GENERAL PUBLIC LICENSE\nVersion 3")
+        result = get_license_info("/repo")
+        assert result == "GPL-3.0"
+
+    def test_gpl2_license(self, fs):
+        """Detects GPL-2.0 license."""
+        fs.create_file("/repo/LICENSE", contents="GNU GENERAL PUBLIC LICENSE\nVersion 2")
+        result = get_license_info("/repo")
+        assert result == "GPL-2.0"
+
+    def test_bsd_license(self, fs):
+        """Detects BSD license."""
+        fs.create_file("/repo/LICENSE", contents="BSD 3-Clause License")
+        result = get_license_info("/repo")
+        assert result == "BSD"
+
+    def test_other_license(self, fs):
+        """Returns Other for unrecognized license."""
+        fs.create_file("/repo/LICENSE", contents="Some custom license text")
+        result = get_license_info("/repo")
+        assert result == "Other"
+
+    def test_no_license_file(self, fs):
+        """Returns None when no license file exists."""
+        fs.create_dir("/repo")
+        result = get_license_info("/repo")
+        assert result == "None"
+
+    def test_license_txt_extension(self, fs):
+        """Detects license in LICENSE.txt file."""
+        fs.create_file("/repo/LICENSE.txt", contents="MIT License")
+        result = get_license_info("/repo")
+        assert result == "MIT"
+
+    def test_licence_spelling(self, fs):
+        """Detects license in LICENCE file (British spelling)."""
+        fs.create_file("/repo/LICENCE", contents="MIT License")
+        result = get_license_info("/repo")
+        assert result == "MIT"
+
+
+# ============================================================================
+# Tests for find_git_repos_from_config
+# ============================================================================
+
+from repoindex.utils import find_git_repos_from_config
+
+
+class TestFindGitReposFromConfig:
+    """Tests for find_git_repos_from_config function."""
+
+    def test_empty_config(self):
+        """Returns empty list for empty config."""
+        result = find_git_repos_from_config([])
+        assert result == []
+
+    def test_none_config(self):
+        """Returns empty list for None config."""
+        result = find_git_repos_from_config(None)
+        assert result == []
+
+    def test_simple_directory(self, fs):
+        """Finds repos in simple directory path."""
+        fs.create_dir("/home/user/projects/repo1/.git")
+        fs.create_dir("/home/user/projects/repo2/.git")
+        result = find_git_repos_from_config(["/home/user/projects"])
+        assert len(result) == 2
+        assert "/home/user/projects/repo1" in result
+        assert "/home/user/projects/repo2" in result
+
+    def test_recursive_pattern(self, fs):
+        """Finds repos with ** recursive pattern."""
+        fs.create_dir("/home/user/projects/repo1/.git")
+        fs.create_dir("/home/user/projects/nested/repo2/.git")
+        result = find_git_repos_from_config(["/home/user/projects/**"])
+        assert len(result) == 2
+        assert "/home/user/projects/repo1" in result
+        assert "/home/user/projects/nested/repo2" in result
+
+    def test_glob_pattern(self, fs):
+        """Finds repos with glob pattern."""
+        fs.create_dir("/home/user/proj-a/repo/.git")
+        fs.create_dir("/home/user/proj-b/repo/.git")
+        fs.create_dir("/home/user/other/repo/.git")
+        result = find_git_repos_from_config(["/home/user/proj-*"])
+        # proj-a and proj-b match, other doesn't
+        assert len(result) == 2
+
+    def test_nonexistent_directory(self, fs, caplog):
+        """Warns about nonexistent directory."""
+        fs.create_dir("/home/user")
+        result = find_git_repos_from_config(["/home/user/nonexistent"])
+        assert result == []
+
+
+# ============================================================================
+# Tests for detect_github_pages_locally
+# ============================================================================
+
+from repoindex.utils import detect_github_pages_locally
+
+
+class TestDetectGithubPagesLocally:
+    """Tests for detect_github_pages_locally function."""
+
+    @patch('repoindex.utils.run_command')
+    def test_gh_pages_branch(self, mock_run, fs):
+        """Detects gh-pages branch."""
+        fs.create_dir("/repo/.git")
+        mock_run.return_value = ("origin/gh-pages\norigin/main", 0)
+        result = detect_github_pages_locally("/repo")
+        assert result is not None
+        assert result['has_gh_pages_branch'] is True
+        assert result['likely_enabled'] is True
+
+    def test_jekyll_config(self, fs):
+        """Detects Jekyll config file."""
+        fs.create_dir("/repo/.git")
+        fs.create_file("/repo/_config.yml", contents="title: My Site")
+        with patch('repoindex.utils.run_command', return_value=("", 0)):
+            result = detect_github_pages_locally("/repo")
+        assert result is not None
+        assert result['has_jekyll_config'] is True
+        assert result['likely_enabled'] is True
+
+    def test_docs_folder_with_index(self, fs):
+        """Docs folder alone doesn't enable Pages without other indicators."""
+        fs.create_dir("/repo/.git")
+        fs.create_file("/repo/docs/index.md", contents="# Docs")
+        with patch('repoindex.utils.run_command', return_value=("", 0)):
+            result = detect_github_pages_locally("/repo")
+        # docs folder alone doesn't set likely_enabled (needs gh-pages, workflow, jekyll, or cname)
+        assert result is None
+
+    def test_cname_file(self, fs):
+        """Detects CNAME file for custom domain."""
+        fs.create_dir("/repo/.git")
+        fs.create_file("/repo/CNAME", contents="example.com")
+        with patch('repoindex.utils.run_command', return_value=("", 0)):
+            result = detect_github_pages_locally("/repo")
+        assert result is not None
+        assert result['has_cname'] is True
+        assert result['likely_enabled'] is True
+
+    def test_pages_workflow(self, fs):
+        """Detects GitHub Actions Pages workflow."""
+        fs.create_dir("/repo/.git")
+        fs.create_file("/repo/.github/workflows/pages.yml",
+                      contents="name: Deploy Pages\njobs:\n  deploy:")
+        with patch('repoindex.utils.run_command', return_value=("", 0)):
+            result = detect_github_pages_locally("/repo")
+        assert result is not None
+        assert result['has_pages_workflow'] is True
+
+    def test_no_pages_indicators(self, fs):
+        """Returns None when no Pages indicators found."""
+        fs.create_dir("/repo/.git")
+        with patch('repoindex.utils.run_command', return_value=("origin/main", 0)):
+            result = detect_github_pages_locally("/repo")
+        assert result is None
+
+
+# ============================================================================
+# Tests for get_gh_pages_url
+# ============================================================================
+
+from repoindex.utils import get_gh_pages_url
+
+
+class TestGetGhPagesUrl:
+    """Tests for get_gh_pages_url function."""
+
+    @patch('repoindex.utils.run_command')
+    def test_gh_api_success(self, mock_run, fs):
+        """Returns URL from GitHub API when available."""
+        fs.create_dir("/repo/.git")
+        mock_run.side_effect = [
+            ("https://github.com/user/repo.git", 0),  # get remote url
+            ('{"html_url": "https://user.github.io/repo"}', 0)  # gh api pages
+        ]
+        result = get_gh_pages_url("/repo")
+        assert result == "https://user.github.io/repo"
+
+    @patch('repoindex.utils.run_command')
+    def test_gh_pages_branch_fallback(self, mock_run, fs):
+        """Falls back to gh-pages branch detection."""
+        fs.create_dir("/repo/.git")
+        mock_run.side_effect = [
+            ("https://github.com/user/repo.git", 0),  # get remote url
+            ("", 1),  # gh api pages fails
+            ("origin/gh-pages\norigin/main", 0)  # git branch -r
+        ]
+        result = get_gh_pages_url("/repo")
+        assert result == "https://user.github.io/repo/"
+
+    @patch('repoindex.utils.run_command')
+    def test_no_pages_returns_none(self, mock_run, fs):
+        """Returns None when no Pages found."""
+        fs.create_dir("/repo/.git")
+        mock_run.side_effect = [
+            ("https://github.com/user/repo.git", 0),  # get remote url
+            ("", 1),  # gh api pages fails
+            ("origin/main", 0)  # git branch -r (no gh-pages)
+        ]
+        result = get_gh_pages_url("/repo")
+        assert result is None
+
+    @patch('repoindex.utils.run_command')
+    def test_ssh_url_parsing(self, mock_run, fs):
+        """Parses SSH remote URL correctly."""
+        fs.create_dir("/repo/.git")
+        mock_run.side_effect = [
+            ("git@github.com:user/repo.git", 0),  # SSH format
+            ('{"html_url": "https://user.github.io/repo"}', 0)
+        ]
+        result = get_gh_pages_url("/repo")
+        assert result == "https://user.github.io/repo"
+
+
+# ============================================================================
+# Tests for get_github_repo_info
+# ============================================================================
+
+from repoindex.utils import get_github_repo_info
+
+
+class TestGetGithubRepoInfo:
+    """Tests for get_github_repo_info function."""
+
+    @patch('repoindex.utils.run_command')
+    def test_returns_repo_info(self, mock_run):
+        """Returns parsed repo info on success."""
+        mock_run.return_value = ('{"name": "repo", "full_name": "user/repo", "stars": 42}', 0)
+        result = get_github_repo_info("user", "repo")
+        assert result is not None
+        assert result['name'] == "repo"
+        assert result['stars'] == 42
+
+    @patch('repoindex.utils.run_command')
+    def test_returns_none_on_empty(self, mock_run):
+        """Returns None when command returns empty."""
+        mock_run.return_value = ("", 0)
+        result = get_github_repo_info("user", "repo")
+        assert result is None
+
+    @patch('repoindex.utils.run_command')
+    def test_returns_none_on_exception(self, mock_run):
+        """Returns None when exception occurs."""
+        mock_run.side_effect = Exception("API error")
+        result = get_github_repo_info("user", "repo")
+        assert result is None
+
+    @patch('repoindex.utils.run_command')
+    def test_returns_none_on_invalid_json(self, mock_run):
+        """Returns None on invalid JSON response."""
+        mock_run.return_value = ("not json", 0)
+        result = get_github_repo_info("user", "repo")
+        assert result is None
+
+
+# ============================================================================
+# Additional run_command tests
+# ============================================================================
+
+class TestRunCommandAdvanced:
+    """Additional tests for run_command edge cases."""
+
+    def test_list_command_format(self):
+        """Test run_command with list command format."""
+        output, returncode = run_command(["echo", "test"], capture_output=True)
+        assert output.strip() == "test"
+        assert returncode == 0
+
+    def test_check_false_doesnt_raise(self):
+        """Test check=False doesn't raise on failure."""
+        # Should not raise
+        output, returncode = run_command("exit 1", capture_output=True, check=False)
+        assert returncode == 1
+
+    def test_check_true_raises(self):
+        """Test check=True raises CalledProcessError."""
+        import subprocess
+        with pytest.raises(subprocess.CalledProcessError):
+            run_command("exit 1", check=True)
+
+    def test_dry_run_no_capture(self):
+        """Test dry_run with capture_output=False."""
+        output, returncode = run_command("rm -rf /", dry_run=True, capture_output=False)
+        assert output is None
+        assert returncode == 0

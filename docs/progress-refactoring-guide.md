@@ -35,7 +35,7 @@ if pretty:
     console.print("Starting...")
 
 # After
-from ghops.progress import get_progress
+from repoindex.progress import get_progress
 progress = get_progress(enabled=verbose or None)
 progress("Starting...")
 ```
@@ -147,7 +147,7 @@ print(json.dumps(data))
 
 ### Pattern 4: Using cli_utils Decorator
 ```python
-from ghops.cli_utils import standard_command
+from repoindex.cli_utils import standard_command
 
 @click.command()
 @standard_command()
@@ -160,13 +160,13 @@ def my_command(progress, **kwargs):
 
 After refactoring, test:
 
-1. **Terminal output**: `ghops <command>`
+1. **Terminal output**: `repoindex <command>`
    - Should show progress automatically
 
-2. **Piped output**: `ghops <command> | jq .`
+2. **Piped output**: `repoindex <command> | jq .`
    - Should show only JSON, no progress
 
-3. **Forced verbose**: `ghops <command> -v | jq .`
+3. **Forced verbose**: `repoindex <command> -v | jq .`
    - Should show progress even when piped
 
 4. **Error handling**: Ctrl+C during operation

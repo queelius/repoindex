@@ -1,6 +1,6 @@
 # Export Command
 
-The `ghops export` command generates portfolio exports from your repositories in various formats, perfect for creating documentation sites, portfolios, and reports.
+The `repoindex export` command generates portfolio exports from your repositories in various formats, perfect for creating documentation sites, portfolios, and reports.
 
 ## Overview
 
@@ -15,7 +15,7 @@ Export your repository data as:
 ## Usage
 
 ```bash
-ghops export generate [OPTIONS]
+repoindex export generate [OPTIONS]
 ```
 
 ## Key Options
@@ -37,13 +37,13 @@ Simple, clean markdown suitable for any documentation system.
 
 ```bash
 # Export all repos to markdown
-ghops export generate -f markdown -o ./portfolio
+repoindex export generate -f markdown -o ./portfolio
 
 # Export Python projects only
-ghops export generate -f markdown -t "lang:python" -o ./python-projects
+repoindex export generate -f markdown -t "lang:python" -o ./python-projects
 
 # Single file export
-ghops export generate -f markdown --single-file -o ./output
+repoindex export generate -f markdown --single-file -o ./output
 ```
 
 ### Hugo Export
@@ -52,13 +52,13 @@ Creates a complete Hugo content structure with front matter.
 
 ```bash
 # Generate Hugo site content
-ghops export generate -f hugo -o ./my-site/content/projects
+repoindex export generate -f hugo -o ./my-site/content/projects
 
 # Group by language
-ghops export generate -f hugo --group-by lang -o ./my-site/content/projects
+repoindex export generate -f hugo --group-by lang -o ./my-site/content/projects
 
 # Export work projects
-ghops export generate -f hugo -t "dir:work" -o ./my-site/content/work
+repoindex export generate -f hugo -t "dir:work" -o ./my-site/content/work
 ```
 
 Generated structure:
@@ -80,13 +80,13 @@ Interactive portfolio with JavaScript-powered search and filtering.
 
 ```bash
 # Create interactive portfolio
-ghops export generate -f html -o ./portfolio
+repoindex export generate -f html -o ./portfolio
 
 # Single-page application
-ghops export generate -f html --single-file -o ./portfolio
+repoindex export generate -f html --single-file -o ./portfolio
 
 # Group by directory
-ghops export generate -f html --group-by dir -o ./portfolio
+repoindex export generate -f html --group-by dir -o ./portfolio
 ```
 
 Features:
@@ -102,13 +102,13 @@ Clean JSON for API consumption or further processing.
 
 ```bash
 # Export all metadata
-ghops export generate -f json -o ./data
+repoindex export generate -f json -o ./data
 
 # Single file with all repos
-ghops export generate -f json --single-file -o ./data
+repoindex export generate -f json --single-file -o ./data
 
 # Filter high-star projects
-ghops export generate -f json -q "stars > 10" -o ./popular
+repoindex export generate -f json -q "stars > 10" -o ./popular
 ```
 
 ### CSV Export
@@ -117,10 +117,10 @@ Tabular format for spreadsheet analysis.
 
 ```bash
 # Export to CSV
-ghops export generate -f csv -o ./reports
+repoindex export generate -f csv -o ./reports
 
 # Group by language
-ghops export generate -f csv --group-by lang -o ./reports
+repoindex export generate -f csv --group-by lang -o ./reports
 ```
 
 Columns included:
@@ -136,10 +136,10 @@ Professional document format for printed portfolios.
 
 ```bash
 # Generate LaTeX document
-ghops export generate -f latex -o ./portfolio
+repoindex export generate -f latex -o ./portfolio
 
 # Compile to PDF (requires pdflatex)
-ghops export generate -f latex -o ./portfolio
+repoindex export generate -f latex -o ./portfolio
 cd ./portfolio && pdflatex repositories.tex
 ```
 
@@ -149,13 +149,13 @@ Use `--group-by` to organize repositories by tag prefix:
 
 ```bash
 # Group by directory
-ghops export generate -f hugo --group-by dir
+repoindex export generate -f hugo --group-by dir
 
 # Group by language
-ghops export generate -f html --group-by lang
+repoindex export generate -f html --group-by lang
 
 # Group by organization
-ghops export generate -f markdown --group-by org
+repoindex export generate -f markdown --group-by org
 ```
 
 ## Templates
@@ -164,13 +164,13 @@ Custom templates allow you to control the export format:
 
 ```bash
 # List available templates
-ghops export templates --list
+repoindex export templates --list
 
 # Use a template
-ghops export generate -f markdown --template my-template
+repoindex export generate -f markdown --template my-template
 
 # Show template content
-ghops export templates --show my-template
+repoindex export templates --show my-template
 ```
 
 ## Pipeline Integration
@@ -179,13 +179,13 @@ Export commands output JSONL by default for progress tracking:
 
 ```bash
 # Monitor export progress
-ghops export generate -f hugo -o ./site | jq -r '.file'
+repoindex export generate -f hugo -o ./site | jq -r '.file'
 
 # Count exported files
-ghops export generate -f html | jq -s 'length'
+repoindex export generate -f html | jq -s 'length'
 
 # Get export summary
-ghops export generate -f markdown | jq -s '{
+repoindex export generate -f markdown | jq -s '{
   total_files: length,
   total_repos: [.[] | .repositories // 0] | add
 }'
@@ -197,7 +197,7 @@ ghops export generate -f markdown | jq -s '{
 
 ```bash
 # Generate full Hugo site for all projects
-ghops export generate -f hugo \
+repoindex export generate -f hugo \
   --group-by lang \
   -o ./my-portfolio/content/projects
 
@@ -213,13 +213,13 @@ ghops export generate -f hugo \
 
 ```bash
 # Export work projects
-ghops export generate -f html \
+repoindex export generate -f html \
   -t "dir:work" \
   -o ./portfolios/work \
   --single-file
 
 # Export personal projects
-ghops export generate -f html \
+repoindex export generate -f html \
   -t "dir:personal" \
   -o ./portfolios/personal \
   --single-file
@@ -229,13 +229,13 @@ ghops export generate -f html \
 
 ```bash
 # Python portfolio
-ghops export generate -f markdown \
+repoindex export generate -f markdown \
   -t "lang:python" \
   -o ./python-portfolio \
   --single-file
 
 # JavaScript portfolio
-ghops export generate -f markdown \
+repoindex export generate -f markdown \
   -t "lang:javascript" \
   -o ./js-portfolio \
   --single-file
@@ -245,7 +245,7 @@ ghops export generate -f markdown \
 
 ```bash
 # High-level PDF report of popular projects
-ghops export generate -f latex \
+repoindex export generate -f latex \
   -q "stars > 5 or forks > 2" \
   -o ./executive-summary \
   --single-file
@@ -258,7 +258,7 @@ pdflatex repositories.tex
 
 ```bash
 # Export all repos with docs to JSON
-ghops export generate -f json \
+repoindex export generate -f json \
   -t "has:docs" \
   -o ./api/data \
   --single-file
@@ -273,7 +273,7 @@ cd ./api && python -m http.server
 
 ```bash
 # Export directly to Hugo content directory
-ghops export generate -f hugo -o ./my-site/content/projects
+repoindex export generate -f hugo -o ./my-site/content/projects
 
 # Build and serve
 cd ./my-site
@@ -284,7 +284,7 @@ hugo serve
 
 ```bash
 # Export as markdown to Jekyll collections
-ghops export generate -f markdown -o ./my-site/_projects
+repoindex export generate -f markdown -o ./my-site/_projects
 
 # Add to _config.yml:
 # collections:
@@ -296,7 +296,7 @@ ghops export generate -f markdown -o ./my-site/_projects
 
 ```bash
 # Export as JSON for static generation
-ghops export generate -f json \
+repoindex export generate -f json \
   --single-file \
   -o ./my-app/data/projects.json
 

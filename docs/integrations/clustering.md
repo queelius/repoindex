@@ -18,7 +18,7 @@ The clustering integration requires additional dependencies:
 
 ```bash
 # Install with clustering support
-pip install ghops[clustering]
+pip install repoindex[clustering]
 
 # Or install dependencies separately
 pip install scikit-learn numpy pandas matplotlib seaborn
@@ -28,19 +28,19 @@ pip install scikit-learn numpy pandas matplotlib seaborn
 
 ```bash
 # Basic clustering with defaults
-ghops cluster analyze
+repoindex cluster analyze
 
 # Specify algorithm and clusters
-ghops cluster analyze --algorithm kmeans --n-clusters 5
+repoindex cluster analyze --algorithm kmeans --n-clusters 5
 
 # Detect duplicates
-ghops cluster duplicates --threshold 0.8
+repoindex cluster duplicates --threshold 0.8
 
 # Visualize clusters
-ghops cluster visualize --output clusters.html
+repoindex cluster visualize --output clusters.html
 
 # Export clustering results
-ghops cluster export --format json --output clusters.json
+repoindex cluster export --format json --output clusters.json
 ```
 
 ## Clustering Algorithms
@@ -50,7 +50,7 @@ ghops cluster export --format json --output clusters.json
 Best for: Well-separated spherical clusters of similar size
 
 ```bash
-ghops cluster analyze --algorithm kmeans --n-clusters 5
+repoindex cluster analyze --algorithm kmeans --n-clusters 5
 ```
 
 Options:
@@ -63,7 +63,7 @@ Options:
 Best for: Understanding cluster hierarchy and relationships
 
 ```bash
-ghops cluster analyze --algorithm hierarchical --distance-threshold 0.5
+repoindex cluster analyze --algorithm hierarchical --distance-threshold 0.5
 ```
 
 Options:
@@ -76,7 +76,7 @@ Options:
 Best for: Arbitrary shaped clusters, outlier detection
 
 ```bash
-ghops cluster analyze --algorithm dbscan --eps 0.5 --min-samples 3
+repoindex cluster analyze --algorithm dbscan --eps 0.5 --min-samples 3
 ```
 
 Options:
@@ -89,7 +89,7 @@ Options:
 Best for: Non-convex clusters, image segmentation patterns
 
 ```bash
-ghops cluster analyze --algorithm spectral --n-clusters 4
+repoindex cluster analyze --algorithm spectral --n-clusters 4
 ```
 
 Options:
@@ -105,13 +105,13 @@ Control which repository features are used for clustering:
 
 ```bash
 # Technology stack based clustering
-ghops cluster analyze --features tech-stack
+repoindex cluster analyze --features tech-stack
 
 # Multi-feature clustering
-ghops cluster analyze --features tech-stack,size,activity,complexity
+repoindex cluster analyze --features tech-stack,size,activity,complexity
 
 # All available features
-ghops cluster analyze --features all
+repoindex cluster analyze --features all
 ```
 
 Feature categories:
@@ -128,7 +128,7 @@ Feature categories:
 Adjust the importance of different features:
 
 ```bash
-ghops cluster analyze \
+repoindex cluster analyze \
   --features tech-stack,size,activity \
   --weights 0.5,0.3,0.2
 ```
@@ -139,29 +139,29 @@ ghops cluster analyze \
 
 ```bash
 # Find duplicates with default threshold (0.8)
-ghops cluster duplicates
+repoindex cluster duplicates
 
 # Adjust similarity threshold
-ghops cluster duplicates --threshold 0.9
+repoindex cluster duplicates --threshold 0.9
 
 # Include archived repositories
-ghops cluster duplicates --include-archived
+repoindex cluster duplicates --include-archived
 
 # Output detailed similarity scores
-ghops cluster duplicates --detailed
+repoindex cluster duplicates --detailed
 ```
 
 ### Consolidation Suggestions
 
 ```bash
 # Get consolidation recommendations
-ghops cluster consolidate
+repoindex cluster consolidate
 
 # Interactive consolidation wizard
-ghops cluster consolidate --interactive
+repoindex cluster consolidate --interactive
 
 # Generate consolidation script
-ghops cluster consolidate --generate-script
+repoindex cluster consolidate --generate-script
 ```
 
 ## Visualization
@@ -170,28 +170,28 @@ ghops cluster consolidate --generate-script
 
 ```bash
 # Generate interactive HTML visualization
-ghops cluster visualize --output clusters.html
+repoindex cluster visualize --output clusters.html
 
 # Include specific metadata in tooltips
-ghops cluster visualize \
+repoindex cluster visualize \
   --output clusters.html \
   --metadata name,language,stars,last_commit
 
 # 3D visualization
-ghops cluster visualize --3d --output clusters3d.html
+repoindex cluster visualize --3d --output clusters3d.html
 ```
 
 ### Static Visualizations
 
 ```bash
 # Generate static plots
-ghops cluster plot --output clusters.png
+repoindex cluster plot --output clusters.png
 
 # Dendrogram for hierarchical clustering
-ghops cluster plot --type dendrogram --output dendrogram.png
+repoindex cluster plot --type dendrogram --output dendrogram.png
 
 # Scatter plot matrix
-ghops cluster plot --type scatter-matrix --output matrix.png
+repoindex cluster plot --type scatter-matrix --output matrix.png
 ```
 
 ## Cluster Analysis
@@ -200,23 +200,23 @@ ghops cluster plot --type scatter-matrix --output matrix.png
 
 ```bash
 # Get detailed cluster statistics
-ghops cluster stats
+repoindex cluster stats
 
 # Focus on specific cluster
-ghops cluster stats --cluster-id 2
+repoindex cluster stats --cluster-id 2
 
 # Compare clusters
-ghops cluster compare --cluster-a 1 --cluster-b 2
+repoindex cluster compare --cluster-a 1 --cluster-b 2
 ```
 
 ### Cluster Profiles
 
 ```bash
 # Generate cluster profiles
-ghops cluster profile
+repoindex cluster profile
 
 # Export profiles to markdown
-ghops cluster profile --format markdown --output profiles.md
+repoindex cluster profile --format markdown --output profiles.md
 ```
 
 Example output:
@@ -243,17 +243,17 @@ Example output:
 
 ```bash
 # Cluster only active Python projects
-ghops query "language == 'Python' and days_since_commit < 30" | \
-  ghops cluster analyze --stdin
+repoindex query "language == 'Python' and days_since_commit < 30" | \
+  repoindex cluster analyze --stdin
 
 # Export clustered repositories
-ghops cluster analyze | \
-  ghops export hugo --group-by cluster
+repoindex cluster analyze | \
+  repoindex export hugo --group-by cluster
 
 # Audit each cluster
-ghops cluster analyze | \
+repoindex cluster analyze | \
   jq -r '.cluster_id' | sort -u | \
-  xargs -I {} ghops audit --cluster {}
+  xargs -I {} repoindex audit --cluster {}
 ```
 
 ### Workflow Integration
@@ -262,18 +262,18 @@ ghops cluster analyze | \
 name: Weekly Clustering Analysis
 steps:
   - name: cluster-analysis
-    action: ghops.cluster.analyze
+    action: repoindex.cluster.analyze
     parameters:
       algorithm: kmeans
       n_clusters: 5
 
   - name: find-outliers
-    action: ghops.cluster.outliers
+    action: repoindex.cluster.outliers
     parameters:
       threshold: 2.0
 
   - name: report
-    action: ghops.export
+    action: repoindex.export
     parameters:
       format: markdown
       template: cluster-report
@@ -281,7 +281,7 @@ steps:
 
 ## Configuration
 
-Configure clustering defaults in `~/.ghops/config.json`:
+Configure clustering defaults in `~/.repoindex/config.json`:
 
 ```json
 {
@@ -309,7 +309,7 @@ Create custom features for clustering:
 
 ```python
 # Custom feature extractor
-from ghops.integrations.clustering import FeatureExtractor
+from repoindex.integrations.clustering import FeatureExtractor
 
 class CustomExtractor(FeatureExtractor):
     def extract(self, repo):
@@ -319,14 +319,14 @@ class CustomExtractor(FeatureExtractor):
         }
 
 # Use in clustering
-ghops cluster analyze --extractor custom_extractor.py
+repoindex cluster analyze --extractor custom_extractor.py
 ```
 
 ### Clustering Pipelines
 
 ```bash
 # Multi-stage clustering pipeline
-ghops cluster pipeline \
+repoindex cluster pipeline \
   --stage hierarchical:n_clusters=10 \
   --stage kmeans:n_clusters=5 \
   --stage dbscan:eps=0.3
@@ -338,7 +338,7 @@ Analyze how clusters change over time:
 
 ```bash
 # Cluster evolution analysis
-ghops cluster evolution \
+repoindex cluster evolution \
   --start-date 2024-01-01 \
   --interval monthly \
   --output evolution.gif
@@ -350,27 +350,27 @@ ghops cluster evolution \
 
 ```bash
 # Organize repositories by technology
-ghops cluster analyze --features tech-stack --n-clusters 7
-ghops catalog tag-from-clusters --prefix "tech"
+repoindex cluster analyze --features tech-stack --n-clusters 7
+repoindex catalog tag-from-clusters --prefix "tech"
 
 # Create directory structure based on clusters
-ghops cluster organize --create-dirs --base-path ~/organized-repos
+repoindex cluster organize --create-dirs --base-path ~/organized-repos
 ```
 
 ### Technical Debt Analysis
 
 ```bash
 # Find repositories needing updates
-ghops cluster analyze --features quality,activity
-ghops cluster stats | jq '.clusters[] | select(.avg_quality < 0.5)'
+repoindex cluster analyze --features quality,activity
+repoindex cluster stats | jq '.clusters[] | select(.avg_quality < 0.5)'
 ```
 
 ### Team Assignment
 
 ```bash
 # Cluster by expertise requirements
-ghops cluster analyze --features tech-stack,complexity
-ghops cluster assign-teams --team-config teams.json
+repoindex cluster analyze --features tech-stack,complexity
+repoindex cluster assign-teams --team-config teams.json
 ```
 
 ## Performance Optimization
@@ -381,26 +381,26 @@ For portfolios with 1000+ repositories:
 
 ```bash
 # Use sampling for initial analysis
-ghops cluster analyze --sample-size 100 --algorithm kmeans
+repoindex cluster analyze --sample-size 100 --algorithm kmeans
 
 # Mini-batch K-means for large datasets
-ghops cluster analyze --algorithm mini-batch-kmeans --batch-size 100
+repoindex cluster analyze --algorithm mini-batch-kmeans --batch-size 100
 
 # Incremental clustering
-ghops cluster analyze --incremental --checkpoint cluster.pkl
+repoindex cluster analyze --incremental --checkpoint cluster.pkl
 ```
 
 ### Feature Caching
 
 ```bash
 # Cache extracted features
-ghops cluster cache-features
+repoindex cluster cache-features
 
 # Use cached features
-ghops cluster analyze --use-cache
+repoindex cluster analyze --use-cache
 
 # Clear feature cache
-ghops cluster clear-cache
+repoindex cluster clear-cache
 ```
 
 ## Troubleshooting
@@ -410,28 +410,28 @@ ghops cluster clear-cache
 #### No clusters found
 ```bash
 # Check feature variance
-ghops cluster diagnose --check-variance
+repoindex cluster diagnose --check-variance
 
 # Try different algorithm
-ghops cluster analyze --algorithm dbscan --eps 0.1
+repoindex cluster analyze --algorithm dbscan --eps 0.1
 ```
 
 #### Too many singleton clusters
 ```bash
 # Adjust parameters
-ghops cluster analyze --algorithm kmeans --n-clusters 3
+repoindex cluster analyze --algorithm kmeans --n-clusters 3
 
 # Use different features
-ghops cluster analyze --features size,activity
+repoindex cluster analyze --features size,activity
 ```
 
 #### Memory issues with large datasets
 ```bash
 # Use incremental learning
-ghops cluster analyze --algorithm mini-batch-kmeans
+repoindex cluster analyze --algorithm mini-batch-kmeans
 
 # Reduce feature dimensions
-ghops cluster analyze --max-features 50
+repoindex cluster analyze --max-features 50
 ```
 
 ## API Reference
@@ -439,13 +439,13 @@ ghops cluster analyze --max-features 50
 ### Python API
 
 ```python
-from ghops.integrations.clustering import ClusteringIntegration
+from repoindex.integrations.clustering import ClusteringIntegration
 
 # Initialize
 clustering = ClusteringIntegration(config)
 
 # Analyze repositories
-repos = list(ghops.list_repositories())
+repos = list(repoindex.list_repositories())
 results = clustering.analyze(
     repos,
     algorithm='kmeans',
@@ -465,11 +465,11 @@ clustering.visualize(results, output='clusters.html')
 
 ```bash
 # Main commands
-ghops cluster analyze      # Perform clustering analysis
-ghops cluster duplicates    # Find duplicate repositories
-ghops cluster visualize     # Create visualizations
-ghops cluster stats        # Show cluster statistics
-ghops cluster export       # Export clustering results
+repoindex cluster analyze      # Perform clustering analysis
+repoindex cluster duplicates    # Find duplicate repositories
+repoindex cluster visualize     # Create visualizations
+repoindex cluster stats        # Show cluster statistics
+repoindex cluster export       # Export clustering results
 
 # Common options
 --algorithm         # Clustering algorithm
@@ -489,7 +489,7 @@ ghops cluster export       # Export clustering results
 3. **Validate**: Manually review cluster assignments for accuracy
 4. **Document**: Save clustering parameters and rationale
 5. **Monitor**: Track how clusters evolve over time
-6. **Combine**: Use clustering with other ghops features
+6. **Combine**: Use clustering with other repoindex features
 
 ## Next Steps
 

@@ -12,7 +12,7 @@ from io import StringIO
 from unittest.mock import patch, MagicMock
 from rich.console import Console
 
-from ghops import render
+from repoindex import render
 
 
 class TestRenderTable:

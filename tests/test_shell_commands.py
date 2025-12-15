@@ -17,13 +17,13 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch, call, ANY
 import click
 
-from ghops.shell.shell import GhopsShell
+from repoindex.shell.shell import GhopsShell
 
 
 @pytest.fixture
 def temp_config_dir(tmp_path):
     """Create temporary config directory."""
-    config_dir = tmp_path / ".ghops"
+    config_dir = tmp_path / ".repoindex"
     config_dir.mkdir()
     return config_dir
 
@@ -70,10 +70,10 @@ def mock_metadata():
 @pytest.fixture
 def shell_instance(mock_repos):
     """Create a shell instance with mocked dependencies."""
-    with patch('ghops.shell.shell.load_config') as mock_load_config, \
-         patch('ghops.shell.shell.find_git_repos_from_config') as mock_find_repos, \
-         patch('ghops.shell.shell.get_metadata_store') as mock_metadata_store, \
-         patch('ghops.shell.shell.get_repository_tags') as mock_get_tags:
+    with patch('repoindex.shell.shell.load_config') as mock_load_config, \
+         patch('repoindex.shell.shell.find_git_repos_from_config') as mock_find_repos, \
+         patch('repoindex.shell.shell.get_metadata_store') as mock_metadata_store, \
+         patch('repoindex.shell.shell.get_repository_tags') as mock_get_tags:
 
         mock_load_config.return_value = {
             'general': {'repository_directories': [str(Path(mock_repos[0]).parent)]},
@@ -94,12 +94,12 @@ def shell_instance(mock_repos):
 class TestShellGitRecursive:
     """Test git command with recursive flag."""
 
-    @patch('ghops.shell.shell.load_config')
-    @patch('ghops.shell.shell.find_git_repos_from_config')
-    @patch('ghops.shell.shell.get_metadata_store')
-    @patch('ghops.shell.shell.get_repository_tags')
-    @patch('ghops.git_ops.utils.get_repos_from_vfs_path')
-    @patch('ghops.commands.git.git_status')
+    @patch('repoindex.shell.shell.load_config')
+    @patch('repoindex.shell.shell.find_git_repos_from_config')
+    @patch('repoindex.shell.shell.get_metadata_store')
+    @patch('repoindex.shell.shell.get_repository_tags')
+    @patch('repoindex.git_ops.utils.get_repos_from_vfs_path')
+    @patch('repoindex.commands.git.git_status')
     def test_git_recursive_status_multiple_repos(self, mock_git_status, mock_get_repos,
                                                   mock_get_tags, mock_metadata_store,
                                                   mock_find_repos, mock_load_config,
@@ -139,12 +139,12 @@ class TestShellGitRecursive:
         assert f"Running 'git status' on {len(mock_repos)} repositories" in captured.out
         assert 'project-a' in captured.out or 'project-b' in captured.out
 
-    @patch('ghops.shell.shell.load_config')
-    @patch('ghops.shell.shell.find_git_repos_from_config')
-    @patch('ghops.shell.shell.get_metadata_store')
-    @patch('ghops.shell.shell.get_repository_tags')
-    @patch('ghops.git_ops.utils.get_repos_from_vfs_path')
-    @patch('ghops.commands.git.git_pull')
+    @patch('repoindex.shell.shell.load_config')
+    @patch('repoindex.shell.shell.find_git_repos_from_config')
+    @patch('repoindex.shell.shell.get_metadata_store')
+    @patch('repoindex.shell.shell.get_repository_tags')
+    @patch('repoindex.git_ops.utils.get_repos_from_vfs_path')
+    @patch('repoindex.commands.git.git_pull')
     def test_git_recursive_pull_on_vfs_path(self, mock_git_pull, mock_get_repos,
                                              mock_get_tags, mock_metadata_store,
                                              mock_find_repos, mock_load_config,
@@ -184,11 +184,11 @@ class TestShellGitRecursive:
         captured = capsys.readouterr()
         assert "Running 'git pull'" in captured.out
 
-    @patch('ghops.shell.shell.load_config')
-    @patch('ghops.shell.shell.find_git_repos_from_config')
-    @patch('ghops.shell.shell.get_metadata_store')
-    @patch('ghops.shell.shell.get_repository_tags')
-    @patch('ghops.commands.git.git_status')
+    @patch('repoindex.shell.shell.load_config')
+    @patch('repoindex.shell.shell.find_git_repos_from_config')
+    @patch('repoindex.shell.shell.get_metadata_store')
+    @patch('repoindex.shell.shell.get_repository_tags')
+    @patch('repoindex.commands.git.git_status')
     def test_git_status_non_recursive(self, mock_git_status, mock_get_tags,
                                        mock_metadata_store, mock_find_repos,
                                        mock_load_config, mock_repos):
@@ -218,11 +218,11 @@ class TestShellGitRecursive:
         # Should be called once for current path
         mock_git_status.callback.assert_called_once()
 
-    @patch('ghops.shell.shell.load_config')
-    @patch('ghops.shell.shell.find_git_repos_from_config')
-    @patch('ghops.shell.shell.get_metadata_store')
-    @patch('ghops.shell.shell.get_repository_tags')
-    @patch('ghops.git_ops.utils.get_repos_from_vfs_path')
+    @patch('repoindex.shell.shell.load_config')
+    @patch('repoindex.shell.shell.find_git_repos_from_config')
+    @patch('repoindex.shell.shell.get_metadata_store')
+    @patch('repoindex.shell.shell.get_repository_tags')
+    @patch('repoindex.git_ops.utils.get_repos_from_vfs_path')
     def test_git_recursive_no_repos(self, mock_get_repos, mock_get_tags,
                                      mock_metadata_store, mock_find_repos,
                                      mock_load_config, capsys):
@@ -252,11 +252,11 @@ class TestShellGitRecursive:
         captured = capsys.readouterr()
         assert 'No repositories found' in captured.out
 
-    @patch('ghops.shell.shell.load_config')
-    @patch('ghops.shell.shell.find_git_repos_from_config')
-    @patch('ghops.shell.shell.get_metadata_store')
-    @patch('ghops.shell.shell.get_repository_tags')
-    @patch('ghops.commands.git.git_log')
+    @patch('repoindex.shell.shell.load_config')
+    @patch('repoindex.shell.shell.find_git_repos_from_config')
+    @patch('repoindex.shell.shell.get_metadata_store')
+    @patch('repoindex.shell.shell.get_repository_tags')
+    @patch('repoindex.commands.git.git_log')
     def test_git_log_with_args(self, mock_git_log, mock_get_tags,
                                mock_metadata_store, mock_find_repos,
                                mock_load_config, mock_repos):
@@ -298,11 +298,11 @@ class TestShellGitRecursive:
 class TestShellClone:
     """Test clone command."""
 
-    @patch('ghops.shell.shell.load_config')
-    @patch('ghops.shell.shell.find_git_repos_from_config')
-    @patch('ghops.shell.shell.get_metadata_store')
-    @patch('ghops.shell.shell.get_repository_tags')
-    @patch('ghops.commands.clone.clone_handler')
+    @patch('repoindex.shell.shell.load_config')
+    @patch('repoindex.shell.shell.find_git_repos_from_config')
+    @patch('repoindex.shell.shell.get_metadata_store')
+    @patch('repoindex.shell.shell.get_repository_tags')
+    @patch('repoindex.commands.clone.clone_handler')
     def test_clone_single_repo(self, mock_handler, mock_get_tags,
                                mock_metadata_store, mock_find_repos,
                                mock_load_config, capsys):
@@ -338,11 +338,11 @@ class TestShellClone:
         captured = capsys.readouterr()
         assert 'Refreshing VFS' in captured.out
 
-    @patch('ghops.shell.shell.load_config')
-    @patch('ghops.shell.shell.find_git_repos_from_config')
-    @patch('ghops.shell.shell.get_metadata_store')
-    @patch('ghops.shell.shell.get_repository_tags')
-    @patch('ghops.commands.clone.clone_handler')
+    @patch('repoindex.shell.shell.load_config')
+    @patch('repoindex.shell.shell.find_git_repos_from_config')
+    @patch('repoindex.shell.shell.get_metadata_store')
+    @patch('repoindex.shell.shell.get_repository_tags')
+    @patch('repoindex.commands.clone.clone_handler')
     def test_clone_multiple_repos(self, mock_handler, mock_get_tags,
                                    mock_metadata_store, mock_find_repos,
                                    mock_load_config):
@@ -373,11 +373,11 @@ class TestShellClone:
         call_args = mock_handler.callback.call_args
         assert call_args[1]['repos'] == ['user/repo1', 'user/repo2', 'user/repo3']
 
-    @patch('ghops.shell.shell.load_config')
-    @patch('ghops.shell.shell.find_git_repos_from_config')
-    @patch('ghops.shell.shell.get_metadata_store')
-    @patch('ghops.shell.shell.get_repository_tags')
-    @patch('ghops.commands.clone.clone_handler')
+    @patch('repoindex.shell.shell.load_config')
+    @patch('repoindex.shell.shell.find_git_repos_from_config')
+    @patch('repoindex.shell.shell.get_metadata_store')
+    @patch('repoindex.shell.shell.get_repository_tags')
+    @patch('repoindex.commands.clone.clone_handler')
     def test_clone_user_repos(self, mock_handler, mock_get_tags,
                               mock_metadata_store, mock_find_repos,
                               mock_load_config):
@@ -410,11 +410,11 @@ class TestShellClone:
         assert call_args[1]['repos'] == []
         assert call_args[1]['limit'] == 100
 
-    @patch('ghops.shell.shell.load_config')
-    @patch('ghops.shell.shell.find_git_repos_from_config')
-    @patch('ghops.shell.shell.get_metadata_store')
-    @patch('ghops.shell.shell.get_repository_tags')
-    @patch('ghops.commands.clone.clone_handler')
+    @patch('repoindex.shell.shell.load_config')
+    @patch('repoindex.shell.shell.find_git_repos_from_config')
+    @patch('repoindex.shell.shell.get_metadata_store')
+    @patch('repoindex.shell.shell.get_repository_tags')
+    @patch('repoindex.commands.clone.clone_handler')
     def test_clone_user_with_limit(self, mock_handler, mock_get_tags,
                                     mock_metadata_store, mock_find_repos,
                                     mock_load_config):
@@ -446,11 +446,11 @@ class TestShellClone:
         assert call_args[1]['user'] == 'username'
         assert call_args[1]['limit'] == 10
 
-    @patch('ghops.shell.shell.load_config')
-    @patch('ghops.shell.shell.find_git_repos_from_config')
-    @patch('ghops.shell.shell.get_metadata_store')
-    @patch('ghops.shell.shell.get_repository_tags')
-    @patch('ghops.commands.clone.clone_handler')
+    @patch('repoindex.shell.shell.load_config')
+    @patch('repoindex.shell.shell.find_git_repos_from_config')
+    @patch('repoindex.shell.shell.get_metadata_store')
+    @patch('repoindex.shell.shell.get_repository_tags')
+    @patch('repoindex.commands.clone.clone_handler')
     def test_clone_url(self, mock_handler, mock_get_tags,
                        mock_metadata_store, mock_find_repos,
                        mock_load_config):
@@ -481,10 +481,10 @@ class TestShellClone:
         call_args = mock_handler.callback.call_args
         assert call_args[1]['repos'] == ['https://github.com/user/repo']
 
-    @patch('ghops.shell.shell.load_config')
-    @patch('ghops.shell.shell.find_git_repos_from_config')
-    @patch('ghops.shell.shell.get_metadata_store')
-    @patch('ghops.shell.shell.get_repository_tags')
+    @patch('repoindex.shell.shell.load_config')
+    @patch('repoindex.shell.shell.find_git_repos_from_config')
+    @patch('repoindex.shell.shell.get_metadata_store')
+    @patch('repoindex.shell.shell.get_repository_tags')
     def test_clone_no_args(self, mock_get_tags, mock_metadata_store,
                           mock_find_repos, mock_load_config, capsys):
         """Test clone with no arguments."""
@@ -510,11 +510,11 @@ class TestShellClone:
         captured = capsys.readouterr()
         assert 'Usage:' in captured.out
 
-    @patch('ghops.shell.shell.load_config')
-    @patch('ghops.shell.shell.find_git_repos_from_config')
-    @patch('ghops.shell.shell.get_metadata_store')
-    @patch('ghops.shell.shell.get_repository_tags')
-    @patch('ghops.commands.clone.clone_handler')
+    @patch('repoindex.shell.shell.load_config')
+    @patch('repoindex.shell.shell.find_git_repos_from_config')
+    @patch('repoindex.shell.shell.get_metadata_store')
+    @patch('repoindex.shell.shell.get_repository_tags')
+    @patch('repoindex.commands.clone.clone_handler')
     def test_clone_error_handling(self, mock_handler, mock_get_tags,
                                    mock_metadata_store, mock_find_repos,
                                    mock_load_config, capsys):
@@ -548,11 +548,11 @@ class TestShellClone:
 class TestShellConfig:
     """Test config command."""
 
-    @patch('ghops.shell.shell.load_config')
-    @patch('ghops.shell.shell.find_git_repos_from_config')
-    @patch('ghops.shell.shell.get_metadata_store')
-    @patch('ghops.shell.shell.get_repository_tags')
-    @patch('ghops.commands.config.show_config')
+    @patch('repoindex.shell.shell.load_config')
+    @patch('repoindex.shell.shell.find_git_repos_from_config')
+    @patch('repoindex.shell.shell.get_metadata_store')
+    @patch('repoindex.shell.shell.get_repository_tags')
+    @patch('repoindex.commands.config.show_config')
     def test_config_show(self, mock_show_config, mock_get_tags,
                         mock_metadata_store, mock_find_repos,
                         mock_load_config):
@@ -581,11 +581,11 @@ class TestShellConfig:
         # Verify show_config was called
         mock_show_config.callback.assert_called_once()
 
-    @patch('ghops.shell.shell.load_config')
-    @patch('ghops.shell.shell.find_git_repos_from_config')
-    @patch('ghops.shell.shell.get_metadata_store')
-    @patch('ghops.shell.shell.get_repository_tags')
-    @patch('ghops.commands.config_repos.repos_list')
+    @patch('repoindex.shell.shell.load_config')
+    @patch('repoindex.shell.shell.find_git_repos_from_config')
+    @patch('repoindex.shell.shell.get_metadata_store')
+    @patch('repoindex.shell.shell.get_repository_tags')
+    @patch('repoindex.commands.config_repos.repos_list')
     def test_config_repos_list(self, mock_repos_list, mock_get_tags,
                                mock_metadata_store, mock_find_repos,
                                mock_load_config):
@@ -616,11 +616,11 @@ class TestShellConfig:
         call_args = mock_repos_list.callback.call_args
         assert call_args[1]['json_output'] == False
 
-    @patch('ghops.shell.shell.load_config')
-    @patch('ghops.shell.shell.find_git_repos_from_config')
-    @patch('ghops.shell.shell.get_metadata_store')
-    @patch('ghops.shell.shell.get_repository_tags')
-    @patch('ghops.commands.config_repos.repos_add')
+    @patch('repoindex.shell.shell.load_config')
+    @patch('repoindex.shell.shell.find_git_repos_from_config')
+    @patch('repoindex.shell.shell.get_metadata_store')
+    @patch('repoindex.shell.shell.get_repository_tags')
+    @patch('repoindex.commands.config_repos.repos_add')
     def test_config_repos_add(self, mock_repos_add, mock_get_tags,
                              mock_metadata_store, mock_find_repos,
                              mock_load_config, capsys):
@@ -656,11 +656,11 @@ class TestShellConfig:
         captured = capsys.readouterr()
         assert 'Refreshing VFS' in captured.out
 
-    @patch('ghops.shell.shell.load_config')
-    @patch('ghops.shell.shell.find_git_repos_from_config')
-    @patch('ghops.shell.shell.get_metadata_store')
-    @patch('ghops.shell.shell.get_repository_tags')
-    @patch('ghops.commands.config_repos.repos_remove')
+    @patch('repoindex.shell.shell.load_config')
+    @patch('repoindex.shell.shell.find_git_repos_from_config')
+    @patch('repoindex.shell.shell.get_metadata_store')
+    @patch('repoindex.shell.shell.get_repository_tags')
+    @patch('repoindex.commands.config_repos.repos_remove')
     def test_config_repos_remove(self, mock_repos_remove, mock_get_tags,
                                  mock_metadata_store, mock_find_repos,
                                  mock_load_config, capsys):
@@ -695,11 +695,11 @@ class TestShellConfig:
         captured = capsys.readouterr()
         assert 'Refreshing VFS' in captured.out
 
-    @patch('ghops.shell.shell.load_config')
-    @patch('ghops.shell.shell.find_git_repos_from_config')
-    @patch('ghops.shell.shell.get_metadata_store')
-    @patch('ghops.shell.shell.get_repository_tags')
-    @patch('ghops.commands.config_repos.repos_clear')
+    @patch('repoindex.shell.shell.load_config')
+    @patch('repoindex.shell.shell.find_git_repos_from_config')
+    @patch('repoindex.shell.shell.get_metadata_store')
+    @patch('repoindex.shell.shell.get_repository_tags')
+    @patch('repoindex.commands.config_repos.repos_clear')
     def test_config_repos_clear(self, mock_repos_clear, mock_get_tags,
                                 mock_metadata_store, mock_find_repos,
                                 mock_load_config, capsys):
@@ -732,10 +732,10 @@ class TestShellConfig:
         captured = capsys.readouterr()
         assert 'Refreshing VFS' in captured.out
 
-    @patch('ghops.shell.shell.load_config')
-    @patch('ghops.shell.shell.find_git_repos_from_config')
-    @patch('ghops.shell.shell.get_metadata_store')
-    @patch('ghops.shell.shell.get_repository_tags')
+    @patch('repoindex.shell.shell.load_config')
+    @patch('repoindex.shell.shell.find_git_repos_from_config')
+    @patch('repoindex.shell.shell.get_metadata_store')
+    @patch('repoindex.shell.shell.get_repository_tags')
     def test_config_no_args(self, mock_get_tags, mock_metadata_store,
                            mock_find_repos, mock_load_config, capsys):
         """Test config with no arguments."""
@@ -761,10 +761,10 @@ class TestShellConfig:
         captured = capsys.readouterr()
         assert 'Usage:' in captured.out
 
-    @patch('ghops.shell.shell.load_config')
-    @patch('ghops.shell.shell.find_git_repos_from_config')
-    @patch('ghops.shell.shell.get_metadata_store')
-    @patch('ghops.shell.shell.get_repository_tags')
+    @patch('repoindex.shell.shell.load_config')
+    @patch('repoindex.shell.shell.find_git_repos_from_config')
+    @patch('repoindex.shell.shell.get_metadata_store')
+    @patch('repoindex.shell.shell.get_repository_tags')
     def test_config_invalid_subcommand(self, mock_get_tags, mock_metadata_store,
                                        mock_find_repos, mock_load_config, capsys):
         """Test config with invalid subcommand."""
@@ -792,15 +792,15 @@ class TestShellConfig:
 
 
 class TestShellExport:
-    """Test export command."""
+    """Test export command (now shows help about using VFS for exports)."""
 
-    @patch('ghops.shell.shell.load_config')
-    @patch('ghops.shell.shell.find_git_repos_from_config')
-    @patch('ghops.shell.shell.get_metadata_store')
-    @patch('ghops.shell.shell.get_repository_tags')
-    def test_export_markdown(self, mock_get_tags, mock_metadata_store,
-                            mock_find_repos, mock_load_config, capsys):
-        """Test export markdown command."""
+    @patch('repoindex.shell.shell.load_config')
+    @patch('repoindex.shell.shell.find_git_repos_from_config')
+    @patch('repoindex.shell.shell.get_metadata_store')
+    @patch('repoindex.shell.shell.get_repository_tags')
+    def test_export_shows_vfs_help(self, mock_get_tags, mock_metadata_store,
+                                   mock_find_repos, mock_load_config, capsys):
+        """Test export command shows VFS-based export guidance."""
         # Setup mocks
         mock_load_config.return_value = {
             'general': {'repository_directories': ['/tmp/repos']},
@@ -816,78 +816,21 @@ class TestShellExport:
         # Create shell
         shell = GhopsShell()
 
-        # Execute export markdown
+        # Execute export with any args - should show guidance
         shell.do_export('markdown')
 
-        # Check output
+        # Check output contains VFS guidance
         captured = capsys.readouterr()
-        assert 'Exporting as markdown' in captured.out
+        assert 'VFS' in captured.out
+        assert 'metadata' in captured.out.lower() or 'JSON' in captured.out
 
-    @patch('ghops.shell.shell.load_config')
-    @patch('ghops.shell.shell.find_git_repos_from_config')
-    @patch('ghops.shell.shell.get_metadata_store')
-    @patch('ghops.shell.shell.get_repository_tags')
-    def test_export_hugo_with_output(self, mock_get_tags, mock_metadata_store,
-                                     mock_find_repos, mock_load_config, capsys):
-        """Test export hugo with output option."""
-        # Setup mocks
-        mock_load_config.return_value = {
-            'general': {'repository_directories': ['/tmp/repos']},
-            'repository_tags': {}
-        }
-        mock_find_repos.return_value = []
-
-        mock_store = MagicMock()
-        mock_metadata_store.return_value = mock_store
-
-        mock_get_tags.return_value = []
-
-        # Create shell
-        shell = GhopsShell()
-
-        # Execute export hugo with output
-        shell.do_export('hugo --output ./site')
-
-        # Check output
-        captured = capsys.readouterr()
-        assert 'Exporting as hugo' in captured.out
-
-    @patch('ghops.shell.shell.load_config')
-    @patch('ghops.shell.shell.find_git_repos_from_config')
-    @patch('ghops.shell.shell.get_metadata_store')
-    @patch('ghops.shell.shell.get_repository_tags')
-    def test_export_csv(self, mock_get_tags, mock_metadata_store,
-                       mock_find_repos, mock_load_config, capsys):
-        """Test export csv command."""
-        # Setup mocks
-        mock_load_config.return_value = {
-            'general': {'repository_directories': ['/tmp/repos']},
-            'repository_tags': {}
-        }
-        mock_find_repos.return_value = []
-
-        mock_store = MagicMock()
-        mock_metadata_store.return_value = mock_store
-
-        mock_get_tags.return_value = []
-
-        # Create shell
-        shell = GhopsShell()
-
-        # Execute export csv
-        shell.do_export('csv --output repos.csv')
-
-        # Check output
-        captured = capsys.readouterr()
-        assert 'Exporting as csv' in captured.out
-
-    @patch('ghops.shell.shell.load_config')
-    @patch('ghops.shell.shell.find_git_repos_from_config')
-    @patch('ghops.shell.shell.get_metadata_store')
-    @patch('ghops.shell.shell.get_repository_tags')
+    @patch('repoindex.shell.shell.load_config')
+    @patch('repoindex.shell.shell.find_git_repos_from_config')
+    @patch('repoindex.shell.shell.get_metadata_store')
+    @patch('repoindex.shell.shell.get_repository_tags')
     def test_export_no_args(self, mock_get_tags, mock_metadata_store,
                            mock_find_repos, mock_load_config, capsys):
-        """Test export with no arguments."""
+        """Test export with no arguments shows guidance."""
         # Setup mocks
         mock_load_config.return_value = {
             'general': {'repository_directories': ['/tmp/repos']},
@@ -906,20 +849,19 @@ class TestShellExport:
         # Execute export without args
         shell.do_export('')
 
-        # Check error message
+        # Check output contains guidance
         captured = capsys.readouterr()
-        assert 'Usage:' in captured.out
-        assert 'markdown, hugo, html, csv, json' in captured.out
+        assert 'VFS' in captured.out or 'external tools' in captured.out
 
 
 class TestShellDocs:
     """Test docs command (recently fixed imports)."""
 
-    @patch('ghops.shell.shell.load_config')
-    @patch('ghops.shell.shell.find_git_repos_from_config')
-    @patch('ghops.shell.shell.get_metadata_store')
-    @patch('ghops.shell.shell.get_repository_tags')
-    @patch('ghops.commands.docs.docs_detect')
+    @patch('repoindex.shell.shell.load_config')
+    @patch('repoindex.shell.shell.find_git_repos_from_config')
+    @patch('repoindex.shell.shell.get_metadata_store')
+    @patch('repoindex.shell.shell.get_repository_tags')
+    @patch('repoindex.commands.docs.docs_detect')
     def test_docs_detect(self, mock_docs_detect, mock_get_tags,
                         mock_metadata_store, mock_find_repos,
                         mock_load_config, mock_repos):
@@ -954,11 +896,11 @@ class TestShellDocs:
         call_args = mock_docs_detect.callback.call_args
         assert call_args[1]['repo_path'] == mock_repos[0]
 
-    @patch('ghops.shell.shell.load_config')
-    @patch('ghops.shell.shell.find_git_repos_from_config')
-    @patch('ghops.shell.shell.get_metadata_store')
-    @patch('ghops.shell.shell.get_repository_tags')
-    @patch('ghops.commands.docs.docs_build')
+    @patch('repoindex.shell.shell.load_config')
+    @patch('repoindex.shell.shell.find_git_repos_from_config')
+    @patch('repoindex.shell.shell.get_metadata_store')
+    @patch('repoindex.shell.shell.get_repository_tags')
+    @patch('repoindex.commands.docs.docs_build')
     def test_docs_build(self, mock_docs_build, mock_get_tags,
                        mock_metadata_store, mock_find_repos,
                        mock_load_config, mock_repos):
@@ -993,11 +935,11 @@ class TestShellDocs:
         call_args = mock_docs_build.callback.call_args
         assert call_args[1]['repo_path'] == mock_repos[0]
 
-    @patch('ghops.shell.shell.load_config')
-    @patch('ghops.shell.shell.find_git_repos_from_config')
-    @patch('ghops.shell.shell.get_metadata_store')
-    @patch('ghops.shell.shell.get_repository_tags')
-    @patch('ghops.commands.docs.docs_deploy')
+    @patch('repoindex.shell.shell.load_config')
+    @patch('repoindex.shell.shell.find_git_repos_from_config')
+    @patch('repoindex.shell.shell.get_metadata_store')
+    @patch('repoindex.shell.shell.get_repository_tags')
+    @patch('repoindex.commands.docs.docs_deploy')
     def test_docs_deploy(self, mock_docs_deploy, mock_get_tags,
                         mock_metadata_store, mock_find_repos,
                         mock_load_config, mock_repos):
@@ -1033,12 +975,12 @@ class TestShellDocs:
         assert call_args[1]['repo_path'] == mock_repos[0]
         assert call_args[1]['branch'] == 'gh-pages'
 
-    @patch('ghops.shell.shell.load_config')
-    @patch('ghops.shell.shell.find_git_repos_from_config')
-    @patch('ghops.shell.shell.get_metadata_store')
-    @patch('ghops.shell.shell.get_repository_tags')
-    @patch('ghops.git_ops.utils.get_repos_from_vfs_path')
-    @patch('ghops.commands.docs.docs_detect')
+    @patch('repoindex.shell.shell.load_config')
+    @patch('repoindex.shell.shell.find_git_repos_from_config')
+    @patch('repoindex.shell.shell.get_metadata_store')
+    @patch('repoindex.shell.shell.get_repository_tags')
+    @patch('repoindex.git_ops.utils.get_repos_from_vfs_path')
+    @patch('repoindex.commands.docs.docs_detect')
     def test_docs_detect_with_vfs_path(self, mock_docs_detect, mock_get_repos_from_vfs,
                                        mock_get_tags, mock_metadata_store,
                                        mock_find_repos, mock_load_config, mock_repos):
@@ -1071,10 +1013,10 @@ class TestShellDocs:
         # Verify docs_detect was called
         mock_docs_detect.callback.assert_called_once()
 
-    @patch('ghops.shell.shell.load_config')
-    @patch('ghops.shell.shell.find_git_repos_from_config')
-    @patch('ghops.shell.shell.get_metadata_store')
-    @patch('ghops.shell.shell.get_repository_tags')
+    @patch('repoindex.shell.shell.load_config')
+    @patch('repoindex.shell.shell.find_git_repos_from_config')
+    @patch('repoindex.shell.shell.get_metadata_store')
+    @patch('repoindex.shell.shell.get_repository_tags')
     def test_docs_no_args(self, mock_get_tags, mock_metadata_store,
                          mock_find_repos, mock_load_config, capsys):
         """Test docs with no arguments."""
@@ -1100,10 +1042,10 @@ class TestShellDocs:
         captured = capsys.readouterr()
         assert 'Usage:' in captured.out
 
-    @patch('ghops.shell.shell.load_config')
-    @patch('ghops.shell.shell.find_git_repos_from_config')
-    @patch('ghops.shell.shell.get_metadata_store')
-    @patch('ghops.shell.shell.get_repository_tags')
+    @patch('repoindex.shell.shell.load_config')
+    @patch('repoindex.shell.shell.find_git_repos_from_config')
+    @patch('repoindex.shell.shell.get_metadata_store')
+    @patch('repoindex.shell.shell.get_repository_tags')
     def test_docs_invalid_subcommand(self, mock_get_tags, mock_metadata_store,
                                     mock_find_repos, mock_load_config,
                                     mock_repos, capsys):
@@ -1134,11 +1076,11 @@ class TestShellDocs:
         captured = capsys.readouterr()
         assert 'Unknown' in captured.out
 
-    @patch('ghops.shell.shell.load_config')
-    @patch('ghops.shell.shell.find_git_repos_from_config')
-    @patch('ghops.shell.shell.get_metadata_store')
-    @patch('ghops.shell.shell.get_repository_tags')
-    @patch('ghops.git_ops.utils.get_repos_from_vfs_path')
+    @patch('repoindex.shell.shell.load_config')
+    @patch('repoindex.shell.shell.find_git_repos_from_config')
+    @patch('repoindex.shell.shell.get_metadata_store')
+    @patch('repoindex.shell.shell.get_repository_tags')
+    @patch('repoindex.git_ops.utils.get_repos_from_vfs_path')
     def test_docs_no_repo_found(self, mock_get_repos_from_vfs, mock_get_tags,
                                 mock_metadata_store, mock_find_repos,
                                 mock_load_config, capsys):
@@ -1172,10 +1114,10 @@ class TestShellDocs:
 class TestShellEdgeCases:
     """Test edge cases and error handling."""
 
-    @patch('ghops.shell.shell.load_config')
-    @patch('ghops.shell.shell.find_git_repos_from_config')
-    @patch('ghops.shell.shell.get_metadata_store')
-    @patch('ghops.shell.shell.get_repository_tags')
+    @patch('repoindex.shell.shell.load_config')
+    @patch('repoindex.shell.shell.find_git_repos_from_config')
+    @patch('repoindex.shell.shell.get_metadata_store')
+    @patch('repoindex.shell.shell.get_repository_tags')
     def test_git_no_args(self, mock_get_tags, mock_metadata_store,
                         mock_find_repos, mock_load_config, capsys):
         """Test git with no arguments."""
@@ -1202,10 +1144,10 @@ class TestShellEdgeCases:
         assert 'Usage:' in captured.out
         assert 'Supported:' in captured.out
 
-    @patch('ghops.shell.shell.load_config')
-    @patch('ghops.shell.shell.find_git_repos_from_config')
-    @patch('ghops.shell.shell.get_metadata_store')
-    @patch('ghops.shell.shell.get_repository_tags')
+    @patch('repoindex.shell.shell.load_config')
+    @patch('repoindex.shell.shell.find_git_repos_from_config')
+    @patch('repoindex.shell.shell.get_metadata_store')
+    @patch('repoindex.shell.shell.get_repository_tags')
     def test_git_unsupported_command(self, mock_get_tags, mock_metadata_store,
                                      mock_find_repos, mock_load_config,
                                      mock_repos, capsys):
@@ -1233,11 +1175,11 @@ class TestShellEdgeCases:
         captured = capsys.readouterr()
         assert 'not a supported' in captured.out
 
-    @patch('ghops.shell.shell.load_config')
-    @patch('ghops.shell.shell.find_git_repos_from_config')
-    @patch('ghops.shell.shell.get_metadata_store')
-    @patch('ghops.shell.shell.get_repository_tags')
-    @patch('ghops.commands.clone.clone_handler')
+    @patch('repoindex.shell.shell.load_config')
+    @patch('repoindex.shell.shell.find_git_repos_from_config')
+    @patch('repoindex.shell.shell.get_metadata_store')
+    @patch('repoindex.shell.shell.get_repository_tags')
+    @patch('repoindex.commands.clone.clone_handler')
     def test_clone_user_missing_username(self, mock_handler, mock_get_tags,
                                          mock_metadata_store, mock_find_repos,
                                          mock_load_config, capsys):
@@ -1264,11 +1206,11 @@ class TestShellEdgeCases:
         captured = capsys.readouterr()
         assert 'Error' in captured.out or 'requires a username' in captured.out
 
-    @patch('ghops.shell.shell.load_config')
-    @patch('ghops.shell.shell.find_git_repos_from_config')
-    @patch('ghops.shell.shell.get_metadata_store')
-    @patch('ghops.shell.shell.get_repository_tags')
-    @patch('ghops.commands.config_repos.repos_add')
+    @patch('repoindex.shell.shell.load_config')
+    @patch('repoindex.shell.shell.find_git_repos_from_config')
+    @patch('repoindex.shell.shell.get_metadata_store')
+    @patch('repoindex.shell.shell.get_repository_tags')
+    @patch('repoindex.commands.config_repos.repos_add')
     def test_config_repos_add_no_path(self, mock_repos_add, mock_get_tags,
                                       mock_metadata_store, mock_find_repos,
                                       mock_load_config, capsys):
@@ -1299,12 +1241,12 @@ class TestShellEdgeCases:
 class TestShellIntegration:
     """Integration tests for shell commands."""
 
-    @patch('ghops.shell.shell.load_config')
-    @patch('ghops.shell.shell.find_git_repos_from_config')
-    @patch('ghops.shell.shell.get_metadata_store')
-    @patch('ghops.shell.shell.get_repository_tags')
-    @patch('ghops.git_ops.utils.get_repos_from_vfs_path')
-    @patch('ghops.commands.git.git_status')
+    @patch('repoindex.shell.shell.load_config')
+    @patch('repoindex.shell.shell.find_git_repos_from_config')
+    @patch('repoindex.shell.shell.get_metadata_store')
+    @patch('repoindex.shell.shell.get_repository_tags')
+    @patch('repoindex.git_ops.utils.get_repos_from_vfs_path')
+    @patch('repoindex.commands.git.git_status')
     def test_git_recursive_from_different_vfs_paths(self, mock_git_status,
                                                      mock_get_repos, mock_get_tags,
                                                      mock_metadata_store,
@@ -1341,11 +1283,11 @@ class TestShellIntegration:
         assert 'Running' in captured.out
         assert 'repositories' in captured.out
 
-    @patch('ghops.shell.shell.load_config')
-    @patch('ghops.shell.shell.find_git_repos_from_config')
-    @patch('ghops.shell.shell.get_metadata_store')
-    @patch('ghops.shell.shell.get_repository_tags')
-    @patch('ghops.commands.docs.docs_detect')
+    @patch('repoindex.shell.shell.load_config')
+    @patch('repoindex.shell.shell.find_git_repos_from_config')
+    @patch('repoindex.shell.shell.get_metadata_store')
+    @patch('repoindex.shell.shell.get_repository_tags')
+    @patch('repoindex.commands.docs.docs_detect')
     def test_docs_in_real_fs_mode(self, mock_docs_detect, mock_get_tags,
                                   mock_metadata_store, mock_find_repos,
                                   mock_load_config, mock_repos):

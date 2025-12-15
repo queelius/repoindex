@@ -9,7 +9,7 @@ import json
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-from ghops.pypi import (
+from repoindex.pypi import (
     detect_pypi_package,
     check_pypi_package,
     is_package_outdated,
@@ -93,7 +93,7 @@ description = A test package
         self.assertFalse(result['is_published'])
         self.assertIsNone(result['pypi_info'])
     
-    @patch('ghops.pypi.check_pypi_package')
+    @patch('repoindex.pypi.check_pypi_package')
     def test_published_package(self, mock_check_pypi):
         """Test detection of published package"""
         # Setup package file
@@ -219,7 +219,7 @@ name = invalid-cfg-package
 class TestCheckPypiPackage(unittest.TestCase):
     """Test PyPI API interaction"""
     
-    @patch('ghops.pypi.requests.get')
+    @patch('repoindex.pypi.requests.get')
     def test_check_package_success(self, mock_get):
         """Test successful PyPI API call"""
         mock_response = MagicMock()
@@ -243,7 +243,7 @@ class TestCheckPypiPackage(unittest.TestCase):
         self.assertEqual(result['version'], '2.1.0')
         self.assertIn('url', result)
     
-    @patch('ghops.pypi.requests.get')
+    @patch('repoindex.pypi.requests.get')
     def test_check_package_not_found(self, mock_get):
         """Test PyPI API call for non-existent package"""
         mock_response = MagicMock()
@@ -255,7 +255,7 @@ class TestCheckPypiPackage(unittest.TestCase):
         self.assertIsNotNone(result)
         self.assertFalse(result['exists'])
     
-    @patch('ghops.pypi.requests.get')
+    @patch('repoindex.pypi.requests.get')
     def test_check_package_network_error(self, mock_get):
         """Test PyPI API call with network error"""
         mock_get.side_effect = Exception("Network error")
@@ -383,8 +383,8 @@ class TestIsPackageOutdated(unittest.TestCase):
         """Clean up test directory"""
         shutil.rmtree(self.temp_dir)
     
-    @patch('ghops.pypi.check_pypi_package')
-    @patch('ghops.pypi.get_local_package_version')
+    @patch('repoindex.pypi.check_pypi_package')
+    @patch('repoindex.pypi.get_local_package_version')
     def test_package_is_outdated(self, mock_get_local, mock_check_pypi):
         """Test detection of outdated package"""
         # Mock local version
@@ -401,8 +401,8 @@ class TestIsPackageOutdated(unittest.TestCase):
         
         self.assertTrue(result)
     
-    @patch('ghops.pypi.check_pypi_package')
-    @patch('ghops.pypi.get_local_package_version')
+    @patch('repoindex.pypi.check_pypi_package')
+    @patch('repoindex.pypi.get_local_package_version')
     def test_package_is_current(self, mock_get_local, mock_check_pypi):
         """Test detection of current package"""
         # Mock local version
@@ -419,7 +419,7 @@ class TestIsPackageOutdated(unittest.TestCase):
         
         self.assertFalse(result)
     
-    @patch('ghops.pypi.check_pypi_package')
+    @patch('repoindex.pypi.check_pypi_package')
     def test_package_not_on_pypi(self, mock_check_pypi):
         """Test when package is not available on PyPI"""
         mock_check_pypi.return_value = {'exists': False}
@@ -450,7 +450,7 @@ version = "1.2.3"
         pyproject_path = Path(self.temp_dir) / "pyproject.toml"
         pyproject_path.write_text(pyproject_content)
         
-        from ghops.pypi import get_local_package_version
+        from repoindex.pypi import get_local_package_version
         version = get_local_package_version(self.temp_dir, "test-package")
         
         self.assertEqual(version, "1.2.3")
@@ -465,7 +465,7 @@ version = "2.1.0"
         pyproject_path = Path(self.temp_dir) / "pyproject.toml"
         pyproject_path.write_text(pyproject_content)
         
-        from ghops.pypi import get_local_package_version
+        from repoindex.pypi import get_local_package_version
         version = get_local_package_version(self.temp_dir, "test-package")
         
         self.assertEqual(version, "2.1.0")
@@ -484,14 +484,14 @@ setup(
         setup_path = Path(self.temp_dir) / "setup.py"
         setup_path.write_text(setup_content)
         
-        from ghops.pypi import get_local_package_version
+        from repoindex.pypi import get_local_package_version
         version = get_local_package_version(self.temp_dir, "test-package")
         
         self.assertEqual(version, "3.0.1")
     
     def test_get_version_no_packaging_files(self):
         """Test version extraction when no packaging files exist"""
-        from ghops.pypi import get_local_package_version
+        from repoindex.pypi import get_local_package_version
         version = get_local_package_version(self.temp_dir, "test-package")
         
         self.assertIsNone(version)
@@ -504,7 +504,7 @@ setup(
         pyproject_path = Path(self.temp_dir) / "pyproject.toml"
         pyproject_path.write_text(pyproject_content)
         
-        from ghops.pypi import get_local_package_version
+        from repoindex.pypi import get_local_package_version
         version = get_local_package_version(self.temp_dir, "test-package")
         
         self.assertIsNone(version)
@@ -521,42 +521,42 @@ class TestPackageVersionComparison(unittest.TestCase):
         """Clean up test directory"""
         shutil.rmtree(self.temp_dir)
     
-    @patch('ghops.pypi.get_local_package_version')
+    @patch('repoindex.pypi.get_local_package_version')
     def test_package_is_outdated_local_older(self, mock_get_local):
         """Test package is outdated when local version is older"""
         mock_get_local.return_value = "1.0.0"
         
-        from ghops.pypi import is_package_outdated
+        from repoindex.pypi import is_package_outdated
         result = is_package_outdated(self.temp_dir, "test-package", "2.0.0")
         
         self.assertTrue(result)
     
-    @patch('ghops.pypi.get_local_package_version')
+    @patch('repoindex.pypi.get_local_package_version')
     def test_package_is_current_same_version(self, mock_get_local):
         """Test package is current when versions match"""
         mock_get_local.return_value = "1.0.0"
         
-        from ghops.pypi import is_package_outdated
+        from repoindex.pypi import is_package_outdated
         result = is_package_outdated(self.temp_dir, "test-package", "1.0.0")
         
         self.assertFalse(result)
     
-    @patch('ghops.pypi.get_local_package_version')
+    @patch('repoindex.pypi.get_local_package_version')
     def test_package_is_current_local_newer(self, mock_get_local):
         """Test package is current when local version is newer"""
         mock_get_local.return_value = "2.0.0"
         
-        from ghops.pypi import is_package_outdated
+        from repoindex.pypi import is_package_outdated
         result = is_package_outdated(self.temp_dir, "test-package", "1.0.0")
         
         self.assertFalse(result)
     
-    @patch('ghops.pypi.get_local_package_version')
+    @patch('repoindex.pypi.get_local_package_version')
     def test_package_no_local_version(self, mock_get_local):
         """Test when local version cannot be determined"""
         mock_get_local.return_value = None
         
-        from ghops.pypi import is_package_outdated
+        from repoindex.pypi import is_package_outdated
         result = is_package_outdated(self.temp_dir, "test-package", "1.0.0")
         
         self.assertFalse(result)

@@ -9,7 +9,7 @@ import json
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-from ghops.core import (
+from repoindex.core import (
     get_available_licenses as list_licenses,
     get_license_template as show_license_template,
     add_license_to_repo
@@ -37,7 +37,7 @@ class TestLicenseCommands(unittest.TestCase):
         os.chdir(self.original_cwd)
         shutil.rmtree(self.temp_dir)
 
-    @patch('ghops.core.run_command')
+    @patch('repoindex.core.run_command')
     def test_list_licenses_success(self, mock_run_command):
         """Test successful listing of licenses"""
         mock_response = json.dumps([
@@ -53,7 +53,7 @@ class TestLicenseCommands(unittest.TestCase):
 
         mock_run_command.assert_called_once_with("gh api /licenses", capture_output=True, check=False)
 
-    @patch('ghops.core.run_command')
+    @patch('repoindex.core.run_command')
     def test_list_licenses_command_failure(self, mock_run_command):
         """Test listing licenses when command fails"""
         mock_run_command.return_value = (None, 1)
@@ -63,7 +63,7 @@ class TestLicenseCommands(unittest.TestCase):
 
         mock_run_command.assert_called_once_with("gh api /licenses", capture_output=True, check=False)
 
-    @patch('ghops.core.run_command')
+    @patch('repoindex.core.run_command')
     def test_list_licenses_table_output(self, mock_run_command):
         """Test listing licenses with table output"""
         mock_response = json.dumps([
@@ -76,7 +76,7 @@ class TestLicenseCommands(unittest.TestCase):
 
         mock_run_command.assert_called_once_with("gh api /licenses", capture_output=True, check=False)
 
-    @patch('ghops.core.run_command')
+    @patch('repoindex.core.run_command')
     def test_show_license_template_success(self, mock_run_command):
         """Test successful showing of a license template"""
         mock_response = json.dumps({
@@ -91,7 +91,7 @@ class TestLicenseCommands(unittest.TestCase):
 
         mock_run_command.assert_called_once_with("gh api /licenses/mit", capture_output=True, check=False)
 
-    @patch('ghops.core.run_command')
+    @patch('repoindex.core.run_command')
     def test_show_license_template_command_failure(self, mock_run_command):
         """Test showing license when command fails"""
         mock_run_command.return_value = (None, 1)
@@ -101,7 +101,7 @@ class TestLicenseCommands(unittest.TestCase):
 
         mock_run_command.assert_called_once_with("gh api /licenses/invalid", capture_output=True, check=False)
 
-    @patch('ghops.core.run_command')
+    @patch('repoindex.core.run_command')
     def test_show_license_template_table_output(self, mock_run_command):
         """Test showing license template with table output"""
         mock_response = json.dumps({
@@ -116,7 +116,7 @@ class TestLicenseCommands(unittest.TestCase):
 
         mock_run_command.assert_called_once_with("gh api /licenses/mit", capture_output=True, check=False)
 
-    @patch('ghops.core.run_command')
+    @patch('repoindex.core.run_command')
     def test_add_license_to_repo_success(self, mock_run_command):
         """Test successful addition of license to repository"""
         mock_response = json.dumps({
@@ -150,7 +150,7 @@ class TestLicenseCommands(unittest.TestCase):
 
         mock_run_command.assert_called_once_with("gh api /licenses/mit", capture_output=True, check=False)
 
-    @patch('ghops.core.run_command')
+    @patch('repoindex.core.run_command')
     def test_add_license_to_repo_dry_run(self, mock_run_command):
         """Test adding license in dry run mode"""
         mock_response = json.dumps({
@@ -203,7 +203,7 @@ class TestLicenseCommands(unittest.TestCase):
             content = f.read()
             self.assertEqual(content, "Existing license content")
     
-    @patch('ghops.core.run_command')
+    @patch('repoindex.core.run_command')
     def test_add_license_to_repo_existing_file_with_force(self, mock_run_command):
         """Test adding license when file exists and force is True"""
         # Create existing LICENSE file
@@ -237,7 +237,7 @@ class TestLicenseCommands(unittest.TestCase):
 
         mock_run_command.assert_called_once_with("gh api /licenses/mit", capture_output=True, check=False)
 
-    @patch('ghops.core.run_command')
+    @patch('repoindex.core.run_command')
     def test_add_license_to_repo_command_failure(self, mock_run_command):
         """Test adding license when GitHub API command fails"""
         mock_run_command.return_value = (None, 1)
@@ -262,7 +262,7 @@ class TestLicenseCommands(unittest.TestCase):
 
         mock_run_command.assert_called_once_with("gh api /licenses/invalid", capture_output=True, check=False)
 
-    @patch('ghops.core.run_command')
+    @patch('repoindex.core.run_command')
     def test_add_license_to_repo_invalid_json(self, mock_run_command):
         """Test adding license with invalid JSON response"""
         mock_run_command.return_value = ("invalid json", 0)
@@ -285,8 +285,8 @@ class TestLicenseCommands(unittest.TestCase):
         license_file = Path(self.test_repo) / "LICENSE"
         self.assertFalse(license_file.exists())
 
-    @patch('ghops.core.run_command')
-    @patch('ghops.core.datetime')
+    @patch('repoindex.core.run_command')
+    @patch('repoindex.core.datetime')
     def test_add_license_to_repo_default_year(self, mock_datetime, mock_run_command):
         """Test adding license with default year"""
         # Mock datetime to return a specific year
@@ -316,7 +316,7 @@ class TestLicenseCommands(unittest.TestCase):
             content = f.read()
             self.assertIn("Copyright (c) 2023 Test Author", content)
 
-    @patch('ghops.core.run_command')
+    @patch('repoindex.core.run_command')
     def test_add_license_to_repo_no_author_info(self, mock_run_command):
         """Test adding license without author information"""
         mock_response = json.dumps({

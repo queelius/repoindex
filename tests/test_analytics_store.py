@@ -13,7 +13,7 @@ import tempfile
 import sqlite3
 from pathlib import Path
 from datetime import datetime, timedelta
-from ghops.analytics_store import AnalyticsStore, get_analytics_db_path
+from repoindex.analytics_store import AnalyticsStore, get_analytics_db_path
 
 
 class TestAnalyticsStore:
@@ -563,12 +563,12 @@ class TestAnalyticsDBPath:
         path = get_analytics_db_path()
 
         assert path.name == 'analytics.db'
-        assert '.ghops' in str(path)
+        assert '.repoindex' in str(path)
 
     def test_environment_override(self, monkeypatch):
         """Test overriding path via environment variable."""
         custom_path = '/tmp/custom_analytics.db'
-        monkeypatch.setenv('GHOPS_ANALYTICS_DB', custom_path)
+        monkeypatch.setenv('REPOINDEX_ANALYTICS_DB', custom_path)
 
         path = get_analytics_db_path()
 

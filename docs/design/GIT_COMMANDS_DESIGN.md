@@ -2,7 +2,7 @@
 
 ## Vision
 
-Replicate familiar git commands in ghops, allowing users to run git operations on repositories through the VFS. This is especially powerful in the shell where users can execute git commands on multiple repositories at once.
+Replicate familiar git commands in repoindex, allowing users to run git operations on repositories through the VFS. This is especially powerful in the shell where users can execute git commands on multiple repositories at once.
 
 ## Key Design Principles
 
@@ -17,39 +17,39 @@ Replicate familiar git commands in ghops, allowing users to run git operations o
 ### In Shell
 ```bash
 # Navigate to VFS location
-ghops:/> cd /by-tag/work/active
+repoindex:/> cd /by-tag/work/active
 
 # Run git status on ALL repos with that tag
-ghops:/by-tag/work/active> git status
+repoindex:/by-tag/work/active> git status
 
 # See recent commits across all active work repos
-ghops:/by-tag/work/active> git log --oneline -5
+repoindex:/by-tag/work/active> git log --oneline -5
 
 # Pull updates for all active work repos
-ghops:/by-tag/work/active> git pull
+repoindex:/by-tag/work/active> git pull
 
 # Navigate to specific repo
-ghops:/> cd /repos/myproject
+repoindex:/> cd /repos/myproject
 
 # Git commands work on single repo
-ghops:/repos/myproject> git log --graph --all
-ghops:/repos/myproject> git diff
-ghops:/repos/myproject> git commit -m "Update"
+repoindex:/repos/myproject> git log --graph --all
+repoindex:/repos/myproject> git diff
+repoindex:/repos/myproject> git commit -m "Update"
 ```
 
 ### In CLI
 ```bash
 # Status for specific VFS path
-ghops git status /by-tag/work/active
+repoindex git status /by-tag/work/active
 
 # Log for specific repo
-ghops git log /repos/myproject --oneline -5
+repoindex git log /repos/myproject --oneline -5
 
 # Pull all repos in directory
-ghops git pull /by-tag/needs-update
+repoindex git pull /by-tag/needs-update
 
 # Diff across multiple repos
-ghops git diff --name-status /by-language/Python
+repoindex git diff --name-status /by-language/Python
 ```
 
 ## Command Categories
@@ -83,27 +83,27 @@ ghops git diff --name-status /by-language/Python
 ## Implementation Structure
 
 ```
-ghops git <command> [VFS_PATH] [options]
+repoindex git <command> [VFS_PATH] [options]
 ```
 
 ### Examples:
 ```bash
 # CLI mode - path is explicit
-ghops git status /by-tag/work/active
-ghops git log /repos/myproject --oneline -10
-ghops git pull /by-tag/needs-update --confirm
+repoindex git status /by-tag/work/active
+repoindex git log /repos/myproject --oneline -10
+repoindex git pull /by-tag/needs-update --confirm
 
 # Shell mode - path is from cwd
-ghops:/by-tag/work/active> git status
-ghops:/repos/myproject> git log --oneline -10
-ghops:/by-tag/needs-update> git pull
+repoindex:/by-tag/work/active> git status
+repoindex:/repos/myproject> git log --oneline -10
+repoindex:/by-tag/needs-update> git pull
 ```
 
 ## Output Formats
 
 ### Single Repository
 ```bash
-ghops git status /repos/myproject
+repoindex git status /repos/myproject
 
 Repository: myproject (/home/user/repos/myproject)
 On branch: main
@@ -116,7 +116,7 @@ Changes not staged for commit:
 
 ### Multiple Repositories
 ```bash
-ghops git status /by-tag/work/active
+repoindex git status /by-tag/work/active
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Repository: myproject
@@ -136,7 +136,7 @@ Summary: 2 repositories, 1 with changes
 
 ### JSONL Mode
 ```bash
-ghops git status /by-tag/work/active --json
+repoindex git status /by-tag/work/active --json
 
 {"repo": "myproject", "path": "/home/user/repos/myproject", "branch": "main", "clean": false, "modified": 2}
 {"repo": "another-project", "path": "/home/user/repos/another", "branch": "develop", "clean": true, "modified": 0}
@@ -146,7 +146,7 @@ ghops git status /by-tag/work/active --json
 
 ### `git status`
 ```bash
-Usage: ghops git status [VFS_PATH] [OPTIONS]
+Usage: repoindex git status [VFS_PATH] [OPTIONS]
 
 Show working tree status for repositories.
 
@@ -159,7 +159,7 @@ Options:
 
 ### `git log`
 ```bash
-Usage: ghops git log [VFS_PATH] [OPTIONS]
+Usage: repoindex git log [VFS_PATH] [OPTIONS]
 
 Show commit history.
 
@@ -175,7 +175,7 @@ Options:
 
 ### `git pull`
 ```bash
-Usage: ghops git pull [VFS_PATH] [OPTIONS]
+Usage: repoindex git pull [VFS_PATH] [OPTIONS]
 
 Pull changes from remote.
 
@@ -189,7 +189,7 @@ Options:
 
 ### `git diff`
 ```bash
-Usage: ghops git diff [VFS_PATH] [OPTIONS]
+Usage: repoindex git diff [VFS_PATH] [OPTIONS]
 
 Show changes.
 
@@ -207,19 +207,19 @@ In the shell, git commands should:
 
 1. **Use current VFS directory as default path**
    ```bash
-   ghops:/by-tag/work/active> git status
-   # Equivalent to: ghops git status /by-tag/work/active
+   repoindex:/by-tag/work/active> git status
+   # Equivalent to: repoindex git status /by-tag/work/active
    ```
 
 2. **Support relative VFS paths**
    ```bash
-   ghops:/by-tag> git status work/active
-   # Equivalent to: ghops git status /by-tag/work/active
+   repoindex:/by-tag> git status work/active
+   # Equivalent to: repoindex git status /by-tag/work/active
    ```
 
 3. **Work on single repos**
    ```bash
-   ghops:/repos/myproject> git log --oneline -10
+   repoindex:/repos/myproject> git log --oneline -10
    # Shows log for just myproject
    ```
 
@@ -227,7 +227,7 @@ In the shell, git commands should:
 
 ### Confirmation Prompts
 ```bash
-ghops git pull /by-tag/work/active
+repoindex git pull /by-tag/work/active
 
 Found 5 repositories. Pull changes? [y/N]: y
 
@@ -240,7 +240,7 @@ Summary: 2/5 successful, 1 failed
 
 ### Dry Run Mode
 ```bash
-ghops git push /by-tag/ready-to-publish --dry-run
+repoindex git push /by-tag/ready-to-publish --dry-run
 
 Would push to remote:
   myproject (main): 2 commits
@@ -278,8 +278,8 @@ Use --confirm to actually push.
 ## File Structure
 
 ```
-ghops/commands/git.py          # Main git command group
-ghops/git_ops/
+repoindex/commands/git.py          # Main git command group
+repoindex/git_ops/
     __init__.py
     status.py                   # Git status operations
     log.py                      # Git log operations
@@ -345,8 +345,8 @@ def get_repos_from_vfs_path(vfs_path: str) -> List[str]:
 ### Daily Status Check
 ```bash
 # In shell
-ghops:/> cd /by-tag/work/active
-ghops:/by-tag/work/active> git status --dirty-only
+repoindex:/> cd /by-tag/work/active
+repoindex:/by-tag/work/active> git status --dirty-only
 
 # Shows only repos with uncommitted changes
 ```
@@ -354,7 +354,7 @@ ghops:/by-tag/work/active> git status --dirty-only
 ### Pull All Work Repos
 ```bash
 # In CLI
-ghops git pull /by-tag/work --confirm
+repoindex git pull /by-tag/work --confirm
 
 # Pulls updates for all work-tagged repos with confirmation
 ```
@@ -362,7 +362,7 @@ ghops git pull /by-tag/work --confirm
 ### View Recent Activity
 ```bash
 # In shell
-ghops:/by-tag/client/acme> git log --since="1 week ago" --oneline
+repoindex:/by-tag/client/acme> git log --since="1 week ago" --oneline
 
 # Shows commits from last week across all client repos
 ```
@@ -370,8 +370,8 @@ ghops:/by-tag/client/acme> git log --since="1 week ago" --oneline
 ### Bulk Operations
 ```bash
 # Push all ready repos
-ghops git push /by-tag/ready-to-publish --dry-run  # Check first
-ghops git push /by-tag/ready-to-publish --confirm  # Then push
+repoindex git push /by-tag/ready-to-publish --dry-run  # Check first
+repoindex git push /by-tag/ready-to-publish --confirm  # Then push
 ```
 
 ## Questions to Consider
@@ -380,7 +380,7 @@ ghops git push /by-tag/ready-to-publish --confirm  # Then push
 2. Should we support git aliases/custom shortcuts?
 3. Should there be a `--all` flag to run on all repos?
 4. How to handle repos in different states (some ahead, some behind)?
-5. Should we add ghops-specific enhancements (like auto-fix, bulk tagging based on git state)?
+5. Should we add repoindex-specific enhancements (like auto-fix, bulk tagging based on git state)?
 
 ## Next Steps
 

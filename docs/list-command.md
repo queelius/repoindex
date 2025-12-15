@@ -1,6 +1,6 @@
-# Enhanced ghops list Command
+# Enhanced repoindex list Command
 
-The `ghops list` command now provides rich metadata about repositories, including GitHub statistics when available.
+The `repoindex list` command now provides rich metadata about repositories, including GitHub statistics when available.
 
 ## Output Format
 
@@ -50,32 +50,32 @@ When using `--dedup` or `--dedup-details`, the command warns about memory usage 
 
 ### 1. Basic Repository Discovery
 ```bash
-ghops list --dir ~/projects
+repoindex list --dir ~/projects
 ```
 
 ### 2. Find Popular Projects
 ```bash
-ghops list --dir ~/projects | jq 'select(.github.stars > 10)'
+repoindex list --dir ~/projects | jq 'select(.github.stars > 10)'
 ```
 
 ### 3. Language Analysis
 ```bash
-ghops list --dir ~/projects | jq -s 'group_by(.github.language) | map({language: .[0].github.language, count: length})'
+repoindex list --dir ~/projects | jq -s 'group_by(.github.language) | map({language: .[0].github.language, count: length})'
 ```
 
 ### 4. Generate Reports
 ```bash
 # CSV format
 echo "name,stars,language" > repos.csv
-ghops list --dir ~/projects | jq -r '[.name, .github.stars, .github.language] | @csv' >> repos.csv
+repoindex list --dir ~/projects | jq -r '[.name, .github.stars, .github.language] | @csv' >> repos.csv
 
 # Markdown format
-ghops list --dir ~/projects | jq -r '"## " + .name + "\n- **Language:** " + .github.language + "\n- **Stars:** " + (.github.stars | tostring)'
+repoindex list --dir ~/projects | jq -r '"## " + .name + "\n- **Language:** " + .github.language + "\n- **Stars:** " + (.github.stars | tostring)'
 ```
 
 ### 5. Repository Health Assessment
 ```bash
-ghops list --dir ~/projects | jq '{
+repoindex list --dir ~/projects | jq '{
   name: .name,
   health_score: (
     (if .github.stars > 0 then 1 else 0 end) +
@@ -88,8 +88,8 @@ ghops list --dir ~/projects | jq '{
 ### 6. Combine with Status Command
 ```bash
 # Get comprehensive repository analysis
-ghops list --dir ~/projects > repos.jsonl
-ghops status --dir ~/projects > status.jsonl
+repoindex list --dir ~/projects > repos.jsonl
+repoindex status --dir ~/projects > status.jsonl
 
 # Join and analyze
 jq -s 'map({name: .name, github_stars: .github.stars, language: .github.language})' repos.jsonl

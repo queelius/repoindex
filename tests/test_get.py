@@ -9,7 +9,7 @@ import json
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-from ghops.commands.clone import get_user_repositories, clone_repositories
+from repoindex.commands.clone import get_user_repositories, clone_repositories
 
 
 class TestGetCommand(unittest.TestCase):
@@ -29,7 +29,7 @@ class TestGetCommand(unittest.TestCase):
         os.chdir(self.original_cwd)
         shutil.rmtree(self.temp_dir)
 
-    @patch('ghops.commands.clone.run_command')
+    @patch('repoindex.commands.clone.run_command')
     def test_get_user_repositories_basic(self, mock_run_command):
         """Test getting repository list from GitHub"""
         # Mock GitHub CLI response - must return tuple (stdout, returncode)
@@ -53,7 +53,7 @@ class TestGetCommand(unittest.TestCase):
         self.assertEqual(repos[0]['name'], 'repo1')
         self.assertEqual(repos[1]['name'], 'repo2')
 
-    @patch('ghops.commands.clone.run_command')
+    @patch('repoindex.commands.clone.run_command')
     def test_clone_repositories_with_ignore_list(self, mock_run_command):
         """Test repository cloning with ignore list"""
         # Mock git clone responses - must return tuple (stdout, returncode)
@@ -87,7 +87,7 @@ class TestGetCommand(unittest.TestCase):
         self.assertNotIn('git clone "https://github.com/user/ignored-repo.git"', clone_calls)
 
 
-    @patch('ghops.commands.clone.run_command')
+    @patch('repoindex.commands.clone.run_command')
     def test_get_user_repositories_no_repos_found(self, mock_run_command):
         """Test behavior when no repositories are found"""
         # Mock empty GitHub CLI response - must return tuple
@@ -101,7 +101,7 @@ class TestGetCommand(unittest.TestCase):
         self.assertEqual(len(repos), 0)
 
 
-    @patch('ghops.commands.clone.run_command')
+    @patch('repoindex.commands.clone.run_command')
     def test_clone_repositories_failure(self, mock_run_command):
         """Test behavior when git clone fails"""
         # Mock git clone failure
@@ -120,7 +120,7 @@ class TestGetCommand(unittest.TestCase):
         self.assertFalse(results[0]['actions']['cloned'])
         self.assertIn('error', results[0]['actions'])
 
-    @patch('ghops.commands.clone.run_command')
+    @patch('repoindex.commands.clone.run_command')
     def test_get_user_repositories_multiple_calls(self, mock_run_command):
         """Test getting repositories for multiple users separately"""
         # First call for user1 - must return tuple

@@ -1,24 +1,24 @@
 # Usage Guide
 
-This guide covers all the features and commands available in `ghops`.
+This guide covers all the features and commands available in `repoindex`.
 
 ## Installation and Setup
 
-### Install ghops
+### Install repoindex
 ```bash
-pip install ghops
+pip install repoindex
 ```
 
 ### Initial Configuration
 ```bash
 # Generate an example configuration file
-ghops config generate
+repoindex config generate
 
-# Edit the configuration (opens ~/.ghopsrc)
-nano ~/.ghopsrc
+# Edit the configuration (opens ~/.repoindexrc)
+nano ~/.repoindexrc
 
 # View current configuration
-ghops config show
+repoindex config show
 ```
 
 ## Core Commands
@@ -28,43 +28,43 @@ ghops config show
 #### Clone Repositories
 ```bash
 # Clone all your GitHub repositories
-ghops get
+repoindex get
 
 # Clone to a specific directory
-ghops get --dir ~/projects
+repoindex get --dir ~/projects
 
 # Clone and add MIT license
-ghops get --license mit --license-name "Your Name" --license-email "you@example.com"
+repoindex get --license mit --license-name "Your Name" --license-email "you@example.com"
 ```
 
 #### Update Repositories
 ```bash
 # Update all repositories in current directory
-ghops update
+repoindex update
 
 # Update recursively (search subdirectories)
-ghops update -r
+repoindex update -r
 
 # Update repositories in specific directory
-ghops update --dir ~/projects -r
+repoindex update --dir ~/projects -r
 
 # Update and add/update licenses
-ghops update -r --license mit --license-name "Your Name"
+repoindex update -r --license mit --license-name "Your Name"
 ```
 
 #### Check Status
 ```bash
 # Show comprehensive status
-ghops status -r
+repoindex status -r
 
 # Fast status (skip PyPI and Pages checks)
-ghops status --no-pypi-check --no-pages-check
+repoindex status --no-pypi-check --no-pages-check
 
 # JSON output for scripts
-ghops status --json
+repoindex status --json
 
 # Status for specific directory
-ghops status --dir ~/projects -r
+repoindex status --dir ~/projects -r
 ```
 
 ### Configuration Management
@@ -72,15 +72,15 @@ ghops status --dir ~/projects -r
 #### Generate Configuration
 ```bash
 # Create example config file
-ghops config generate
+repoindex config generate
 ```
 
-This creates `~/.ghopsrc` with documented examples for all configuration options.
+This creates `~/.repoindexrc` with documented examples for all configuration options.
 
 #### View Configuration
 ```bash
 # Show current configuration
-ghops config show
+repoindex config show
 ```
 
 ### PyPI Integration
@@ -112,30 +112,30 @@ include_test_pypi = false       # Also check test.pypi.org
 #### Sample Repositories
 ```bash
 # Sample 3 repositories randomly
-ghops social sample
+repoindex social sample
 
 # Sample 5 repositories
-ghops social sample --size 5
+repoindex social sample --size 5
 
 # Sample from specific directory
-ghops social sample --dir ~/projects --size 3
+repoindex social sample --dir ~/projects --size 3
 ```
 
 #### Create and Post Content
 ```bash
 # Preview what would be posted
-ghops social post --dry-run
+repoindex social post --dry-run
 
 # Preview with custom sample size
-ghops social post --dry-run --size 2
+repoindex social post --dry-run --size 2
 
 # Actually post to configured platforms
-ghops social post --size 3
+repoindex social post --size 3
 ```
 
 #### Platform Configuration
 
-Configure social media platforms in your `~/.ghopsrc`:
+Configure social media platforms in your `~/.repoindexrc`:
 
 ```toml
 [social_media.platforms.twitter]
@@ -196,23 +196,23 @@ hashtag_limit = 5               # Maximum hashtags per post
 
 #### List Available Licenses
 ```bash
-ghops license list
+repoindex license list
 ```
 
 #### View License Template
 ```bash
-ghops license show mit
-ghops license show apache-2.0
-ghops license show gpl-3.0
+repoindex license show mit
+repoindex license show apache-2.0
+repoindex license show gpl-3.0
 ```
 
 #### Add Licenses During Operations
 ```bash
 # Add license during cloning
-ghops get --license mit --license-name "Your Name" --license-email "you@example.com"
+repoindex get --license mit --license-name "Your Name" --license-email "you@example.com"
 
 # Add/update licenses during update
-ghops update -r --license mit --license-name "Your Name"
+repoindex update -r --license mit --license-name "Your Name"
 ```
 
 ## Performance and Optimization
@@ -220,10 +220,10 @@ ghops update -r --license mit --license-name "Your Name"
 ### Speed Up Status Checks
 ```bash
 # Skip time-consuming checks
-ghops status --no-pypi-check --no-pages-check
+repoindex status --no-pypi-check --no-pages-check
 
 # For very large numbers of repositories
-ghops status --no-pypi-check  # PyPI check is usually the slowest
+repoindex status --no-pypi-check  # PyPI check is usually the slowest
 ```
 
 ### Configuration for Performance
@@ -241,38 +241,38 @@ timeout_seconds = 5             # Reduce timeout for faster checks
 ### Daily Development Workflow
 ```bash
 # Check status of all projects
-ghops status -r
+repoindex status -r
 
 # Update all repositories
-ghops update -r
+repoindex update -r
 
 # Post about recent work (dry run first)
-ghops social post --dry-run --size 2
-ghops social post --size 2
+repoindex social post --dry-run --size 2
+repoindex social post --size 2
 ```
 
 ### New Project Setup
 ```bash
 # Clone all repositories
-ghops get --dir ~/projects
+repoindex get --dir ~/projects
 
 # Add licenses to unlicensed repositories
-ghops update -r --license mit --license-name "Your Name" --license-email "you@example.com"
+repoindex update -r --license mit --license-name "Your Name" --license-email "you@example.com"
 
 # Check final status
-ghops status -r
+repoindex status -r
 ```
 
 ### Social Media Promotion
 ```bash
 # Sample repositories to see what's available
-ghops social sample --size 5
+repoindex social sample --size 5
 
 # Create posts for PyPI releases and documentation updates
-ghops social post --dry-run
+repoindex social post --dry-run
 
 # Actually post when ready
-ghops social post --size 3
+repoindex social post --size 3
 ```
 
 ## Troubleshooting
@@ -280,10 +280,10 @@ ghops social post --size 3
 ### Configuration Issues
 ```bash
 # Regenerate configuration if corrupted
-ghops config generate
+repoindex config generate
 
 # Check current configuration
-ghops config show
+repoindex config show
 ```
 
 ### Performance Issues
@@ -308,7 +308,7 @@ ghops config show
 
 ### Test Coverage and Quality
 
-`ghops` maintains high quality standards with:
+`repoindex` maintains high quality standards with:
 
 - **138 comprehensive tests** covering all major functionality
 - **86% test coverage** across the entire codebase
@@ -327,7 +327,7 @@ pip install -e ".[test]"
 pytest
 
 # Run with coverage report
-pytest --cov=ghops --cov-report=html
+pytest --cov=repoindex --cov-report=html
 
 # Run specific test modules
 pytest tests/test_status.py

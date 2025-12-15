@@ -1,7 +1,7 @@
 # Social Media Enhancement Design
 
 **Date**: 2025-10-20  
-**Goal**: Transform `ghops social` into a powerful, automated social media promotion system
+**Goal**: Transform `repoindex social` into a powerful, automated social media promotion system
 
 ## Vision
 
@@ -9,7 +9,7 @@ A config-driven, event-triggered social media automation system that:
 - Posts automatically on key events (releases, milestones, publishes)
 - Supports modern platforms (Bluesky, Threads, Discord, Slack)
 - Manages templates professionally
-- Integrates with ghops workflows (publish, release, etc.)
+- Integrates with repoindex workflows (publish, release, etc.)
 - Provides shell interface for interactive use
 
 ## Architecture
@@ -83,7 +83,7 @@ A config-driven, event-triggered social media automation system that:
     },
     "history": {
       "enabled": true,
-      "path": "~/.ghops/social_history.json",
+      "path": "~/.repoindex/social_history.json",
       "prevent_duplicates": true
     }
   }
@@ -215,9 +215,9 @@ class TemplateManager:
 
 ### 5. Event Integration Points
 
-**Integration with `ghops publish`**:
+**Integration with `repoindex publish`**:
 ```python
-# In ghops/commands/publish.py
+# In repoindex/commands/publish.py
 def publish_handler(...):
     # ... existing publish logic ...
     
@@ -234,7 +234,7 @@ def publish_handler(...):
 
 **Integration with version bumping**:
 ```python
-# In ghops/version_manager.py
+# In repoindex/version_manager.py
 def bump_version(...):
     old_version, new_version = ...
     
@@ -249,12 +249,12 @@ def bump_version(...):
 
 **New command for manual triggers**:
 ```bash
-ghops social trigger on_release --repo . --version 1.2.0
+repoindex social trigger on_release --repo . --version 1.2.0
 ```
 
 ### 6. Shell Interface
 
-**Add to shell** (`ghops/shell/shell.py`):
+**Add to shell** (`repoindex/shell/shell.py`):
 ```python
 def do_social(self, arg):
     """Social media management.
@@ -286,7 +286,7 @@ def do_social(self, arg):
       "id": "abc123",
       "timestamp": "2025-10-20T15:30:00Z",
       "event": "on_release",
-      "repo": "ghops",
+      "repo": "repoindex",
       "version": "1.2.0",
       "platforms": {
         "twitter": {
@@ -306,7 +306,7 @@ def do_social(self, arg):
           }
         }
       },
-      "content": "🚀 ghops v1.2.0 is out! ..."
+      "content": "🚀 repoindex v1.2.0 is out! ..."
     }
   ],
   "rate_limit": {
@@ -358,7 +358,7 @@ class RateLimiter:
 1. ✅ Add `do_social()` to shell
 2. ✅ Create trigger event system
 3. ✅ Add config schema for triggers
-4. ✅ Integrate with `ghops publish`
+4. ✅ Integrate with `repoindex publish`
 5. ✅ Add history tracking
 6. ✅ Basic tests
 
@@ -405,7 +405,7 @@ class RateLimiter:
 ## File Structure
 
 ```
-ghops/
+repoindex/
 ├── social.py                    # Core social media logic (existing)
 ├── social_triggers.py           # NEW: Event trigger system
 ├── social_platforms/            # NEW: Platform implementations
@@ -435,46 +435,46 @@ tests/
 ### Basic Usage
 ```bash
 # Create posts
-ghops social create --sample-size 3
+repoindex social create --sample-size 3
 
 # Post with dry-run
-ghops social post --dry-run
+repoindex social post --dry-run
 
 # Check status
-ghops social status
+repoindex social status
 
 # View history
-ghops social history --limit 10
+repoindex social history --limit 10
 ```
 
 ### Trigger-Based (Automated)
 ```bash
 # Publish triggers auto-post
-ghops publish --bump-version minor
+repoindex publish --bump-version minor
 # → Automatically posts to configured platforms
 
 # Manual trigger
-ghops social trigger on_milestone_stars --stars 1000
+repoindex social trigger on_milestone_stars --stars 1000
 
 # Test trigger without posting
-ghops social trigger on_release --dry-run --version 2.0.0
+repoindex social trigger on_release --dry-run --version 2.0.0
 ```
 
 ### Template Management
 ```bash
 # List available templates
-ghops social templates list
+repoindex social templates list
 
 # Preview template with sample data
-ghops social templates preview release
+repoindex social templates preview release
 
 # Test custom template
-ghops social templates test "🎉 New: {{repo_name}} v{{version}}"
+repoindex social templates test "🎉 New: {{repo_name}} v{{version}}"
 ```
 
 ### Shell Interface
 ```bash
-ghops shell
+repoindex shell
 > social create --sample-size 1
 > social post --platform bluesky --dry-run
 > social history
@@ -484,13 +484,13 @@ ghops shell
 ### Configuration Example
 ```bash
 # Configure Bluesky
-ghops social configure bluesky --handle myhandle.bsky.social
+repoindex social configure bluesky --handle myhandle.bsky.social
 
 # Enable trigger
-ghops config set social.triggers.on_publish.enabled true
+repoindex config set social.triggers.on_publish.enabled true
 
 # Set custom template
-ghops config set social.templates.release "🚀 {{repo_name}} {{version}}"
+repoindex config set social.templates.release "🚀 {{repo_name}} {{version}}"
 ```
 
 ## Testing Strategy

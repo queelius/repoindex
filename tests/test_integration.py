@@ -47,7 +47,7 @@ description = "A test package"
     
     def run_ghops_command(self, *args):
         """Helper to run ghops commands"""
-        cmd = ["python", "-m", "ghops.cli"] + list(args)
+        cmd = ["python", "-m", "repoindex.cli"] + list(args)
         env = os.environ.copy()
         # Add the project root to PYTHONPATH so the module can be found
         project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -88,7 +88,7 @@ description = "A test package"
         self.assertIn("example configuration", result.stdout.lower())
         
         # Check that example file was created in the temp_dir
-        example_file = Path.home() / ".ghopsrc"
+        example_file = Path.home() / ".repoindexrc"
         self.assertTrue(example_file.exists())
     
     def test_config_show(self):
@@ -111,7 +111,7 @@ description = "A test package"
         # Main help
         result = self.run_ghops_command("--help")
         self.assertEqual(result.returncode, 0)
-        self.assertIn("GitHub Operations CLI Tool", result.stdout)
+        self.assertIn("Collection-aware metadata index", result.stdout)
         
         # Status help
         result = self.run_ghops_command("status", "--help")
@@ -154,7 +154,7 @@ class TestCLIErrorHandling(unittest.TestCase):
     
     def run_ghops_command(self, *args):
         """Helper to run ghops commands"""
-        cmd = ["python", "-m", "ghops.cli"] + list(args)
+        cmd = ["python", "-m", "repoindex.cli"] + list(args)
         env = os.environ.copy()
         # Add the project root to PYTHONPATH so the module can be found
         project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

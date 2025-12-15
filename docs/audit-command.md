@@ -1,6 +1,6 @@
 # Audit Command
 
-The `ghops audit` command provides comprehensive health checks for your repositories, identifying and optionally fixing common issues.
+The `repoindex audit` command provides comprehensive health checks for your repositories, identifying and optionally fixing common issues.
 
 ## Overview
 
@@ -15,87 +15,87 @@ The audit command checks repositories for:
 ## Usage
 
 ```bash
-ghops audit SUBCOMMAND [OPTIONS]
+repoindex audit SUBCOMMAND [OPTIONS]
 ```
 
 ## Subcommands
 
-### `ghops audit all`
+### `repoindex audit all`
 
 Run all audit checks on repositories.
 
 ```bash
 # Audit all repositories
-ghops audit all --pretty
+repoindex audit all --pretty
 
 # Audit and fix issues
-ghops audit all --fix
+repoindex audit all --fix
 
 # Audit Python repositories only
-ghops audit all -t "lang:python" --pretty
+repoindex audit all -t "lang:python" --pretty
 
 # Dry run to see what would be fixed
-ghops audit all --fix --dry-run
+repoindex audit all --fix --dry-run
 ```
 
-### `ghops audit license`
+### `repoindex audit license`
 
 Check for missing or problematic license files.
 
 ```bash
 # Check all repos for licenses
-ghops audit license --pretty
+repoindex audit license --pretty
 
 # Add MIT licenses to repos missing them
-ghops audit license --fix --type MIT --author "Your Name"
+repoindex audit license --fix --type MIT --author "Your Name"
 
 # Audit specific repositories
-ghops audit license -t "dir:work" --fix --type Apache-2.0
+repoindex audit license -t "dir:work" --fix --type Apache-2.0
 ```
 
-### `ghops audit security`
+### `repoindex audit security`
 
 Scan for potential security issues like hardcoded secrets.
 
 ```bash
 # Security scan all repos
-ghops audit security --pretty
+repoindex audit security --pretty
 
 # Fix security issues (adds secrets to .gitignore)
-ghops audit security --fix
+repoindex audit security --fix
 
 # Scan specific repos
-ghops audit security -q "language == 'python'"
+repoindex audit security -q "language == 'python'"
 ```
 
-### `ghops audit deps`
+### `repoindex audit deps`
 
 Check dependency management health.
 
 ```bash
 # Check all repos
-ghops audit deps --pretty
+repoindex audit deps --pretty
 
 # Check JavaScript projects
-ghops audit deps -q "has:package.json"
+repoindex audit deps -q "has:package.json"
 
 # Check Python projects
-ghops audit deps -t "lang:python"
+repoindex audit deps -t "lang:python"
 ```
 
-### `ghops audit docs`
+### `repoindex audit docs`
 
 Verify documentation setup and configuration.
 
 ```bash
 # Check documentation health
-ghops audit docs --pretty
+repoindex audit docs --pretty
 
 # Fix missing documentation setup
-ghops audit docs --fix
+repoindex audit docs --fix
 
 # Check repos that should have docs
-ghops audit docs -q "file_count > 100"
+repoindex audit docs -q "file_count > 100"
 ```
 
 ## Common Options
@@ -112,16 +112,16 @@ By default, audit commands output JSONL for pipeline processing:
 
 ```bash
 # Find all repos failing security audit
-ghops audit security | jq 'select(.status == "fail")'
+repoindex audit security | jq 'select(.status == "fail")'
 
 # Get summary of all audit failures
-ghops audit all | jq 'select(.status == "fail") | {
+repoindex audit all | jq 'select(.status == "fail") | {
   name: .name,
   failed_checks: [.checks | to_entries[] | select(.value.status == "fail") | .key]
 }'
 
 # Export audit results to CSV
-ghops audit all | jq -r '
+repoindex audit all | jq -r '
   [.name, .status, (.checks.license.status), (.checks.security.status)] | @csv
 ' > audit-results.csv
 ```
@@ -144,10 +144,10 @@ The `--fix` flag enables automatic remediation:
 
 ```bash
 # Generate full audit report for all repos
-ghops audit all --pretty > audit-report.txt
+repoindex audit all --pretty > audit-report.txt
 
 # Get JSON summary
-ghops audit all | jq -s '{
+repoindex audit all | jq -s '{
   total: length,
   passed: [.[] | select(.status == "pass")] | length,
   failed: [.[] | select(.status == "fail")] | length,
@@ -159,21 +159,21 @@ ghops audit all | jq -s '{
 
 ```bash
 # Fix all Python repos missing licenses
-ghops audit license -t "lang:python" --fix --type MIT \
+repoindex audit license -t "lang:python" --fix --type MIT \
   --author "Your Name" --email "your@email.com"
 
 # Add READMEs to all work projects
-ghops audit readme -t "dir:work" --fix
+repoindex audit readme -t "dir:work" --fix
 
 # Secure all repos with potential issues
-ghops audit security --fix
+repoindex audit security --fix
 ```
 
 ### Integration with CI/CD
 
 ```bash
 # Fail CI if any audits fail
-if ghops audit all | jq -e 'any(.status == "fail")'; then
+if repoindex audit all | jq -e 'any(.status == "fail")'; then
   echo "Audit failed!"
   exit 1
 fi

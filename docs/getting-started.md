@@ -1,6 +1,6 @@
-# Getting Started with ghops
+# Getting Started with repoindex
 
-Welcome to ghops! This guide will help you get up and running with the repository orchestration platform in just a few minutes.
+Welcome to repoindex! This guide will help you get up and running with the repository orchestration platform in just a few minutes.
 
 ## Prerequisites
 
@@ -13,22 +13,22 @@ Welcome to ghops! This guide will help you get up and running with the repositor
 ### Install from PyPI (Recommended)
 
 ```bash
-pip install ghops
+pip install repoindex
 ```
 
 ### Install from Source
 
 ```bash
-git clone https://github.com/queelius/ghops.git
-cd ghops
+git clone https://github.com/queelius/repoindex.git
+cd repoindex
 pip install -e .
 ```
 
 ### Verify Installation
 
 ```bash
-ghops --version
-ghops --help
+repoindex --version
+repoindex --help
 ```
 
 ## Quick Setup
@@ -38,10 +38,10 @@ ghops --help
 Create your initial configuration file with sensible defaults:
 
 ```bash
-ghops config generate
+repoindex config generate
 ```
 
-This creates `~/.ghops/config.json` with example settings. The configuration includes:
+This creates `~/.repoindex/config.json` with example settings. The configuration includes:
 - Repository directories to scan
 - GitHub API settings
 - Social media templates
@@ -49,7 +49,7 @@ This creates `~/.ghops/config.json` with example settings. The configuration inc
 
 ### 2. Configure Repository Directories
 
-Edit `~/.ghops/config.json` to specify where your repositories are located:
+Edit `~/.repoindex/config.json` to specify where your repositories are located:
 
 ```json
 {
@@ -70,7 +70,7 @@ The `**` pattern recursively searches subdirectories.
 For enhanced GitHub features, add your personal access token:
 
 ```bash
-export GHOPS_GITHUB_TOKEN="your-token-here"
+export REPOINDEX_GITHUB_TOKEN="your-token-here"
 ```
 
 Or add it to your configuration:
@@ -89,39 +89,39 @@ Or add it to your configuration:
 
 ```bash
 # List all repositories (JSONL output)
-ghops list
+repoindex list
 
 # Pretty-print as a table
-ghops list --pretty
+repoindex list --pretty
 
 # Show only Python projects
-ghops list --pretty | grep Python
+repoindex list --pretty | grep Python
 ```
 
 ### Check Repository Status
 
 ```bash
 # Status of current directory
-ghops status
+repoindex status
 
 # Status of all repositories
-ghops status -r --pretty
+repoindex status -r --pretty
 
 # Find repos with uncommitted changes (using jq)
-ghops status -r | jq 'select(.status.uncommitted_changes == true)'
+repoindex status -r | jq 'select(.status.uncommitted_changes == true)'
 ```
 
 ### Organize with Tags
 
 ```bash
 # Add tags to repositories
-ghops catalog tag myproject "important" "python" "ml"
+repoindex catalog tag myproject "important" "python" "ml"
 
 # Query by tags
-ghops query "tag:important"
+repoindex query "tag:important"
 
 # List all tags
-ghops catalog tags --pretty
+repoindex catalog tags --pretty
 ```
 
 ### Analyze Repository Clusters
@@ -130,22 +130,22 @@ Clustering helps you organize and understand relationships between your reposito
 
 ```bash
 # Find similar repositories using K-means
-ghops cluster analyze --algorithm kmeans --n-clusters 5 -r
+repoindex cluster analyze --algorithm kmeans --n-clusters 5 -r
 
 # Use DBSCAN for density-based clustering
-ghops cluster analyze --algorithm dbscan --eps 0.3 -r
+repoindex cluster analyze --algorithm dbscan --eps 0.3 -r
 
 # Pretty-print cluster analysis
-ghops cluster analyze --pretty
+repoindex cluster analyze --pretty
 
 # Find duplicate code across repositories
-ghops cluster find-duplicates --min-similarity 0.7 -r --pretty
+repoindex cluster find-duplicates --min-similarity 0.7 -r --pretty
 
 # Get consolidation suggestions for similar repos
-ghops cluster suggest-consolidation --confidence 0.8 -r --pretty
+repoindex cluster suggest-consolidation --confidence 0.8 -r --pretty
 
 # Export cluster results for visualization
-ghops cluster export --format html --output clusters.html
+repoindex cluster export --format html --output clusters.html
 ```
 
 **Understanding Clustering Algorithms:**
@@ -161,18 +161,18 @@ Workflows automate complex multi-step operations with conditional logic and para
 
 ```bash
 # Run example morning routine workflow
-ghops workflow run examples/workflows/morning-routine.yaml
+repoindex workflow run examples/workflows/morning-routine.yaml
 
 # Run release pipeline with variables
-ghops workflow run examples/workflows/release-pipeline.yaml \
+repoindex workflow run examples/workflows/release-pipeline.yaml \
   --var version=1.2.0 \
   --var branch=main
 
 # Dry run to preview without executing
-ghops workflow run my-workflow.yaml --dry-run
+repoindex workflow run my-workflow.yaml --dry-run
 
 # Validate workflow syntax
-ghops workflow validate my-workflow.yaml
+repoindex workflow validate my-workflow.yaml
 ```
 
 **Create Your First Workflow:**
@@ -188,7 +188,7 @@ variables:
 
 tasks:
   - id: check_status
-    type: ghops
+    type: repoindex
     name: Check all repository statuses
     command: status
     args: ["--recursive", "--format", "json"]
@@ -196,7 +196,7 @@ tasks:
     output_var: repo_statuses
 
   - id: find_stale
-    type: ghops
+    type: repoindex
     name: Find stale repositories
     command: query
     args:
@@ -206,7 +206,7 @@ tasks:
     depends_on: [check_status]
 
   - id: analyze_duplicates
-    type: ghops
+    type: repoindex
     name: Find duplicate code
     command: cluster find-duplicates
     args: ["--recursive", "--min-similarity", "0.8"]
@@ -255,7 +255,7 @@ timeout: 600
 EOF
 
 # Run your workflow
-ghops workflow run my-workflow.yaml
+repoindex workflow run my-workflow.yaml
 ```
 
 **Workflow Features:**
@@ -269,12 +269,12 @@ ghops workflow run my-workflow.yaml
 
 ### Jupyter Notebooks
 
-Explore ghops features interactively with our tutorial notebooks:
+Explore repoindex features interactively with our tutorial notebooks:
 
 ```bash
 # Clone the repository to access notebooks
-git clone https://github.com/queelius/ghops.git
-cd ghops/notebooks
+git clone https://github.com/queelius/repoindex.git
+cd repoindex/notebooks
 
 # Start Jupyter
 jupyter notebook
@@ -293,73 +293,73 @@ jupyter notebook
 
 ```bash
 # Update all repositories
-ghops update -r
+repoindex update -r
 
 # Check status
-ghops status -r --pretty
+repoindex status -r --pretty
 
 # Audit for issues
-ghops audit -r --check license,readme,security
+repoindex audit -r --check license,readme,security
 ```
 
 ### Export Portfolio
 
 ```bash
 # Export to Markdown
-ghops export markdown --output portfolio.md
+repoindex export markdown --output portfolio.md
 
 # Export to interactive HTML
-ghops export html --output portfolio.html --group-by language
+repoindex export html --output portfolio.html --group-by language
 
 # Export for Hugo site
-ghops export hugo --output-dir my-site/content
+repoindex export hugo --output-dir my-site/content
 ```
 
 ### Social Media Automation
 
 ```bash
 # Sample repositories for promotion
-ghops social sample --size 3
+repoindex social sample --size 3
 
 # Preview posts (dry run)
-ghops social post --dry-run
+repoindex social post --dry-run
 
 # Post to configured platforms
-ghops social post
+repoindex social post
 ```
 
 ## Environment Variables
 
-ghops respects the following environment variables:
+repoindex respects the following environment variables:
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `GHOPS_CONFIG` | Path to config file | `~/.config/ghops/config.json` |
-| `GHOPS_GITHUB_TOKEN` | GitHub API token | `ghp_xxxxxxxxxxxx` |
-| `GHOPS_LOG_LEVEL` | Logging level | `DEBUG`, `INFO`, `WARNING` |
-| `GHOPS_NO_COLOR` | Disable colored output | `1` or `true` |
+| `REPOINDEX_CONFIG` | Path to config file | `~/.config/repoindex/config.json` |
+| `REPOINDEX_GITHUB_TOKEN` | GitHub API token | `ghp_xxxxxxxxxxxx` |
+| `REPOINDEX_LOG_LEVEL` | Logging level | `DEBUG`, `INFO`, `WARNING` |
+| `REPOINDEX_NO_COLOR` | Disable colored output | `1` or `true` |
 
 ## Command Output Formats
 
-ghops follows Unix philosophy - all commands output JSONL by default:
+repoindex follows Unix philosophy - all commands output JSONL by default:
 
 ```bash
 # JSONL output (default) - great for piping
-ghops list | jq '.name'
+repoindex list | jq '.name'
 
 # Pretty table output - great for humans
-ghops list --pretty
+repoindex list --pretty
 
 # Export specific format
-ghops export json --output repos.json
-ghops export csv --output repos.csv
+repoindex export json --output repos.json
+repoindex export csv --output repos.csv
 ```
 
 ## Next Steps
 
 Now that you're up and running:
 
-1. **Explore Commands**: Run `ghops --help` to see all available commands
+1. **Explore Commands**: Run `repoindex --help` to see all available commands
 2. **Read the Usage Guide**: Dive deeper into [command reference](usage.md)
 3. **Try Clustering**: Group similar repositories with [clustering integration](integrations/clustering.md)
 4. **Automate Workflows**: Create complex automations with [workflow orchestration](integrations/workflow.md)
@@ -368,16 +368,16 @@ Now that you're up and running:
 ## Getting Help
 
 - **Documentation**: You're reading it!
-- **Command Help**: `ghops <command> --help`
-- **GitHub Issues**: [Report bugs or request features](https://github.com/queelius/ghops/issues)
-- **Discussions**: [Ask questions and share ideas](https://github.com/queelius/ghops/discussions)
+- **Command Help**: `repoindex <command> --help`
+- **GitHub Issues**: [Report bugs or request features](https://github.com/queelius/repoindex/issues)
+- **Discussions**: [Ask questions and share ideas](https://github.com/queelius/repoindex/discussions)
 
 ## Troubleshooting Quick Fixes
 
 ### No repositories found
 - Check your `repository_directories` configuration
 - Ensure directories contain `.git` folders
-- Use `ghops config show` to verify settings
+- Use `repoindex config show` to verify settings
 
 ### GitHub API rate limit
 - Add a GitHub token to increase limits

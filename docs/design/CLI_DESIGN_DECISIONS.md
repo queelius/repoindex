@@ -35,34 +35,34 @@ Let's examine each current top-level command and determine if it:
 
 #### Operations `fs` CAN replace:
 ```bash
-# Instead of: ghops list
-ghops fs ls /repos                    # List all repos
-ghops fs ls /by-language/Python       # List Python repos
-ghops fs ls /by-tag/alex/beta         # List tagged repos
+# Instead of: repoindex list
+repoindex fs ls /repos                    # List all repos
+repoindex fs ls /by-language/Python       # List Python repos
+repoindex fs ls /by-tag/alex/beta         # List tagged repos
 
-# Instead of: ghops query "language == 'Python'"
-ghops fs find --language Python       # Find by language
-ghops fs find --tag alex/beta         # Find by tag
-ghops fs ls /by-language/Python       # Browse by language
+# Instead of: repoindex query "language == 'Python'"
+repoindex fs find --language Python       # Find by language
+repoindex fs find --tag alex/beta         # Find by tag
+repoindex fs ls /by-language/Python       # Browse by language
 
-# Instead of: ghops catalog show -t "alex/beta"
-ghops fs ls /by-tag/alex/beta         # List repos with tag
+# Instead of: repoindex catalog show -t "alex/beta"
+repoindex fs ls /by-tag/alex/beta         # List repos with tag
 ```
 
 #### Operations `fs` CANNOT replace:
 ```bash
-ghops get owner/repo                  # Clone operation
-ghops update                          # Git pull operation
-ghops status --dirty                  # Git status check
-ghops top --hours 24                  # Activity monitoring
-ghops export --format hugo            # Content generation
+repoindex get owner/repo                  # Clone operation
+repoindex update                          # Git pull operation
+repoindex status --dirty                  # Git status check
+repoindex top --hours 24                  # Activity monitoring
+repoindex export --format hugo            # Content generation
 ```
 
 ### Recommendation: Hybrid Approach
 
 **Top-Level Commands (frequently used, can't be replaced by `fs`):**
 ```
-ghops
+repoindex
 ├── get          # Clone repos - unique operation
 ├── update       # Update repos - unique operation
 ├── status       # Git status - unique operation
@@ -75,13 +75,13 @@ ghops
 **Commands that COULD use `fs` but should stay top-level for convenience:**
 ```bash
 # Keep these as convenient shortcuts:
-ghops list              # Shortcut for: ghops fs ls /repos
-ghops list --language Python  # Shortcut for: ghops fs ls /by-language/Python
+repoindex list              # Shortcut for: repoindex fs ls /repos
+repoindex list --language Python  # Shortcut for: repoindex fs ls /by-language/Python
 ```
 
 **Commands to Group:**
 ```
-ghops
+repoindex
 ├── tag          # Already grouped - keep as-is
 ├── docs         # Already grouped - keep as-is
 ├── analysis     # New group
@@ -154,10 +154,10 @@ pip list --format json
 ### Current Export Implementation
 
 ```bash
-ghops export --format markdown --output-dir ./docs
-ghops export --format hugo --output-dir ./site
-ghops export --format html --output-dir ./public
-ghops export --format pdf --output-file report.pdf
+repoindex export --format markdown --output-dir ./docs
+repoindex export --format hugo --output-dir ./site
+repoindex export --format html --output-dir ./public
+repoindex export --format pdf --output-file report.pdf
 ```
 
 ### Option 1: Keep Flat with --format Flag (Current)
@@ -176,9 +176,9 @@ ghops export --format pdf --output-file report.pdf
 
 **Example:**
 ```bash
-ghops export --format markdown --output-dir ./docs
-ghops export --format hugo --output-dir ./site --theme minimal
-ghops export --format pdf --template custom.jinja2
+repoindex export --format markdown --output-dir ./docs
+repoindex export --format hugo --output-dir ./site --theme minimal
+repoindex export --format pdf --template custom.jinja2
 ```
 
 ### Option 2: Grouped by Format
@@ -196,10 +196,10 @@ ghops export --format pdf --template custom.jinja2
 
 **Example:**
 ```bash
-ghops export markdown --output-dir ./docs
-ghops export hugo --output-dir ./site --theme minimal
-ghops export pdf --template custom.jinja2
-ghops export html --output-dir ./public --style dark
+repoindex export markdown --output-dir ./docs
+repoindex export hugo --output-dir ./site --theme minimal
+repoindex export pdf --template custom.jinja2
+repoindex export html --output-dir ./public --style dark
 ```
 
 ### Option 3: Hybrid (Grouped + Smart Defaults)
@@ -217,13 +217,13 @@ ghops export html --output-dir ./public --style dark
 **Example:**
 ```bash
 # Simple case - use default format detector
-ghops export ./output              # Auto-detects format from dir structure
+repoindex export ./output              # Auto-detects format from dir structure
 
 # Explicit format (short)
-ghops export --format hugo ./site  # Flag-based
+repoindex export --format hugo ./site  # Flag-based
 
 # Explicit format (grouped)
-ghops export hugo ./site           # Subcommand-based
+repoindex export hugo ./site           # Subcommand-based
 
 # Both work!
 ```
@@ -274,7 +274,7 @@ Benefits:
 ## Final Proposed Structure
 
 ```
-ghops
+repoindex
 │
 ├── Core Operations (Top-Level)
 │   ├── get          Clone repositories
@@ -348,7 +348,7 @@ ghops
 ### `list` stays top-level because:
 - It's a frequently used discovery command
 - Acts as convenient shortcut for `fs ls /repos`
-- Users expect `ghops list` to work (established pattern)
+- Users expect `repoindex list` to work (established pattern)
 - `fs ls` is for browsing VFS structure, `list` is for listing repos
 
 ### `fs` group provides:
@@ -360,18 +360,18 @@ ghops
 ### Relationship between commands:
 ```bash
 # These are equivalent:
-ghops list                           # Traditional listing
-ghops fs ls /repos                   # VFS-based listing
+repoindex list                           # Traditional listing
+repoindex fs ls /repos                   # VFS-based listing
 
 # These are equivalent:
-ghops list --language Python         # Filter-based
-ghops fs ls /by-language/Python      # Path-based
+repoindex list --language Python         # Filter-based
+repoindex fs ls /by-language/Python      # Path-based
 
 # These are equivalent:
-ghops query "stars > 10"             # Query language
-ghops fs find --min-stars 10         # Criteria-based
+repoindex query "stars > 10"             # Query language
+repoindex fs find --min-stars 10         # Criteria-based
 
 # These complement each other:
-ghops tag list -t alex/beta          # Tag-centric view
-ghops fs ls /by-tag/alex/beta        # Path-centric view
+repoindex tag list -t alex/beta          # Tag-centric view
+repoindex fs ls /by-tag/alex/beta        # Path-centric view
 ```

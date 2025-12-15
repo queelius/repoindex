@@ -1,6 +1,6 @@
 # Tutorial Notebooks
 
-Learn ghops interactively with our comprehensive Jupyter notebook tutorials. These notebooks provide hands-on experience with all major features, from basic commands to advanced integrations.
+Learn repoindex interactively with our comprehensive Jupyter notebook tutorials. These notebooks provide hands-on experience with all major features, from basic commands to advanced integrations.
 
 ## Overview
 
@@ -20,22 +20,22 @@ Our tutorial notebooks are designed to:
 # Install Jupyter and dependencies
 pip install jupyter notebook pandas matplotlib seaborn
 
-# Install ghops with all features
-pip install ghops[all]
+# Install repoindex with all features
+pip install repoindex[all]
 
 # Or install specific features
-pip install ghops[clustering,visualization]
+pip install repoindex[clustering,visualization]
 ```
 
 ### Setup Verification
 
 ```python
 # Verify installation (run in notebook)
-import ghops
+import repoindex
 import pandas as pd
 import matplotlib.pyplot as plt
 
-print(f"ghops version: {ghops.__version__}")
+print(f"repoindex version: {repoindex.__version__}")
 print("Setup complete!")
 ```
 
@@ -46,7 +46,7 @@ print("Setup complete!")
 **Learn the Basics**
 
 Topics covered:
-- Installing and configuring ghops
+- Installing and configuring repoindex
 - Basic commands and operations
 - Understanding JSONL output
 - Working with the metadata store
@@ -55,13 +55,13 @@ Topics covered:
 Key exercises:
 ```python
 # List all repositories
-repos = ghops.list_repositories()
+repos = repoindex.list_repositories()
 
 # Filter and query
-python_repos = ghops.query("language == 'Python'")
+python_repos = repoindex.query("language == 'Python'")
 
 # Check status
-status = ghops.get_status(recursive=True)
+status = repoindex.get_status(recursive=True)
 ```
 
 **Duration**: 30-45 minutes
@@ -81,7 +81,7 @@ Topics covered:
 Key exercises:
 ```python
 # Perform clustering
-from ghops.integrations.clustering import ClusterAnalyzer
+from repoindex.integrations.clustering import ClusterAnalyzer
 
 analyzer = ClusterAnalyzer()
 clusters = analyzer.fit_predict(repos, algorithm='kmeans', n_clusters=5)
@@ -110,15 +110,15 @@ Topics covered:
 Key exercises:
 ```python
 # Load and run workflow
-from ghops.integrations.workflow import Workflow
+from repoindex.integrations.workflow import Workflow
 
 workflow = Workflow.from_file('morning-routine.yaml')
 result = workflow.run(variables={'env': 'production'})
 
 # Create workflow programmatically
 workflow = Workflow(name="Custom Workflow")
-workflow.add_step("list", action="ghops.list")
-workflow.add_step("filter", action="ghops.filter", depends_on=["list"])
+workflow.add_step("list", action="repoindex.list")
+workflow.add_step("filter", action="repoindex.filter", depends_on=["list"])
 ```
 
 **Duration**: 60 minutes
@@ -126,7 +126,7 @@ workflow.add_step("filter", action="ghops.filter", depends_on=["list"])
 
 ### 4. Advanced Integrations (04_advanced_integrations.ipynb)
 
-**Extend ghops with Custom Features**
+**Extend repoindex with Custom Features**
 
 Topics covered:
 - Creating custom integrations
@@ -138,7 +138,7 @@ Topics covered:
 Key exercises:
 ```python
 # Create custom integration
-from ghops.integrations.base import Integration
+from repoindex.integrations.base import Integration
 
 class SecurityAnalyzer(Integration):
     def analyze(self, repos):
@@ -147,8 +147,8 @@ class SecurityAnalyzer(Integration):
             yield repo
 
 # Register and use
-ghops.register_integration('security', SecurityAnalyzer)
-results = ghops.run_integration('security', repos)
+repoindex.register_integration('security', SecurityAnalyzer)
+results = repoindex.run_integration('security', repos)
 ```
 
 **Duration**: 60-90 minutes
@@ -176,11 +176,11 @@ lang_dist = pd.DataFrame(repos).groupby('language').size()
 plt.pie(lang_dist.values, labels=lang_dist.index, autopct='%1.1f%%')
 
 # Activity heatmap
-activity = ghops.get_activity_matrix(repos)
+activity = repoindex.get_activity_matrix(repos)
 sns.heatmap(activity, cmap='YlOrRd')
 
 # Interactive dashboard
-from ghops.visualizations import Dashboard
+from repoindex.visualizations import Dashboard
 dashboard = Dashboard(repos)
 dashboard.show()
 ```
@@ -194,8 +194,8 @@ dashboard.show()
 
 ```bash
 # Clone repository with notebooks
-git clone https://github.com/queelius/ghops.git
-cd ghops/notebooks
+git clone https://github.com/queelius/repoindex.git
+cd repoindex/notebooks
 
 # Start Jupyter
 jupyter notebook
@@ -208,9 +208,9 @@ jupyter lab
 
 Run notebooks in your browser without installation:
 
-[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/queelius/ghops/blob/main/notebooks/)
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/queelius/repoindex/blob/main/notebooks/)
 
-[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/queelius/ghops/main?filepath=notebooks)
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/queelius/repoindex/main?filepath=notebooks)
 
 ## Notebook Structure
 
@@ -232,10 +232,10 @@ Modify and experiment with code:
 
 ```python
 # Original
-repos = ghops.list_repositories()
+repos = repoindex.list_repositories()
 
 # Try modifying:
-repos = ghops.list_repositories(
+repos = repoindex.list_repositories(
     filter_language='Python',
     min_stars=10
 )
@@ -288,12 +288,12 @@ def cluster_interactive(algorithm, n_clusters):
 
 ```python
 # Your code here
-# Hint: Use ghops.query() with appropriate conditions
+# Hint: Use repoindex.query() with appropriate conditions
 ```
 
 **Solution**:
 ```python
-recent_python = ghops.query(
+recent_python = repoindex.query(
     "language == 'Python' and days_since_commit < 7"
 )
 print(f"Found {len(list(recent_python))} repositories")
@@ -314,12 +314,12 @@ workflow_yaml = """
 name: Audit and Report
 steps:
   - id: audit
-    action: ghops.audit
+    action: repoindex.audit
     parameters:
       check: [license, security]
 
   - id: report
-    action: ghops.export
+    action: repoindex.export
     parameters:
       format: markdown
     depends_on: [audit]
@@ -373,7 +373,7 @@ clusters = kmeans.fit_predict(features)
 
 ```python
 # Use generators for large datasets
-repos = ghops.list_repositories()  # Generator
+repos = repoindex.list_repositories()  # Generator
 repos_list = list(repos)           # Only if needed
 
 # Cache expensive operations
@@ -442,9 +442,9 @@ jupyter nbconvert --to markdown notebook.ipynb
 ### Certification Track
 
 Complete all notebooks and exercises to earn:
-- **ghops Practitioner**: Notebooks 1-3
-- **ghops Expert**: All notebooks + custom integration
-- **ghops Master**: Contribute your own notebook
+- **repoindex Practitioner**: Notebooks 1-3
+- **repoindex Expert**: All notebooks + custom integration
+- **repoindex Master**: Contribute your own notebook
 
 ## Troubleshooting
 
@@ -461,7 +461,7 @@ resource.setrlimit(resource.RLIMIT_AS, (2147483648, 2147483648))
 ```python
 # Check installation
 import sys
-!{sys.executable} -m pip install ghops[all]
+!{sys.executable} -m pip install repoindex[all]
 ```
 
 #### Slow Execution
@@ -482,9 +482,9 @@ We welcome notebook contributions! Guidelines:
 
 ## Additional Resources
 
-- **Video Tutorials**: [YouTube Channel](https://youtube.com/ghops)
-- **Blog Posts**: [ghops Blog](https://blog.ghops.io)
-- **Community**: [Discord Server](https://discord.gg/ghops)
+- **Video Tutorials**: [YouTube Channel](https://youtube.com/repoindex)
+- **Blog Posts**: [repoindex Blog](https://blog.repoindex.io)
+- **Community**: [Discord Server](https://discord.gg/repoindex)
 - **Office Hours**: Weekly Q&A sessions
 
 ## Next Steps
@@ -493,7 +493,7 @@ After completing the notebooks:
 
 1. Build your own workflows
 2. Create custom integrations
-3. Contribute to ghops
+3. Contribute to repoindex
 4. Share your experience
 5. Teach others
 

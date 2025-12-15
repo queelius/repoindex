@@ -1,10 +1,10 @@
 # Interactive TUI (Text User Interface)
 
-ghops provides a powerful, user-friendly TUI that offers an interactive, stateful alternative to the CLI commands. The TUI is built with [Textual](https://textual.textualize.io/) and provides a modern terminal interface for repository management.
+repoindex provides a powerful, user-friendly TUI that offers an interactive, stateful alternative to the CLI commands. The TUI is built with [Textual](https://textual.textualize.io/) and provides a modern terminal interface for repository management.
 
 ## Overview
 
-The TUI transforms ghops into an interactive application with:
+The TUI transforms repoindex into an interactive application with:
 
 - **Visual repository tree** with status indicators
 - **Stateful navigation** with history and bookmarks
@@ -19,10 +19,10 @@ Install TUI support:
 
 ```bash
 # Install TUI dependencies
-pip install ghops[tui]
+pip install repoindex[tui]
 
 # Or install all features
-pip install ghops[all]
+pip install repoindex[all]
 ```
 
 ## Quick Start
@@ -31,10 +31,10 @@ pip install ghops[all]
 
 ```bash
 # Launch with default configuration
-ghops tui
+repoindex tui
 
 # Launch with custom config
-ghops tui --config ~/.ghopsrc
+repoindex tui --config ~/.repoindexrc
 ```
 
 ### First Steps
@@ -49,7 +49,7 @@ ghops tui --config ~/.ghopsrc
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    ghops - Repository Management                │
+│                    repoindex - Repository Management                │
 ├──────────────────┬──────────────────────────────────────────────┤
 │                  │                                              │
 │  📂 Repositories │         Main Content Area                    │
@@ -199,13 +199,13 @@ Press `w` to access workflow features:
 name: morning-routine
 steps:
   - name: Check Status
-    action: ghops
+    action: repoindex
     params:
       command: status
       args: ["-r"]
 
   - name: Update All
-    action: ghops
+    action: repoindex
     params:
       command: update
       args: ["-r"]
@@ -298,7 +298,7 @@ The TUI maintains state across your session:
 
 ## Configuration
 
-The TUI respects ghops configuration with TUI-specific options:
+The TUI respects repoindex configuration with TUI-specific options:
 
 ```json
 {
@@ -419,7 +419,7 @@ Open repositories in external tools:
 
 **Solution:**
 ```bash
-pip install ghops[tui]
+pip install repoindex[tui]
 # or
 pip install textual textual-dev
 ```
@@ -454,7 +454,7 @@ pip install textual textual-dev
    ```
 3. Filter before opening TUI:
    ```bash
-   ghops query "language == 'Python'" | ghops tui --stdin
+   repoindex query "language == 'Python'" | repoindex tui --stdin
    ```
 
 ### Mouse Not Working
@@ -477,7 +477,7 @@ pip install textual textual-dev
 
 1. **Use Command Palette** - `Ctrl+p` is faster than navigating menus
 2. **Bookmark Frequently Used Repos** - Press `b` to bookmark
-3. **Filter Before Opening** - Use ghops query to pre-filter
+3. **Filter Before Opening** - Use repoindex query to pre-filter
 4. **Split Terminal** - Run multiple TUI instances in tmux
 5. **Learn Shortcuts** - Press `h` to see all shortcuts
 
@@ -512,7 +512,7 @@ pip install textual textual-dev
 ✅ **Good for:**
 - Exploring repositories interactively
 - Visual analysis and clustering
-- Learning ghops features
+- Learning repoindex features
 - Multi-step workflows with monitoring
 - Repository discovery
 
@@ -543,7 +543,7 @@ pip install textual textual-dev
 ### Example 1: Morning Routine
 
 ```
-1. Launch TUI: ghops tui
+1. Launch TUI: repoindex tui
 2. Press 'r' to refresh all repositories
 3. Press '/' and search for "uncommitted"
 4. Press 'Space' to select all dirty repos
@@ -568,7 +568,7 @@ pip install textual textual-dev
 ### Example 3: Repository Discovery
 
 ```
-1. Launch TUI with: ghops tui
+1. Launch TUI with: repoindex tui
 2. Browse tree with arrow keys
 3. Press 'c' for clustering
 4. Select "Network" algorithm
@@ -594,14 +594,14 @@ pip install textual textual-dev
 ### Running from Source
 
 ```bash
-cd ghops
+cd repoindex
 pip install -e .[tui]
 
 # Run directly
-python -m ghops.tui.app
+python -m repoindex.tui.app
 
 # Or use CLI
-ghops tui
+repoindex tui
 ```
 
 ### Creating Custom Screens
@@ -611,7 +611,7 @@ Extend the TUI with custom screens:
 ```python
 from textual.screen import Screen
 from textual.widgets import Static
-from ghops.tui import GhopsApp
+from repoindex.tui import GhopsApp
 
 class MyCustomScreen(Screen):
     """Custom screen example."""
@@ -629,7 +629,7 @@ app.install_screen(MyCustomScreen(), name="custom")
 Add custom actions to the command palette:
 
 ```python
-from ghops.tui.app import GhopsApp
+from repoindex.tui.app import GhopsApp
 
 class ExtendedApp(GhopsApp):
     async def execute_custom_command(self, command):
@@ -658,7 +658,7 @@ Planned TUI features:
 ## Resources
 
 - [Textual Documentation](https://textual.textualize.io/)
-- [ghops CLI Reference](cli-reference.md)
+- [repoindex CLI Reference](cli-reference.md)
 - [Workflow Guide](integrations/workflows.md)
 - [Clustering Guide](integrations/clustering.md)
-- [GitHub Issues](https://github.com/queelius/ghops/issues)
+- [GitHub Issues](https://github.com/queelius/repoindex/issues)

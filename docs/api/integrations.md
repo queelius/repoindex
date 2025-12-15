@@ -1,26 +1,26 @@
 # Integration API Reference
 
-Complete Python API reference for ghops integrations. Use these APIs to build custom workflows, integrations, and automation tools.
+Complete Python API reference for repoindex integrations. Use these APIs to build custom workflows, integrations, and automation tools.
 
 ## Overview
 
-The ghops integration API provides programmatic access to all clustering, workflow, and analysis features. This allows you to:
+The repoindex integration API provides programmatic access to all clustering, workflow, and analysis features. This allows you to:
 
 - Build custom analysis tools
-- Integrate ghops into larger applications
+- Integrate repoindex into larger applications
 - Create specialized workflows
-- Extend ghops functionality
+- Extend repoindex functionality
 - Automate repository management
 
 ## Installation
 
 ```bash
-# Install ghops with all integration features
-pip install ghops[clustering,workflows,all]
+# Install repoindex with all integration features
+pip install repoindex[clustering,workflows,all]
 
 # Or install specific integrations
-pip install ghops[clustering]
-pip install ghops[workflows]
+pip install repoindex[clustering]
+pip install repoindex[workflows]
 ```
 
 ## Core Integration Classes
@@ -30,10 +30,10 @@ pip install ghops[workflows]
 All integrations extend the base `Integration` class:
 
 ```python
-from ghops.integrations.base import Integration
+from repoindex.integrations.base import Integration
 
 class CustomIntegration(Integration):
-    """Base class for all ghops integrations."""
+    """Base class for all repoindex integrations."""
 
     def __init__(self, config: dict):
         """
@@ -86,8 +86,8 @@ class CustomIntegration(Integration):
 Main class for repository clustering:
 
 ```python
-from ghops.integrations.clustering import ClusterAnalyzer
-from ghops.integrations.clustering.algorithms import (
+from repoindex.integrations.clustering import ClusterAnalyzer
+from repoindex.integrations.clustering.algorithms import (
     KMeansClustering,
     DBSCANClustering,
     HierarchicalClustering,
@@ -124,7 +124,7 @@ for result in results:
 Extract features from repositories for clustering:
 
 ```python
-from ghops.integrations.clustering.features import (
+from repoindex.integrations.clustering.features import (
     TechStackExtractor,
     SizeExtractor,
     ActivityExtractor,
@@ -157,7 +157,7 @@ complexity_features = complexity_extractor.extract('/path/to/repo')
 Use specific clustering algorithms directly:
 
 ```python
-from ghops.integrations.clustering.algorithms import KMeansClustering
+from repoindex.integrations.clustering.algorithms import KMeansClustering
 import numpy as np
 
 # Create feature matrix
@@ -184,7 +184,7 @@ print(f"Silhouette score: {score:.2f}")
 #### DBSCAN Clustering
 
 ```python
-from ghops.integrations.clustering.algorithms import DBSCANClustering
+from repoindex.integrations.clustering.algorithms import DBSCANClustering
 
 dbscan = DBSCANClustering(eps=0.5, min_samples=2, metric='euclidean')
 labels = dbscan.fit_predict(feature_matrix)
@@ -201,7 +201,7 @@ print(f"Found {n_clusters} clusters")
 #### Hierarchical Clustering
 
 ```python
-from ghops.integrations.clustering.algorithms import HierarchicalClustering
+from repoindex.integrations.clustering.algorithms import HierarchicalClustering
 
 hierarchical = HierarchicalClustering(
     n_clusters=3,
@@ -228,7 +228,7 @@ plt.show()
 Detect duplicate code across repositories:
 
 ```python
-from ghops.integrations.clustering import DuplicationAnalyzer
+from repoindex.integrations.clustering import DuplicationAnalyzer
 
 analyzer = DuplicationAnalyzer(
     min_block_size=10,
@@ -254,7 +254,7 @@ for result in results:
 Get intelligent consolidation suggestions:
 
 ```python
-from ghops.integrations.clustering import ConsolidationAdvisor
+from repoindex.integrations.clustering import ConsolidationAdvisor
 
 advisor = ConsolidationAdvisor(
     min_confidence=0.7,
@@ -285,7 +285,7 @@ for suggestion in suggestions:
 Create and manage workflows programmatically:
 
 ```python
-from ghops.integrations.workflow import Workflow, Task
+from repoindex.integrations.workflow import Workflow, Task
 
 # Create workflow
 workflow = Workflow(
@@ -311,7 +311,7 @@ workflow.set_variables({
 workflow.add_task(Task(
     id='list_repos',
     name='List all repositories',
-    action='ghops.list',
+    action='repoindex.list',
     parameters={'format': 'json'},
     output_var='repos'
 ))
@@ -319,7 +319,7 @@ workflow.add_task(Task(
 workflow.add_task(Task(
     id='filter_python',
     name='Filter Python repositories',
-    action='ghops.query',
+    action='repoindex.query',
     parameters={'query': 'language == "Python"'},
     depends_on=['list_repos'],
     output_var='python_repos'
@@ -328,7 +328,7 @@ workflow.add_task(Task(
 workflow.add_task(Task(
     id='analyze',
     name='Analyze Python repos',
-    action='ghops.cluster',
+    action='repoindex.cluster',
     parameters={'algorithm': 'kmeans', 'n_clusters': 3},
     depends_on=['filter_python']
 ))
@@ -337,7 +337,7 @@ workflow.add_task(Task(
 workflow.save('my-workflow.yaml')
 
 # Or execute directly
-from ghops.integrations.workflow import WorkflowRunner
+from repoindex.integrations.workflow import WorkflowRunner
 
 runner = WorkflowRunner()
 result = runner.run(workflow)
@@ -419,7 +419,7 @@ git_task = Task(
 Create custom workflow actions:
 
 ```python
-from ghops.integrations.workflow import Action, ActionRegistry
+from repoindex.integrations.workflow import Action, ActionRegistry
 
 class CustomAnalysisAction(Action):
     """Custom action for specialized analysis."""
@@ -487,7 +487,7 @@ workflow.add_task(Task(
 Advanced workflow execution control:
 
 ```python
-from ghops.integrations.workflow import WorkflowRunner, ExecutionContext
+from repoindex.integrations.workflow import WorkflowRunner, ExecutionContext
 
 # Create execution context
 context = ExecutionContext(
@@ -533,7 +533,7 @@ runner.export_report(result, format='json', output='workflow-report.json')
 ### Repository Analysis
 
 ```python
-from ghops.core import analyze_repository
+from repoindex.core import analyze_repository
 
 # Analyze a single repository
 repo_info = analyze_repository('/path/to/repo')
@@ -546,7 +546,7 @@ print(f"LOC: {repo_info['metrics']['loc']}")
 ### Query Engine
 
 ```python
-from ghops.query import QueryEngine
+from repoindex.query import QueryEngine
 
 # Create query engine
 engine = QueryEngine()
@@ -579,7 +579,7 @@ print(f"Found {len(list(results))} popular repos")
 ### Export Utilities
 
 ```python
-from ghops.export import ExportManager
+from repoindex.export import ExportManager
 
 # Initialize export manager
 exporter = ExportManager()
@@ -623,7 +623,7 @@ exporter.export_csv(
 ### Exception Classes
 
 ```python
-from ghops.exceptions import (
+from repoindex.exceptions import (
     GhopsError,
     IntegrationError,
     ClusteringError,
@@ -650,7 +650,7 @@ except WorkflowError as e:
 ### Error Recovery
 
 ```python
-from ghops.integrations.workflow import WorkflowRunner, ErrorHandler
+from repoindex.integrations.workflow import WorkflowRunner, ErrorHandler
 
 # Create custom error handler
 class CustomErrorHandler(ErrorHandler):
@@ -679,10 +679,10 @@ result = runner.run(workflow)
 ### Integration Configuration
 
 ```python
-from ghops.config import Config
+from repoindex.config import Config
 
 # Load configuration
-config = Config.load('~/.ghops/config.json')
+config = Config.load('~/.repoindex/config.json')
 
 # Access integration settings
 clustering_config = config.get('integrations.clustering', {})
@@ -700,17 +700,17 @@ max_parallel = config.get('integrations.workflow.max_parallel', default=4)
 
 ```python
 import os
-from ghops.config import apply_env_overrides
+from repoindex.config import apply_env_overrides
 
 # Configuration with environment variables
 config = {
     'github': {
-        'token': os.getenv('GHOPS_GITHUB_TOKEN'),
-        'api_url': os.getenv('GHOPS_GITHUB_API', 'https://api.github.com')
+        'token': os.getenv('REPOINDEX_GITHUB_TOKEN'),
+        'api_url': os.getenv('REPOINDEX_GITHUB_API', 'https://api.github.com')
     },
     'integrations': {
         'clustering': {
-            'enabled': os.getenv('GHOPS_CLUSTERING_ENABLED', 'true').lower() == 'true'
+            'enabled': os.getenv('REPOINDEX_CLUSTERING_ENABLED', 'true').lower() == 'true'
         }
     }
 }
@@ -785,7 +785,7 @@ with workflow_execution(workflow) as runner:
 
 ```python
 import unittest
-from ghops.integrations.clustering import ClusterAnalyzer
+from repoindex.integrations.clustering import ClusterAnalyzer
 
 class TestClustering(unittest.TestCase):
     def setUp(self):
@@ -814,7 +814,7 @@ if __name__ == '__main__':
 
 ## Examples
 
-See the [examples directory](https://github.com/queelius/ghops/tree/main/examples) for complete working examples:
+See the [examples directory](https://github.com/queelius/repoindex/tree/main/examples) for complete working examples:
 
 - **basic_clustering.py**: Simple clustering example
 - **advanced_workflow.py**: Complex workflow with multiple stages
@@ -831,6 +831,6 @@ See the [examples directory](https://github.com/queelius/ghops/tree/main/example
 
 ## Support
 
-- [GitHub Issues](https://github.com/queelius/ghops/issues)
-- [Discussions](https://github.com/queelius/ghops/discussions)
-- [API Documentation](https://ghops.readthedocs.io)
+- [GitHub Issues](https://github.com/queelius/repoindex/issues)
+- [Discussions](https://github.com/queelius/repoindex/discussions)
+- [API Documentation](https://repoindex.readthedocs.io)

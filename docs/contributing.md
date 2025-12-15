@@ -1,6 +1,6 @@
-# Contributing to ghops
+# Contributing to repoindex
 
-Thank you for your interest in contributing to ghops!
+Thank you for your interest in contributing to repoindex!
 
 ## How to Contribute
 

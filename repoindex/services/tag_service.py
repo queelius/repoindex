@@ -1,0 +1,305 @@
+"""
+Tag service for ghops.
+
+Provides tag management operations:
+- Add/remove tags from repositories
+- Query repositories by tag
+- Generate implicit tags
+- Persist tags to config
+"""
+
+from typing import Generator, List, Set, Dict, Any, Optional, Iterable
+from pathlib import Path
+import logging
+
+from ..domain import Repository, Tag, TagSource
+from ..domain.tag import tags_from_strings, tags_to_strings
+from ..infra import FileStore
+
+logger = logging.getLogger(__name__)
+
+
+class TagService:
+    """
+    Service for managing repository tags.
+
+    Tags are stored in the config file under 'repository_tags'.
+    Implicit tags are generated on-the-fly from repository metadata.
+
+    Example:
+        service = TagService(config_store)
+        service.add(repo, Tag.parse("topic:ml"))
+        tags = service.get_tags(repo)
+    """
+
+    def __init__(
+        self,
+        config_store: Optional[FileStore] = None,
+        config_path: Optional[Path] = None
+    ):
+        """
+        Initialize TagService.
+
+        Args:
+            config_store: FileStore for tag persistence
+            config_path: Path to config file (creates store if config_store is None)
+        """
+        if config_store:
+            self.store = config_store
+        else:
+            path = config_path or Path("~/.repoindex/config.json")
+            self.store = FileStore(path)
+
+    def add(self, repo: Repository, tag: Tag) -> None:
+        """
+        Add tag to repository.
+
+        Args:
+            repo: Repository to tag
+            tag: Tag to add
+        """
+        config = self.store.read()
+        repo_tags = config.get('repository_tags', {})
+
+        # Use path as key
+        key = repo.path
+        current_tags = set(repo_tags.get(key, []))
+        current_tags.add(tag.value)
+
+        repo_tags[key] = sorted(list(current_tags))
+        config['repository_tags'] = repo_tags
+        self.store.write(config)
+
+        logger.info(f"Added tag '{tag.value}' to {repo.name}")
+
+    def add_string(self, repo: Repository, tag_string: str) -> None:
+        """Add tag from string."""
+        self.add(repo, Tag.parse(tag_string, TagSource.EXPLICIT))
+
+    def remove(self, repo: Repository, tag: Tag) -> bool:
+        """
+        Remove tag from repository.
+
+        Args:
+            repo: Repository to untag
+            tag: Tag to remove
+
+        Returns:
+            True if tag was removed, False if not found
+        """
+        config = self.store.read()
+        repo_tags = config.get('repository_tags', {})
+
+        key = repo.path
+        current_tags = set(repo_tags.get(key, []))
+
+        if tag.value in current_tags:
+            current_tags.remove(tag.value)
+
+            if current_tags:
+                repo_tags[key] = sorted(list(current_tags))
+            else:
+                del repo_tags[key]
+
+            config['repository_tags'] = repo_tags
+            self.store.write(config)
+
+            logger.info(f"Removed tag '{tag.value}' from {repo.name}")
+            return True
+
+        return False
+
+    def remove_string(self, repo: Repository, tag_string: str) -> bool:
+        """Remove tag by string."""
+        return self.remove(repo, Tag.parse(tag_string))
+
+    def get_explicit_tags(self, repo: Repository) -> Set[Tag]:
+        """
+        Get explicit (user-assigned) tags for repository.
+
+        Args:
+            repo: Repository to get tags for
+
+        Returns:
+            Set of explicit Tag objects
+        """
+        config = self.store.read()
+        repo_tags = config.get('repository_tags', {})
+
+        tag_strings = repo_tags.get(repo.path, [])
+        return set(tags_from_strings(tag_strings, TagSource.EXPLICIT))
+
+    def get_implicit_tags(self, repo: Repository) -> Set[Tag]:
+        """
+        Generate implicit tags from repository metadata.
+
+        Args:
+            repo: Repository to generate tags for
+
+        Returns:
+            Set of implicit Tag objects
+        """
+        tags = set()
+
+        # repo:name
+        tags.add(Tag.parse(f"repo:{repo.name}", TagSource.IMPLICIT))
+
+        # dir:parent
+        parent = Path(repo.path).parent.name
+        tags.add(Tag.parse(f"dir:{parent}", TagSource.IMPLICIT))
+
+        # lang:language
+        if repo.language:
+            tags.add(Tag.parse(f"lang:{repo.language.lower()}", TagSource.IMPLICIT))
+
+        # owner:owner
+        if repo.owner:
+            tags.add(Tag.parse(f"owner:{repo.owner}", TagSource.IMPLICIT))
+
+        # license:key
+        if repo.license:
+            tags.add(Tag.parse(f"license:{repo.license.key}", TagSource.IMPLICIT))
+
+        # status:clean or status:dirty
+        if repo.status:
+            status = "clean" if repo.status.clean else "dirty"
+            tags.add(Tag.parse(f"status:{status}", TagSource.IMPLICIT))
+
+        # GitHub-specific implicit tags
+        if repo.github:
+            gh = repo.github
+
+            if gh.is_fork:
+                tags.add(Tag.parse("source:fork", TagSource.IMPLICIT))
+            if gh.is_archived:
+                tags.add(Tag.parse("archived:true", TagSource.IMPLICIT))
+            if gh.is_private:
+                tags.add(Tag.parse("visibility:private", TagSource.IMPLICIT))
+            else:
+                tags.add(Tag.parse("visibility:public", TagSource.IMPLICIT))
+
+            # Stars buckets
+            if gh.stars >= 1000:
+                tags.add(Tag.parse("stars:1000+", TagSource.IMPLICIT))
+            elif gh.stars >= 100:
+                tags.add(Tag.parse("stars:100+", TagSource.IMPLICIT))
+            elif gh.stars >= 10:
+                tags.add(Tag.parse("stars:10+", TagSource.IMPLICIT))
+
+            # GitHub topics as provider tags
+            for topic in gh.topics:
+                tags.add(Tag.parse(f"topic:{topic}", TagSource.PROVIDER))
+
+        # Package registry tags
+        if repo.package:
+            pkg = repo.package
+            if pkg.published:
+                tags.add(Tag.parse(f"registry:{pkg.registry}", TagSource.IMPLICIT))
+                tags.add(Tag.parse("published:true", TagSource.IMPLICIT))
+
+        return tags
+
+    def get_tags(self, repo: Repository) -> Set[Tag]:
+        """
+        Get all tags for repository (explicit + implicit).
+
+        Args:
+            repo: Repository to get tags for
+
+        Returns:
+            Set of all Tag objects
+        """
+        explicit = self.get_explicit_tags(repo)
+        implicit = self.get_implicit_tags(repo)
+        return explicit | implicit
+
+    def get_tag_strings(self, repo: Repository) -> List[str]:
+        """Get all tag strings for repository."""
+        return tags_to_strings(list(self.get_tags(repo)))
+
+    def query(
+        self,
+        repos: Iterable[Repository],
+        pattern: str
+    ) -> Generator[Repository, None, None]:
+        """
+        Find repositories matching tag pattern.
+
+        Args:
+            repos: Repositories to search
+            pattern: Tag pattern (e.g., "lang:python", "topic:*")
+
+        Yields:
+            Repositories matching the pattern
+        """
+        for repo in repos:
+            tags = self.get_tags(repo)
+            for tag in tags:
+                if tag.matches(pattern):
+                    yield repo
+                    break
+
+    def list_all_tags(self) -> Dict[str, List[str]]:
+        """
+        List all explicit tags organized by repository.
+
+        Returns:
+            Dict mapping repo paths to tag lists
+        """
+        config = self.store.read()
+        return config.get('repository_tags', {})
+
+    def get_unique_tags(self, repos: Iterable[Repository]) -> Set[str]:
+        """
+        Get all unique tag values across repositories.
+
+        Args:
+            repos: Repositories to collect tags from
+
+        Returns:
+            Set of unique tag strings
+        """
+        unique = set()
+        for repo in repos:
+            tags = self.get_tags(repo)
+            unique.update(tags_to_strings(list(tags)))
+        return unique
+
+    def move_tag(
+        self,
+        repo: Repository,
+        from_tag: str,
+        to_tag: str
+    ) -> bool:
+        """
+        Move repository from one tag to another.
+
+        Args:
+            repo: Repository to move
+            from_tag: Tag to remove
+            to_tag: Tag to add
+
+        Returns:
+            True if move was successful
+        """
+        removed = self.remove_string(repo, from_tag)
+        if removed:
+            self.add_string(repo, to_tag)
+            return True
+        return False
+
+    def clear_tags(self, repo: Repository) -> None:
+        """
+        Remove all explicit tags from repository.
+
+        Args:
+            repo: Repository to clear tags from
+        """
+        config = self.store.read()
+        repo_tags = config.get('repository_tags', {})
+
+        if repo.path in repo_tags:
+            del repo_tags[repo.path]
+            config['repository_tags'] = repo_tags
+            self.store.write(config)
+            logger.info(f"Cleared all tags from {repo.name}")

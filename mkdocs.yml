@@ -1,6 +1,6 @@
-site_name: ghops
-repo_url: https://github.com/queelius/ghops
-repo_name: queelius/ghops
+site_name: repoindex
+repo_url: https://github.com/queelius/repoindex
+repo_name: queelius/repoindex
 docs_dir: docs
 site_dir: site
 theme:

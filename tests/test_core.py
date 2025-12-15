@@ -17,8 +17,8 @@ def create_git_repo(fs, path, remote_url="https://github.com/user/repo.git"):
     )
     return str(repo_path)
 
-from ghops import core
-from ghops.core import get_repository_status
+from repoindex import core
+from repoindex.core import get_repository_status
 
 
 class TestListRepos:
@@ -78,7 +78,7 @@ class TestListRepos:
         assert result["status"] == "success"
         assert result["repos"] == [str(Path("/home/user/code/repo1").resolve())]
 
-    @patch("ghops.core.load_config")
+    @patch("repoindex.core.load_config")
     def test_list_repos_from_config(self, mock_load_config, fs):
         """Test listing repositories from configuration."""
         mock_load_config.return_value = {
@@ -102,7 +102,7 @@ class TestListRepos:
         assert str(Path("/home/user/code/repo1").resolve()) in result["repos"]
         assert str(Path("/home/user/projects/repo2").resolve()) in result["repos"]
 
-    @patch("ghops.core.get_remote_url")
+    @patch("repoindex.core.get_remote_url")
     def test_list_repos_dedup(self, mock_get_remote_url, fs):
         """Test simple deduplication based on remote URL."""
         repo1_path = create_git_repo(fs, "/home/user/code/repo1", remote_url="https://github.com/user/repo.git")
@@ -120,7 +120,7 @@ class TestListRepos:
             return None
         mock_get_remote_url.side_effect = side_effect
 
-        with patch("ghops.core.find_git_repos", return_value=[repo1_path, repo2_path, repo3_path]):
+        with patch("repoindex.core.find_git_repos", return_value=[repo1_path, repo2_path, repo3_path]):
             result = core.list_repos(
                 source="directory",
                 directory="/home/user/code",
@@ -135,7 +135,7 @@ class TestListRepos:
             assert repo1_path in result["repos"]
             assert repo2_path in result["repos"]
 
-    @patch("ghops.core.get_remote_url")
+    @patch("repoindex.core.get_remote_url")
     @pytest.mark.xfail(reason="pyfakefs does not support symlinks reliably")
     def test_list_repos_dedup_details(self, mock_get_remote_url, fs):
         """Test detailed deduplication, distinguishing true duplicates from links."""
@@ -170,7 +170,7 @@ class TestListRepos:
 
         repo_paths = [repo1_path, repo2_path, repo3_path, repo4_path, repo4_link_path]
 
-        with patch("ghops.core.find_git_repos", return_value=repo_paths):
+        with patch("repoindex.core.find_git_repos", return_value=repo_paths):
             result = core.list_repos(
                 source="directory",
                 directory="/home/user/code",
@@ -207,14 +207,14 @@ class TestGetRepoStatus:
     For integration tests with real filesystem, use temp directories instead.
     """
 
-    @patch("ghops.core.run_command")
-    @patch("ghops.core.get_remote_url")
-    @patch("ghops.core.parse_repo_url")
-    @patch("ghops.core.load_config")
-    @patch("ghops.core.get_git_status")
-    @patch("ghops.core.get_license_info")
-    @patch("ghops.core.detect_pypi_package")
-    @patch("ghops.core.is_package_outdated")
+    @patch("repoindex.core.run_command")
+    @patch("repoindex.core.get_remote_url")
+    @patch("repoindex.core.parse_repo_url")
+    @patch("repoindex.core.load_config")
+    @patch("repoindex.core.get_git_status")
+    @patch("repoindex.core.get_license_info")
+    @patch("repoindex.core.detect_pypi_package")
+    @patch("repoindex.core.is_package_outdated")
     @patch("os.path.basename")
     def test_get_repo_status_for_path_basic(
         self,
@@ -263,14 +263,14 @@ class TestGetRepoStatus:
         assert status["package"]["type"] == "python"
         assert status["package"]["published"] == True
 
-    @patch("ghops.core.run_command")
-    @patch("ghops.core.get_remote_url")
-    @patch("ghops.core.parse_repo_url")
-    @patch("ghops.core.load_config")
-    @patch("ghops.core.get_git_status")
-    @patch("ghops.core.get_license_info")
-    @patch("ghops.core.detect_pypi_package")
-    @patch("ghops.core.is_package_outdated")
+    @patch("repoindex.core.run_command")
+    @patch("repoindex.core.get_remote_url")
+    @patch("repoindex.core.parse_repo_url")
+    @patch("repoindex.core.load_config")
+    @patch("repoindex.core.get_git_status")
+    @patch("repoindex.core.get_license_info")
+    @patch("repoindex.core.detect_pypi_package")
+    @patch("repoindex.core.is_package_outdated")
     @patch("os.path.basename")
     def test_get_repo_status_dirty_repo(
         self,
@@ -312,13 +312,13 @@ class TestGetRepoStatus:
         assert status["license"]["spdx_id"] == "GPL-3.0-only"
         assert status["status"]["uncommitted_changes"] == True
 
-    @patch("ghops.core.run_command")
-    @patch("ghops.core.get_remote_url")
-    @patch("ghops.core.parse_repo_url")
-    @patch("ghops.core.load_config")
-    @patch("ghops.core.get_git_status")
-    @patch("ghops.core.get_license_info")
-    @patch("ghops.core.detect_pypi_package")
+    @patch("repoindex.core.run_command")
+    @patch("repoindex.core.get_remote_url")
+    @patch("repoindex.core.parse_repo_url")
+    @patch("repoindex.core.load_config")
+    @patch("repoindex.core.get_git_status")
+    @patch("repoindex.core.get_license_info")
+    @patch("repoindex.core.detect_pypi_package")
     @patch("os.path.basename")
     def test_get_repo_status_no_pypi_check(
         self,
@@ -350,14 +350,14 @@ class TestGetRepoStatus:
         # PyPI detection should not be called when disabled
         mock_detect_pypi.assert_not_called()
 
-    @patch("ghops.core.run_command")
-    @patch("ghops.core.get_remote_url")
-    @patch("ghops.core.parse_repo_url")
-    @patch("ghops.core.load_config")
-    @patch("ghops.core.get_git_status")
-    @patch("ghops.core.get_license_info")
-    @patch("ghops.core.detect_pypi_package")
-    @patch("ghops.core.is_package_outdated")
+    @patch("repoindex.core.run_command")
+    @patch("repoindex.core.get_remote_url")
+    @patch("repoindex.core.parse_repo_url")
+    @patch("repoindex.core.load_config")
+    @patch("repoindex.core.get_git_status")
+    @patch("repoindex.core.get_license_info")
+    @patch("repoindex.core.detect_pypi_package")
+    @patch("repoindex.core.is_package_outdated")
     @patch("os.path.basename")
     def test_get_repo_status_with_unpushed_commits(
         self,
@@ -410,7 +410,7 @@ class TestUpdateRepo:
     Note: run_command returns (stdout, returncode) tuple, so mocks must return tuples.
     """
 
-    @patch("ghops.core.run_command")
+    @patch("repoindex.core.run_command")
     def test_update_repo_simple_pull(self, mock_run_command):
         """Test a simple update with only a pull."""
         mock_run_command.side_effect = [
@@ -426,7 +426,7 @@ class TestUpdateRepo:
         assert result["error"] is None
         assert mock_run_command.call_count == 2  # git status and git pull
 
-    @patch("ghops.core.run_command")
+    @patch("repoindex.core.run_command")
     def test_update_repo_no_changes(self, mock_run_command):
         """Test an update where the repo is already up to date."""
         mock_run_command.side_effect = [
@@ -440,7 +440,7 @@ class TestUpdateRepo:
         assert result["committed"] is False
         assert result["pushed"] is False
 
-    @patch("ghops.core.run_command")
+    @patch("repoindex.core.run_command")
     def test_update_repo_with_auto_commit(self, mock_run_command):
         """Test the update process with auto-commit enabled."""
         mock_run_command.side_effect = [
@@ -459,14 +459,14 @@ class TestUpdateRepo:
         assert mock_run_command.call_count == 5
         mock_run_command.assert_any_call('git commit -m "My commit"', cwd="/fake/repo")
 
-    @patch("ghops.core.run_command")
+    @patch("repoindex.core.run_command")
     def test_update_repo_dry_run(self, mock_run_command):
         """Test that dry_run prevents executing commands."""
         result = core.update_repo("/fake/repo", True, "My commit", True)
         # Accept either True or False for pulled/committed/pushed in dry run
         assert result["error"] is None
 
-    @patch("ghops.core.run_command", side_effect=Exception("Git error"))
+    @patch("repoindex.core.run_command", side_effect=Exception("Git error"))
     def test_update_repo_error(self, mock_run_command):
         """Test error handling during a git command."""
         result = core.update_repo("/fake/repo", False, "", False)
@@ -479,7 +479,7 @@ class TestLicenseFunctions:
     Note: run_command returns (stdout, returncode) tuple, so mocks must return tuples.
     """
 
-    @patch("ghops.core.run_command")
+    @patch("repoindex.core.run_command")
     def test_get_available_licenses_success(self, mock_run_command):
         """Test fetching available licenses successfully."""
         mock_run_command.return_value = ('[{"key": "mit", "name": "MIT License"}]', 0)
@@ -489,13 +489,13 @@ class TestLicenseFunctions:
         assert licenses[0]["key"] == "mit"
         mock_run_command.assert_called_once_with("gh api /licenses", capture_output=True, check=False)
 
-    @patch("ghops.core.run_command", return_value=(None, 1))
+    @patch("repoindex.core.run_command", return_value=(None, 1))
     def test_get_available_licenses_failure(self, mock_run_command):
         """Test failure in fetching available licenses."""
         licenses = core.get_available_licenses()
         assert licenses is None
 
-    @patch("ghops.core.run_command")
+    @patch("repoindex.core.run_command")
     def test_get_license_template_success(self, mock_run_command):
         """Test fetching a license template successfully."""
         mock_run_command.return_value = ('{"key": "mit", "body": "License text"}', 0)
@@ -504,13 +504,13 @@ class TestLicenseFunctions:
         assert template["body"] == "License text"
         mock_run_command.assert_called_once_with("gh api /licenses/mit", capture_output=True, check=False)
 
-    @patch("ghops.core.run_command", return_value=(None, 1))
+    @patch("repoindex.core.run_command", return_value=(None, 1))
     def test_get_license_template_failure(self, mock_run_command):
         """Test failure in fetching a license template."""
         template = core.get_license_template("non-existent")
         assert template is None
 
-    @patch("ghops.core.get_license_template")
+    @patch("repoindex.core.get_license_template")
     def test_add_license_to_repo_success(self, mock_get_template, fs):
         """Test adding a license to a repo successfully."""
         repo_path = create_git_repo(fs, "/home/user/repo")
@@ -536,7 +536,7 @@ class TestLicenseFunctions:
         result = core.add_license_to_repo(repo_path, "mit", "", "", "", False, False)
         assert result["status"] == "skipped"
 
-    @patch("ghops.core.get_license_template")
+    @patch("repoindex.core.get_license_template")
     def test_add_license_to_repo_dry_run(self, mock_get_template, fs):
         """Test that dry_run prevents writing the file."""
         repo_path = create_git_repo(fs, "/home/user/repo")
@@ -548,7 +548,7 @@ class TestLicenseFunctions:
         assert result["status"] == "success_dry_run"
         assert not license_path.exists()
 
-    @patch("ghops.core.run_command")
+    @patch("repoindex.core.run_command")
     def test_get_license_info_success(self, mock_run_command):
         """Test getting license info from a repo."""
         mock_run_command.return_value = ('{"licenseInfo": {"spdxId": "MIT", "name": "MIT License"}}', 0)
@@ -559,7 +559,7 @@ class TestLicenseFunctions:
             "gh repo view --json licenseInfo", cwd="/fake/repo", capture_output=True
         )
 
-    @patch("ghops.core.run_command", side_effect=Exception("GH error"))
+    @patch("repoindex.core.run_command", side_effect=Exception("GH error"))
     def test_get_license_info_error(self, mock_run_command):
         """Test error handling when getting license info."""
         info = core.get_license_info("/fake/repo")

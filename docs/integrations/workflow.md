@@ -6,7 +6,7 @@ The workflow integration provides powerful YAML-based automation for complex rep
 
 Workflow orchestration enables you to:
 
-- **Automate Complex Tasks**: Chain multiple ghops commands into workflows
+- **Automate Complex Tasks**: Chain multiple repoindex commands into workflows
 - **Conditional Execution**: Run steps based on conditions and previous results
 - **Parallel Processing**: Execute independent tasks concurrently
 - **Scheduled Operations**: Run workflows on schedules via cron
@@ -19,16 +19,16 @@ Workflow orchestration enables you to:
 
 ```bash
 # Run the morning routine workflow
-ghops workflow run examples/workflows/morning-routine.yaml
+repoindex workflow run examples/workflows/morning-routine.yaml
 
 # Run with variables
-ghops workflow run release.yaml --var version=1.2.0 --var branch=main
+repoindex workflow run release.yaml --var version=1.2.0 --var branch=main
 
 # Dry run to preview execution
-ghops workflow run complex-workflow.yaml --dry-run
+repoindex workflow run complex-workflow.yaml --dry-run
 
 # Run with verbose output
-ghops workflow run workflow.yaml --verbose
+repoindex workflow run workflow.yaml --verbose
 ```
 
 ### Create Your First Workflow
@@ -46,13 +46,13 @@ variables:
 steps:
   - id: find-stale
     name: Find stale repositories
-    action: ghops.query
+    action: repoindex.query
     parameters:
       query: "days_since_commit > {{ max_days }}"
 
   - id: audit-stale
     name: Audit stale repositories
-    action: ghops.audit
+    action: repoindex.audit
     parameters:
       check: ["license", "readme", "security"]
       fix: "{{ fix_issues }}"
@@ -61,7 +61,7 @@ steps:
 
   - id: report
     name: Generate report
-    action: ghops.export
+    action: repoindex.export
     parameters:
       format: markdown
       output: health-report.md
@@ -71,7 +71,7 @@ steps:
 Run it:
 
 ```bash
-ghops workflow run my-workflow.yaml --var fix_issues=true
+repoindex workflow run my-workflow.yaml --var fix_issues=true
 ```
 
 ## Workflow Structure
@@ -98,13 +98,13 @@ variables:
 steps:
   - id: step-1
     name: First Step
-    action: ghops.list
+    action: repoindex.list
     parameters:
       pretty: false
 
   - id: step-2
     name: Second Step
-    action: ghops.status
+    action: repoindex.status
     depends_on: [step-1]
 ```
 
@@ -115,7 +115,7 @@ Each step can include:
 ```yaml
 - id: unique-identifier        # Required: unique step ID
   name: Human Readable Name     # Required: display name
-  action: ghops.command         # Required: action to execute
+  action: repoindex.command         # Required: action to execute
   parameters:                   # Optional: action parameters
     key: value
   depends_on: [step-1, step-2]  # Optional: dependencies
@@ -133,25 +133,25 @@ Each step can include:
 
 #### Repository Management
 ```yaml
-- action: ghops.list           # List repositories
-- action: ghops.status         # Check repository status
-- action: ghops.update         # Update repositories
-- action: ghops.clone          # Clone repositories
+- action: repoindex.list           # List repositories
+- action: repoindex.status         # Check repository status
+- action: repoindex.update         # Update repositories
+- action: repoindex.clone          # Clone repositories
 ```
 
 #### Analysis Actions
 ```yaml
-- action: ghops.audit          # Audit repositories
-- action: ghops.cluster        # Cluster analysis
-- action: ghops.query          # Query repositories
-- action: ghops.stats          # Generate statistics
+- action: repoindex.audit          # Audit repositories
+- action: repoindex.cluster        # Cluster analysis
+- action: repoindex.query          # Query repositories
+- action: repoindex.stats          # Generate statistics
 ```
 
 #### Export Actions
 ```yaml
-- action: ghops.export         # Export to various formats
-- action: ghops.report         # Generate reports
-- action: ghops.publish        # Publish to platforms
+- action: repoindex.export         # Export to various formats
+- action: repoindex.report         # Generate reports
+- action: repoindex.publish        # Publish to platforms
 ```
 
 #### Utility Actions
@@ -168,8 +168,8 @@ Each step can include:
 Create custom actions in Python:
 
 ```python
-# ~/.ghops/actions/my_action.py
-from ghops.integrations.workflow import Action
+# ~/.repoindex/actions/my_action.py
+from repoindex.integrations.workflow import Action
 
 class MyCustomAction(Action):
     def execute(self, parameters, context):
@@ -216,7 +216,7 @@ variables:
 ```yaml
 steps:
   - id: deploy
-    action: ghops.deploy
+    action: repoindex.deploy
     parameters:
       env: "{{ environment }}"
       server: "{{ config.server }}:{{ config.port }}"
@@ -244,7 +244,7 @@ Access workflow context:
 
 ```yaml
 - id: deploy
-  action: ghops.deploy
+  action: repoindex.deploy
   when: "{{ environment == 'production' }}"
 ```
 
@@ -284,14 +284,14 @@ when: "{{ (a > b) or (c == 'd' and e != 'f') }}"
 ```yaml
 steps:
   - id: step1
-    action: ghops.list
+    action: repoindex.list
 
   - id: step2
-    action: ghops.filter
+    action: repoindex.filter
     depends_on: [step1]
 
   - id: step3
-    action: ghops.export
+    action: repoindex.export
     depends_on: [step2]
 ```
 
@@ -301,23 +301,23 @@ steps:
 steps:
   # These run in parallel
   - id: audit-security
-    action: ghops.audit
+    action: repoindex.audit
     parameters:
       check: security
 
   - id: audit-license
-    action: ghops.audit
+    action: repoindex.audit
     parameters:
       check: license
 
   - id: audit-docs
-    action: ghops.audit
+    action: repoindex.audit
     parameters:
       check: documentation
 
   # This waits for all audits
   - id: combine-reports
-    action: ghops.combine
+    action: repoindex.combine
     depends_on: [audit-security, audit-license, audit-docs]
 ```
 
@@ -326,34 +326,34 @@ steps:
 ```yaml
 steps:
   - id: init
-    action: ghops.init
+    action: repoindex.init
 
   - id: fetch-a
-    action: ghops.fetch
+    action: repoindex.fetch
     depends_on: [init]
 
   - id: fetch-b
-    action: ghops.fetch
+    action: repoindex.fetch
     depends_on: [init]
 
   - id: process-a
-    action: ghops.process
+    action: repoindex.process
     depends_on: [fetch-a]
 
   - id: process-b
-    action: ghops.process
+    action: repoindex.process
     depends_on: [fetch-b]
 
   - id: merge
-    action: ghops.merge
+    action: repoindex.merge
     depends_on: [process-a, process-b]
 
   - id: validate
-    action: ghops.validate
+    action: repoindex.validate
     depends_on: [merge]
 
   - id: deploy
-    action: ghops.deploy
+    action: repoindex.deploy
     depends_on: [validate]
     when: "{{ steps.validate.status == 'success' }}"
 ```
@@ -380,11 +380,11 @@ steps:
 ```yaml
 steps:
   - id: main-operation
-    action: ghops.deploy
+    action: repoindex.deploy
     continue_on_error: true
 
   - id: fallback
-    action: ghops.rollback
+    action: repoindex.rollback
     when: "{{ steps.main-operation.status == 'failed' }}"
 
   - id: notify-error
@@ -404,7 +404,7 @@ config:
       parameters:
         channel: alerts
         message: "Workflow {{ workflow.name }} failed"
-    - action: ghops.cleanup
+    - action: repoindex.cleanup
 ```
 
 ## Loops and Iteration
@@ -421,10 +421,10 @@ variables:
 steps:
   - id: process-repos
     name: Process each repository
-    action: ghops.foreach
+    action: repoindex.foreach
     parameters:
       items: "{{ repos }}"
-      action: ghops.audit
+      action: repoindex.audit
       item_name: repo
       parameters:
         repository: "{{ item }}"
@@ -436,7 +436,7 @@ steps:
 ```yaml
 steps:
   - id: wait-for-ready
-    action: ghops.while
+    action: repoindex.while
     parameters:
       condition: "{{ not ready }}"
       max_iterations: 10
@@ -451,7 +451,7 @@ steps:
 ```yaml
 steps:
   - id: map-repos
-    action: ghops.map
+    action: repoindex.map
     parameters:
       items: "{{ steps.list.output }}"
       expression: |
@@ -473,21 +473,21 @@ description: Daily repository maintenance tasks
 steps:
   - id: update-all
     name: Update all repositories
-    action: ghops.update
+    action: repoindex.update
     parameters:
       recursive: true
       fetch: true
 
   - id: check-status
     name: Check repository status
-    action: ghops.status
+    action: repoindex.status
     parameters:
       recursive: true
     depends_on: [update-all]
 
   - id: find-issues
     name: Find repositories with issues
-    action: ghops.query
+    action: repoindex.query
     parameters:
       query: |
         status.uncommitted_changes == true or
@@ -497,7 +497,7 @@ steps:
 
   - id: generate-report
     name: Generate morning report
-    action: ghops.export
+    action: repoindex.export
     parameters:
       format: markdown
       template: morning-report
@@ -553,7 +553,7 @@ steps:
 
   - id: audit
     name: Security audit
-    action: ghops.audit
+    action: repoindex.audit
     parameters:
       check: [security, dependencies]
       fail_on_issues: true
@@ -579,7 +579,7 @@ steps:
 
   - id: publish-docs
     name: Deploy documentation
-    action: ghops.docs
+    action: repoindex.docs
     parameters:
       command: deploy
       platform: github-pages
@@ -587,7 +587,7 @@ steps:
 
   - id: announce
     name: Announce release
-    action: ghops.social
+    action: repoindex.social
     parameters:
       platforms: [twitter, linkedin]
       message: "Released v{{ version }} with new features!"
@@ -600,11 +600,11 @@ steps:
 
 ```bash
 # Add to crontab
-0 9 * * * ghops workflow run morning-routine.yaml
-0 0 * * 0 ghops workflow run weekly-cleanup.yaml
+0 9 * * * repoindex workflow run morning-routine.yaml
+0 0 * * 0 repoindex workflow run weekly-cleanup.yaml
 ```
 
-### Using ghops Service
+### Using repoindex Service
 
 ```json
 {
@@ -629,36 +629,36 @@ steps:
 
 ```bash
 # List available workflows
-ghops workflow list
+repoindex workflow list
 
 # List with details
-ghops workflow list --detailed
+repoindex workflow list --detailed
 
 # Search workflows
-ghops workflow search "release"
+repoindex workflow search "release"
 ```
 
 ### Validate Workflows
 
 ```bash
 # Validate workflow syntax
-ghops workflow validate my-workflow.yaml
+repoindex workflow validate my-workflow.yaml
 
 # Validate with verbose output
-ghops workflow validate my-workflow.yaml --verbose
+repoindex workflow validate my-workflow.yaml --verbose
 ```
 
 ### Workflow History
 
 ```bash
 # Show workflow execution history
-ghops workflow history
+repoindex workflow history
 
 # Show specific workflow history
-ghops workflow history --workflow release-pipeline
+repoindex workflow history --workflow release-pipeline
 
 # Show failed runs
-ghops workflow history --status failed
+repoindex workflow history --status failed
 ```
 
 ## Advanced Features
@@ -671,12 +671,12 @@ Include other workflows:
 name: Master Workflow
 steps:
   - id: morning
-    action: ghops.workflow
+    action: repoindex.workflow
     parameters:
       file: morning-routine.yaml
 
   - id: release
-    action: ghops.workflow
+    action: repoindex.workflow
     parameters:
       file: release-pipeline.yaml
       variables:
@@ -689,12 +689,12 @@ steps:
 ```yaml
 steps:
   - id: generate-steps
-    action: ghops.generate
+    action: repoindex.generate
     parameters:
       template: |
         {% for repo in repos %}
         - id: process-{{ repo.name }}
-          action: ghops.audit
+          action: repoindex.audit
           parameters:
             repository: {{ repo.path }}
         {% endfor %}
@@ -715,7 +715,7 @@ parameters:
 
 steps:
   - id: audit
-    action: ghops.audit
+    action: repoindex.audit
     parameters:
       repository: "{{ parameters.repository }}"
       check: "{{ parameters.checks }}"
@@ -748,10 +748,10 @@ steps:
 
 ```bash
 # Run with debug output
-ghops workflow run my-workflow.yaml --debug
+repoindex workflow run my-workflow.yaml --debug
 
 # Save debug logs
-ghops workflow run my-workflow.yaml --debug --log-file debug.log
+repoindex workflow run my-workflow.yaml --debug --log-file debug.log
 ```
 
 ### Common Issues
@@ -776,7 +776,7 @@ ghops workflow run my-workflow.yaml --debug --log-file debug.log
 ### Python API
 
 ```python
-from ghops.integrations.workflow import Workflow, WorkflowRunner
+from repoindex.integrations.workflow import Workflow, WorkflowRunner
 
 # Load workflow
 workflow = Workflow.from_file('my-workflow.yaml')
@@ -804,11 +804,11 @@ else:
 
 ```bash
 # Main commands
-ghops workflow run        # Run a workflow
-ghops workflow validate   # Validate workflow syntax
-ghops workflow list       # List available workflows
-ghops workflow history    # Show execution history
-ghops workflow debug      # Debug workflow execution
+repoindex workflow run        # Run a workflow
+repoindex workflow validate   # Validate workflow syntax
+repoindex workflow list       # List available workflows
+repoindex workflow history    # Show execution history
+repoindex workflow debug      # Debug workflow execution
 
 # Common options
 --dry-run                # Preview without executing
@@ -821,7 +821,7 @@ ghops workflow debug      # Debug workflow execution
 
 ## Next Steps
 
-- Explore [example workflows](https://github.com/queelius/ghops/tree/main/examples/workflows)
+- Explore [example workflows](https://github.com/queelius/repoindex/tree/main/examples/workflows)
 - Learn about [Clustering Integration](clustering.md) for analysis workflows
 - Check [Tutorial Notebooks](../tutorials/notebooks.md) for interactive examples
 - See [API Documentation](../api/workflow.md) for detailed reference

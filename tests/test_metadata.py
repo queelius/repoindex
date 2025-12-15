@@ -5,7 +5,7 @@ import json
 import tempfile
 from pathlib import Path
 from unittest import TestCase
-from ghops.metadata import detect_languages, MetadataStore
+from repoindex.metadata import detect_languages, MetadataStore
 
 
 class TestLanguageDetection(TestCase):

@@ -9,7 +9,7 @@ import json
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-from ghops.config import (
+from repoindex.config import (
     load_config,
     save_config,
     generate_config_example,
@@ -71,8 +71,8 @@ class TestConfigManagement(unittest.TestCase):
             'logging': {'level': 'DEBUG'}
         }
         
-        # Create .ghops directory
-        ghops_dir = Path(self.temp_dir) / '.ghops'
+        # Create .repoindex directory
+        ghops_dir = Path(self.temp_dir) / '.repoindex'
         ghops_dir.mkdir(exist_ok=True)
         config_path = ghops_dir / 'config.json'
         with open(config_path, 'w') as f:
@@ -93,8 +93,8 @@ check_by_default = false
 level = "DEBUG"
 """
         
-        # Create .ghops directory
-        ghops_dir = Path(self.temp_dir) / '.ghops'
+        # Create .repoindex directory
+        ghops_dir = Path(self.temp_dir) / '.repoindex'
         ghops_dir.mkdir(exist_ok=True)
         config_path = ghops_dir / 'config.toml'
         config_path.write_text(config_content)
@@ -104,7 +104,7 @@ level = "DEBUG"
         self.assertFalse(config['pypi']['check_by_default'])
         self.assertEqual(config['logging']['level'], 'DEBUG')
     
-    @patch.dict(os.environ, {'GHOPS_PYPI_CHECK_BY_DEFAULT': 'false'})
+    @patch.dict(os.environ, {'REPOINDEX_PYPI_CHECK_BY_DEFAULT': 'false'})
     def test_environment_override(self):
         """Test environment variable override"""
         config = load_config()
@@ -112,7 +112,7 @@ level = "DEBUG"
         # Environment should override config file
         self.assertFalse(config['pypi']['check_by_default'])
     
-    @patch.dict(os.environ, {'GHOPS_SOCIAL_MEDIA_PLATFORMS_TWITTER_ENABLED': 'false'})
+    @patch.dict(os.environ, {'REPOINDEX_SOCIAL_MEDIA_PLATFORMS_TWITTER_ENABLED': 'false'})
     def test_nested_environment_override(self):
         """Test nested environment variable override"""
         config = load_config()
@@ -129,8 +129,8 @@ level = "DEBUG"
         
         save_config(config_data)
         
-        # Check in .ghops directory
-        config_path = Path(self.temp_dir) / '.ghops' / 'config.json'
+        # Check in .repoindex directory
+        config_path = Path(self.temp_dir) / '.repoindex' / 'config.json'
         self.assertTrue(config_path.exists())
         
         with open(config_path, 'r') as f:
@@ -143,7 +143,7 @@ level = "DEBUG"
         """Test config example generation"""
         generate_config_example()
         
-        config_path = Path(self.temp_dir) / '.ghopsrc.example'
+        config_path = Path(self.temp_dir) / '.repoindexrc.example'
         self.assertTrue(config_path.exists())
         
         # Verify console output
@@ -157,7 +157,7 @@ class TestConfigValidation(unittest.TestCase):
     
     def test_merge_configs(self):
         """Test configuration merging"""
-        from ghops.config import merge_configs
+        from repoindex.config import merge_configs
         
         base_config = {
             'pypi': {'check_by_default': True, 'timeout': 30},

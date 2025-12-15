@@ -1,10 +1,10 @@
-# ghops Documentation
+# repoindex Documentation
 
-Welcome to the documentation for **ghops** - a comprehensive repository orchestration platform that helps developers manage, analyze, and automate their projects across multiple platforms with advanced clustering, workflow orchestration, and intelligent integrations.
+Welcome to the documentation for **repoindex** - a comprehensive repository orchestration platform that helps developers manage, analyze, and automate their projects across multiple platforms with advanced clustering, workflow orchestration, and intelligent integrations.
 
-## What is ghops?
+## What is repoindex?
 
-`ghops` is a powerful repository orchestration platform that treats your local git repositories as the source of truth, with remote platforms (GitHub, GitLab, PyPI, etc.) serving as enrichment and distribution services. It provides advanced repository analysis, intelligent clustering, workflow automation, and comprehensive export capabilities for managing projects at scale.
+`repoindex` is a powerful repository orchestration platform that treats your local git repositories as the source of truth, with remote platforms (GitHub, GitLab, PyPI, etc.) serving as enrichment and distribution services. It provides advanced repository analysis, intelligent clustering, workflow automation, and comprehensive export capabilities for managing projects at scale.
 
 ## 🚀 What's New in Version 0.8.0
 
@@ -15,7 +15,7 @@ Welcome to the documentation for **ghops** - a comprehensive repository orchestr
   - Support for Python, JavaScript, Java, and Go code analysis
 - **🔄 Workflow Orchestration**: YAML-based workflow automation with DAG execution
   - Parallel and sequential step execution with dependency resolution
-  - Multiple action types: shell, python, http, git, ghops
+  - Multiple action types: shell, python, http, git, repoindex
   - Conditional execution and retry mechanisms
   - Built-in actions library and extensible custom actions
 - **📊 Data Visualization**: Interactive charts and graphs for repository analytics
@@ -67,7 +67,7 @@ Welcome to the documentation for **ghops** - a comprehensive repository orchestr
   - **python**: Run Python code with context access
   - **http**: Make HTTP requests with authentication
   - **git**: Git operations (clone, pull, push, commit)
-  - **ghops**: Integrate all ghops commands seamlessly
+  - **repoindex**: Integrate all repoindex commands seamlessly
   - **custom**: Extensible custom action support
 - **Conditional Logic**: Support for if/else conditions and dynamic branching
   - Jinja2-style template expressions
@@ -82,7 +82,7 @@ Welcome to the documentation for **ghops** - a comprehensive repository orchestr
 
 ### 🔍 **Repository Discovery & Organization**
 - **Tag-Based Catalogs**: Organize repos with explicit tags and auto-generated implicit tags
-- **Powerful Query Language**: Find repos with fuzzy matching: `ghops query "language ~= 'pyton'"`
+- **Powerful Query Language**: Find repos with fuzzy matching: `repoindex query "language ~= 'pyton'"`
 - **Metadata Store**: Local database of all repository information for fast queries
 - **Implicit Tags**: Automatic tags like `repo:name`, `lang:python`, `has:docs`, `dir:parent`
 
@@ -157,42 +157,42 @@ Welcome to the documentation for **ghops** - a comprehensive repository orchestr
 ## 🚀 Quick Start
 
 ```bash
-# Install ghops
-pip install ghops
+# Install repoindex
+pip install repoindex
 
 # Generate configuration with examples
-ghops config generate
+repoindex config generate
 
 # Clone all your repositories
-ghops get
+repoindex get
 
 # Check status of all repositories (outputs JSONL)
-ghops status -r
+repoindex status -r
 
 # Pretty-print status as a table
-ghops status -r --pretty
+repoindex status -r --pretty
 
 # Analyze repository clusters using K-means
-ghops cluster analyze --algorithm kmeans --n-clusters 5
+repoindex cluster analyze --algorithm kmeans --n-clusters 5
 
 # Find duplicate code across repositories
-ghops cluster find-duplicates --min-similarity 0.7 -r
+repoindex cluster find-duplicates --min-similarity 0.7 -r
 
 # Get consolidation suggestions
-ghops cluster suggest-consolidation --confidence 0.8 --pretty
+repoindex cluster suggest-consolidation --confidence 0.8 --pretty
 
 # Run a workflow
-ghops workflow run examples/workflows/morning-routine.yaml
+repoindex workflow run examples/workflows/morning-routine.yaml
 
 # Run workflow with variables
-ghops workflow run release-pipeline.yaml --var version=1.0.0
+repoindex workflow run release-pipeline.yaml --var version=1.0.0
 
 # Filter repos with jq
-ghops status | jq 'select(.status.uncommitted_changes == true)'
+repoindex status | jq 'select(.status.uncommitted_changes == true)'
 
 # Sample repositories for social media (dry run)
-ghops social sample --size 3
-ghops social post --dry-run
+repoindex social sample --size 3
+repoindex social post --dry-run
 ```
 
 ## Use Cases
@@ -257,11 +257,11 @@ ghops social post --dry-run
 
 ### Version 0.6.0 🎉
 
-**Major Architecture & Quality Overhaul** - This release represents a complete transformation of `ghops` into a robust, enterprise-ready tool.
+**Major Architecture & Quality Overhaul** - This release represents a complete transformation of `repoindex` into a robust, enterprise-ready tool.
 
 #### 🏗️ **Complete Architecture Redesign**
 
-- ✅ **Modular Command Structure**: Separated all commands into dedicated modules (`ghops/commands/`)
+- ✅ **Modular Command Structure**: Separated all commands into dedicated modules (`repoindex/commands/`)
 - ✅ **Clean Separation of Concerns**: Utilities, configuration, and API integrations properly separated
 - ✅ **Extensible Design**: Easy to add new commands and features without breaking existing functionality
 - ✅ **Import Optimization**: Eliminated circular dependencies and improved startup time
@@ -296,7 +296,7 @@ ghops social post --dry-run
 - ✅ **Multiple Formats**: Support for both JSON and TOML configuration files
 - ✅ **Environment Overrides**: All settings controllable via environment variables
 - ✅ **Intelligent Merging**: Proper precedence of defaults, files, and overrides
-- ✅ **Example Generation**: `ghops config generate` creates comprehensive examples
+- ✅ **Example Generation**: `repoindex config generate` creates comprehensive examples
 
 #### 📄 **Robust License Management**
 
@@ -328,13 +328,13 @@ ghops social post --dry-run
 
 ## Community and Support
 
-- **GitHub Repository**: [github.com/queelius/ghops](https://github.com/queelius/ghops)
-- **Issues and Bug Reports**: [GitHub Issues](https://github.com/queelius/ghops/issues)
-- **Feature Requests**: [GitHub Discussions](https://github.com/queelius/ghops/discussions)
+- **GitHub Repository**: [github.com/queelius/repoindex](https://github.com/queelius/repoindex)
+- **Issues and Bug Reports**: [GitHub Issues](https://github.com/queelius/repoindex/issues)
+- **Feature Requests**: [GitHub Discussions](https://github.com/queelius/repoindex/discussions)
 
 ## License
 
-This project is licensed under the MIT License. See the [LICENSE](https://github.com/queelius/ghops/blob/main/LICENSE) file for details.
+This project is licensed under the MIT License. See the [LICENSE](https://github.com/queelius/repoindex/blob/main/LICENSE) file for details.
 
 ---
 

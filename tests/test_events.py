@@ -1,23 +1,98 @@
 """
 Tests for events.py module.
 
-Tests the event system including:
-- Event creation and serialization
-- EventHandler base class behavior
-- EventDispatcher routing and execution
-- Configuration loading
+Tests the stateless event scanning system:
+- Time specification parsing
+- Event dataclass functionality
+- Git tag scanning
+- Commit scanning
+- Multi-repo event scanning
 """
 
 import pytest
-from datetime import datetime
+from datetime import datetime, timedelta
 from unittest.mock import Mock, MagicMock, patch
-from ghops.events import (
+from repoindex.events import (
     Event,
-    EventHandler,
-    EventDispatcher,
-    load_handlers_from_config,
-    create_dispatcher_from_config
+    parse_timespec,
+    scan_git_tags,
+    scan_commits,
+    scan_events,
+    get_recent_events,
+    events_to_jsonl
 )
+
+
+class TestParseTimespec:
+    """Test time specification parsing."""
+
+    def test_parse_hours(self):
+        """Test parsing hour specifications."""
+        result = parse_timespec('1h')
+        expected = datetime.now() - timedelta(hours=1)
+        assert abs((result - expected).total_seconds()) < 1
+
+        result = parse_timespec('24h')
+        expected = datetime.now() - timedelta(hours=24)
+        assert abs((result - expected).total_seconds()) < 1
+
+    def test_parse_days(self):
+        """Test parsing day specifications."""
+        result = parse_timespec('1d')
+        expected = datetime.now() - timedelta(days=1)
+        assert abs((result - expected).total_seconds()) < 1
+
+        result = parse_timespec('7d')
+        expected = datetime.now() - timedelta(days=7)
+        assert abs((result - expected).total_seconds()) < 1
+
+    def test_parse_weeks(self):
+        """Test parsing week specifications."""
+        result = parse_timespec('1w')
+        expected = datetime.now() - timedelta(weeks=1)
+        assert abs((result - expected).total_seconds()) < 1
+
+    def test_parse_minutes(self):
+        """Test parsing minute specifications."""
+        result = parse_timespec('30m')
+        expected = datetime.now() - timedelta(minutes=30)
+        assert abs((result - expected).total_seconds()) < 1
+
+    def test_parse_months(self):
+        """Test parsing month specifications (approximate)."""
+        result = parse_timespec('1M')
+        expected = datetime.now() - timedelta(days=30)
+        assert abs((result - expected).total_seconds()) < 1
+
+    def test_parse_iso_date(self):
+        """Test parsing ISO date format."""
+        result = parse_timespec('2024-01-15')
+        assert result.year == 2024
+        assert result.month == 1
+        assert result.day == 15
+
+    def test_parse_iso_datetime(self):
+        """Test parsing ISO datetime format."""
+        result = parse_timespec('2024-01-15T10:30:00')
+        assert result.year == 2024
+        assert result.month == 1
+        assert result.day == 15
+        assert result.hour == 10
+        assert result.minute == 30
+
+    def test_parse_invalid(self):
+        """Test parsing invalid specification."""
+        with pytest.raises(ValueError):
+            parse_timespec('invalid')
+
+        with pytest.raises(ValueError):
+            parse_timespec('abc123')
+
+    def test_parse_with_whitespace(self):
+        """Test parsing with leading/trailing whitespace."""
+        result = parse_timespec('  7d  ')
+        expected = datetime.now() - timedelta(days=7)
+        assert abs((result - expected).total_seconds()) < 1
 
 
 class TestEvent:
@@ -25,472 +100,301 @@ class TestEvent:
 
     def test_event_creation(self):
         """Test creating an event with all fields."""
+        timestamp = datetime.now()
         event = Event(
-            id='test_event_123',
             type='git_tag',
+            timestamp=timestamp,
+            repo_name='myrepo',
             repo_path='/test/repo',
+            data={'tag': 'v1.0.0', 'commit': 'abc123'}
+        )
+
+        assert event.type == 'git_tag'
+        assert event.timestamp == timestamp
+        assert event.repo_name == 'myrepo'
+        assert event.repo_path == '/test/repo'
+        assert event.data['tag'] == 'v1.0.0'
+
+    def test_event_id_git_tag(self):
+        """Test ID generation for git_tag events."""
+        event = Event(
+            type='git_tag',
             timestamp=datetime.now(),
-            context={'tag': 'v1.0.0', 'branch': 'main'}
-        )
-
-        assert event.id == 'test_event_123'
-        assert event.type == 'git_tag'
-        assert event.repo_path == '/test/repo'
-        assert isinstance(event.timestamp, datetime)
-        assert event.context['tag'] == 'v1.0.0'
-
-    def test_event_create_factory(self):
-        """Test Event.create factory method."""
-        event = Event.create(
-            event_type='git_tag',
+            repo_name='myrepo',
             repo_path='/test/repo',
-            tag='v1.0.0',
-            branch='main'
+            data={'tag': 'v1.0.0'}
         )
 
-        assert event.type == 'git_tag'
-        assert event.repo_path == '/test/repo'
-        assert event.id.startswith('git_tag_')
-        assert isinstance(event.timestamp, datetime)
-        assert event.context['tag'] == 'v1.0.0'
-        assert event.context['branch'] == 'main'
+        assert event.id == 'git_tag_myrepo_v1.0.0'
+
+    def test_event_id_commit(self):
+        """Test ID generation for commit events."""
+        event = Event(
+            type='commit',
+            timestamp=datetime.now(),
+            repo_name='myrepo',
+            repo_path='/test/repo',
+            data={'hash': 'abc123def456'}
+        )
+
+        assert event.id == 'commit_myrepo_abc123de'
 
     def test_event_to_dict(self):
         """Test converting event to dictionary."""
         timestamp = datetime.now()
         event = Event(
-            id='test_123',
             type='git_tag',
-            repo_path='/test/repo',
             timestamp=timestamp,
-            context={'tag': 'v1.0.0'}
+            repo_name='myrepo',
+            repo_path='/test/repo',
+            data={'tag': 'v1.0.0'}
         )
 
         event_dict = event.to_dict()
 
-        assert event_dict['id'] == 'test_123'
+        assert event_dict['id'] == 'git_tag_myrepo_v1.0.0'
         assert event_dict['type'] == 'git_tag'
-        assert event_dict['repo_path'] == '/test/repo'
         assert event_dict['timestamp'] == timestamp.isoformat()
-        assert event_dict['context']['tag'] == 'v1.0.0'
+        assert event_dict['repo'] == 'myrepo'
+        assert event_dict['path'] == '/test/repo'
+        assert event_dict['data']['tag'] == 'v1.0.0'
 
-    def test_event_timestamp_string_conversion(self):
-        """Test that string timestamps are converted to datetime."""
-        timestamp_str = '2024-01-15T10:30:00'
+    def test_event_to_jsonl(self):
+        """Test converting event to JSONL string."""
+        import json
+
         event = Event(
-            id='test_123',
             type='git_tag',
+            timestamp=datetime(2024, 1, 15, 10, 30, 0),
+            repo_name='myrepo',
             repo_path='/test/repo',
-            timestamp=timestamp_str,
-            context={}
+            data={'tag': 'v1.0.0'}
         )
 
-        assert isinstance(event.timestamp, datetime)
-        assert event.timestamp.isoformat().startswith('2024-01-15T10:30:00')
+        jsonl = event.to_jsonl()
+        parsed = json.loads(jsonl)
 
-    def test_event_empty_context(self):
-        """Test event with empty context."""
-        event = Event.create(
-            event_type='git_tag',
+        assert parsed['type'] == 'git_tag'
+        assert parsed['repo'] == 'myrepo'
+        assert parsed['data']['tag'] == 'v1.0.0'
+
+    def test_event_empty_data(self):
+        """Test event with empty data."""
+        event = Event(
+            type='git_tag',
+            timestamp=datetime.now(),
+            repo_name='myrepo',
             repo_path='/test/repo'
         )
 
-        assert event.context == {}
-
-
-class MockHandler(EventHandler):
-    """Mock handler for testing."""
-
-    def __init__(self, config):
-        super().__init__(config)
-        self.handled_events = []
-
-    def should_handle(self, event: Event) -> bool:
-        """Check if should handle based on event type."""
-        trigger = self.config.get('trigger', 'git_tag')
-        return event.type == trigger
-
-    def handle(self, event: Event) -> list:
-        """Handle event and record it."""
-        self.handled_events.append(event)
-        return [{
-            'action': 'mock_action',
-            'status': 'success',
-            'event_id': event.id
-        }]
-
-
-class TestEventHandler:
-    """Test EventHandler base class."""
-
-    def test_handler_initialization(self):
-        """Test handler initialization with config."""
-        config = {'enabled': True, 'trigger': 'git_tag'}
-        handler = MockHandler(config)
-
-        assert handler.config == config
-        assert handler.enabled is True
-
-    def test_handler_default_enabled(self):
-        """Test handler is enabled by default."""
-        handler = MockHandler({})
-        assert handler.enabled is True
-
-    def test_handler_disabled(self):
-        """Test handler can be disabled."""
-        handler = MockHandler({'enabled': False})
-        assert handler.enabled is False
-
-    def test_handler_should_handle(self):
-        """Test should_handle logic."""
-        handler = MockHandler({'trigger': 'git_tag'})
-
-        event1 = Event.create('git_tag', '/repo')
-        event2 = Event.create('release', '/repo')
-
-        assert handler.should_handle(event1) is True
-        assert handler.should_handle(event2) is False
-
-    def test_handler_handle(self):
-        """Test handler processing an event."""
-        handler = MockHandler({})
-        event = Event.create('git_tag', '/repo', tag='v1.0.0')
-
-        results = handler.handle(event)
-
-        assert len(handler.handled_events) == 1
-        assert handler.handled_events[0] == event
-        assert results[0]['status'] == 'success'
-
-    def test_check_conditions_tag_pattern(self):
-        """Test _check_conditions with tag_pattern."""
-        handler = MockHandler({})
-
-        event = Event.create('git_tag', '/repo', tag='v1.0.0')
-        conditions = {'tag_pattern': 'v*'}
-
-        assert handler._check_conditions(event, conditions) is True
-
-        # Non-matching pattern
-        conditions = {'tag_pattern': 'release-*'}
-        assert handler._check_conditions(event, conditions) is False
-
-    def test_check_conditions_branches(self):
-        """Test _check_conditions with branch filtering."""
-        handler = MockHandler({})
-
-        event = Event.create('git_tag', '/repo', branch='main')
-        conditions = {'branches': ['main', 'master']}
-
-        assert handler._check_conditions(event, conditions) is True
-
-        # Non-matching branch
-        conditions = {'branches': ['develop']}
-        assert handler._check_conditions(event, conditions) is False
-
-    def test_check_conditions_project_types(self):
-        """Test _check_conditions with project_type filtering."""
-        handler = MockHandler({})
-
-        event = Event.create('git_tag', '/repo', project_type='python')
-        conditions = {'project_types': ['python', 'javascript']}
-
-        assert handler._check_conditions(event, conditions) is True
-
-        # Non-matching type
-        conditions = {'project_types': ['rust']}
-        assert handler._check_conditions(event, conditions) is False
-
-    def test_check_conditions_multiple(self):
-        """Test _check_conditions with multiple conditions."""
-        handler = MockHandler({})
-
-        event = Event.create('git_tag', '/repo', tag='v1.0.0', branch='main')
-        conditions = {
-            'tag_pattern': 'v*',
-            'branches': ['main']
-        }
-
-        assert handler._check_conditions(event, conditions) is True
-
-        # One condition fails
-        conditions['branches'] = ['develop']
-        assert handler._check_conditions(event, conditions) is False
-
-    def test_check_conditions_empty(self):
-        """Test _check_conditions with no conditions."""
-        handler = MockHandler({})
-        event = Event.create('git_tag', '/repo')
-
-        assert handler._check_conditions(event, {}) is True
-
-
-class TestEventDispatcher:
-    """Test EventDispatcher functionality."""
-
-    def test_dispatcher_initialization(self):
-        """Test dispatcher starts with no handlers."""
-        dispatcher = EventDispatcher()
-        assert dispatcher.handlers == []
-
-    def test_register_handler(self):
-        """Test registering a handler."""
-        dispatcher = EventDispatcher()
-        handler = MockHandler({})
-
-        dispatcher.register(handler)
-
-        assert len(dispatcher.handlers) == 1
-        assert dispatcher.handlers[0] == handler
-
-    def test_register_multiple_handlers(self):
-        """Test registering multiple handlers."""
-        dispatcher = EventDispatcher()
-        handler1 = MockHandler({'trigger': 'git_tag'})
-        handler2 = MockHandler({'trigger': 'release'})
-
-        dispatcher.register(handler1)
-        dispatcher.register(handler2)
-
-        assert len(dispatcher.handlers) == 2
-
-    def test_dispatch_to_matching_handler(self):
-        """Test dispatching event to matching handler."""
-        dispatcher = EventDispatcher()
-        handler = MockHandler({'trigger': 'git_tag'})
-        dispatcher.register(handler)
-
-        event = Event.create('git_tag', '/repo', tag='v1.0.0')
-        results = dispatcher.dispatch(event)
-
-        assert len(results) == 1
-        assert results[0]['status'] == 'success'
-        assert len(handler.handled_events) == 1
-
-    def test_dispatch_skips_non_matching_handler(self):
-        """Test that non-matching handlers are skipped."""
-        dispatcher = EventDispatcher()
-        handler = MockHandler({'trigger': 'release'})
-        dispatcher.register(handler)
-
-        event = Event.create('git_tag', '/repo')
-        results = dispatcher.dispatch(event)
-
-        assert len(results) == 0
-        assert len(handler.handled_events) == 0
-
-    def test_dispatch_to_multiple_handlers(self):
-        """Test dispatching to multiple matching handlers."""
-        dispatcher = EventDispatcher()
-        handler1 = MockHandler({'trigger': 'git_tag'})
-        handler2 = MockHandler({'trigger': 'git_tag'})
-        dispatcher.register(handler1)
-        dispatcher.register(handler2)
-
-        event = Event.create('git_tag', '/repo')
-        results = dispatcher.dispatch(event)
-
-        assert len(results) == 2
-        assert len(handler1.handled_events) == 1
-        assert len(handler2.handled_events) == 1
-
-    def test_dispatch_skips_disabled_handler(self):
-        """Test that disabled handlers are skipped."""
-        dispatcher = EventDispatcher()
-        handler = MockHandler({'enabled': False, 'trigger': 'git_tag'})
-        dispatcher.register(handler)
-
-        event = Event.create('git_tag', '/repo')
-        results = dispatcher.dispatch(event)
-
-        assert len(results) == 0
-        assert len(handler.handled_events) == 0
-
-    def test_dispatch_handles_handler_errors(self):
-        """Test that handler errors are caught and returned as failed results."""
-        class FailingHandler(EventHandler):
-            def should_handle(self, event):
-                return True
-
-            def handle(self, event):
-                raise ValueError("Handler failed!")
-
-        dispatcher = EventDispatcher()
-        handler = FailingHandler({})
-        dispatcher.register(handler)
-
-        event = Event.create('git_tag', '/repo')
-        results = dispatcher.dispatch(event)
-
-        assert len(results) == 1
-        assert results[0]['status'] == 'failed'
-        assert 'Handler failed!' in results[0]['error']
-
-    @patch('ghops.analytics_store.get_analytics_store')
-    def test_dispatch_and_record(self, mock_get_store):
-        """Test dispatching and recording to analytics."""
-        # Mock analytics store
-        mock_store = MagicMock()
-        mock_get_store.return_value = mock_store
-
-        dispatcher = EventDispatcher()
-        handler = MockHandler({'trigger': 'git_tag'})
-        dispatcher.register(handler)
-
-        event = Event.create('git_tag', '/repo', tag='v1.0.0')
-        results = dispatcher.dispatch_and_record(event)
-
-        # Should record event
-        mock_store.record_event.assert_called_once_with(
-            event_id=event.id,
-            event_type='git_tag',
-            repo_path='/repo',
-            context=event.context,
-            status='processing'
+        assert event.data == {}
+
+
+class TestScanGitTags:
+    """Test git tag scanning."""
+
+    @patch('repoindex.events.run_command')
+    def test_scan_tags_basic(self, mock_run):
+        """Test basic tag scanning."""
+        mock_run.return_value = (
+            "v1.0.0|2024-01-15 10:30:00 -0500|abc123|user@example.com|Release v1.0.0\n"
+            "v0.9.0|2024-01-10 09:00:00 -0500|def456|user@example.com|Beta release",
+            0
         )
 
-        # Should record action
-        mock_store.record_event_action.assert_called_once()
-        action_call = mock_store.record_event_action.call_args
-        assert action_call[1]['event_id'] == event.id
-        assert action_call[1]['action_type'] == 'mock_action'
-        assert action_call[1]['status'] == 'success'
+        events = list(scan_git_tags('/test/repo'))
 
-        # Should update event status
-        mock_store.update_event_status.assert_called_once_with(event.id, 'completed')
+        assert len(events) == 2
+        assert events[0].type == 'git_tag'
+        assert events[0].data['tag'] == 'v1.0.0'
+        assert events[1].data['tag'] == 'v0.9.0'
 
-    @patch('ghops.analytics_store.get_analytics_store')
-    def test_dispatch_and_record_failed_action(self, mock_get_store):
-        """Test that failed actions update event status to failed."""
-        mock_store = MagicMock()
-        mock_get_store.return_value = mock_store
+    @patch('repoindex.events.run_command')
+    def test_scan_tags_with_since(self, mock_run):
+        """Test tag scanning with since filter."""
+        mock_run.return_value = (
+            "v1.0.0|2024-01-15 10:30:00 -0500|abc123||Release v1.0.0\n"
+            "v0.9.0|2024-01-01 09:00:00 -0500|def456||Old release",
+            0
+        )
 
-        class FailingHandler(EventHandler):
-            def should_handle(self, event):
-                return True
+        since = datetime(2024, 1, 10)
+        events = list(scan_git_tags('/test/repo', since=since))
 
-            def handle(self, event):
-                raise ValueError("Action failed")
+        # Only v1.0.0 should match (after Jan 10)
+        assert len(events) == 1
+        assert events[0].data['tag'] == 'v1.0.0'
 
-        dispatcher = EventDispatcher()
-        dispatcher.register(FailingHandler({}))
+    @patch('repoindex.events.run_command')
+    def test_scan_tags_with_limit(self, mock_run):
+        """Test tag scanning with limit."""
+        mock_run.return_value = (
+            "v1.0.0|2024-01-15 10:30:00 -0500|abc123||Release\n"
+            "v0.9.0|2024-01-10 09:00:00 -0500|def456||Beta\n"
+            "v0.8.0|2024-01-05 08:00:00 -0500|ghi789||Alpha",
+            0
+        )
 
-        event = Event.create('git_tag', '/repo')
-        dispatcher.dispatch_and_record(event)
+        events = list(scan_git_tags('/test/repo', limit=2))
 
-        # Should update event status to failed
-        mock_store.update_event_status.assert_called_once_with(event.id, 'failed')
+        assert len(events) == 2
+
+    @patch('repoindex.events.run_command')
+    def test_scan_tags_empty_repo(self, mock_run):
+        """Test scanning repo with no tags."""
+        mock_run.return_value = ('', 0)
+
+        events = list(scan_git_tags('/test/repo'))
+
+        assert len(events) == 0
+
+    @patch('repoindex.events.run_command')
+    def test_scan_tags_command_failure(self, mock_run):
+        """Test handling git command failure."""
+        mock_run.return_value = (None, 1)
+
+        events = list(scan_git_tags('/test/repo'))
+
+        assert len(events) == 0
 
 
-class TestConfigLoading:
-    """Test configuration loading for handlers."""
+class TestScanCommits:
+    """Test commit scanning."""
 
-    def test_load_handlers_empty_config(self):
-        """Test loading handlers with empty config."""
-        handlers = load_handlers_from_config({})
-        assert handlers == []
+    @patch('repoindex.events.run_command')
+    def test_scan_commits_basic(self, mock_run):
+        """Test basic commit scanning."""
+        mock_run.return_value = (
+            "abc123|2024-01-15T10:30:00+00:00|John Doe|john@example.com|Add feature\n"
+            "def456|2024-01-14T09:00:00+00:00|Jane Doe|jane@example.com|Fix bug",
+            0
+        )
 
-    def test_load_handlers_disabled(self):
-        """Test that disabled event system returns no handlers."""
-        config = {
-            'events': {
-                'enabled': False,
-                'handlers': [{'type': 'social_media_post'}]
-            }
-        }
+        events = list(scan_commits('/test/repo'))
 
-        handlers = load_handlers_from_config(config)
-        assert handlers == []
+        assert len(events) == 2
+        assert events[0].type == 'commit'
+        assert events[0].data['hash'] == 'abc123'
+        assert events[0].data['author'] == 'John Doe'
+        assert events[1].data['hash'] == 'def456'
 
-    @patch('ghops.event_handlers.SocialMediaPostHandler')
-    def test_load_social_media_handler(self, mock_handler_class):
-        """Test loading social media post handler."""
-        config = {
-            'events': {
-                'enabled': True,
-                'handlers': [
-                    {
-                        'type': 'social_media_post',
-                        'trigger': 'git_tag',
-                        'enabled': True
-                    }
-                ]
-            }
-        }
+    @patch('repoindex.events.run_command')
+    def test_scan_commits_with_limit(self, mock_run):
+        """Test commit scanning with limit."""
+        mock_run.return_value = (
+            "abc123|2024-01-15T10:30:00+00:00|John|john@example.com|Commit 1\n"
+            "def456|2024-01-14T09:00:00+00:00|Jane|jane@example.com|Commit 2",
+            0
+        )
 
-        handlers = load_handlers_from_config(config)
+        events = list(scan_commits('/test/repo', limit=1))
 
-        mock_handler_class.assert_called_once()
-        assert len(handlers) == 1
+        # The command itself handles limit, but verify we process output correctly
+        assert len(events) == 2  # Still get all from mocked output
 
-    @patch('ghops.event_handlers.PublishPackageHandler')
-    def test_load_publish_handler(self, mock_handler_class):
-        """Test loading publish package handler."""
-        config = {
-            'events': {
-                'enabled': True,
-                'handlers': [
-                    {
-                        'type': 'publish_package',
-                        'trigger': 'git_tag'
-                    }
-                ]
-            }
-        }
 
-        handlers = load_handlers_from_config(config)
+class TestScanEvents:
+    """Test multi-repo event scanning."""
 
-        mock_handler_class.assert_called_once()
-        assert len(handlers) == 1
+    @patch('repoindex.events.scan_git_tags')
+    def test_scan_events_multiple_repos(self, mock_scan_tags):
+        """Test scanning multiple repositories."""
+        mock_scan_tags.side_effect = [
+            [Event('git_tag', datetime(2024, 1, 15), 'repo1', '/repo1', {'tag': 'v1.0'})],
+            [Event('git_tag', datetime(2024, 1, 14), 'repo2', '/repo2', {'tag': 'v2.0'})]
+        ]
 
-    @patch('ghops.event_handlers.SocialMediaPostHandler')
-    @patch('ghops.event_handlers.PublishPackageHandler')
-    def test_load_multiple_handlers(self, mock_publish, mock_social):
-        """Test loading multiple handlers."""
-        config = {
-            'events': {
-                'enabled': True,
-                'handlers': [
-                    {'type': 'social_media_post'},
-                    {'type': 'publish_package'}
-                ]
-            }
-        }
+        events = list(scan_events(['/repo1', '/repo2']))
 
-        handlers = load_handlers_from_config(config)
+        assert len(events) == 2
+        # Should be sorted by timestamp, newest first
+        assert events[0].repo_name == 'repo1'
+        assert events[1].repo_name == 'repo2'
 
-        assert len(handlers) == 2
-        mock_social.assert_called_once()
-        mock_publish.assert_called_once()
+    @patch('repoindex.events.scan_git_tags')
+    def test_scan_events_with_repo_filter(self, mock_scan_tags):
+        """Test scanning with repo filter."""
+        mock_scan_tags.return_value = [
+            Event('git_tag', datetime.now(), 'myrepo', '/myrepo', {'tag': 'v1.0'})
+        ]
 
-    def test_load_unknown_handler_type(self):
-        """Test that unknown handler types are logged and skipped."""
-        config = {
-            'events': {
-                'enabled': True,
-                'handlers': [
-                    {'type': 'unknown_handler_type'}
-                ]
-            }
-        }
+        events = list(scan_events(['/repo1', '/myrepo'], repo_filter='myrepo'))
 
-        handlers = load_handlers_from_config(config)
+        # Only myrepo should be scanned
+        assert mock_scan_tags.call_count == 1
 
-        # Unknown handlers should be skipped
-        assert handlers == []
+    @patch('repoindex.events.scan_git_tags')
+    def test_scan_events_with_limit(self, mock_scan_tags):
+        """Test scanning with global limit."""
+        mock_scan_tags.side_effect = [
+            [
+                Event('git_tag', datetime(2024, 1, 15), 'repo1', '/r1', {'tag': 'v1.0'}),
+                Event('git_tag', datetime(2024, 1, 14), 'repo1', '/r1', {'tag': 'v0.9'})
+            ],
+            [
+                Event('git_tag', datetime(2024, 1, 13), 'repo2', '/r2', {'tag': 'v2.0'})
+            ]
+        ]
 
-    @patch('ghops.events.load_handlers_from_config')
-    def test_create_dispatcher_from_config(self, mock_load_handlers):
-        """Test creating dispatcher from config."""
-        mock_handler = MockHandler({})
-        mock_load_handlers.return_value = [mock_handler]
+        events = list(scan_events(['/r1', '/r2'], limit=2))
 
-        config = {'events': {'enabled': True}}
-        dispatcher = create_dispatcher_from_config(config)
+        assert len(events) == 2
 
-        assert isinstance(dispatcher, EventDispatcher)
-        assert len(dispatcher.handlers) == 1
-        assert dispatcher.handlers[0] == mock_handler
+
+class TestGetRecentEvents:
+    """Test convenience function for getting recent events."""
+
+    @patch('repoindex.events.scan_events')
+    def test_get_recent_events_default(self, mock_scan):
+        """Test getting recent events with defaults."""
+        mock_scan.return_value = iter([
+            Event('git_tag', datetime.now(), 'repo', '/repo', {'tag': 'v1.0'})
+        ])
+
+        events = get_recent_events(['/repo'])
+
+        assert len(events) == 1
+        # Verify scan_events was called with correct params
+        call_args = mock_scan.call_args
+        assert call_args[0][0] == ['/repo']  # repos
+        assert call_args[1]['limit'] == 50
+
+    @patch('repoindex.events.scan_events')
+    def test_get_recent_events_custom_days(self, mock_scan):
+        """Test getting recent events with custom days."""
+        mock_scan.return_value = iter([])
+
+        get_recent_events(['/repo'], days=30)
+
+        call_args = mock_scan.call_args
+        since = call_args[1]['since']
+        expected = datetime.now() - timedelta(days=30)
+        assert abs((since - expected).total_seconds()) < 1
+
+
+class TestEventsToJsonl:
+    """Test JSONL conversion."""
+
+    def test_events_to_jsonl(self):
+        """Test converting events list to JSONL."""
+        import json
+
+        events = [
+            Event('git_tag', datetime(2024, 1, 15), 'repo1', '/r1', {'tag': 'v1.0'}),
+            Event('git_tag', datetime(2024, 1, 14), 'repo2', '/r2', {'tag': 'v2.0'})
+        ]
+
+        jsonl = events_to_jsonl(events)
+        lines = jsonl.strip().split('\n')
+
+        assert len(lines) == 2
+        assert json.loads(lines[0])['data']['tag'] == 'v1.0'
+        assert json.loads(lines[1])['data']['tag'] == 'v2.0'
+
+    def test_events_to_jsonl_empty(self):
+        """Test converting empty events list."""
+        jsonl = events_to_jsonl([])
+        assert jsonl == ''
 
 
 if __name__ == '__main__':

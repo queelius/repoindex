@@ -4,7 +4,7 @@ import os
 import tempfile
 from pathlib import Path
 from unittest import TestCase
-from ghops.gitignore import generate_gitignore_content, _get_language_patterns, _detect_project_structure_patterns
+from repoindex.gitignore import generate_gitignore_content, _get_language_patterns, _detect_project_structure_patterns
 
 
 class TestGitignoreGeneration(TestCase):

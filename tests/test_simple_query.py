@@ -1,7 +1,7 @@
 """Tests for query.py module."""
 
 import pytest
-from ghops.query import Query, query_repositories
+from repoindex.query import Query, query_repositories
 
 
 class TestQuery:

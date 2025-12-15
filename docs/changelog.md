@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to ghops will be documented in this file.
+All notable changes to repoindex will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -35,10 +35,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Complexity metrics (cyclomatic complexity, dependency depth)
   - Documentation and quality scores
 - **CLI Commands**: New clustering command group
-  - `ghops cluster analyze`: Analyze and cluster repositories
-  - `ghops cluster find-duplicates`: Detect duplicate code
-  - `ghops cluster suggest-consolidation`: Get consolidation recommendations
-  - `ghops cluster export`: Export results in multiple formats (JSON, HTML, GraphML)
+  - `repoindex cluster analyze`: Analyze and cluster repositories
+  - `repoindex cluster find-duplicates`: Detect duplicate code
+  - `repoindex cluster suggest-consolidation`: Get consolidation recommendations
+  - `repoindex cluster export`: Export results in multiple formats (JSON, HTML, GraphML)
 - **JSONL Output**: Streaming output for all clustering operations
   - Compatible with Unix pipelines and jq
   - Progress updates and error reporting
@@ -61,7 +61,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `python`: Run Python code with context access
   - `http`: Make HTTP requests with authentication
   - `git`: Git operations (clone, pull, push, commit)
-  - `ghops`: Integrate all ghops commands seamlessly
+  - `repoindex`: Integrate all repoindex commands seamlessly
   - `custom`: Extensible custom action support
 - **Conditional Execution**: Advanced control flow
   - If/else conditions using template expressions
@@ -74,10 +74,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Error recovery steps and fallback actions
   - Comprehensive error reporting and logging
 - **CLI Commands**: Workflow management
-  - `ghops workflow run`: Execute workflows with variables
-  - `ghops workflow validate`: Syntax and semantic validation
-  - `ghops workflow list`: List available workflows
-  - `ghops workflow history`: Execution history and logs
+  - `repoindex workflow run`: Execute workflows with variables
+  - `repoindex workflow validate`: Syntax and semantic validation
+  - `repoindex workflow list`: List available workflows
+  - `repoindex workflow history`: Execution history and logs
 - **Example Workflows**: Production-ready workflow templates
   - Morning routine: Daily repository maintenance
   - Release pipeline: Automated release process
@@ -86,7 +86,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### Tutorial Notebooks
 - **5 Comprehensive Jupyter Notebooks**: Interactive learning materials
-  - `01_getting_started.ipynb`: Introduction to ghops basics
+  - `01_getting_started.ipynb`: Introduction to repoindex basics
   - `02_clustering_analysis.ipynb`: Repository clustering tutorial
   - `03_workflow_orchestration.ipynb`: Building automated workflows
   - `04_advanced_integrations.ipynb`: Combining features and custom integrations
@@ -121,8 +121,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### Command Line Interface
 - **New Command Groups**: Organized command structure
-  - `ghops cluster`: Clustering and analysis commands
-  - `ghops workflow`: Workflow management commands
+  - `repoindex cluster`: Clustering and analysis commands
+  - `repoindex workflow`: Workflow management commands
 - **Improved Output**: Better formatting and progress indicators
   - Streaming JSONL for all commands
   - Pretty-print tables for human readability
@@ -138,17 +138,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Workflow execution parameters
   - Feature extraction options
 - **Environment Variables**: Additional environment variable support
-  - `GHOPS_CLUSTERING_ENABLED`: Enable/disable clustering
-  - `GHOPS_WORKFLOW_DIR`: Custom workflow directory
-  - `GHOPS_MAX_PARALLEL`: Maximum parallel tasks
+  - `REPOINDEX_CLUSTERING_ENABLED`: Enable/disable clustering
+  - `REPOINDEX_WORKFLOW_DIR`: Custom workflow directory
+  - `REPOINDEX_MAX_PARALLEL`: Maximum parallel tasks
 
 ### Changed
 
 - **Minimum Python Version**: Now requires Python 3.8+ (was 3.7+)
 - **Optional Dependencies**: Clustering and workflow features require extra packages
-  - Install with `pip install ghops[clustering]` for clustering features
-  - Install with `pip install ghops[workflows]` for workflow features
-  - Install with `pip install ghops[all]` for all features
+  - Install with `pip install repoindex[clustering]` for clustering features
+  - Install with `pip install repoindex[workflows]` for workflow features
+  - Install with `pip install repoindex[all]` for all features
 - **Output Format**: All commands now default to JSONL (was mixed)
   - Use `--pretty` flag for human-readable table output
   - Better Unix pipeline compatibility
@@ -198,37 +198,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 2. **Optional Features**: Install extra dependencies
    ```bash
    # For clustering
-   pip install ghops[clustering]
+   pip install repoindex[clustering]
 
    # For workflows
-   pip install ghops[workflows]
+   pip install repoindex[workflows]
 
    # For everything
-   pip install ghops[all]
+   pip install repoindex[all]
    ```
 
 3. **Output Format**: All commands now output JSONL by default
    ```bash
    # Old way (might have mixed output)
-   ghops list
+   repoindex list
 
    # New way (JSONL output)
-   ghops list
+   repoindex list
 
    # For human-readable table
-   ghops list --pretty
+   repoindex list --pretty
    ```
 
 **New Features to Try:**
 1. **Clustering**: Organize your repositories
    ```bash
-   ghops cluster analyze --algorithm kmeans -r
-   ghops cluster find-duplicates --min-similarity 0.8
+   repoindex cluster analyze --algorithm kmeans -r
+   repoindex cluster find-duplicates --min-similarity 0.8
    ```
 
 2. **Workflows**: Automate your tasks
    ```bash
-   ghops workflow run examples/workflows/morning-routine.yaml
+   repoindex workflow run examples/workflows/morning-routine.yaml
    ```
 
 3. **Notebooks**: Learn interactively
@@ -276,7 +276,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dependency Auditing**: Check for outdated dependencies
 
 ### Changed
-- **Architecture**: Modular command structure in `ghops/commands/`
+- **Architecture**: Modular command structure in `repoindex/commands/`
 - **Testing**: 138 tests with 86% coverage
 - **Performance**: Optional API checks for faster operations
 
@@ -346,7 +346,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/queelius/ghops/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/queelius/ghops/discussions)
-- **Documentation**: [ghops.readthedocs.io](https://ghops.readthedocs.io)
+- **Issues**: [GitHub Issues](https://github.com/queelius/repoindex/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/queelius/repoindex/discussions)
+- **Documentation**: [repoindex.readthedocs.io](https://repoindex.readthedocs.io)
 - **Contributing**: [CONTRIBUTING.md](contributing.md)

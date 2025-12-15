@@ -15,7 +15,7 @@ import toml
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-from ghops.version_manager import (
+from repoindex.version_manager import (
     VersionBumper,
     PythonVersionManager,
     NodeVersionManager,
@@ -577,7 +577,7 @@ project(MyProject VERSION 1.0.0 LANGUAGES CXX)
 class TestGoVersionManager:
     """Test Go module version management via git tags."""
 
-    @patch('ghops.utils.run_command')
+    @patch('repoindex.utils.run_command')
     def test_get_version_from_git_tag(self, mock_run_command):
         """Test reading version from git tag."""
         mock_run_command.return_value = ("v1.2.3\n", 0)
@@ -592,7 +592,7 @@ class TestGoVersionManager:
             check=False
         )
 
-    @patch('ghops.utils.run_command')
+    @patch('repoindex.utils.run_command')
     def test_get_version_without_v_prefix(self, mock_run_command):
         """Test reading version from git tag without 'v' prefix."""
         mock_run_command.return_value = ("2.0.0\n", 0)
@@ -600,7 +600,7 @@ class TestGoVersionManager:
         version = GoVersionManager.get_version("/test/repo")
         assert version == "2.0.0"
 
-    @patch('ghops.utils.run_command')
+    @patch('repoindex.utils.run_command')
     def test_get_version_no_tags(self, mock_run_command):
         """Test when no git tags exist."""
         mock_run_command.return_value = ("", 1)
@@ -608,7 +608,7 @@ class TestGoVersionManager:
         version = GoVersionManager.get_version("/test/repo")
         assert version is None
 
-    @patch('ghops.utils.run_command')
+    @patch('repoindex.utils.run_command')
     def test_set_version_creates_git_tag(self, mock_run_command):
         """Test that set_version creates a git tag with 'v' prefix."""
         mock_run_command.return_value = ("", 0)
@@ -623,7 +623,7 @@ class TestGoVersionManager:
             check=False
         )
 
-    @patch('ghops.utils.run_command')
+    @patch('repoindex.utils.run_command')
     def test_set_version_with_v_prefix(self, mock_run_command):
         """Test that set_version doesn't double 'v' prefix."""
         mock_run_command.return_value = ("", 0)
@@ -638,7 +638,7 @@ class TestGoVersionManager:
             check=False
         )
 
-    @patch('ghops.utils.run_command')
+    @patch('repoindex.utils.run_command')
     def test_set_version_git_failure(self, mock_run_command):
         """Test handling git tag creation failure."""
         mock_run_command.return_value = ("error: tag already exists", 1)

@@ -1,8 +1,8 @@
-# ghops Architecture Vision
+# repoindex Architecture Vision
 
 ## Overview
 
-ghops is a comprehensive multi-platform git project management system that helps developers manage the full lifecycle of their projects across multiple platforms - from local development through hosting, distribution, documentation, and promotion.
+repoindex is a comprehensive multi-platform git project management system that helps developers manage the full lifecycle of their projects across multiple platforms - from local development through hosting, distribution, documentation, and promotion.
 
 ## Core Philosophy
 
@@ -13,7 +13,7 @@ ghops is a comprehensive multi-platform git project management system that helps
 
 ## JSONL: The Universal Interface
 
-Every ghops command outputs newline-delimited JSON (JSONL) by default, making it perfect for pipeline composition with standard Unix tools.
+Every repoindex command outputs newline-delimited JSON (JSONL) by default, making it perfect for pipeline composition with standard Unix tools.
 
 ### Why JSONL?
 - **Streamable**: Process millions of repos without loading all into memory
@@ -25,31 +25,31 @@ Every ghops command outputs newline-delimited JSON (JSONL) by default, making it
 
 ```bash
 # Find Python projects with uncommitted changes
-ghops status | jq 'select(.has_uncommitted_changes == true and .language == "Python")'
+repoindex status | jq 'select(.has_uncommitted_changes == true and .language == "Python")'
 
 # List repos with both GitHub and PyPI presence  
-ghops list | jq 'select(.topics | contains(["pypi"]) and .provider == "github")'
+repoindex list | jq 'select(.topics | contains(["pypi"]) and .provider == "github")'
 
 # Get total stars across all projects
-ghops query "provider == 'github'" | jq -s 'map(.stargazers_count // 0) | add'
+repoindex query "provider == 'github'" | jq -s 'map(.stargazers_count // 0) | add'
 
 # Find outdated documentation
-ghops metadata refresh | \
+repoindex metadata refresh | \
   jq 'select(.has_pages == true and (.pushed_at | fromdateiso8601) < (now - 86400 * 30))'
 
 # Export active projects to Hugo
-ghops query "has_uncommitted or open_issues_count > 0" | \
-  ghops export --format hugo --stdin
+repoindex query "has_uncommitted or open_issues_count > 0" | \
+  repoindex export --format hugo --stdin
 
 # Chain operations: find, update, and report
-ghops list | \
+repoindex list | \
   jq 'select(.language == "Python" and .topics | contains(["cli"]))' | \
   jq -r '.path' | \
-  xargs -I {} ghops update {} | \
+  xargs -I {} repoindex update {} | \
   jq '{repo: .name, status: .update_status}'
 
 # Complex aggregation: repos by language
-ghops list | \
+repoindex list | \
   jq -s 'group_by(.language) | 
     map({language: .[0].language, count: length, stars: map(.stargazers_count // 0) | add})'
 ```
@@ -59,7 +59,7 @@ ghops list | \
 Every command returns predictable JSON structures:
 
 ```json
-// ghops status output
+// repoindex status output
 {
   "path": "/home/user/projects/myrepo",
   "name": "myrepo",
@@ -70,7 +70,7 @@ Every command returns predictable JSON structures:
   "stargazers_count": 42
 }
 
-// ghops query output  
+// repoindex query output  
 {
   "path": "/home/user/projects/myrepo",
   "name": "myrepo",
@@ -83,7 +83,7 @@ Every command returns predictable JSON structures:
 This enables powerful workflows:
 ```bash
 # Morning routine: check what needs attention
-ghops status | jq -r '
+repoindex status | jq -r '
   select(.has_uncommitted_changes or .open_issues_count > 0) | 
   "\(.name): \(
     if .has_uncommitted_changes then "uncommitted changes" else "" end
@@ -92,15 +92,15 @@ ghops status | jq -r '
   )"'
 ```
 
-### `ghops` - Repository Operations
+### `repoindex` - Repository Operations
 **Focus**: Direct operations on git repositories
 ```bash
-ghops status     # Repository health and metadata
-ghops sync       # Sync with remotes
-ghops clean      # Cleanup operations
-ghops backup     # Archive repositories
-ghops migrate    # Move between services (GitHub -> GitLab)
-ghops health     # Check repository integrity
+repoindex status     # Repository health and metadata
+repoindex sync       # Sync with remotes
+repoindex clean      # Cleanup operations
+repoindex backup     # Archive repositories
+repoindex migrate    # Move between services (GitHub -> GitLab)
+repoindex health     # Check repository integrity
 ```
 
 ### `ghj` - GitHub Metadata & Search
@@ -123,7 +123,7 @@ repodocs search-index --engine lunr
 
 ```
 ┌─────────┐    JSONL    ┌──────────┐    JSONL    ┌──────────┐
-│  ghops  │──────────→  │    jq    │──────────→  │ repodocs │
+│  repoindex  │──────────→  │    jq    │──────────→  │ repodocs │
 │ status  │             │ filter   │             │ generate │
 └─────────┘             └──────────┘             └──────────┘
      │                       │                       │
@@ -140,24 +140,24 @@ repodocs search-index --engine lunr
 └──────────┘
 ```
 
-## ghops Export Group Proposal
+## repoindex Export Group Proposal
 
-For the export functionality in `ghops`, focus on repository-level operations:
+For the export functionality in `repoindex`, focus on repository-level operations:
 
 ### Export Operations
 ```bash
 # Repository migration
-ghops export github-to-gitlab --repos repos.jsonl
-ghops export backup --format tar.gz
-ghops export clone-bundle --include-lfs
+repoindex export github-to-gitlab --repos repos.jsonl
+repoindex export backup --format tar.gz
+repoindex export clone-bundle --include-lfs
 
 # Integration exports
-ghops export dashboard --format json    # For external dashboards
-ghops export metrics --format prometheus
-ghops export inventory --format csv
+repoindex export dashboard --format json    # For external dashboards
+repoindex export metrics --format prometheus
+repoindex export inventory --format csv
 ```
 
-### NOT in ghops export
+### NOT in repoindex export
 - Documentation generation (belongs in `repodocs`)
 - Markdown conversion (belongs in `repodocs`) 
 - Static site generation (belongs in `repodocs`)
@@ -166,13 +166,13 @@ ghops export inventory --format csv
 
 ```bash
 # 1. Discover and analyze repositories
-ghops status --recursive > repos.jsonl
+repoindex status --recursive > repos.jsonl
 
 # 2. Filter for specific criteria
 cat repos.jsonl | jq 'select(.github.on_github and .license.name)' > public-repos.jsonl
 
 # 3. Migrate to GitLab
-ghops export github-to-gitlab --input public-repos.jsonl
+repoindex export github-to-gitlab --input public-repos.jsonl
 
 # 4. Generate documentation site
 repodocs generate --input public-repos.jsonl --template hugo-academic
@@ -181,10 +181,10 @@ repodocs generate --input public-repos.jsonl --template hugo-academic
 ghj enrich --input public-repos.jsonl > enriched-repos.jsonl
 ```
 
-## Plugin Architecture for ghops
+## Plugin Architecture for repoindex
 
 ```python
-# ghops/plugins/export/gitlab.py
+# repoindex/plugins/export/gitlab.py
 @click.command("gitlab")
 @click.option("--input", type=click.File('r'))
 def export_to_gitlab(input):
@@ -205,7 +205,7 @@ def export_to_gitlab(input):
 
 ## Recommendation
 
-Keep `ghops` focused on repository operations. Add export functionality for:
+Keep `repoindex` focused on repository operations. Add export functionality for:
 - Repository migration between services
 - Backup and archival operations
 - Integration with external tools (dashboards, monitoring)

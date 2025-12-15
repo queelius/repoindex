@@ -1,6 +1,6 @@
 # Integration Architecture Overview
 
-ghops features a powerful plugin-based integration architecture that allows for extensible functionality through modular components. This document provides an overview of the integration system and available integrations.
+repoindex features a powerful plugin-based integration architecture that allows for extensible functionality through modular components. This document provides an overview of the integration system and available integrations.
 
 ## Architecture Philosophy
 
@@ -16,7 +16,7 @@ The integration system follows these core principles:
 
 ### Core Integrations
 
-Built into ghops and always available:
+Built into repoindex and always available:
 
 - **Git Operations**: Repository management, status tracking, synchronization
 - **GitHub API**: Issues, pull requests, releases, GitHub Pages
@@ -82,7 +82,7 @@ All integrations follow a standard interface for consistency:
 
 ```python
 class Integration:
-    """Base class for all ghops integrations."""
+    """Base class for all repoindex integrations."""
 
     def __init__(self, config: dict):
         """Initialize with configuration."""
@@ -103,9 +103,9 @@ class Integration:
 
 ## Data Flow
 
-Integrations work with ghops' streaming architecture:
+Integrations work with repoindex' streaming architecture:
 
-1. **Input Stream**: Receive JSONL data from ghops commands
+1. **Input Stream**: Receive JSONL data from repoindex commands
 2. **Processing**: Transform, analyze, or enrich the data
 3. **Output Stream**: Return JSONL results for further processing
 4. **Composition**: Chain multiple integrations via Unix pipes
@@ -114,15 +114,15 @@ Example pipeline:
 
 ```bash
 # List repos → Filter Python → Cluster → Export
-ghops list | \
+repoindex list | \
   jq 'select(.language == "Python")' | \
-  ghops cluster analyze --stdin | \
-  ghops export markdown --stdin
+  repoindex cluster analyze --stdin | \
+  repoindex export markdown --stdin
 ```
 
 ## Configuration
 
-Integrations are configured in `~/.ghops/config.json`:
+Integrations are configured in `~/.repoindex/config.json`:
 
 ```json
 {
@@ -134,7 +134,7 @@ Integrations are configured in `~/.ghops/config.json`:
     },
     "workflow": {
       "enabled": true,
-      "workflows_dir": "~/.ghops/workflows",
+      "workflows_dir": "~/.repoindex/workflows",
       "max_parallel": 4
     },
     "network_analysis": {
@@ -187,12 +187,12 @@ To create your own integration:
 ### 1. Create Integration Module
 
 ```python
-# ghops/integrations/myintegration.py
-from ghops.integrations.base import Integration
+# repoindex/integrations/myintegration.py
+from repoindex.integrations.base import Integration
 import click
 
 class MyIntegration(Integration):
-    """Custom integration for ghops."""
+    """Custom integration for repoindex."""
 
     def validate(self):
         """Check if requirements are met."""
@@ -221,7 +221,7 @@ class MyIntegration(Integration):
 ### 2. Register Integration
 
 ```python
-# ghops/integrations/__init__.py
+# repoindex/integrations/__init__.py
 from .myintegration import MyIntegration
 
 INTEGRATIONS = {
@@ -262,7 +262,7 @@ INTEGRATIONS = {
 ### Testing
 
 - **Unit Tests**: Test integration logic in isolation
-- **Integration Tests**: Test interaction with ghops core
+- **Integration Tests**: Test interaction with repoindex core
 - **Mock External Services**: Don't depend on external APIs in tests
 - **Performance Tests**: Ensure integration scales well
 
@@ -275,7 +275,7 @@ INTEGRATIONS = {
 
 ## Integration Lifecycle
 
-1. **Discovery**: ghops discovers available integrations at startup
+1. **Discovery**: repoindex discovers available integrations at startup
 2. **Registration**: Integrations register their commands and capabilities
 3. **Configuration**: User configuration is loaded and validated
 4. **Execution**: Integrations are invoked as needed by commands
@@ -298,4 +298,4 @@ Planned integrations for future releases:
 - **Integration Docs**: See individual integration documentation
 - **API Reference**: [Integration API Documentation](../api/integrations.md)
 - **Examples**: Check `examples/integrations/` directory
-- **Support**: [GitHub Discussions](https://github.com/queelius/ghops/discussions)
+- **Support**: [GitHub Discussions](https://github.com/queelius/repoindex/discussions)

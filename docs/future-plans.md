@@ -1,8 +1,8 @@
-# Future Plans for ghops
+# Future Plans for repoindex
 
 ## Vision: From GitHub Operations to Digital Legacy Platform
 
-ghops has evolved from a simple GitHub operations tool into a comprehensive repository and digital presence management system. This document outlines our vision, planned features, and development roadmap.
+repoindex has evolved from a simple GitHub operations tool into a comprehensive repository and digital presence management system. This document outlines our vision, planned features, and development roadmap.
 
 ## Core Philosophy
 
@@ -34,9 +34,9 @@ ghops has evolved from a simple GitHub operations tool into a comprehensive repo
 - ✅ **Performance Options**: `--no-pypi-check` flag for faster results
 
 ### Configuration System
-- ✅ **Config File Support**: `~/.ghopsrc` with JSON/TOML format support
-- ✅ **Example Generation**: `ghops config generate` command
-- ✅ **Environment Override**: `GHOPS_CONFIG` and per-setting environment variables
+- ✅ **Config File Support**: `~/.repoindexrc` with JSON/TOML format support
+- ✅ **Example Generation**: `repoindex config generate` command
+- ✅ **Environment Override**: `REPOINDEX_CONFIG` and per-setting environment variables
 
 ### Social Media Framework
 - ✅ **Platform Support**: Framework for Twitter/X, LinkedIn, Mastodon
@@ -55,13 +55,13 @@ ghops has evolved from a simple GitHub operations tool into a comprehensive repo
 
 #### GitHub Remote Management
 
-**Motivation**: Many local repositories are not yet tracked on GitHub. `ghops` should streamline the process of creating and linking remote repositories.
+**Motivation**: Many local repositories are not yet tracked on GitHub. `repoindex` should streamline the process of creating and linking remote repositories.
 
 **Features**:
 
-- **Auto-Create Remotes**: A new command, `ghops remote create`, will create a GitHub repository for a local-only repo using the `gh` CLI.
+- **Auto-Create Remotes**: A new command, `repoindex remote create`, will create a GitHub repository for a local-only repo using the `gh` CLI.
 - **Interactive Prompts**: The command will prompt for repository name, visibility (public/private), and description.
-- **Status Integration**: The `ghops status` command will highlight local-only repositories and suggest running the `remote create` command.
+- **Status Integration**: The `repoindex status` command will highlight local-only repositories and suggest running the `remote create` command.
 
 #### Automated Homepage URL Update
 
@@ -69,28 +69,28 @@ ghops has evolved from a simple GitHub operations tool into a comprehensive repo
 
 **Features**:
 
-- **Homepage Update Command**: A new command, `ghops pages update-homepage`, will automatically find the `homepage` or `urls.Homepage` key in `pyproject.toml` and set it to the detected GitHub Pages URL.
+- **Homepage Update Command**: A new command, `repoindex pages update-homepage`, will automatically find the `homepage` or `urls.Homepage` key in `pyproject.toml` and set it to the detected GitHub Pages URL.
 - **Dry-Run Support**: The command will include a `--dry-run` flag to show the proposed changes without writing to the file.
 
 #### Single Repository Operations
 
-**Motivation**: Fix the critical usability gap where `ghops` does nothing when run inside a git repository.
+**Motivation**: Fix the critical usability gap where `repoindex` does nothing when run inside a git repository.
 
 **Current Problem**:
 
 ```bash
 cd ~/my-awesome-project  # This is a git repo
-ghops status             # Does nothing - very confusing!
-ghops update            # Does nothing - breaks user expectations
+repoindex status             # Does nothing - very confusing!
+repoindex update            # Does nothing - breaks user expectations
 ```
 
 **Expected Behavior**:
 
 ```bash
 cd ~/my-awesome-project  # This is a git repo  
-ghops status             # Shows detailed status of THIS repo
-ghops update            # Updates THIS repo with enhanced output
-ghops license add mit   # Adds license to THIS repo
+repoindex status             # Shows detailed status of THIS repo
+repoindex update            # Updates THIS repo with enhanced output
+repoindex license add mit   # Adds license to THIS repo
 ```
 
 **Implementation Features**:
@@ -100,18 +100,18 @@ ghops license add mit   # Adds license to THIS repo
   - Single repo mode: Detailed output, repo-specific operations
   - Batch mode: Summary tables, multi-repo operations
 - **Unified Command Interface**:
-  - `ghops status` - Auto-detects mode based on current directory
-  - `ghops status --batch` - Force batch mode even in git directory
-  - `ghops status --single` - Force single mode even outside git directory
+  - `repoindex status` - Auto-detects mode based on current directory
+  - `repoindex status --batch` - Force batch mode even in git directory
+  - `repoindex status --single` - Force single mode even outside git directory
 - **Enhanced Single-Repo Output**: More detailed information when focusing on one repository
 
 #### Programmatic API
 
-**Motivation**: Enable `ghops` integration into Python scripts, automation systems, and provide better developer experience.
+**Motivation**: Enable `repoindex` integration into Python scripts, automation systems, and provide better developer experience.
 
 **API Design Goals**:
 
-- **Clean Python Interface**: Full programmatic access to all `ghops` functionality
+- **Clean Python Interface**: Full programmatic access to all `repoindex` functionality
 - **Type Safety**: Complete type hints for IDE support and better developer experience
 - **Async Support**: For operations involving network calls and batch processing
 - **Documentation**: Auto-generated API docs via docstrings and MkDocs
@@ -119,7 +119,7 @@ ghops license add mit   # Adds license to THIS repo
 **Example API Usage**:
 
 ```python
-from ghops import api
+from repoindex import api
 from pathlib import Path
 
 # Single repository operations
@@ -156,7 +156,7 @@ posts = api.create_social_posts(
 
 **Motivation**: Make it easy to convert existing repositories into publishable Python packages.
 
-- **New command**: `ghops package init` to bootstrap packaging for repositories
+- **New command**: `repoindex package init` to bootstrap packaging for repositories
 - **Smart defaults**:
   - Package name from repository directory name
   - Version starts at `0.1.0`
@@ -167,7 +167,7 @@ posts = api.create_social_posts(
 
 #### Publishing Automation
 
-- **New command**: `ghops package publish` for automated PyPI uploads
+- **New command**: `repoindex package publish` for automated PyPI uploads
 - **Version management**: Integration with version bumping
 - **Build automation**: Automatic wheel and sdist generation
 - **Safety checks**: Verify package before upload
@@ -179,10 +179,10 @@ posts = api.create_social_posts(
 
 **Motivation**: When managing hundreds of repositories, you need fine-grained control over which repositories to operate on.
 
-- **`.ghopsignore` files**: Similar to `.gitignore`, but for excluding repositories from operations
-  - **Base directory**: Place `.ghopsignore` in the root directory to set global exclusions
-  - **Subdirectory filtering**: `.ghopsignore` in subdirectories excludes repos in that subtree
-  - **Self-exclusion**: If a repository directory contains `.ghopsignore`, it excludes itself
+- **`.repoindexignore` files**: Similar to `.gitignore`, but for excluding repositories from operations
+  - **Base directory**: Place `.repoindexignore` in the root directory to set global exclusions
+  - **Subdirectory filtering**: `.repoindexignore` in subdirectories excludes repos in that subtree
+  - **Self-exclusion**: If a repository directory contains `.repoindexignore`, it excludes itself
   - **Pattern matching**: Support glob patterns, regex, and path-based exclusions
 - **Command-line filters**: One-off filtering for specific operations
   - `--include` and `--exclude` flags with glob patterns
@@ -191,7 +191,7 @@ posts = api.create_social_posts(
 - **Whitelist mode**: Invert the filtering logic
   - `--whitelist-only` mode where only explicitly included repositories are processed
   - Useful for focusing on specific projects while ignoring everything else
-  - Can be combined with `.ghopsinclude` files for persistent whitelist configuration
+  - Can be combined with `.repoindexinclude` files for persistent whitelist configuration
 - **Smart selection**:
   - `--changed-only`: Only repositories with uncommitted changes
   - `--outdated-only`: Only repositories behind their remote
@@ -201,11 +201,11 @@ posts = api.create_social_posts(
 #### Filter Configuration
 
 - **Filter profiles**: Named filter configurations for different use cases
-  - `ghops config filter create work --include "work/*" --exclude "*/archive/*"`
-  - `ghops config filter create python --filter "language:python"`
-  - `ghops status --filter-profile python`
+  - `repoindex config filter create work --include "work/*" --exclude "*/archive/*"`
+  - `repoindex config filter create python --filter "language:python"`
+  - `repoindex status --filter-profile python`
 - **Interactive selection**: TUI for selecting repositories visually
-- **Filter testing**: `ghops filter test` to see which repositories match current filters
+- **Filter testing**: `repoindex filter test` to see which repositories match current filters
 
 ## Medium-term Goals (v0.7.0 - v0.8.0)
 
@@ -306,7 +306,7 @@ posts = api.create_social_posts(
 
 - **Plugin system**: Allow third-party extensions and customizations
 - **API endpoints**: Provide REST API for integration with other tools
-- **Webhook support**: React to external events and trigger ghops operations
+- **Webhook support**: React to external events and trigger repoindex operations
 - **IDE integration**: Plugins for VS Code, PyCharm, etc.
 
 #### Enterprise Management
@@ -320,13 +320,13 @@ posts = api.create_social_posts(
 
 ### Core Repository Operations
 
-**Philosophy**: `ghops` should focus on repository-level operations while maintaining composability with other tools through streaming JSONL output.
+**Philosophy**: `repoindex` should focus on repository-level operations while maintaining composability with other tools through streaming JSONL output.
 
 #### Sync Operations
 ```bash
-ghops sync --dry-run      # Show what would be synchronized
-ghops sync --pull-only    # Only pull changes, don't push
-ghops sync --force        # Force sync even with conflicts
+repoindex sync --dry-run      # Show what would be synchronized
+repoindex sync --pull-only    # Only pull changes, don't push
+repoindex sync --force        # Force sync even with conflicts
 ```
 
 **Features**:
@@ -337,9 +337,9 @@ ghops sync --force        # Force sync even with conflicts
 
 #### Backup and Archive
 ```bash
-ghops backup --format tar.gz --include-lfs    # Create compressed backups
-ghops backup --format git-bundle              # Create git bundles
-ghops archive --to-storage s3://bucket/path   # Archive to cloud storage
+repoindex backup --format tar.gz --include-lfs    # Create compressed backups
+repoindex backup --format git-bundle              # Create git bundles
+repoindex archive --to-storage s3://bucket/path   # Archive to cloud storage
 ```
 
 **Features**:
@@ -351,10 +351,10 @@ ghops archive --to-storage s3://bucket/path   # Archive to cloud storage
 
 #### Health and Maintenance
 ```bash
-ghops health --check-corruption     # Check repository integrity
-ghops clean --dry-run              # Show what would be cleaned
-ghops clean --cache --temp          # Clean caches and temporary files
-ghops optimize --gc --repack        # Optimize repository storage
+repoindex health --check-corruption     # Check repository integrity
+repoindex clean --dry-run              # Show what would be cleaned
+repoindex clean --cache --temp          # Clean caches and temporary files
+repoindex optimize --gc --repack        # Optimize repository storage
 ```
 
 **Features**:
@@ -366,9 +366,9 @@ ghops optimize --gc --repack        # Optimize repository storage
 
 #### Migration and Export
 ```bash
-ghops migrate github-to-gitlab --input repos.jsonl    # Migrate between services
-ghops export --format json --include-history          # Export metadata
-ghops export --clone-bundle --mirror                  # Create mirror bundles
+repoindex migrate github-to-gitlab --input repos.jsonl    # Migrate between services
+repoindex export --format json --include-history          # Export metadata
+repoindex export --clone-bundle --mirror                  # Create mirror bundles
 ```
 
 **Features**:
@@ -382,9 +382,9 @@ ghops export --clone-bundle --mirror                  # Create mirror bundles
 
 #### Dashboard and Monitoring Export
 ```bash
-ghops export dashboard --format prometheus    # Metrics for monitoring
-ghops export grafana --datasource json        # Grafana dashboard data
-ghops export json --schema v2                 # Structured data export
+repoindex export dashboard --format prometheus    # Metrics for monitoring
+repoindex export grafana --datasource json        # Grafana dashboard data
+repoindex export json --schema v2                 # Structured data export
 ```
 
 **Features**:
@@ -396,9 +396,9 @@ ghops export json --schema v2                 # Structured data export
 
 #### Documentation Generation
 ```bash
-ghops export readme --template detailed       # Generate README files
-ghops export inventory --format markdown      # Repository inventory
-ghops export changelog --since-tag v1.0       # Generate changelogs
+repoindex export readme --template detailed       # Generate README files
+repoindex export inventory --format markdown      # Repository inventory
+repoindex export changelog --since-tag v1.0       # Generate changelogs
 ```
 
 **Features**:
@@ -408,7 +408,7 @@ ghops export changelog --since-tag v1.0       # Generate changelogs
 - Template-based documentation generation
 - Integration with static site generators
 
-### NOT in ghops Operations
+### NOT in repoindex Operations
 
 **These belong in separate tools to maintain focus**:
 
@@ -421,8 +421,8 @@ ghops export changelog --since-tag v1.0       # Generate changelogs
 ### Plugin Architecture for Extensions
 
 ```python
-# ghops/plugins/export/custom.py
-@ghops_plugin("export", "custom-format")
+# repoindex/plugins/export/custom.py
+@repoindex_plugin("export", "custom-format")
 def export_custom_format(repos: Iterator[dict], **options):
     """Custom export plugin example."""
     for repo in repos:
@@ -455,9 +455,9 @@ def export_custom_format(repos: Iterator[dict], **options):
 
 ### Phase 2: Package Management & Filtering (v0.8.0)
 
-- Auto-package generation (`ghops package init`)
-- Publishing automation (`ghops package publish`)
-- `.ghopsignore` file support
+- Auto-package generation (`repoindex package init`)
+- Publishing automation (`repoindex package publish`)
+- `.repoindexignore` file support
 - Command-line filtering options
 - Filter profiles and testing
 
@@ -496,4 +496,4 @@ We welcome contributions in all these areas! If you're interested in working on 
 4. **Documentation**: Help improve docs and examples
 5. **Testing**: Add tests for new features and edge cases
 
-The future of `ghops` is exciting, and we're building it together with the community!
+The future of `repoindex` is exciting, and we're building it together with the community!

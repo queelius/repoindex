@@ -1,6 +1,6 @@
-# ghops docs Command
+# repoindex docs Command
 
-The `ghops docs` command provides comprehensive documentation management for your repositories, including detection, building, serving, and deployment to GitHub Pages.
+The `repoindex docs` command provides comprehensive documentation management for your repositories, including detection, building, serving, and deployment to GitHub Pages.
 
 ## Overview
 
@@ -19,13 +19,13 @@ Show documentation status for repositories:
 
 ```bash
 # Show docs status for all repositories (JSONL output)
-ghops docs status
+repoindex docs status
 
 # Pretty table format
-ghops docs status --pretty
+repoindex docs status --pretty
 
 # Specific directory
-ghops docs status --dir /path/to/repos --recursive
+repoindex docs status --dir /path/to/repos --recursive
 ```
 
 Output includes:
@@ -40,7 +40,7 @@ Detect which documentation tool a repository uses:
 
 ```bash
 # Detect docs tool for current directory
-ghops docs detect .
+repoindex docs detect .
 
 # Output (JSONL)
 {
@@ -59,19 +59,19 @@ Build documentation for one or more repositories:
 
 ```bash
 # Build docs for current repository
-ghops docs build .
+repoindex docs build .
 
 # Build all repositories with docs (using tag filter)
-ghops docs build -t "repo:*"
+repoindex docs build -t "repo:*"
 
 # Build only MkDocs projects
-ghops docs build -t "tool:mkdocs"
+repoindex docs build -t "tool:mkdocs"
 
 # Build Python projects with docs
-ghops docs build -t "lang:python" -t "has:docs" --all-tags
+repoindex docs build -t "lang:python" -t "has:docs" --all-tags
 
 # Dry run to see what would be built
-ghops docs build -t "has:docs" --dry-run
+repoindex docs build -t "has:docs" --dry-run
 ```
 
 ### docs serve
@@ -80,13 +80,13 @@ Serve documentation locally for preview:
 
 ```bash
 # Serve current repository docs
-ghops docs serve .
+repoindex docs serve .
 
 # Custom port
-ghops docs serve . --port 8080
+repoindex docs serve . --port 8080
 
 # Open browser automatically
-ghops docs serve . --open
+repoindex docs serve . --open
 ```
 
 ### docs deploy
@@ -95,16 +95,16 @@ Deploy documentation to GitHub Pages:
 
 ```bash
 # Deploy current repository
-ghops docs deploy .
+repoindex docs deploy .
 
 # Custom branch (default: gh-pages)
-ghops docs deploy . --branch docs
+repoindex docs deploy . --branch docs
 
 # Custom commit message
-ghops docs deploy . --message "Update API docs"
+repoindex docs deploy . --message "Update API docs"
 
 # Dry run
-ghops docs deploy . --dry-run
+repoindex docs deploy . --dry-run
 ```
 
 ## Supported Documentation Tools
@@ -125,43 +125,43 @@ The docs command automatically detects:
 
 ```bash
 # List repos with docs
-ghops docs status | jq 'select(.has_docs == true)'
+repoindex docs status | jq 'select(.has_docs == true)'
 
 # Count by documentation tool
-ghops docs status | jq -s 'group_by(.docs_tool) | map({tool: .[0].docs_tool, count: length})'
+repoindex docs status | jq -s 'group_by(.docs_tool) | map({tool: .[0].docs_tool, count: length})'
 
 # Find repos without GitHub Pages
-ghops docs status | jq 'select(.has_docs == true and .pages_url == null)'
+repoindex docs status | jq 'select(.has_docs == true and .pages_url == null)'
 ```
 
 ### Batch operations
 
 ```bash
 # Build all MkDocs projects
-ghops docs status | \
+repoindex docs status | \
   jq -r 'select(.docs_tool == "mkdocs") | .path' | \
-  xargs -I {} ghops docs build {}
+  xargs -I {} repoindex docs build {}
 
 # Deploy all repos with built docs
-ghops docs build --all --tool mkdocs
-ghops docs status | \
+repoindex docs build --all --tool mkdocs
+repoindex docs status | \
   jq -r 'select(.docs_tool == "mkdocs") | .path' | \
-  xargs -I {} ghops docs deploy {}
+  xargs -I {} repoindex docs deploy {}
 ```
 
 ### Integration with other commands
 
 ```bash
 # Find Python projects with docs
-ghops query "lang:python" | \
+repoindex query "lang:python" | \
   jq -r '.path' | \
-  xargs -I {} ghops docs detect {} | \
+  xargs -I {} repoindex docs detect {} | \
   jq 'select(.tool != null)'
 
 # Export repos with docs to Hugo
-ghops docs status | \
+repoindex docs status | \
   jq 'select(.has_docs == true)' | \
-  ghops export --format hugo --stdin
+  repoindex export --format hugo --stdin
 ```
 
 ## JSONL Output Schema

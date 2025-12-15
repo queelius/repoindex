@@ -1,6 +1,6 @@
 # Shell Virtual Filesystem
 
-The ghops interactive shell provides a powerful virtual filesystem (VFS) for navigating and managing repositories using hierarchical tags.
+The repoindex interactive shell provides a powerful virtual filesystem (VFS) for navigating and managing repositories using hierarchical tags.
 
 ## Overview
 
@@ -38,14 +38,14 @@ The shell VFS maps your repositories and their tags to a familiar filesystem str
 ## Launching the Shell
 
 ```bash
-ghops shell
+repoindex shell
 ```
 
 You'll see:
 
 ```
 ╔════════════════════════════════════════════════════════════════╗
-║                    ghops Interactive Shell                     ║
+║                    repoindex Interactive Shell                     ║
 ║                                                                ║
 ║  Navigate repositories with hierarchical tag filesystem       ║
 ║  - /repos/           All repositories                         ║
@@ -57,7 +57,7 @@ You'll see:
 ║  Type 'help' for available commands, 'exit' or Ctrl+D to quit ║
 ╚════════════════════════════════════════════════════════════════╝
 
-ghops:/>
+repoindex:/>
 ```
 
 ## Navigation Commands
@@ -65,7 +65,7 @@ ghops:/>
 ### `pwd` - Print Working Directory
 
 ```bash
-ghops:/> pwd
+repoindex:/> pwd
 /
 ```
 
@@ -73,7 +73,7 @@ ghops:/> pwd
 
 ```bash
 # List with nice formatted table (default)
-ghops:/> ls
+repoindex:/> ls
 ┏━━━━━━━━━━━━━━━┳━━━━━━━━━━━┳━━━━━━━━┓
 ┃ Name          ┃ Type      ┃ Target ┃
 ┡━━━━━━━━━━━━━━━╇━━━━━━━━━━━╇━━━━━━━━┩
@@ -84,7 +84,7 @@ ghops:/> ls
 └───────────────┴───────────┴────────┘
 
 # List with JSONL output (opt-in)
-ghops:/> ls --json
+repoindex:/> ls --json
 {"name": "repos", "type": "directory", "icon": "📂"}
 {"name": "by-tag", "type": "directory", "icon": "📂"}
 {"name": "by-language", "type": "directory", "icon": "📂"}
@@ -94,10 +94,10 @@ ghops:/> ls --json
 ### `cd` - Change Directory
 
 ```bash
-ghops:/> cd by-tag
-ghops:/by-tag> cd alex
-ghops:/by-tag/alex> cd beta
-ghops:/by-tag/alex/beta> ls
+repoindex:/> cd by-tag
+repoindex:/by-tag> cd alex
+repoindex:/by-tag/alex> cd beta
+repoindex:/by-tag/alex/beta> ls
 {"name": "myproject", "type": "symlink", "icon": "🔗", "target": "/repos/myproject"}
 ```
 
@@ -109,17 +109,17 @@ Copy a repository to a tag location to add that tag:
 
 ```bash
 # Add simple hierarchical tag
-ghops:/> cp /repos/myproject /by-tag/alex/beta
+repoindex:/> cp /repos/myproject /by-tag/alex/beta
 Added tag 'alex/beta' to myproject
 
 # Add key:value hierarchical tag
-ghops:/> cp /repos/myproject /by-tag/topic/ml/research
+repoindex:/> cp /repos/myproject /by-tag/topic/ml/research
 Added tag 'topic:ml/research' to myproject
 
 # Multiple tags can coexist
-ghops:/by-tag/alex/beta> ls
+repoindex:/by-tag/alex/beta> ls
 {"name": "myproject", "type": "symlink", ...}
-ghops:/by-tag/topic/ml/research> ls
+repoindex:/by-tag/topic/ml/research> ls
 {"name": "myproject", "type": "symlink", ...}
 ```
 
@@ -128,7 +128,7 @@ ghops:/by-tag/topic/ml/research> ls
 Move a repository from one tag to another (removes old tag, adds new tag):
 
 ```bash
-ghops:/> mv /by-tag/alex/beta/myproject /by-tag/alex/production
+repoindex:/> mv /by-tag/alex/beta/myproject /by-tag/alex/production
 Moved myproject from 'alex/beta' to 'alex/production'
 ```
 
@@ -137,7 +137,7 @@ Moved myproject from 'alex/beta' to 'alex/production'
 Remove a tag from a repository:
 
 ```bash
-ghops:/> rm /by-tag/work/active/myproject
+repoindex:/> rm /by-tag/work/active/myproject
 Removed tag 'work/active' from myproject
 ```
 
@@ -146,7 +146,7 @@ Removed tag 'work/active' from myproject
 Create a tag hierarchy (directory will be created when repos are tagged):
 
 ```bash
-ghops:/> mkdir -p /by-tag/client/acme/backend
+repoindex:/> mkdir -p /by-tag/client/acme/backend
 Tag namespace '/by-tag/client/acme/backend' ready for use
 ```
 
@@ -173,10 +173,10 @@ Tags with a key prefix (automatically detected for known keys like `lang`, `topi
 
 ### Refresh VFS
 
-After making changes outside the shell (e.g., using `ghops catalog add`), refresh the VFS:
+After making changes outside the shell (e.g., using `repoindex catalog add`), refresh the VFS:
 
 ```bash
-ghops:/> refresh
+repoindex:/> refresh
 Refreshing VFS...
 VFS refreshed
 ```
@@ -186,7 +186,7 @@ VFS refreshed
 Execute queries from within the shell:
 
 ```bash
-ghops:/> query "stars > 10 and language == 'Python'"
+repoindex:/> query "stars > 10 and language == 'Python'"
 {"name": "myproject", "path": "/home/user/repos/myproject"}
 {"name": "another-project", "path": "/home/user/repos/another-project"}
 ```
@@ -196,7 +196,7 @@ ghops:/> query "stars > 10 and language == 'Python'"
 Find repositories by criteria:
 
 ```bash
-ghops:/> find --language Python --dirty
+repoindex:/> find --language Python --dirty
 find with filters: {'language': 'Python', 'dirty': True}
 ```
 
@@ -205,8 +205,8 @@ find with filters: {'language': 'Python', 'dirty': True}
 ### 1. Use Relative Paths
 
 ```bash
-ghops:/repos> cd ../by-tag/alex/beta
-ghops:/by-tag/alex/beta>
+repoindex:/repos> cd ../by-tag/alex/beta
+repoindex:/by-tag/alex/beta>
 ```
 
 ### 2. Tab Completion
@@ -219,11 +219,11 @@ You can use the shell for navigation and the CLI for operations:
 
 ```bash
 # In shell: navigate to tag
-ghops:/> cd /by-tag/lang/python
-ghops:/by-tag/lang/python>
+repoindex:/> cd /by-tag/lang/python
+repoindex:/by-tag/lang/python>
 
 # Outside shell: use CLI
-$ ghops status -t "lang:python" --pretty
+$ repoindex status -t "lang:python" --pretty
 ```
 
 ### 4. Multi-Tag Organization
@@ -232,13 +232,13 @@ Repos can have multiple tags and appear in multiple locations:
 
 ```bash
 # Same repo appears in multiple tag hierarchies
-ghops:/by-tag/alex/beta> ls
+repoindex:/by-tag/alex/beta> ls
 {"name": "myproject", ...}
 
-ghops:/by-tag/topic/ml> ls
+repoindex:/by-tag/topic/ml> ls
 {"name": "myproject", ...}
 
-ghops:/by-language/Python> ls
+repoindex:/by-language/Python> ls
 {"name": "myproject", ...}
 ```
 
@@ -247,7 +247,7 @@ ghops:/by-language/Python> ls
 Combine shell commands with external tools:
 
 ```bash
-ghops:/> ls /repos | jq -r '.name'
+repoindex:/> ls /repos | jq -r '.name'
 myproject
 another-project
 ```
@@ -258,13 +258,13 @@ The CLI now has full parity with the shell's tag operations:
 
 | Operation | Shell VFS | CLI |
 |-----------|-----------|-----|
-| **Add tag** | `cp /repos/myproject /by-tag/alex/beta` | `ghops tag add myproject alex/beta` |
-| **Remove tag** | `rm /by-tag/alex/beta/myproject` | `ghops tag remove myproject alex/beta` |
-| **Move between tags** | `mv /by-tag/alex/beta/myproject /by-tag/alex/production` | `ghops tag move myproject alex/beta alex/production` |
-| **List tags** | `ls /by-tag` | `ghops tag list` |
-| **List tagged repos** | `ls /by-tag/alex/beta` | `ghops tag list -t "alex/beta"` |
-| **Show hierarchy** | `cd /by-tag/alex && ls` | `ghops tag tree -t alex` |
-| **Show repo tags** | N/A (use `query`) | `ghops tag list -r myproject` |
+| **Add tag** | `cp /repos/myproject /by-tag/alex/beta` | `repoindex tag add myproject alex/beta` |
+| **Remove tag** | `rm /by-tag/alex/beta/myproject` | `repoindex tag remove myproject alex/beta` |
+| **Move between tags** | `mv /by-tag/alex/beta/myproject /by-tag/alex/production` | `repoindex tag move myproject alex/beta alex/production` |
+| **List tags** | `ls /by-tag` | `repoindex tag list` |
+| **List tagged repos** | `ls /by-tag/alex/beta` | `repoindex tag list -t "alex/beta"` |
+| **Show hierarchy** | `cd /by-tag/alex && ls` | `repoindex tag tree -t alex` |
+| **Show repo tags** | N/A (use `query`) | `repoindex tag list -r myproject` |
 
 ### Legacy Catalog Commands
 
@@ -272,9 +272,9 @@ The `catalog` commands still work for backward compatibility:
 
 | Legacy Command | New Tag Command |
 |----------------|-----------------|
-| `ghops catalog add myproject tag1` | `ghops tag add myproject tag1` |
-| `ghops catalog remove myproject tag1` | `ghops tag remove myproject tag1` |
-| `ghops catalog show -t tag1` | `ghops tag list -t tag1` |
+| `repoindex catalog add myproject tag1` | `repoindex tag add myproject tag1` |
+| `repoindex catalog remove myproject tag1` | `repoindex tag remove myproject tag1` |
+| `repoindex catalog show -t tag1` | `repoindex tag list -t tag1` |
 
 ## Implementation Details
 
@@ -299,7 +299,7 @@ The VFS is rebuilt after tag operations (`cp`, `mv`, `rm`) to reflect changes. T
 
 ### Configuration Storage
 
-Tags are stored in `~/.ghops/config.json` under `repository_tags`:
+Tags are stored in `~/.repoindex/config.json` under `repository_tags`:
 
 ```json
 {

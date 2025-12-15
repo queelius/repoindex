@@ -9,13 +9,13 @@ import os
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from ghops.shell.shell import GhopsShell
+from repoindex.shell.shell import GhopsShell
 
 
 @pytest.fixture
 def temp_config_dir(tmp_path):
     """Create temporary config directory."""
-    config_dir = tmp_path / ".ghops"
+    config_dir = tmp_path / ".repoindex"
     config_dir.mkdir()
     return config_dir
 
@@ -99,10 +99,10 @@ class TestShellVFSHierarchicalTags:
         assert shell._path_to_tag('/repos/myproject') is None
         assert shell._path_to_tag('/by-tag/') is None
 
-    @patch('ghops.shell.shell.load_config')
-    @patch('ghops.shell.shell.find_git_repos_from_config')
-    @patch('ghops.shell.shell.get_metadata_store')
-    @patch('ghops.shell.shell.get_repository_tags')
+    @patch('repoindex.shell.shell.load_config')
+    @patch('repoindex.shell.shell.find_git_repos_from_config')
+    @patch('repoindex.shell.shell.get_metadata_store')
+    @patch('repoindex.shell.shell.get_repository_tags')
     def test_build_hierarchical_tag_vfs(self, mock_get_tags, mock_metadata_store,
                                         mock_find_repos, mock_load_config, mock_repos):
         """Test building VFS with hierarchical tags."""
@@ -149,11 +149,11 @@ class TestShellVFSHierarchicalTags:
         assert 'engineering' in scientific
         assert 'ai' in scientific['engineering']['children']
 
-    @patch('ghops.shell.shell.load_config')
-    @patch('ghops.shell.shell.save_config')
-    @patch('ghops.shell.shell.find_git_repos_from_config')
-    @patch('ghops.shell.shell.get_metadata_store')
-    @patch('ghops.shell.shell.get_repository_tags')
+    @patch('repoindex.shell.shell.load_config')
+    @patch('repoindex.shell.shell.save_config')
+    @patch('repoindex.shell.shell.find_git_repos_from_config')
+    @patch('repoindex.shell.shell.get_metadata_store')
+    @patch('repoindex.shell.shell.get_repository_tags')
     def test_add_tag_with_cp(self, mock_get_tags, mock_metadata_store, mock_find_repos,
                             mock_save_config, mock_load_config, mock_repos, capsys):
         """Test adding tags using cp command."""
@@ -186,11 +186,11 @@ class TestShellVFSHierarchicalTags:
         # Verify save_config was called
         assert mock_save_config.called
 
-    @patch('ghops.shell.shell.load_config')
-    @patch('ghops.shell.shell.save_config')
-    @patch('ghops.shell.shell.find_git_repos_from_config')
-    @patch('ghops.shell.shell.get_metadata_store')
-    @patch('ghops.shell.shell.get_repository_tags')
+    @patch('repoindex.shell.shell.load_config')
+    @patch('repoindex.shell.shell.save_config')
+    @patch('repoindex.shell.shell.find_git_repos_from_config')
+    @patch('repoindex.shell.shell.get_metadata_store')
+    @patch('repoindex.shell.shell.get_repository_tags')
     def test_move_tag_with_mv(self, mock_get_tags, mock_metadata_store, mock_find_repos,
                              mock_save_config, mock_load_config, mock_repos, capsys):
         """Test moving repos between tags using mv command."""
@@ -234,11 +234,11 @@ class TestShellVFSHierarchicalTags:
         # Verify save_config was called
         assert mock_save_config.called
 
-    @patch('ghops.shell.shell.load_config')
-    @patch('ghops.shell.shell.save_config')
-    @patch('ghops.shell.shell.find_git_repos_from_config')
-    @patch('ghops.shell.shell.get_metadata_store')
-    @patch('ghops.shell.shell.get_repository_tags')
+    @patch('repoindex.shell.shell.load_config')
+    @patch('repoindex.shell.shell.save_config')
+    @patch('repoindex.shell.shell.find_git_repos_from_config')
+    @patch('repoindex.shell.shell.get_metadata_store')
+    @patch('repoindex.shell.shell.get_repository_tags')
     def test_remove_tag_with_rm(self, mock_get_tags, mock_metadata_store, mock_find_repos,
                                mock_save_config, mock_load_config, mock_repos, capsys):
         """Test removing tags using rm command."""
@@ -281,10 +281,10 @@ class TestShellVFSHierarchicalTags:
         # Verify save_config was called
         assert mock_save_config.called
 
-    @patch('ghops.shell.shell.load_config')
-    @patch('ghops.shell.shell.find_git_repos_from_config')
-    @patch('ghops.shell.shell.get_metadata_store')
-    @patch('ghops.shell.shell.get_repository_tags')
+    @patch('repoindex.shell.shell.load_config')
+    @patch('repoindex.shell.shell.find_git_repos_from_config')
+    @patch('repoindex.shell.shell.get_metadata_store')
+    @patch('repoindex.shell.shell.get_repository_tags')
     def test_ls_hierarchical_tags(self, mock_get_tags, mock_metadata_store,
                                   mock_find_repos, mock_load_config, mock_repos, capsys):
         """Test listing hierarchical tag directories."""
@@ -321,10 +321,10 @@ class TestShellVFSHierarchicalTags:
         assert 'name' in first_line
         assert 'type' in first_line
 
-    @patch('ghops.shell.shell.load_config')
-    @patch('ghops.shell.shell.find_git_repos_from_config')
-    @patch('ghops.shell.shell.get_metadata_store')
-    @patch('ghops.shell.shell.get_repository_tags')
+    @patch('repoindex.shell.shell.load_config')
+    @patch('repoindex.shell.shell.find_git_repos_from_config')
+    @patch('repoindex.shell.shell.get_metadata_store')
+    @patch('repoindex.shell.shell.get_repository_tags')
     def test_ls_default_pretty_output(self, mock_get_tags, mock_metadata_store,
                                       mock_find_repos, mock_load_config, mock_repos, capsys):
         """Test that ls defaults to pretty formatted output."""
@@ -357,10 +357,10 @@ class TestShellVFSHierarchicalTags:
         # Should NOT be JSON (no opening brace on first character of first line)
         assert not captured.out.strip().startswith('{')
 
-    @patch('ghops.shell.shell.load_config')
-    @patch('ghops.shell.shell.find_git_repos_from_config')
-    @patch('ghops.shell.shell.get_metadata_store')
-    @patch('ghops.shell.shell.get_repository_tags')
+    @patch('repoindex.shell.shell.load_config')
+    @patch('repoindex.shell.shell.find_git_repos_from_config')
+    @patch('repoindex.shell.shell.get_metadata_store')
+    @patch('repoindex.shell.shell.get_repository_tags')
     def test_cd_through_hierarchical_tags(self, mock_get_tags, mock_metadata_store,
                                          mock_find_repos, mock_load_config, mock_repos):
         """Test navigating through hierarchical tag directories."""
@@ -401,9 +401,9 @@ class TestShellVFSHierarchicalTags:
 class TestShellVFSEdgeCases:
     """Test edge cases and error handling."""
 
-    @patch('ghops.shell.shell.load_config')
-    @patch('ghops.shell.shell.find_git_repos_from_config')
-    @patch('ghops.shell.shell.get_metadata_store')
+    @patch('repoindex.shell.shell.load_config')
+    @patch('repoindex.shell.shell.find_git_repos_from_config')
+    @patch('repoindex.shell.shell.get_metadata_store')
     def test_cp_invalid_destination(self, mock_metadata_store, mock_find_repos,
                                     mock_load_config, mock_repos, capsys):
         """Test cp command with invalid destination."""
@@ -426,9 +426,9 @@ class TestShellVFSEdgeCases:
         captured = capsys.readouterr()
         assert 'must be under /by-tag/' in captured.out
 
-    @patch('ghops.shell.shell.load_config')
-    @patch('ghops.shell.shell.find_git_repos_from_config')
-    @patch('ghops.shell.shell.get_metadata_store')
+    @patch('repoindex.shell.shell.load_config')
+    @patch('repoindex.shell.shell.find_git_repos_from_config')
+    @patch('repoindex.shell.shell.get_metadata_store')
     def test_mkdir_creates_namespace(self, mock_metadata_store, mock_find_repos,
                                      mock_load_config, capsys):
         """Test mkdir creates tag namespace."""

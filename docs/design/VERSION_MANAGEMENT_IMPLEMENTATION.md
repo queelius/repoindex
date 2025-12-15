@@ -4,7 +4,7 @@
 
 ## Overview
 
-Added comprehensive version management to the `ghops publish` command, supporting automatic version bumping and setting across multiple package ecosystems.
+Added comprehensive version management to the `repoindex publish` command, supporting automatic version bumping and setting across multiple package ecosystems.
 
 ## Features Implemented
 
@@ -12,9 +12,9 @@ Added comprehensive version management to the `ghops publish` command, supportin
 
 **Usage**:
 ```bash
-ghops publish --bump-version patch     # 1.0.0 → 1.0.1
-ghops publish --bump-version minor     # 1.0.0 → 1.1.0
-ghops publish --bump-version major     # 1.0.0 → 2.0.0
+repoindex publish --bump-version patch     # 1.0.0 → 1.0.1
+repoindex publish --bump-version minor     # 1.0.0 → 1.1.0
+repoindex publish --bump-version major     # 1.0.0 → 2.0.0
 ```
 
 **Supports**:
@@ -27,7 +27,7 @@ ghops publish --bump-version major     # 1.0.0 → 2.0.0
 
 **Usage**:
 ```bash
-ghops publish --set-version 2.0.0
+repoindex publish --set-version 2.0.0
 ```
 
 Sets an explicit version across all project files.
@@ -36,7 +36,7 @@ Sets an explicit version across all project files.
 
 **Usage**:
 ```bash
-ghops publish --bump-version patch --version-only
+repoindex publish --bump-version patch --version-only
 ```
 
 Updates version without publishing. Useful for:
@@ -49,13 +49,13 @@ Updates version without publishing. Useful for:
 **Usage**:
 ```bash
 # Bump version and publish in one command
-ghops publish --bump-version patch
+repoindex publish --bump-version patch
 
 # Set version and publish
-ghops publish --set-version 1.0.0
+repoindex publish --set-version 1.0.0
 
 # Dry-run to preview
-ghops publish --bump-version minor --dry-run
+repoindex publish --bump-version minor --dry-run
 ```
 
 ## Supported Package Types
@@ -71,7 +71,7 @@ ghops publish --bump-version minor --dry-run
 **Example**:
 ```bash
 # Current: 0.7.0
-ghops publish --bump-version patch
+repoindex publish --bump-version patch
 # New: 0.7.1 in pyproject.toml and __init__.py
 ```
 
@@ -84,7 +84,7 @@ ghops publish --bump-version patch
 **Example**:
 ```bash
 # package.json: "version": "1.0.0"
-ghops publish --bump-version minor
+repoindex publish --bump-version minor
 # package.json: "version": "1.1.0"
 ```
 
@@ -97,7 +97,7 @@ ghops publish --bump-version minor
 **Example**:
 ```bash
 # Cargo.toml: version = "0.5.0"
-ghops publish --bump-version patch
+repoindex publish --bump-version patch
 # Cargo.toml: version = "0.5.1"
 ```
 
@@ -111,7 +111,7 @@ ghops publish --bump-version patch
 **Example**:
 ```bash
 # conanfile.py: version = "1.2.0"
-ghops publish --bump-version major
+repoindex publish --bump-version major
 # conanfile.py: version = "2.0.0"
 ```
 
@@ -124,7 +124,7 @@ ghops publish --bump-version major
 **Example**:
 ```bash
 # Latest tag: v1.0.0
-ghops publish --bump-version minor
+repoindex publish --bump-version minor
 # New tag: v1.1.0
 ```
 
@@ -139,7 +139,7 @@ ghops publish --bump-version minor
 
 ### Architecture
 
-**New Module**: `ghops/version_manager.py` (~350 lines)
+**New Module**: `repoindex/version_manager.py` (~350 lines)
 
 **Components**:
 1. **VersionBumper** - Generic semver bumping logic
@@ -211,9 +211,9 @@ class PythonVersionManager:
 
 All operations support `--dry-run`:
 ```bash
-$ ghops publish --bump-version patch --dry-run
+$ repoindex publish --bump-version patch --dry-run
 
-Processing: ghops
+Processing: repoindex
 ✓ Detected types: python
 Current version: 0.7.0
 Would bump patch: 0.7.0 → 0.7.1
@@ -231,7 +231,7 @@ Would run: python -m twine upload dist/*
 git commit -m "fix: resolve timeout issue"
 
 # Bump patch version and publish
-ghops publish --bump-version patch
+repoindex publish --bump-version patch
 
 # Output:
 # Current version: 1.0.0
@@ -246,7 +246,7 @@ ghops publish --bump-version patch
 git commit -m "feat: add new export format"
 
 # Bump minor version
-ghops publish --bump-version minor
+repoindex publish --bump-version minor
 
 # Output:
 # Current version: 1.0.1
@@ -261,7 +261,7 @@ ghops publish --bump-version minor
 git commit -m "feat!: redesign API"
 
 # Bump major version
-ghops publish --bump-version major
+repoindex publish --bump-version major
 
 # Output:
 # Current version: 1.1.0
@@ -273,7 +273,7 @@ ghops publish --bump-version major
 
 ```bash
 # Update version across all files without publishing
-ghops publish --set-version 2.0.0-beta.1 --version-only
+repoindex publish --set-version 2.0.0-beta.1 --version-only
 
 # Output:
 # Current version: 1.1.0
@@ -281,14 +281,14 @@ ghops publish --set-version 2.0.0-beta.1 --version-only
 # Summary: ✓ Version updated
 
 # Later, publish when ready
-ghops publish
+repoindex publish
 ```
 
 ### Scenario 5: Bulk Version Updates
 
 ```bash
 # Update all Python packages to 1.0.0
-ghops publish /by-language/Python --set-version 1.0.0 --version-only --dry-run
+repoindex publish /by-language/Python --set-version 1.0.0 --version-only --dry-run
 
 # Shows what would be updated for each repo
 ```
@@ -329,25 +329,25 @@ No configuration required - version management works automatically based on dete
 
 ```bash
 # Test version detection
-ghops publish --dry-run
+repoindex publish --dry-run
 # Shows: Current version: X.Y.Z
 
 # Test bumping without publishing
-ghops publish --bump-version patch --version-only --dry-run
+repoindex publish --bump-version patch --version-only --dry-run
 # Shows: Would bump patch: X.Y.Z → X.Y.Z+1
 
 # Test setting version
-ghops publish --set-version 2.0.0 --version-only --dry-run
+repoindex publish --set-version 2.0.0 --version-only --dry-run
 # Shows: Would set version to: 2.0.0
 ```
 
 ## Files Created/Modified
 
 ### New Files (1)
-- `ghops/version_manager.py` - Complete version management implementation
+- `repoindex/version_manager.py` - Complete version management implementation
 
 ### Modified Files (1)
-- `ghops/commands/publish.py` - Added version bumping options and integration
+- `repoindex/commands/publish.py` - Added version bumping options and integration
 
 ## Future Enhancements
 
@@ -363,7 +363,7 @@ ghops publish --set-version 2.0.0 --version-only --dry-run
 ### Example Future Usage
 ```bash
 # Bump version, update changelog, create git tag, commit, and publish
-ghops publish --bump-version minor --changelog --tag --commit
+repoindex publish --bump-version minor --changelog --tag --commit
 ```
 
 ## Benefits
@@ -380,25 +380,25 @@ ghops publish --bump-version minor --changelog --tag --commit
 
 1. **Always use --dry-run first**:
    ```bash
-   ghops publish --bump-version patch --dry-run
+   repoindex publish --bump-version patch --dry-run
    # Review output, then run without --dry-run
    ```
 
 2. **Version-only for preparation**:
    ```bash
    # Prepare release
-   ghops publish --bump-version minor --version-only
+   repoindex publish --bump-version minor --version-only
    git add .
    git commit -m "chore: bump version to $(cat VERSION)"
 
    # Publish later
-   ghops publish
+   repoindex publish
    ```
 
 3. **Combine with VFS for bulk operations**:
    ```bash
    # Update all Python packages
-   ghops publish /by-language/Python --set-version 1.0.0 --version-only
+   repoindex publish /by-language/Python --set-version 1.0.0 --version-only
    ```
 
 4. **Follow semver guidelines**:
@@ -414,4 +414,4 @@ ghops publish --bump-version minor --changelog --tag --commit
 - **Files per language**: 1-3 (varies by ecosystem)
 - **Test coverage**: Dry-run tested on multiple project types
 
-This implementation provides a complete, production-ready version management system integrated seamlessly with ghops' publishing workflow.
+This implementation provides a complete, production-ready version management system integrated seamlessly with repoindex' publishing workflow.

@@ -1,10 +1,10 @@
 # Tutorial Notebooks
 
-Learn ghops interactively with our comprehensive Jupyter notebook tutorials. These hands-on guides cover everything from basic repository management to advanced clustering and workflow automation.
+Learn repoindex interactively with our comprehensive Jupyter notebook tutorials. These hands-on guides cover everything from basic repository management to advanced clustering and workflow automation.
 
 ## Overview
 
-The ghops tutorial notebooks provide:
+The repoindex tutorial notebooks provide:
 
 - **Interactive Learning**: Run code and see results immediately
 - **Progressive Complexity**: Start simple, build to advanced topics
@@ -18,14 +18,14 @@ The ghops tutorial notebooks provide:
 
 - Python 3.8 or higher
 - Jupyter Notebook or JupyterLab
-- ghops installed: `pip install ghops`
+- repoindex installed: `pip install repoindex`
 
 ### Setup
 
 ```bash
-# Clone the ghops repository to access notebooks
-git clone https://github.com/queelius/ghops.git
-cd ghops/notebooks
+# Clone the repoindex repository to access notebooks
+git clone https://github.com/queelius/repoindex.git
+cd repoindex/notebooks
 
 # Install Jupyter and visualization dependencies
 pip install jupyter matplotlib seaborn plotly pandas
@@ -56,9 +56,9 @@ docker run -it -p 8888:8888 \
 **Duration**: 20-30 minutes
 **Level**: Beginner
 
-Learn the fundamentals of ghops:
+Learn the fundamentals of repoindex:
 
-- Installing and configuring ghops
+- Installing and configuring repoindex
 - Understanding the JSONL output format
 - Listing and querying repositories
 - Working with the catalog and tags
@@ -67,18 +67,18 @@ Learn the fundamentals of ghops:
 **What You'll Learn:**
 ```python
 # List repositories and parse JSONL
-repos = !ghops list
+repos = !repoindex list
 import json
 for line in repos:
     repo = json.loads(line)
     print(f"{repo['name']}: {repo['language']}")
 
 # Query repositories with filters
-python_repos = !ghops query "language == 'Python'"
+python_repos = !repoindex query "language == 'Python'"
 print(f"Found {len(python_repos)} Python repositories")
 
 # Add tags and organize
-!ghops catalog tag myrepo "production" "python" "api"
+!repoindex catalog tag myrepo "production" "python" "api"
 ```
 
 **Key Concepts:**
@@ -106,7 +106,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 # Run clustering and load results
-!ghops cluster analyze --algorithm kmeans -r > clusters.jsonl
+!repoindex cluster analyze --algorithm kmeans -r > clusters.jsonl
 
 # Parse and visualize
 clusters = pd.read_json('clusters.jsonl', lines=True)
@@ -121,7 +121,7 @@ plt.ylabel('Number of Repositories')
 plt.show()
 
 # Find duplicates
-!ghops cluster find-duplicates --min-similarity 0.8 -r > duplicates.jsonl
+!repoindex cluster find-duplicates --min-similarity 0.8 -r > duplicates.jsonl
 duplicates = pd.read_json('duplicates.jsonl', lines=True)
 high_sim = duplicates[duplicates['similarity'] > 0.9]
 print(f"Found {len(high_sim)} highly similar repository pairs")
@@ -156,7 +156,7 @@ Build powerful automated workflows:
 **What You'll Learn:**
 ```python
 # Create a workflow programmatically
-from ghops.integrations.workflow import Workflow, Task
+from repoindex.integrations.workflow import Workflow, Task
 
 workflow = Workflow(
     name="Portfolio Analysis",
@@ -166,7 +166,7 @@ workflow = Workflow(
 # Add tasks
 workflow.add_task(Task(
     id="list_repos",
-    type="ghops",
+    type="repoindex",
     command="list",
     args=["--format", "json"],
     parse_output=True,
@@ -175,7 +175,7 @@ workflow.add_task(Task(
 
 workflow.add_task(Task(
     id="cluster_analysis",
-    type="ghops",
+    type="repoindex",
     command="cluster analyze",
     args=["--algorithm", "kmeans"],
     depends_on=["list_repos"],
@@ -198,7 +198,7 @@ with open('portfolio-report.md', 'w') as f:
 
 # Save and run
 workflow.save('portfolio-analysis.yaml')
-!ghops workflow run portfolio-analysis.yaml
+!repoindex workflow run portfolio-analysis.yaml
 ```
 
 **Key Concepts:**
@@ -219,7 +219,7 @@ workflow.save('portfolio-analysis.yaml')
 **Duration**: 60-75 minutes
 **Level**: Advanced
 
-Combine multiple ghops features for powerful workflows:
+Combine multiple repoindex features for powerful workflows:
 
 - Integration patterns and composition
 - Custom action development
@@ -230,20 +230,20 @@ Combine multiple ghops features for powerful workflows:
 **What You'll Learn:**
 ```python
 # Combine clustering with export
-!ghops cluster analyze -r | \
+!repoindex cluster analyze -r | \
   jq 'select(.action == "cluster_result")' | \
-  ghops export markdown --stdin --output clusters.md
+  repoindex export markdown --stdin --output clusters.md
 
 # Create custom workflow action
-from ghops.integrations.workflow import Action
+from repoindex.integrations.workflow import Action
 
 class AnalyzeAndReportAction(Action):
     def execute(self, parameters, context):
         # Cluster repositories
-        clusters = self.run_ghops_command('cluster', 'analyze', '-r')
+        clusters = self.run_repoindex_command('cluster', 'analyze', '-r')
 
         # Find duplicates
-        duplicates = self.run_ghops_command('cluster', 'find-duplicates', '-r')
+        duplicates = self.run_repoindex_command('cluster', 'find-duplicates', '-r')
 
         # Generate comprehensive report
         report = self.generate_report(clusters, duplicates)
@@ -399,11 +399,11 @@ plt.show()
 
 ```bash
 # Create a dedicated environment
-python -m venv ghops-tutorials
-source ghops-tutorials/bin/activate  # On Windows: ghops-tutorials\Scripts\activate
+python -m venv repoindex-tutorials
+source repoindex-tutorials/bin/activate  # On Windows: repoindex-tutorials\Scripts\activate
 
 # Install all dependencies
-pip install ghops[clustering,workflows] jupyter pandas matplotlib seaborn plotly networkx
+pip install repoindex[clustering,workflows] jupyter pandas matplotlib seaborn plotly networkx
 ```
 
 ### Working with Notebooks
@@ -421,8 +421,8 @@ pip install ghops[clustering,workflows] jupyter pandas matplotlib seaborn plotly
 import json
 import pandas as pd
 
-def load_ghops_output(file_or_command):
-    """Load ghops JSONL output into a DataFrame."""
+def load_repoindex_output(file_or_command):
+    """Load repoindex JSONL output into a DataFrame."""
     if file_or_command.endswith('.jsonl'):
         return pd.read_json(file_or_command, lines=True)
     else:
@@ -434,9 +434,9 @@ def load_ghops_output(file_or_command):
         return pd.DataFrame(data)
 
 # Usage
-repos = load_ghops_output('ghops list')
+repos = load_repoindex_output('repoindex list')
 # or
-repos = load_ghops_output('repos.jsonl')
+repos = load_repoindex_output('repos.jsonl')
 ```
 
 ### Troubleshooting
@@ -448,7 +448,7 @@ jupyter notebook --debug
 jupyter notebook --port 8889
 ```
 
-**Kernel dies when running ghops commands:**
+**Kernel dies when running repoindex commands:**
 ```bash
 # Increase kernel timeout
 jupyter notebook --NotebookApp.iopub_data_rate_limit=1000000000
@@ -459,7 +459,7 @@ jupyter notebook --NotebookApp.iopub_data_rate_limit=1000000000
 # Ensure you're using the right Python
 which python
 # Reinstall in the correct environment
-pip install --force-reinstall ghops
+pip install --force-reinstall repoindex
 ```
 
 **JSONL parsing errors:**
@@ -553,23 +553,23 @@ if __name__ == '__main__':
 ## Additional Resources
 
 ### Documentation
-- [ghops Command Reference](usage.md)
+- [repoindex Command Reference](usage.md)
 - [Clustering Integration](integrations/clustering.md)
 - [Workflow Orchestration](integrations/workflow.md)
 - [Query Language](query-cookbook.md)
 
 ### Example Repositories
-- [ghops Examples](https://github.com/queelius/ghops/tree/main/examples)
-- [Workflow Templates](https://github.com/queelius/ghops/tree/main/examples/workflows)
-- [Custom Actions](https://github.com/queelius/ghops/tree/main/examples/actions)
+- [repoindex Examples](https://github.com/queelius/repoindex/tree/main/examples)
+- [Workflow Templates](https://github.com/queelius/repoindex/tree/main/examples/workflows)
+- [Custom Actions](https://github.com/queelius/repoindex/tree/main/examples/actions)
 
 ### Community
-- [GitHub Discussions](https://github.com/queelius/ghops/discussions)
-- [Issue Tracker](https://github.com/queelius/ghops/issues)
+- [GitHub Discussions](https://github.com/queelius/repoindex/discussions)
+- [Issue Tracker](https://github.com/queelius/repoindex/issues)
 - [Contributing Guide](contributing.md)
 
 ### Video Tutorials (Coming Soon)
-- Introduction to ghops
+- Introduction to repoindex
 - Clustering in action
 - Building your first workflow
 - Advanced integration patterns
@@ -595,10 +595,10 @@ Have you created useful notebooks? Share them with the community!
 
 After completing the tutorials:
 
-1. **Apply to your repositories**: Use ghops with your actual projects
+1. **Apply to your repositories**: Use repoindex with your actual projects
 2. **Customize workflows**: Build workflows for your specific needs
 3. **Explore integrations**: Try advanced features and integrations
 4. **Join the community**: Share experiences and get help
-5. **Contribute**: Help improve ghops and its documentation
+5. **Contribute**: Help improve repoindex and its documentation
 
 Ready to dive in? [Start with Notebook 1: Getting Started](../notebooks/01_getting_started.ipynb)
