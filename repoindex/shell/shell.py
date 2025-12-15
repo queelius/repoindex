@@ -594,19 +594,25 @@ class RepoIndexShell(cmd.Cmd):
         Options:
             --since TIME     Events after this time (e.g., 1h, 7d, 2024-01-01)
             --type TYPE      Filter by event type:
-                             Local: git_tag, commit, branch, merge, version_bump, deps_update
-                             GitHub: github_release, pr, issue, workflow_run, security_alert
-                             Registries: pypi_publish, cran_publish, npm_publish, cargo_publish, docker_publish
-            --github         Include GitHub events (releases, PRs, issues, security alerts)
+                             Local: git_tag, commit, branch, merge, version_bump, deps_update,
+                                    license_change, ci_config_change, docs_change, readme_change
+                             GitHub: github_release, pr, issue, workflow_run, security_alert,
+                                     repo_rename, repo_transfer, repo_visibility, repo_archive
+                             Registries: pypi_publish, cran_publish, npm_publish, cargo_publish,
+                                         docker_publish, gem_publish, nuget_publish, maven_publish
+            --github         Include GitHub events (releases, PRs, issues, security alerts, repo events)
             --pypi           Include PyPI publish events
             --cran           Include CRAN publish events
             --npm            Include npm publish events
             --cargo          Include Cargo (crates.io) publish events
             --docker         Include Docker Hub publish events
+            --gem            Include RubyGems publish events
+            --nuget          Include NuGet (.NET) publish events
+            --maven          Include Maven Central (Java) publish events
             --all            Include all event types
             --stats          Show summary statistics
             --relative-time  Show relative timestamps (e.g., "2h ago")
-            --limit N        Maximum events (default: 50)
+            --limit N        Maximum events (default: 100, use 0 for unlimited)
 
         Examples:
             events                         # Local events, last 7 days
@@ -614,7 +620,10 @@ class RepoIndexShell(cmd.Cmd):
             events --type git_tag          # Only git tags
             events --github --since 7d     # Include GitHub events
             events --npm --cargo           # npm and Cargo publishes
+            events --gem --maven           # RubyGems and Maven publishes
             events --type security_alert   # Security alerts only
+            events --type license_change   # License changes only
+            events --type repo_rename      # Repo renames only
             events --stats                 # Show event statistics
             events --relative-time         # Show "2h ago" style times
         """
@@ -622,13 +631,16 @@ class RepoIndexShell(cmd.Cmd):
         args = arg.split()
         since = '7d'  # Default to 7 days
         event_types = []
-        limit = 50
+        limit = 100  # Default, use 0 for unlimited
         github = False
         pypi = False
         cran = False
         npm = False
         cargo = False
         docker = False
+        gem = False
+        nuget = False
+        maven = False
         include_all = False
         stats = False
         relative_time = False
@@ -666,6 +678,15 @@ class RepoIndexShell(cmd.Cmd):
             elif args[i] == '--docker':
                 docker = True
                 i += 1
+            elif args[i] == '--gem':
+                gem = True
+                i += 1
+            elif args[i] == '--nuget':
+                nuget = True
+                i += 1
+            elif args[i] == '--maven':
+                maven = True
+                i += 1
             elif args[i] in ('--all', '-a'):
                 include_all = True
                 i += 1
@@ -691,6 +712,9 @@ class RepoIndexShell(cmd.Cmd):
                 npm=npm,
                 cargo=cargo,
                 docker=docker,
+                gem=gem,
+                nuget=nuget,
+                maven=maven,
                 include_all=include_all,
                 repo=None,
                 since=since,

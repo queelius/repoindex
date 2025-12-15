@@ -10,7 +10,7 @@ It provides a unified view across all your repositories, enabling queries, organ
 
 **Key Philosophy**: repoindex knows *about* your repos (metadata, tags, status), while Claude Code works *inside* them (editing, generating). Together they provide full portfolio awareness.
 
-**Current Version**: 0.9.0
+**Current Version**: 0.8.2
 
 **See also**: [DESIGN.md](DESIGN.md) for detailed design principles and architecture.
 
@@ -42,9 +42,67 @@ Claude Code (deep work on ONE repo)
 1. **Repository Discovery** - Find and track repos across directories
 2. **Tag-Based Organization** - Hierarchical tags for categorization
 3. **Registry Awareness** - PyPI, CRAN publication status
-4. **Event Tracking** - New tags, releases, publishes
+4. **Event Tracking** - New tags, releases, publishes (28 event types)
 5. **Statistics** - Aggregations across the collection
 6. **Query Language** - Filter and search with expressions
+
+## Using repoindex with Claude Code
+
+Claude Code can run repoindex CLI commands directly. This is often more powerful than MCP since you can compose with Unix tools.
+
+### Common Patterns
+
+```bash
+# What happened across my repos recently?
+repoindex events --since 7d --pretty
+
+# Any security alerts?
+repoindex events --github --type security_alert --since 7d
+
+# Repos with uncommitted changes
+repoindex status -r | jq 'select(.status.uncommitted_changes == true) | .name'
+
+# Find Python repos with >10 stars
+repoindex query "language == 'Python' and stars > 10"
+
+# What got released this week?
+repoindex events --type git_tag --since 7d --pretty
+
+# Package publishes
+repoindex events --pypi --npm --since 30d
+```
+
+### Event Types (28 total)
+
+**Local (fast, default)**:
+- `git_tag`, `commit`, `branch`, `merge`
+- `version_bump`, `deps_update`, `license_change`, `ci_config_change`, `docs_change`, `readme_change`
+
+**GitHub (--github)**:
+- `github_release`, `pr`, `issue`, `workflow_run`, `security_alert`
+- `repo_rename`, `repo_transfer`, `repo_visibility`, `repo_archive`
+
+**Registries**:
+- `--pypi`: pypi_publish
+- `--npm`: npm_publish
+- `--cargo`: cargo_publish
+- `--docker`: docker_publish
+- `--gem`: gem_publish
+- `--nuget`: nuget_publish
+- `--maven`: maven_publish
+- `--cran`: cran_publish
+
+### Output Formats
+
+All commands output JSONL by default:
+```bash
+repoindex events --since 7d | jq '.type' | sort | uniq -c
+```
+
+Use `--pretty` for human-readable tables:
+```bash
+repoindex events --since 7d --pretty
+```
 
 ## CRITICAL DESIGN PRINCIPLES
 

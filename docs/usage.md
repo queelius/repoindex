@@ -1,363 +1,380 @@
 # Usage Guide
 
-This guide covers all the features and commands available in `repoindex`.
+Complete reference for all repoindex commands and features.
 
-## Installation and Setup
+## Installation
 
-### Install repoindex
 ```bash
 pip install repoindex
 ```
 
-### Initial Configuration
+Verify installation:
+
 ```bash
-# Generate an example configuration file
-repoindex config generate
-
-# Edit the configuration (opens ~/.repoindexrc)
-nano ~/.repoindexrc
-
-# View current configuration
-repoindex config show
+repoindex --version
+repoindex --help
 ```
 
 ## Core Commands
 
-### Repository Operations
+### Repository Status
 
-#### Clone Repositories
+```bash
+# Status of all repositories (JSONL output)
+repoindex status -r
+
+# Human-readable table
+repoindex status -r --pretty
+
+# Status for specific directory
+repoindex status --dir ~/projects -r
+
+# Filter by query
+repoindex status -q "language == 'Python'"
+```
+
+### Events
+
+Track what's happening across your repositories:
+
+```bash
+# Events in the last 7 days (default)
+repoindex events --pretty
+
+# Events since specific time
+repoindex events --since 24h --pretty
+repoindex events --since 7d
+repoindex events --since 2024-01-15
+
+# Filter by event type
+repoindex events --type git_tag --since 30d
+repoindex events --type commit --since 1d
+
+# Include GitHub events (requires API)
+repoindex events --github --since 7d
+
+# Include package registry events
+repoindex events --pypi --npm --cargo --since 30d
+
+# Watch mode for continuous monitoring
+repoindex events --watch --interval 300
+
+# Unlimited results (default limit is 100)
+repoindex events --since 30d --limit 0
+```
+
+See [Events Overview](events/overview.md) for full documentation.
+
+### Query Language
+
+Find repositories with fuzzy matching:
+
+```bash
+# Fuzzy language match (typo-tolerant)
+repoindex query "language ~= 'pyton'"
+
+# Multiple conditions
+repoindex query "language == 'Python' and stars > 10"
+
+# Check tags
+repoindex query "'ml' in tags"
+
+# Complex queries
+repoindex query "has_docs and not archived and stars > 10"
+```
+
+See [Query Language](catalog-query.md) for syntax details.
+
+### Tag Management
+
+Organize repositories with hierarchical tags:
+
+```bash
+# Add tags
+repoindex tag add myproject work/active
+repoindex tag add myproject topic:ml/research
+
+# Remove tags
+repoindex tag remove myproject work/active
+
+# Move between tags
+repoindex tag move myproject work/active work/completed
+
+# List all tags
+repoindex tag list
+
+# List repositories with specific tag
+repoindex tag list -t "work/*"
+
+# Show tag hierarchy
+repoindex tag tree
+repoindex tag tree -t work  # Show subtree
+```
+
+### Interactive Shell
+
+```bash
+# Launch interactive shell with VFS
+repoindex shell
+
+# Navigate like a filesystem
+> cd /by-tag/work/active
+> ls
+> events --since 1d
+> exit
+```
+
+See [Shell & VFS](shell-vfs.md) for details.
+
+## Configuration
+
+### Configuration File
+
+Configuration lives at `~/.repoindex/config.json`:
+
+```json
+{
+  "general": {
+    "repository_directories": [
+      "~/projects",
+      "~/work/**"
+    ]
+  },
+  "events": {
+    "default_types": ["git_tag", "commit", "version_bump"]
+  },
+  "github": {
+    "token": "ghp_..."
+  }
+}
+```
+
+### Configuration Commands
+
+```bash
+# Show current configuration
+repoindex config show
+
+# Add repository directory
+repoindex config repos add ~/projects
+repoindex config repos add ~/work/**
+
+# Set GitHub token
+export REPOINDEX_GITHUB_TOKEN="ghp_your_token"
+```
+
+### Environment Variables
+
+| Variable | Description |
+|----------|-------------|
+| `REPOINDEX_CONFIG` | Path to config file |
+| `REPOINDEX_GITHUB_TOKEN` | GitHub API token |
+| `REPOINDEX_LOG_LEVEL` | Logging level (DEBUG, INFO, WARNING) |
+
+## Repository Operations
+
+### Clone Repositories
+
 ```bash
 # Clone all your GitHub repositories
 repoindex get
 
 # Clone to a specific directory
 repoindex get --dir ~/projects
-
-# Clone and add MIT license
-repoindex get --license mit --license-name "Your Name" --license-email "you@example.com"
 ```
 
-#### Update Repositories
+### Update Repositories
+
 ```bash
 # Update all repositories in current directory
 repoindex update
 
-# Update recursively (search subdirectories)
+# Update recursively
 repoindex update -r
 
-# Update repositories in specific directory
+# Update specific directory
 repoindex update --dir ~/projects -r
-
-# Update and add/update licenses
-repoindex update -r --license mit --license-name "Your Name"
 ```
 
-#### Check Status
+### List Repositories
+
 ```bash
-# Show comprehensive status
-repoindex status -r
+# List all tracked repositories
+repoindex list
 
-# Fast status (skip PyPI and Pages checks)
-repoindex status --no-pypi-check --no-pages-check
+# List with metadata
+repoindex list --pretty
 
-# JSON output for scripts
-repoindex status --json
-
-# Status for specific directory
-repoindex status --dir ~/projects -r
+# Filter by tag
+repoindex list -t "lang:python"
 ```
 
-### Configuration Management
+## Output Formats
 
-#### Generate Configuration
+All commands output JSONL (newline-delimited JSON) by default:
+
 ```bash
-# Create example config file
-repoindex config generate
+# Stream to jq
+repoindex events --since 7d | jq '.type' | sort | uniq -c
+
+# Filter specific repos
+repoindex status -r | jq 'select(.name | contains("api"))'
+
+# Human-readable tables
+repoindex events --since 7d --pretty
 ```
 
-This creates `~/.repoindexrc` with documented examples for all configuration options.
+### Pipeline Examples
 
-#### View Configuration
 ```bash
-# Show current configuration
-repoindex config show
-```
+# Find Python repos with uncommitted changes
+repoindex status -r | jq 'select(.status.uncommitted_changes == true and .language == "Python")'
 
-### PyPI Integration
+# Count events by type
+repoindex events --since 30d | jq '.type' | sort | uniq -c
 
-The PyPI integration is automatically enabled and provides:
-
-- **Package Detection**: Scans for `pyproject.toml`, `setup.py`, `setup.cfg`
-- **PyPI Status**: Checks if packages exist on PyPI
-- **Version Tracking**: Shows current PyPI version vs local version
-- **Statistics**: Counts published packages, outdated packages
-
-#### PyPI Status Information
-
-The `status` command shows:
-- **PyPI Package**: Package name (linked if published)
-- **Version**: Current version on PyPI or "Not published"
-- **Statistics**: Summary of package status across all repositories
-
-#### Configuration Options
-```toml
-[pypi]
-check_by_default = true         # Include PyPI info in status
-timeout_seconds = 10            # API request timeout
-include_test_pypi = false       # Also check test.pypi.org
-```
-
-### Social Media Automation
-
-#### Sample Repositories
-```bash
-# Sample 3 repositories randomly
-repoindex social sample
-
-# Sample 5 repositories
-repoindex social sample --size 5
-
-# Sample from specific directory
-repoindex social sample --dir ~/projects --size 3
-```
-
-#### Create and Post Content
-```bash
-# Preview what would be posted
-repoindex social post --dry-run
-
-# Preview with custom sample size
-repoindex social post --dry-run --size 2
-
-# Actually post to configured platforms
-repoindex social post --size 3
-```
-
-#### Platform Configuration
-
-Configure social media platforms in your `~/.repoindexrc`:
-
-```toml
-[social_media.platforms.twitter]
-enabled = true
-api_key = "your_twitter_api_key"
-api_secret = "your_twitter_api_secret"
-access_token = "your_access_token"
-access_token_secret = "your_access_token_secret"
-
-[social_media.platforms.linkedin]
-enabled = true
-access_token = "your_linkedin_access_token"
-
-[social_media.platforms.mastodon]
-enabled = true
-instance_url = "https://mastodon.social"
-access_token = "your_mastodon_access_token"
-```
-
-#### Post Templates
-
-Customize post templates for different content types:
-
-```toml
-[social_media.platforms.twitter.templates]
-pypi_release = "🚀 New release: {package_name} v{version} is now available on PyPI! {pypi_url} #{package_name} #python #opensource"
-github_pages = "📖 Updated documentation for {repo_name}: {pages_url} #docs #opensource"
-random_highlight = "✨ Working on {repo_name}: {description} {repo_url} #{language} #coding"
-```
-
-Available template variables:
-- `{repo_name}` - Repository name
-- `{repo_url}` - GitHub repository URL
-- `{description}` - Repository description
-- `{language}` - Primary language
-- `{license}` - License type
-- `{package_name}` - PyPI package name
-- `{version}` - PyPI package version
-- `{pypi_url}` - PyPI package URL
-- `{pages_url}` - GitHub Pages URL
-
-#### Posting Rules
-
-Control when and what to post:
-
-```toml
-[social_media.posting]
-random_sample_size = 3          # Default sample size
-daily_limit = 5                 # Maximum posts per day
-min_hours_between_posts = 2     # Minimum time between posts
-exclude_private = true          # Don't post about private repos
-exclude_forks = true            # Don't post about forked repos
-minimum_stars = 0               # Minimum stars to post about a repo
-hashtag_limit = 5               # Maximum hashtags per post
-```
-
-### License Management
-
-#### List Available Licenses
-```bash
-repoindex license list
-```
-
-#### View License Template
-```bash
-repoindex license show mit
-repoindex license show apache-2.0
-repoindex license show gpl-3.0
-```
-
-#### Add Licenses During Operations
-```bash
-# Add license during cloning
-repoindex get --license mit --license-name "Your Name" --license-email "you@example.com"
-
-# Add/update licenses during update
-repoindex update -r --license mit --license-name "Your Name"
-```
-
-## Performance and Optimization
-
-### Speed Up Status Checks
-```bash
-# Skip time-consuming checks
-repoindex status --no-pypi-check --no-pages-check
-
-# For very large numbers of repositories
-repoindex status --no-pypi-check  # PyPI check is usually the slowest
-```
-
-### Configuration for Performance
-```toml
-[general]
-max_concurrent_operations = 10  # Increase for faster parallel operations
-progress_bar = true             # Show progress for long operations
-
-[pypi]
-timeout_seconds = 5             # Reduce timeout for faster checks
+# Get repo names needing attention
+repoindex status -r | jq -r 'select(.status.clean == false) | .name'
 ```
 
 ## Common Workflows
 
-### Daily Development Workflow
+### Morning Check
+
 ```bash
-# Check status of all projects
-repoindex status -r
+# What happened overnight?
+repoindex events --since 12h --pretty
 
-# Update all repositories
-repoindex update -r
+# Any security alerts?
+repoindex events --github --type security_alert --since 7d
 
-# Post about recent work (dry run first)
-repoindex social post --dry-run --size 2
-repoindex social post --size 2
+# Repos with uncommitted work
+repoindex status -r | jq 'select(.status.uncommitted_changes == true) | .name'
 ```
 
-### New Project Setup
+### Release Tracking
+
 ```bash
-# Clone all repositories
-repoindex get --dir ~/projects
+# Recent releases across all repos
+repoindex events --type git_tag --since 30d --pretty
 
-# Add licenses to unlicensed repositories
-repoindex update -r --license mit --license-name "Your Name" --license-email "you@example.com"
-
-# Check final status
-repoindex status -r
+# Include GitHub releases
+repoindex events --github --type github_release --since 30d
 ```
 
-### Social Media Promotion
+### Package Monitoring
+
 ```bash
-# Sample repositories to see what's available
-repoindex social sample --size 5
+# Python packages published
+repoindex events --pypi --since 30d --pretty
 
-# Create posts for PyPI releases and documentation updates
-repoindex social post --dry-run
+# All registry events
+repoindex events --pypi --npm --cargo --since 30d
+```
 
-# Actually post when ready
-repoindex social post --size 3
+## Advanced Features
+
+### Metadata Store
+
+Refresh repository metadata:
+
+```bash
+# Refresh all metadata
+repoindex metadata refresh
+
+# Refresh with GitHub data
+repoindex metadata refresh --github
+
+# View metadata for a repo
+repoindex metadata show myproject
+```
+
+### Repository Audit
+
+Check repository health:
+
+```bash
+# Full audit
+repoindex audit
+
+# Auto-fix common issues
+repoindex audit --fix
+
+# Security checks
+repoindex audit security
+```
+
+### MCP Server
+
+For LLM integration:
+
+```bash
+# Start MCP server
+repoindex mcp serve
+
+# Or use CLI directly with Claude Code
+# (documented in MCP Overview)
+```
+
+## Performance Tips
+
+### Fast Status Checks
+
+```bash
+# Skip time-consuming checks
+repoindex status --no-pypi-check --no-pages-check
+
+# Local-only events (no API calls)
+repoindex events --since 7d  # Default is local-only
+```
+
+### Event Limits
+
+```bash
+# Increase limit for more results
+repoindex events --since 30d --limit 500
+
+# Unlimited results
+repoindex events --since 90d --limit 0
 ```
 
 ## Troubleshooting
 
-### Configuration Issues
-```bash
-# Regenerate configuration if corrupted
-repoindex config generate
+### No Repositories Found
 
-# Check current configuration
-repoindex config show
-```
+- Check `repository_directories` in config
+- Verify directories contain `.git` folders
+- Run `repoindex config show` to check settings
 
-### Performance Issues
-- Use `--no-pypi-check` if PyPI API is slow
-- Use `--no-pages-check` if GitHub API is rate-limited
-- Reduce `timeout_seconds` in configuration
-- Increase `max_concurrent_operations` for faster parallel processing
+### GitHub API Rate Limit
 
-### Social Media Issues
-- Verify API credentials in configuration
-- Check platform-specific rate limits
-- Use `--dry-run` to test without actually posting
-- Check that platforms are `enabled = true` in configuration
+- Add a GitHub token (increases limits from 60 to 5000/hour)
+- Skip GitHub events: `repoindex events` (local only by default)
 
-### PyPI Detection Issues
-- Ensure `packaging` Python package is installed
-- Check that packaging files (`pyproject.toml`, etc.) are valid
-- Verify network connectivity to PyPI
-- Check `timeout_seconds` configuration if requests are timing out
+### Permission Errors
 
-## Testing and Quality Assurance
+- Check file permissions in repository directories
+- Ensure git credentials are configured
 
-### Test Coverage and Quality
-
-`repoindex` maintains high quality standards with:
-
-- **138 comprehensive tests** covering all major functionality
-- **86% test coverage** across the entire codebase
-- **Unit tests** for individual functions and classes
-- **Integration tests** for end-to-end workflows
-- **Mock testing** for external API interactions
-- **Error condition testing** for robust error handling
-
-### Running Tests (for Contributors)
+## Testing (for Contributors)
 
 ```bash
 # Install development dependencies
 pip install -e ".[test]"
 
-# Run all tests
+# Run all tests (625+ tests)
 pytest
 
 # Run with coverage report
 pytest --cov=repoindex --cov-report=html
 
 # Run specific test modules
-pytest tests/test_status.py
-pytest tests/test_integration.py
-
-# Run tests with verbose output
-pytest -v
+pytest tests/test_events.py -v
 ```
 
-### Test Categories
+## Next Steps
 
-#### Unit Tests
-
-- **Command modules**: Test each command's core logic
-- **Utility functions**: Test shared utilities and helpers
-- **Configuration system**: Test config loading and merging
-- **PyPI integration**: Test package detection and API calls
-- **Social media**: Test content generation and platform integration
-
-#### Integration Tests
-
-- **End-to-end workflows**: Full command execution paths
-- **File system operations**: Repository cloning and updating
-- **API integration**: Real API calls with mocking for reliability
-- **Error scenarios**: Network failures and edge cases
-
-#### Quality Metrics
-
-- **Code coverage**: 86% across all modules
-- **Error handling**: Comprehensive exception testing  
-- **Performance**: Benchmarks for large repository sets
-- **Compatibility**: Python 3.7+ support testing
-
+- **[Events Overview](events/overview.md)** - Event system details
+- **[Query Language](catalog-query.md)** - Query syntax
+- **[Shell & VFS](shell-vfs.md)** - Interactive shell
+- **[Event Types Reference](events/event-types.md)** - All 28 event types

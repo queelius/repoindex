@@ -1,46 +1,83 @@
-# Repository Organization with Catalog and Query
+# Tags and Query Language
 
 repoindex provides powerful tools for organizing and finding repositories through its tagging system and query language.
 
-## Catalog System
+## Tag System
 
-The catalog system allows you to organize repositories with tags, both explicit (user-defined) and implicit (auto-generated).
+The tag system allows you to organize repositories with hierarchical tags, both explicit (user-defined) and implicit (auto-generated).
 
 ### Adding Tags
 
 ```bash
-# Tag a single repository
-repoindex catalog add myproject python ml research
+# Add tags to a repository
+repoindex tag add myproject python ml research
 
-# Tag multiple repos
-repoindex catalog add project1 client-work urgent
-repoindex catalog add project2 client-work completed
+# Add hierarchical tags
+repoindex tag add myproject work/active
+repoindex tag add myproject topic:ml/research
+
+# Add to multiple repos
+repoindex tag add project1 client-work urgent
+repoindex tag add project2 client-work completed
 ```
 
-### Viewing Tagged Repositories
+### Viewing Tags
 
 ```bash
-# Show all tagged repos
-repoindex catalog show --pretty
+# List all tags
+repoindex tag list
 
-# Filter by specific tags
-repoindex catalog show -t python --pretty
+# List repositories with a specific tag
+repoindex tag list -t python
 
-# Require multiple tags (AND operation)
-repoindex catalog show -t python -t ml --all-tags --pretty
+# List repositories matching tag pattern
+repoindex tag list -t "work/*"
 
-# JSONL output for processing
-repoindex catalog show -t client-work | jq -r '.name'
+# Show tags for a specific repository
+repoindex tag list -r myproject
+
+# Show tag hierarchy as tree
+repoindex tag tree
+
+# Show subtree
+repoindex tag tree -t work
 ```
 
 ### Removing Tags
 
 ```bash
 # Remove specific tags
-repoindex catalog remove myproject urgent
+repoindex tag remove myproject urgent
 
-# Remove all tags from a repo
-repoindex catalog clear myproject
+# Remove hierarchical tag
+repoindex tag remove myproject work/active
+```
+
+### Moving Between Tags
+
+```bash
+# Move from one tag to another (removes old, adds new)
+repoindex tag move myproject work/active work/completed
+```
+
+### Tag Formats
+
+**Simple tags:**
+```bash
+repoindex tag add myproject python ml research
+```
+
+**Hierarchical tags:**
+```bash
+repoindex tag add myproject work/active
+repoindex tag add myproject client/acme/backend
+```
+
+**Key:value tags:**
+```bash
+repoindex tag add myproject topic:ml
+repoindex tag add myproject status:maintained
+repoindex tag add myproject topic:scientific/engineering/ai
 ```
 
 ### Implicit Tags
@@ -118,19 +155,32 @@ repoindex query "description ~= 'web framework'"
 repoindex query "language ~= 'PYTHON'"
 ```
 
-## Combining Catalog and Query
+### Tag Queries
+
+```bash
+# Check if tag exists
+repoindex query "'python' in tags"
+
+# Check for hierarchical tag
+repoindex query "'work/active' in tags"
+
+# Combine with other conditions
+repoindex query "'ml' in tags and stars > 5"
+```
+
+## Combining Tags and Queries
 
 Use both systems together for powerful filtering:
 
 ```bash
-# Tag-based pre-filtering with query refinement
-repoindex list -t "lang:python" | jq -r '.path' | \
-  xargs -I {} repoindex query "stars > 5" --path {}
+# Tag-based filtering with query refinement
+repoindex list -t "lang:python" | jq 'select(.stars > 5)'
 
-# Find untagged repos
-repoindex query "true" | jq -r '.name' > all-repos.txt
-repoindex catalog show | jq -r '.name' > tagged-repos.txt
-comm -23 <(sort all-repos.txt) <(sort tagged-repos.txt)
+# Query with tag conditions
+repoindex query "'work' in tags and language == 'Python'"
+
+# Find repos with specific tag and status
+repoindex query "'client:acme' in tags and not archived"
 ```
 
 ## Common Patterns
@@ -139,49 +189,50 @@ comm -23 <(sort all-repos.txt) <(sort tagged-repos.txt)
 
 ```bash
 # Tag by project status
-repoindex catalog add project1 active in-development
-repoindex catalog add project2 completed archived
-repoindex catalog add project3 active needs-review
+repoindex tag add project1 status/active in-development
+repoindex tag add project2 status/completed archived
+repoindex tag add project3 status/active needs-review
 
 # Find active projects needing review
-repoindex catalog show -t active -t needs-review --all-tags
+repoindex query "'status/active' in tags and 'needs-review' in tags"
 ```
 
 ### Client Work
 
 ```bash
 # Tag by client
-repoindex catalog add webapp client:acme web
-repoindex catalog add api client:acme backend
-repoindex catalog add report client:bigco analysis
+repoindex tag add webapp client/acme web
+repoindex tag add api client/acme backend
+repoindex tag add report client/bigco analysis
 
 # All work for a client
-repoindex catalog show -t "client:acme"
+repoindex tag list -t "client/acme"
 ```
 
 ### Technology Stacks
 
 ```bash
 # Tag by stack
-repoindex catalog add frontend react typescript webpack
-repoindex catalog add backend python django postgresql
-repoindex catalog add mobile flutter dart
+repoindex tag add frontend react typescript webpack
+repoindex tag add backend python django postgresql
+repoindex tag add mobile flutter dart
 
-# Find all TypeScript projects
-repoindex catalog show -t typescript
-# Or use implicit tags
+# Find all TypeScript projects (using implicit tag)
 repoindex list -t "lang:typescript"
+
+# Or explicit tag
+repoindex tag list -t typescript
 ```
 
 ### Maintenance Status
 
 ```bash
 # Tag by maintenance needs
-repoindex catalog add oldproject needs:update needs:tests
-repoindex catalog add newproject well-maintained has:ci
+repoindex tag add oldproject needs/update needs/tests
+repoindex tag add newproject well-maintained has-ci
 
 # Find projects needing attention
-repoindex catalog show -t "needs:update"
+repoindex tag list -t "needs/*"
 ```
 
 ## Query Examples
@@ -218,55 +269,57 @@ repoindex query "language == 'Python' and has_package == true and package.regist
 repoindex query "has_docs == true and (has_pages == true or homepage contains 'github.io')"
 ```
 
-## Integration with Other Commands
+## Integration with Events
 
-### Audit Filtered Repos
-
-```bash
-# Audit all client work
-repoindex audit all -t "client:*" --pretty
-
-# Audit Python projects without docs
-repoindex audit docs -q "language == 'Python' and not has_docs"
-```
-
-### Export Filtered Repos
+Combine tags with event monitoring:
 
 ```bash
-# Export active projects to Hugo
-repoindex export generate -t active -f hugo -o ./site/content/active
+# Events for tagged repos
+repoindex events --since 7d -t "work/active" --pretty
 
-# Export popular repos to PDF
-repoindex export generate -q "stars > 5 or forks > 2" -f pdf
-```
-
-### Bulk Operations
-
-```bash
-# Update all work repos
-repoindex update -t "dir:work"
-
-# Build docs for all documented Python projects
-repoindex docs build -q "language == 'Python' and has_docs == true"
+# Find repos with recent releases
+repoindex events --type git_tag --since 30d | jq -r '.repo' | sort -u
 ```
 
 ## Best Practices
 
-1. **Use Namespaces**: Prefix related tags (e.g., `client:*`, `project:*`, `status:*`)
+1. **Use Namespaces**: Prefix related tags (e.g., `client/*`, `project/*`, `status/*`)
 
-2. **Combine Systems**: Use tags for stable categorization, queries for dynamic filtering
+2. **Hierarchical Organization**: Use paths for related concepts
+   ```bash
+   repoindex tag add myproject work/client/acme/backend
+   ```
 
-3. **Document Tags**: Keep a README of your tagging conventions
+3. **Combine Systems**: Use tags for stable categorization, queries for dynamic filtering
 
 4. **Regular Cleanup**: Remove obsolete tags periodically
    ```bash
-   repoindex catalog show -t obsolete | jq -r '.name' | \
-     xargs -I {} repoindex catalog remove {} obsolete
+   # Find and remove obsolete tags
+   repoindex tag list -t obsolete | jq -r '.name' | \
+     xargs -I {} repoindex tag remove {} obsolete
    ```
 
-5. **Export Tag Documentation**:
-   ```bash
-   # Generate tag documentation
-   repoindex catalog show | jq -r '.tags[]' | sort | uniq -c | \
-     sort -rn > tag-usage.txt
-   ```
+5. **Document Conventions**: Keep a README of your tagging conventions
+
+## Shell VFS Integration
+
+The interactive shell provides a filesystem view of your tags:
+
+```bash
+repoindex shell
+
+# Navigate tag hierarchy
+> cd /by-tag/work/active
+> ls
+
+# Add tags via filesystem operations
+> cp /repos/myproject /by-tag/work/active
+
+# Move between tags
+> mv /by-tag/work/active/myproject /by-tag/work/completed
+
+# Remove tags
+> rm /by-tag/work/active/myproject
+```
+
+See [Shell & VFS](shell-vfs.md) for details.

@@ -173,7 +173,7 @@ Tags with a key prefix (automatically detected for known keys like `lang`, `topi
 
 ### Refresh VFS
 
-After making changes outside the shell (e.g., using `repoindex catalog add`), refresh the VFS:
+After making changes outside the shell (e.g., using `repoindex tag add`), refresh the VFS:
 
 ```bash
 repoindex:/> refresh
@@ -266,16 +266,6 @@ The CLI now has full parity with the shell's tag operations:
 | **Show hierarchy** | `cd /by-tag/alex && ls` | `repoindex tag tree -t alex` |
 | **Show repo tags** | N/A (use `query`) | `repoindex tag list -r myproject` |
 
-### Legacy Catalog Commands
-
-The `catalog` commands still work for backward compatibility:
-
-| Legacy Command | New Tag Command |
-|----------------|-----------------|
-| `repoindex catalog add myproject tag1` | `repoindex tag add myproject tag1` |
-| `repoindex catalog remove myproject tag1` | `repoindex tag remove myproject tag1` |
-| `repoindex catalog show -t tag1` | `repoindex tag list -t tag1` |
-
 ## Implementation Details
 
 ### Tag to Path Conversion
@@ -315,6 +305,6 @@ Tags are stored in `~/.repoindex/config.json` under `repository_tags`:
 
 ## See Also
 
-- [Tag System Documentation](./tags.md)
-- [Catalog Command Reference](./catalog-command.md)
-- [Configuration Guide](./configuration.md)
+- [Query Language](./catalog-query.md)
+- [Events Overview](./events/overview.md)
+- [Usage Guide](./usage.md)

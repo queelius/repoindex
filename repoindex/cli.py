@@ -8,7 +8,6 @@ from repoindex.config import load_config
 from repoindex.commands.status import status_handler
 from repoindex.commands.clone import clone_handler
 from repoindex.commands.config import config_cmd
-from repoindex.commands.catalog import catalog_cmd
 from repoindex.commands.tag import tag_cmd
 from repoindex.commands.query import query_handler
 from repoindex.commands.metadata import metadata_cmd
@@ -53,8 +52,7 @@ cli.add_command(fs_cmd)
 cli.add_command(git_cmd)
 cli.add_command(config_cmd)
 
-# Deprecated commands (backward compatibility)
-cli.add_command(catalog_cmd)
+# Note: catalog command group removed in v0.8.2 (use 'tag' instead)
 
 
 # Deprecated aliases

@@ -1,4 +1,5 @@
 site_name: repoindex
+site_description: Collection-aware metadata index for git repositories
 repo_url: https://github.com/queelius/repoindex
 repo_name: queelius/repoindex
 docs_dir: docs
@@ -31,23 +32,36 @@ theme:
 nav:
   - Home: index.md
   - Getting Started: getting-started.md
-  - Usage: usage.md
+  - Core:
+    - Usage Guide: usage.md
+    - Query Language: catalog-query.md
+    - Query Cookbook: query-cookbook.md
+  - Events:
+    - Overview: events/overview.md
+    - Event Types Reference: events/event-types.md
+  - Interactive:
+    - Shell & VFS: shell-vfs.md
+    - TUI Dashboard: tui.md
   - Commands:
-    - Organization & Discovery: catalog-query.md
     - Repository Audit: audit-command.md
-    - Portfolio Export: export-command.md
     - Documentation: docs-command.md
     - List: list-command.md
-    - Query Cookbook: query-cookbook.md
-  - Integrations:
-    - Overview: integrations/overview.md
-    - Repository Clustering: integrations/clustering.md
-    - Workflow Orchestration: integrations/workflow.md
-  - Tutorials:
-    - Jupyter Notebooks: tutorials.md
-  - API Reference:
-    - Integration API: api/integrations.md
-  - Architecture: architecture-vision.md
+  - MCP Server:
+    - Overview: mcp/overview.md
+  - Reference:
+    - Architecture: architecture-vision.md
+    - Design Decisions: design/CLI_DESIGN_DECISIONS.md
   - Changelog: changelog.md
   - Contributing: contributing.md
-  - Future Plans: future-plans.md
+
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - admonition
+  - pymdownx.details
+  - attr_list
+  - md_in_html
+  - tables

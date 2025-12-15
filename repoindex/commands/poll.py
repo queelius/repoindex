@@ -6,15 +6,22 @@ repoindex is read-only: it observes and reports, external tools consume the stre
 
 Local events (default, fast):
 - git_tag, commit, branch, merge
-- version_bump, deps_update (local metadata changes)
+- version_bump, deps_update, license_change, ci_config_change, docs_change, readme_change
 
 Remote events (opt-in, uses APIs):
-- --github: github_release, pr, issue, workflow_run, security_alert
+- --github: github_release, pr, issue, workflow_run, security_alert,
+            repo_rename, repo_transfer, repo_visibility, repo_archive,
+            deployment, fork, star
 - --pypi: pypi_publish
 - --cran: cran_publish
 - --npm: npm_publish
 - --cargo: cargo_publish
 - --docker: docker_publish
+- --gem: gem_publish
+- --nuget: nuget_publish
+- --maven: maven_publish
+
+Config: Set events.default_types in config to customize default event types.
 """
 
 import click
@@ -34,11 +41,14 @@ logger = logging.getLogger(__name__)
               type=click.Choice([
                   # Local events (fast)
                   'git_tag', 'commit', 'branch', 'merge',
-                  'version_bump', 'deps_update',
+                  'version_bump', 'deps_update', 'license_change', 'ci_config_change', 'docs_change', 'readme_change',
                   # GitHub events (opt-in)
                   'github_release', 'pr', 'issue', 'workflow_run', 'security_alert',
+                  'repo_rename', 'repo_transfer', 'repo_visibility', 'repo_archive',
+                  'deployment', 'fork', 'star',
                   # Registry events (opt-in)
-                  'pypi_publish', 'cran_publish', 'npm_publish', 'cargo_publish', 'docker_publish'
+                  'pypi_publish', 'cran_publish', 'npm_publish', 'cargo_publish', 'docker_publish',
+                  'gem_publish', 'nuget_publish', 'maven_publish'
               ]),
               help='Filter to specific event types')
 @click.option('--github', '-g', is_flag=True,
@@ -53,6 +63,12 @@ logger = logging.getLogger(__name__)
               help='Include Cargo (crates.io) publish events')
 @click.option('--docker', is_flag=True,
               help='Include Docker Hub publish events')
+@click.option('--gem', is_flag=True,
+              help='Include RubyGems publish events')
+@click.option('--nuget', is_flag=True,
+              help='Include NuGet (.NET) publish events')
+@click.option('--maven', is_flag=True,
+              help='Include Maven Central (Java) publish events')
 @click.option('--all', '-a', 'include_all', is_flag=True,
               help='Include all event types (local + remote)')
 @click.option('--repo', '-r',
@@ -69,15 +85,15 @@ logger = logging.getLogger(__name__)
               help='Watch interval in seconds (default: 300)')
 @click.option('--limit', '-n',
               type=int,
-              default=50,
-              help='Maximum events to output (default: 50)')
+              default=100,
+              help='Maximum events to output (default: 100, use 0 for unlimited)')
 @click.option('--pretty', '-p', is_flag=True,
               help='Human-readable table output (default: JSONL)')
 @click.option('--stats', is_flag=True,
               help='Show summary statistics for the event window')
 @click.option('--relative-time', '-R', is_flag=True,
               help='Show relative timestamps (e.g., "2h ago") instead of absolute')
-def events_handler(event_types, github, pypi, cran, npm, cargo, docker, include_all, repo, since, until, watch, interval, limit, pretty, stats, relative_time):
+def events_handler(event_types, github, pypi, cran, npm, cargo, docker, gem, nuget, maven, include_all, repo, since, until, watch, interval, limit, pretty, stats, relative_time):
     """
     Scan repositories for events.
 
@@ -85,21 +101,30 @@ def events_handler(event_types, github, pypi, cran, npm, cargo, docker, include_
 
     \b
     Local Events (default, fast):
-      git_tag       Git tags (versions, releases)
-      commit        Git commits
-      branch        Branch creation (from reflog)
-      merge         Merge commits
-      version_bump  Changes to version files (pyproject.toml, package.json, etc.)
-      deps_update   Dependency file changes (requirements.txt, lock files, etc.)
+      git_tag          Git tags (versions, releases)
+      commit           Git commits
+      branch           Branch creation (from reflog)
+      merge            Merge commits
+      version_bump     Changes to version files
+      deps_update      Dependency file changes
+      license_change   LICENSE file modifications
+      ci_config_change CI/CD config changes
+      docs_change      Documentation changes
+      readme_change    README file changes
 
     \b
     Remote Events (opt-in, rate-limited):
-      --github   GitHub releases, PRs, issues, workflow runs, security alerts
+      --github   GitHub releases, PRs, issues, workflow runs, security alerts,
+                 repo renames, transfers, visibility changes, archives,
+                 deployments, forks, stars
       --pypi     PyPI package publishes
       --cran     CRAN package publishes
       --npm      npm package publishes
       --cargo    Cargo (crates.io) publishes
       --docker   Docker Hub image publishes
+      --gem      RubyGems publishes
+      --nuget    NuGet (.NET) publishes
+      --maven    Maven Central (Java) publishes
       --all      All event types
 
     \b
@@ -177,7 +202,7 @@ def events_handler(event_types, github, pypi, cran, npm, cargo, docker, include_
         until_dt = parse_timespec(until) if until else None
 
         # Build list of event types to scan
-        types = _build_event_types(event_types, github, pypi, cran, npm, cargo, docker, include_all)
+        types = _build_event_types(event_types, github, pypi, cran, npm, cargo, docker, gem, nuget, maven, include_all, config)
 
         if watch:
             _run_watch_mode(repos, types, repo, interval, pretty, relative_time)
@@ -208,12 +233,13 @@ def events_handler(event_types, github, pypi, cran, npm, cargo, docker, include_
         return 1
 
 
-def _build_event_types(event_types, github: bool, pypi: bool, cran: bool, npm: bool, cargo: bool, docker: bool, include_all: bool) -> List[str]:
-    """Build the list of event types based on flags."""
+def _build_event_types(event_types, github: bool, pypi: bool, cran: bool, npm: bool, cargo: bool, docker: bool, gem: bool, nuget: bool, maven: bool, include_all: bool, config: dict) -> List[str]:
+    """Build the list of event types based on flags and config."""
     from ..events import (
         LOCAL_EVENT_TYPES, LOCAL_METADATA_EVENT_TYPES, GITHUB_EVENT_TYPES,
         PYPI_EVENT_TYPES, CRAN_EVENT_TYPES, NPM_EVENT_TYPES, CARGO_EVENT_TYPES,
-        DOCKER_EVENT_TYPES, ALL_EVENT_TYPES
+        DOCKER_EVENT_TYPES, GEM_EVENT_TYPES, NUGET_EVENT_TYPES, MAVEN_EVENT_TYPES,
+        DEFAULT_EVENT_TYPES, ALL_EVENT_TYPES
     )
 
     # If specific types were provided via --type, use those
@@ -222,10 +248,16 @@ def _build_event_types(event_types, github: bool, pypi: bool, cran: bool, npm: b
 
     # If --all, return everything
     if include_all:
-        return ALL_EVENT_TYPES.copy()
+        return list(ALL_EVENT_TYPES)
 
-    # Start with local types (default includes basic git + local metadata events)
-    types = LOCAL_EVENT_TYPES.copy() + LOCAL_METADATA_EVENT_TYPES.copy()
+    # Check config for default event types
+    config_defaults = config.get('events', {}).get('default_types', None)
+    if config_defaults and isinstance(config_defaults, list):
+        types = list(config_defaults)
+    else:
+        # Start with local types (default includes basic git + local metadata events)
+        # These are fast (no API calls)
+        types = list(DEFAULT_EVENT_TYPES)
 
     # Add remote types based on flags
     if github:
@@ -240,6 +272,12 @@ def _build_event_types(event_types, github: bool, pypi: bool, cran: bool, npm: b
         types.extend(CARGO_EVENT_TYPES)
     if docker:
         types.extend(DOCKER_EVENT_TYPES)
+    if gem:
+        types.extend(GEM_EVENT_TYPES)
+    if nuget:
+        types.extend(NUGET_EVENT_TYPES)
+    if maven:
+        types.extend(MAVEN_EVENT_TYPES)
 
     return types
 
@@ -251,12 +289,15 @@ def _run_single_scan(repos, types, repo_filter, since, until, limit, pretty, sta
     from rich.console import Console
     from rich.table import Table
 
+    # limit=0 means unlimited
+    effective_limit = limit if limit > 0 else None
+
     events = list(scan_events(
         repos,
         types=types,
         since=since,
         until=until,
-        limit=limit,
+        limit=effective_limit,
         repo_filter=repo_filter
     ))
 
@@ -336,18 +377,34 @@ def _style_event_type(event_type: str) -> str:
         # Local metadata events
         'version_bump': '[bold yellow]version_bump[/bold yellow]',
         'deps_update': '[dim yellow]deps_update[/dim yellow]',
+        'license_change': '[bold #9370db]license_change[/bold #9370db]',
+        'ci_config_change': '[#ffa500]ci_config_change[/#ffa500]',
+        'docs_change': '[#87ceeb]docs_change[/#87ceeb]',
+        'readme_change': '[#98fb98]readme_change[/#98fb98]',
         # GitHub events
         'github_release': '[bold yellow]github_release[/bold yellow]',
         'pr': '[green]pr[/green]',
         'issue': '[red]issue[/red]',
         'workflow_run': '[dim]workflow_run[/dim]',
         'security_alert': '[bold red]security_alert[/bold red]',
+        # GitHub repo events
+        'repo_rename': '[bold #ff69b4]repo_rename[/bold #ff69b4]',
+        'repo_transfer': '[bold #daa520]repo_transfer[/bold #daa520]',
+        'repo_visibility': '[bold #8a2be2]repo_visibility[/bold #8a2be2]',
+        'repo_archive': '[dim #808080]repo_archive[/dim #808080]',
+        # GitHub additional events
+        'deployment': '[bold #00d4aa]deployment[/bold #00d4aa]',
+        'fork': '[bold #9370db]fork[/bold #9370db]',
+        'star': '[bold #ffd700]star[/bold #ffd700]',
         # Registry events
         'pypi_publish': '[bold cyan]pypi_publish[/bold cyan]',
         'cran_publish': '[bold blue]cran_publish[/bold blue]',
         'npm_publish': '[bold magenta]npm_publish[/bold magenta]',
         'cargo_publish': '[bold #ff6600]cargo_publish[/bold #ff6600]',
         'docker_publish': '[bold #0db7ed]docker_publish[/bold #0db7ed]',
+        'gem_publish': '[bold #cc342d]gem_publish[/bold #cc342d]',
+        'nuget_publish': '[bold #004880]nuget_publish[/bold #004880]',
+        'maven_publish': '[bold #c71a36]maven_publish[/bold #c71a36]',
     }
     return colors.get(event_type, event_type)
 
@@ -483,6 +540,54 @@ def _get_event_details(event) -> str:
         return f"{d.get('package', '')} v{d.get('version', '')}{yanked}"
     elif e.type == 'docker_publish':
         return f"{d.get('image', '')}:{d.get('tag', '')}"
+    elif e.type == 'gem_publish':
+        return f"{d.get('package', '')} v{d.get('version', '')}"
+    elif e.type == 'nuget_publish':
+        return f"{d.get('package', '')} v{d.get('version', '')}"
+    elif e.type == 'maven_publish':
+        return f"{d.get('group', '')}:{d.get('artifact', '')} v{d.get('version', '')}"
+    elif e.type == 'license_change':
+        old_lic = d.get('old_license', '')
+        new_lic = d.get('new_license', '')
+        if old_lic and new_lic:
+            return f"{old_lic} → {new_lic}"
+        return d.get('message', '')[:40] or "License modified"
+    elif e.type == 'ci_config_change':
+        files = d.get('files', [])
+        files_str = ', '.join(files[:2]) if files else 'CI config'
+        return f"{d.get('hash', '')[:8]} - {files_str}"
+    elif e.type == 'docs_change':
+        files = d.get('files', [])
+        files_str = ', '.join(files[:2]) if files else 'docs'
+        return f"{d.get('hash', '')[:8]} - {files_str}"
+    elif e.type == 'readme_change':
+        return f"{d.get('hash', '')[:8]} - {d.get('message', '')[:30]}"
+    elif e.type == 'repo_rename':
+        old_name = d.get('old_name', '')
+        new_name = d.get('new_name', '')
+        return f"{old_name} → {new_name}"
+    elif e.type == 'repo_transfer':
+        old_owner = d.get('old_owner', '')
+        new_owner = d.get('new_owner', '')
+        return f"{old_owner} → {new_owner}"
+    elif e.type == 'repo_visibility':
+        action = d.get('action', '')
+        return f"{action} by {d.get('actor', '')}"
+    elif e.type == 'repo_archive':
+        archived = d.get('archived', False)
+        return "Repository archived" if archived else "Repository unarchived"
+    elif e.type == 'deployment':
+        env = d.get('environment', 'production')
+        ref = d.get('ref', '')[:20]
+        creator = d.get('creator', '')
+        return f"[{env}] {ref} by {creator}"
+    elif e.type == 'fork':
+        fork_name = d.get('fork_name', '')
+        fork_owner = d.get('fork_owner', '')
+        return f"Forked by {fork_owner} → {fork_name}"
+    elif e.type == 'star':
+        user = d.get('user', '')
+        return f"⭐ Starred by {user}"
     else:
         return str(d)[:50]
 
@@ -555,18 +660,34 @@ def _print_event_pretty(event, relative_time: bool = False):
         # Local metadata events
         'version_bump': '⬆️ ',
         'deps_update': '📋',
+        'license_change': '⚖️ ',
+        'ci_config_change': '🔧',
+        'docs_change': '📚',
+        'readme_change': '📄',
         # GitHub events
         'github_release': '🚀',
         'pr': '🔃',
         'issue': '🐛',
         'workflow_run': '⚙️ ',
         'security_alert': '🔒',
+        # GitHub repo events
+        'repo_rename': '✏️ ',
+        'repo_transfer': '🔄',
+        'repo_visibility': '👁️ ',
+        'repo_archive': '📥',
+        # GitHub additional events
+        'deployment': '🚢',
+        'fork': '🍴',
+        'star': '⭐',
         # Registry events
         'pypi_publish': '📦',
         'cran_publish': '📊',
         'npm_publish': '📦',
         'cargo_publish': '🦀',
         'docker_publish': '🐳',
+        'gem_publish': '💎',
+        'nuget_publish': '🟣',
+        'maven_publish': '☕',
     }
 
     emoji = emoji_map.get(event.type, '📌')

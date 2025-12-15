@@ -658,7 +658,7 @@ Planned TUI features:
 ## Resources
 
 - [Textual Documentation](https://textual.textualize.io/)
-- [repoindex CLI Reference](cli-reference.md)
-- [Workflow Guide](integrations/workflows.md)
-- [Clustering Guide](integrations/clustering.md)
+- [Usage Guide](usage.md)
+- [Shell & VFS](shell-vfs.md)
+- [Events Overview](events/overview.md)
 - [GitHub Issues](https://github.com/queelius/repoindex/issues)

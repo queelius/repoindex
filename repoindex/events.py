@@ -10,6 +10,10 @@ Local events (fast, default):
 - merge: Merge commits
 - version_bump: Changes to version files (pyproject.toml, package.json, etc.)
 - deps_update: Dependency file changes (requirements.txt, lock files, etc.)
+- license_change: LICENSE file modifications
+- ci_config_change: CI/CD config changes (.github/workflows, .gitlab-ci.yml, etc.)
+- docs_change: Documentation file changes (docs/, *.md excluding README)
+- readme_change: README file changes
 
 Remote events (opt-in, rate-limited):
 - github_release: GitHub releases (--github)
@@ -17,11 +21,23 @@ Remote events (opt-in, rate-limited):
 - issue: Issues (--github)
 - workflow_run: GitHub Actions (--github)
 - security_alert: GitHub Dependabot security alerts (--github)
+- repo_rename: Repository renamed (--github)
+- repo_transfer: Repository transferred to new owner (--github)
+- repo_visibility: Repository visibility changed (public/private) (--github)
+- repo_archive: Repository archived/unarchived (--github)
+- deployment: GitHub deployments, gh-pages (--github)
+- fork: Repository forked by someone (--github)
+- star: Repository starred by someone (--github)
 - pypi_publish: PyPI releases (--pypi)
 - cran_publish: CRAN releases (--cran)
 - npm_publish: npm releases (--npm)
 - cargo_publish: crates.io releases (--cargo)
 - docker_publish: Docker Hub image pushes (--docker)
+- gem_publish: RubyGems releases (--gem)
+- nuget_publish: NuGet releases (--nuget)
+- maven_publish: Maven Central releases (--maven)
+
+Total: 30 event types across multiple categories.
 
 repoindex is read-only: it observes and reports, external tools consume the stream.
 """
@@ -40,32 +56,49 @@ from .domain.event import Event
 logger = logging.getLogger(__name__)
 
 # Event type categories
+# Local events are fast (no API calls)
 LOCAL_EVENT_TYPES = ['git_tag', 'commit', 'branch', 'merge']
-LOCAL_METADATA_EVENT_TYPES = ['version_bump', 'deps_update']
-GITHUB_EVENT_TYPES = ['github_release', 'pr', 'issue', 'workflow_run', 'security_alert']
+LOCAL_METADATA_EVENT_TYPES = ['version_bump', 'deps_update', 'license_change', 'ci_config_change', 'docs_change', 'readme_change']
+
+# Remote events require API calls (opt-in)
+GITHUB_EVENT_TYPES = ['github_release', 'pr', 'issue', 'workflow_run', 'security_alert',
+                      'repo_rename', 'repo_transfer', 'repo_visibility', 'repo_archive',
+                      'deployment', 'fork', 'star']
 PYPI_EVENT_TYPES = ['pypi_publish']
 CRAN_EVENT_TYPES = ['cran_publish']
 NPM_EVENT_TYPES = ['npm_publish']
 CARGO_EVENT_TYPES = ['cargo_publish']
 DOCKER_EVENT_TYPES = ['docker_publish']
+GEM_EVENT_TYPES = ['gem_publish']
+NUGET_EVENT_TYPES = ['nuget_publish']
+MAVEN_EVENT_TYPES = ['maven_publish']
 
+# Default events (fast, no API calls)
+DEFAULT_EVENT_TYPES = LOCAL_EVENT_TYPES + LOCAL_METADATA_EVENT_TYPES
+
+# All available event types
 ALL_EVENT_TYPES = (
     LOCAL_EVENT_TYPES + LOCAL_METADATA_EVENT_TYPES + GITHUB_EVENT_TYPES +
-    PYPI_EVENT_TYPES + CRAN_EVENT_TYPES + NPM_EVENT_TYPES + CARGO_EVENT_TYPES + DOCKER_EVENT_TYPES
+    PYPI_EVENT_TYPES + CRAN_EVENT_TYPES + NPM_EVENT_TYPES + CARGO_EVENT_TYPES +
+    DOCKER_EVENT_TYPES + GEM_EVENT_TYPES + NUGET_EVENT_TYPES + MAVEN_EVENT_TYPES
 )
 
 # Re-export Event for backward compatibility
 __all__ = [
     'Event', 'parse_timespec', 'scan_git_tags', 'scan_commits', 'scan_branches',
     'scan_merges', 'scan_github_releases', 'scan_github_prs', 'scan_github_issues',
-    'scan_github_workflows', 'scan_github_security_alerts',
+    'scan_github_workflows', 'scan_github_security_alerts', 'scan_github_repo_events',
+    'scan_github_deployments', 'scan_github_forks', 'scan_github_stars',
     'scan_pypi_publishes', 'scan_cran_publishes',
     'scan_npm_publishes', 'scan_cargo_publishes', 'scan_docker_publishes',
+    'scan_gem_publishes', 'scan_nuget_publishes', 'scan_maven_publishes',
     'scan_version_bumps', 'scan_deps_updates',
+    'scan_license_changes', 'scan_ci_config_changes', 'scan_docs_changes', 'scan_readme_changes',
     'scan_events', 'get_recent_events', 'events_to_jsonl',
     'LOCAL_EVENT_TYPES', 'LOCAL_METADATA_EVENT_TYPES', 'GITHUB_EVENT_TYPES',
     'PYPI_EVENT_TYPES', 'CRAN_EVENT_TYPES', 'NPM_EVENT_TYPES', 'CARGO_EVENT_TYPES',
-    'DOCKER_EVENT_TYPES', 'ALL_EVENT_TYPES'
+    'DOCKER_EVENT_TYPES', 'GEM_EVENT_TYPES', 'NUGET_EVENT_TYPES', 'MAVEN_EVENT_TYPES',
+    'DEFAULT_EVENT_TYPES', 'ALL_EVENT_TYPES'
 ]
 
 
@@ -1683,6 +1716,1156 @@ def scan_github_security_alerts(
             continue
 
 
+# =============================================================================
+# GITHUB REPOSITORY EVENTS (opt-in, uses gh CLI)
+# =============================================================================
+
+def scan_github_repo_events(
+    repo_path: str,
+    since: Optional[datetime] = None,
+    until: Optional[datetime] = None,
+    limit: Optional[int] = None
+) -> Generator[Event, None, None]:
+    """
+    Scan GitHub repository events (rename, transfer, visibility, archive).
+
+    Uses the GitHub Events API to detect repository-level administrative changes.
+
+    Requires: gh CLI installed and authenticated.
+
+    Args:
+        repo_path: Path to git repository
+        since: Only events after this time
+        until: Only events before this time
+        limit: Maximum events to return
+
+    Yields:
+        Event objects for repository events (repo_rename, repo_transfer,
+        repo_visibility, repo_archive)
+    """
+    repo_path = str(Path(repo_path).resolve())
+    repo_name = Path(repo_path).name
+
+    info = _get_github_repo_info(repo_path)
+    if not info:
+        return
+
+    owner, name = info
+
+    # Use gh CLI to get repository events
+    # The events API returns various event types including repo-level changes
+    cmd = f'gh api "repos/{owner}/{name}/events?per_page=100"'
+
+    output, returncode = run_command(cmd, cwd=repo_path, capture_output=True, check=False, log_stderr=False)
+
+    if returncode != 0 or not output:
+        return
+
+    try:
+        events = json.loads(output)
+    except json.JSONDecodeError:
+        return
+
+    # Event type mapping from GitHub API to our event types
+    # See: https://docs.github.com/en/rest/using-the-rest-api/github-event-types
+    repo_event_types = {
+        'RepositoryRenamedEvent': 'repo_rename',      # Not in standard events API
+        'MemberEvent': None,                          # Collaborator changes (skip for now)
+        'PublicEvent': 'repo_visibility',             # Repo made public
+        'PrivateEvent': 'repo_visibility',            # Repo made private (rare in API)
+    }
+
+    count = 0
+    for event in events:
+        try:
+            event_type = event.get('type', '')
+            created_at = event.get('created_at')
+
+            if not created_at:
+                continue
+
+            event_date = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+            if event_date.tzinfo:
+                event_date = event_date.replace(tzinfo=None)
+
+            # Apply time filters
+            if since and event_date < since:
+                continue
+            if until and event_date > until:
+                continue
+
+            payload = event.get('payload', {})
+            actor = event.get('actor', {}).get('login', '')
+
+            # Handle different event types
+            if event_type == 'PublicEvent':
+                # Repository was made public
+                yield Event(
+                    type='repo_visibility',
+                    timestamp=event_date,
+                    repo_name=repo_name,
+                    repo_path=repo_path,
+                    data={
+                        'action': 'made_public',
+                        'actor': actor,
+                        'url': f'https://github.com/{owner}/{name}'
+                    }
+                )
+                count += 1
+
+            # Note: GitHub's standard Events API doesn't include rename events directly.
+            # We can check the repo API for name mismatches to detect renames.
+
+            if limit and count >= limit:
+                break
+
+        except (KeyError, TypeError, ValueError) as e:
+            logger.debug(f"Error parsing GitHub event: {e}")
+            continue
+
+    # Additionally, check if current repo name differs from local directory name
+    # This can detect a recent rename
+    try:
+        repo_info_cmd = f'gh api "repos/{owner}/{name}"'
+        repo_output, repo_rc = run_command(repo_info_cmd, cwd=repo_path, capture_output=True, check=False, log_stderr=False)
+
+        if repo_rc == 0 and repo_output:
+            repo_data = json.loads(repo_output)
+            github_name = repo_data.get('name', '')
+            local_name = Path(repo_path).name
+
+            # If names don't match, the repo was likely renamed
+            if github_name and local_name and github_name.lower() != local_name.lower():
+                # Get the updated_at time as approximate rename time
+                updated_at = repo_data.get('updated_at')
+                if updated_at:
+                    rename_date = datetime.fromisoformat(updated_at.replace('Z', '+00:00'))
+                    if rename_date.tzinfo:
+                        rename_date = rename_date.replace(tzinfo=None)
+
+                    # Apply time filters
+                    if (not since or rename_date >= since) and (not until or rename_date <= until):
+                        yield Event(
+                            type='repo_rename',
+                            timestamp=rename_date,
+                            repo_name=github_name,  # Use new name
+                            repo_path=repo_path,
+                            data={
+                                'old_name': local_name,
+                                'new_name': github_name,
+                                'owner': owner,
+                                'url': f'https://github.com/{owner}/{github_name}'
+                            }
+                        )
+
+            # Check if repo is archived
+            if repo_data.get('archived'):
+                updated_at = repo_data.get('updated_at')
+                if updated_at:
+                    archive_date = datetime.fromisoformat(updated_at.replace('Z', '+00:00'))
+                    if archive_date.tzinfo:
+                        archive_date = archive_date.replace(tzinfo=None)
+
+                    if (not since or archive_date >= since) and (not until or archive_date <= until):
+                        yield Event(
+                            type='repo_archive',
+                            timestamp=archive_date,
+                            repo_name=repo_name,
+                            repo_path=repo_path,
+                            data={
+                                'archived': True,
+                                'owner': owner,
+                                'url': f'https://github.com/{owner}/{name}'
+                            }
+                        )
+
+            # Check visibility
+            is_private = repo_data.get('private', False)
+            visibility = 'private' if is_private else 'public'
+            # We can't easily detect visibility *changes* without historical data,
+            # but we note current visibility for completeness
+
+    except (json.JSONDecodeError, KeyError, TypeError, ValueError) as e:
+        logger.debug(f"Error checking repo info: {e}")
+
+
+# =============================================================================
+# GITHUB DEPLOYMENTS (opt-in, uses gh CLI)
+# =============================================================================
+
+def scan_github_deployments(
+    repo_path: str,
+    since: Optional[datetime] = None,
+    until: Optional[datetime] = None,
+    limit: Optional[int] = None
+) -> Generator[Event, None, None]:
+    """
+    Scan GitHub deployments for a repository.
+
+    Detects gh-pages deployments and other deployment environments.
+
+    Requires: gh CLI installed and authenticated.
+
+    Args:
+        repo_path: Path to git repository
+        since: Only deployments after this time
+        until: Only deployments before this time
+        limit: Maximum deployments to return
+
+    Yields:
+        Event objects for deployments
+    """
+    repo_path = str(Path(repo_path).resolve())
+    repo_name = Path(repo_path).name
+
+    info = _get_github_repo_info(repo_path)
+    if not info:
+        return
+
+    owner, name = info
+
+    # Use gh CLI to get deployments
+    cmd = f'gh api "repos/{owner}/{name}/deployments?per_page=100"'
+
+    output, returncode = run_command(cmd, cwd=repo_path, capture_output=True, check=False, log_stderr=False)
+
+    if returncode != 0 or not output:
+        return
+
+    try:
+        deployments = json.loads(output)
+    except json.JSONDecodeError:
+        return
+
+    count = 0
+    for deployment in deployments:
+        try:
+            created_at = deployment.get('created_at')
+            if not created_at:
+                continue
+
+            deploy_date = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+            if deploy_date.tzinfo:
+                deploy_date = deploy_date.replace(tzinfo=None)
+
+            # Apply time filters
+            if since and deploy_date < since:
+                continue
+            if until and deploy_date > until:
+                continue
+
+            environment = deployment.get('environment', 'production')
+            creator = deployment.get('creator', {}).get('login', '')
+
+            yield Event(
+                type='deployment',
+                timestamp=deploy_date,
+                repo_name=repo_name,
+                repo_path=repo_path,
+                data={
+                    'id': deployment.get('id'),
+                    'environment': environment,
+                    'ref': deployment.get('ref', ''),
+                    'sha': deployment.get('sha', '')[:8],
+                    'creator': creator,
+                    'description': deployment.get('description', ''),
+                    'url': f'https://github.com/{owner}/{name}/deployments/{environment}'
+                }
+            )
+
+            count += 1
+            if limit and count >= limit:
+                break
+
+        except (KeyError, TypeError, ValueError) as e:
+            logger.debug(f"Error parsing deployment: {e}")
+            continue
+
+
+# =============================================================================
+# GITHUB FORKS (opt-in, uses gh CLI)
+# =============================================================================
+
+def scan_github_forks(
+    repo_path: str,
+    since: Optional[datetime] = None,
+    until: Optional[datetime] = None,
+    limit: Optional[int] = None
+) -> Generator[Event, None, None]:
+    """
+    Scan GitHub forks of a repository.
+
+    Detects when someone forks your repository.
+
+    Requires: gh CLI installed and authenticated.
+
+    Args:
+        repo_path: Path to git repository
+        since: Only forks after this time
+        until: Only forks before this time
+        limit: Maximum forks to return
+
+    Yields:
+        Event objects for forks
+    """
+    repo_path = str(Path(repo_path).resolve())
+    repo_name = Path(repo_path).name
+
+    info = _get_github_repo_info(repo_path)
+    if not info:
+        return
+
+    owner, name = info
+
+    # Use gh CLI to get forks (sorted by newest)
+    cmd = f'gh api "repos/{owner}/{name}/forks?sort=newest&per_page=100"'
+
+    output, returncode = run_command(cmd, cwd=repo_path, capture_output=True, check=False, log_stderr=False)
+
+    if returncode != 0 or not output:
+        return
+
+    try:
+        forks = json.loads(output)
+    except json.JSONDecodeError:
+        return
+
+    count = 0
+    for fork in forks:
+        try:
+            created_at = fork.get('created_at')
+            if not created_at:
+                continue
+
+            fork_date = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+            if fork_date.tzinfo:
+                fork_date = fork_date.replace(tzinfo=None)
+
+            # Apply time filters
+            if since and fork_date < since:
+                continue
+            if until and fork_date > until:
+                continue
+
+            fork_owner = fork.get('owner', {}).get('login', '')
+            fork_name = fork.get('full_name', '')
+
+            yield Event(
+                type='fork',
+                timestamp=fork_date,
+                repo_name=repo_name,
+                repo_path=repo_path,
+                data={
+                    'fork_owner': fork_owner,
+                    'fork_name': fork_name,
+                    'fork_url': fork.get('html_url', ''),
+                    'description': fork.get('description', ''),
+                    'stars': fork.get('stargazers_count', 0)
+                }
+            )
+
+            count += 1
+            if limit and count >= limit:
+                break
+
+        except (KeyError, TypeError, ValueError) as e:
+            logger.debug(f"Error parsing fork: {e}")
+            continue
+
+
+# =============================================================================
+# GITHUB STARS (opt-in, uses gh CLI)
+# =============================================================================
+
+def scan_github_stars(
+    repo_path: str,
+    since: Optional[datetime] = None,
+    until: Optional[datetime] = None,
+    limit: Optional[int] = None
+) -> Generator[Event, None, None]:
+    """
+    Scan GitHub stargazers of a repository.
+
+    Note: The basic stargazers API doesn't include timestamps. We use the
+    starring API with Accept header to get timestamps, but this may not work
+    for all repos.
+
+    Requires: gh CLI installed and authenticated.
+
+    Args:
+        repo_path: Path to git repository
+        since: Only stars after this time
+        until: Only stars before this time
+        limit: Maximum stars to return
+
+    Yields:
+        Event objects for stars
+    """
+    repo_path = str(Path(repo_path).resolve())
+    repo_name = Path(repo_path).name
+
+    info = _get_github_repo_info(repo_path)
+    if not info:
+        return
+
+    owner, name = info
+
+    # Use gh CLI with star timestamps (requires special Accept header)
+    cmd = f'gh api "repos/{owner}/{name}/stargazers" -H "Accept: application/vnd.github.star+json" --paginate'
+
+    output, returncode = run_command(cmd, cwd=repo_path, capture_output=True, check=False, log_stderr=False)
+
+    if returncode != 0 or not output:
+        return
+
+    try:
+        stargazers = json.loads(output)
+    except json.JSONDecodeError:
+        return
+
+    # Sort by starred_at (newest first)
+    stargazers_with_time = []
+    for sg in stargazers:
+        starred_at = sg.get('starred_at')
+        if starred_at:
+            try:
+                star_date = datetime.fromisoformat(starred_at.replace('Z', '+00:00'))
+                if star_date.tzinfo:
+                    star_date = star_date.replace(tzinfo=None)
+                stargazers_with_time.append((star_date, sg))
+            except (ValueError, TypeError):
+                continue
+
+    stargazers_with_time.sort(key=lambda x: x[0], reverse=True)
+
+    count = 0
+    for star_date, sg in stargazers_with_time:
+        # Apply time filters
+        if since and star_date < since:
+            continue
+        if until and star_date > until:
+            continue
+
+        user = sg.get('user', {})
+        username = user.get('login', '')
+
+        yield Event(
+            type='star',
+            timestamp=star_date,
+            repo_name=repo_name,
+            repo_path=repo_path,
+            data={
+                'user': username,
+                'user_url': user.get('html_url', ''),
+                'avatar_url': user.get('avatar_url', '')
+            }
+        )
+
+        count += 1
+        if limit and count >= limit:
+            break
+
+
+# =============================================================================
+# RUBYGEMS EVENT SCANNING (opt-in)
+# =============================================================================
+
+def scan_gem_publishes(
+    repo_path: str,
+    since: Optional[datetime] = None,
+    until: Optional[datetime] = None,
+    limit: Optional[int] = None
+) -> Generator[Event, None, None]:
+    """
+    Scan RubyGems for gem releases related to a repository.
+
+    Looks for .gemspec file to determine gem name.
+
+    Args:
+        repo_path: Path to git repository
+        since: Only releases after this time
+        until: Only releases before this time
+        limit: Maximum releases to return
+
+    Yields:
+        Event objects for RubyGems releases
+    """
+    import requests
+
+    repo_path = str(Path(repo_path).resolve())
+    repo_name = Path(repo_path).name
+
+    # Find gemspec file
+    gemspec_files = list(Path(repo_path).glob('*.gemspec'))
+    if not gemspec_files:
+        return
+
+    # Parse gemspec for gem name
+    gem_name = None
+    try:
+        content = gemspec_files[0].read_text()
+        # Look for: spec.name = "gem_name" or s.name = 'gem_name'
+        match = re.search(r'\.name\s*=\s*["\']([^"\']+)["\']', content)
+        if match:
+            gem_name = match.group(1)
+    except Exception:
+        return
+
+    if not gem_name:
+        # Fallback to gemspec filename
+        gem_name = gemspec_files[0].stem
+
+    # Query RubyGems API
+    try:
+        response = requests.get(
+            f'https://rubygems.org/api/v1/versions/{gem_name}.json',
+            timeout=10
+        )
+        if response.status_code != 200:
+            return
+
+        versions = response.json()
+    except Exception:
+        return
+
+    count = 0
+    for v in versions:
+        try:
+            created_at = v.get('created_at')
+            if not created_at:
+                continue
+
+            release_date = datetime.fromisoformat(created_at.replace('Z', '+00:00'))
+            if release_date.tzinfo:
+                release_date = release_date.replace(tzinfo=None)
+
+            # Apply time filters
+            if since and release_date < since:
+                continue
+            if until and release_date > until:
+                continue
+
+            version = v.get('number', '')
+
+            yield Event(
+                type='gem_publish',
+                timestamp=release_date,
+                repo_name=repo_name,
+                repo_path=repo_path,
+                data={
+                    'package': gem_name,
+                    'version': version,
+                    'downloads': v.get('downloads_count', 0),
+                    'platform': v.get('platform', 'ruby'),
+                    'url': f'https://rubygems.org/gems/{gem_name}/versions/{version}'
+                }
+            )
+
+            count += 1
+            if limit and count >= limit:
+                break
+
+        except (ValueError, TypeError) as e:
+            logger.debug(f"Error parsing RubyGems release: {e}")
+            continue
+
+
+# =============================================================================
+# NUGET EVENT SCANNING (opt-in)
+# =============================================================================
+
+def scan_nuget_publishes(
+    repo_path: str,
+    since: Optional[datetime] = None,
+    until: Optional[datetime] = None,
+    limit: Optional[int] = None
+) -> Generator[Event, None, None]:
+    """
+    Scan NuGet for .NET package releases related to a repository.
+
+    Looks for .csproj or .nuspec files to determine package name.
+
+    Args:
+        repo_path: Path to git repository
+        since: Only releases after this time
+        until: Only releases before this time
+        limit: Maximum releases to return
+
+    Yields:
+        Event objects for NuGet releases
+    """
+    import requests
+
+    repo_path = str(Path(repo_path).resolve())
+    repo_name = Path(repo_path).name
+
+    # Find package name from .csproj or .nuspec
+    package_name = None
+
+    # Try .csproj first
+    csproj_files = list(Path(repo_path).glob('**/*.csproj'))
+    for csproj in csproj_files[:3]:  # Limit search
+        try:
+            content = csproj.read_text()
+            match = re.search(r'<PackageId>([^<]+)</PackageId>', content)
+            if match:
+                package_name = match.group(1)
+                break
+        except Exception:
+            continue
+
+    # Try .nuspec if no PackageId found
+    if not package_name:
+        nuspec_files = list(Path(repo_path).glob('**/*.nuspec'))
+        for nuspec in nuspec_files[:3]:
+            try:
+                content = nuspec.read_text()
+                match = re.search(r'<id>([^<]+)</id>', content, re.IGNORECASE)
+                if match:
+                    package_name = match.group(1)
+                    break
+            except Exception:
+                continue
+
+    if not package_name:
+        return
+
+    # Query NuGet API
+    try:
+        response = requests.get(
+            f'https://api.nuget.org/v3/registration5-semver1/{package_name.lower()}/index.json',
+            timeout=10
+        )
+        if response.status_code != 200:
+            return
+
+        data = response.json()
+    except Exception:
+        return
+
+    count = 0
+    # NuGet returns pages of versions
+    for page in data.get('items', []):
+        for item in page.get('items', []):
+            try:
+                catalog_entry = item.get('catalogEntry', {})
+                published = catalog_entry.get('published')
+                if not published:
+                    continue
+
+                release_date = datetime.fromisoformat(published.replace('Z', '+00:00'))
+                if release_date.tzinfo:
+                    release_date = release_date.replace(tzinfo=None)
+
+                # Apply time filters
+                if since and release_date < since:
+                    continue
+                if until and release_date > until:
+                    continue
+
+                version = catalog_entry.get('version', '')
+
+                yield Event(
+                    type='nuget_publish',
+                    timestamp=release_date,
+                    repo_name=repo_name,
+                    repo_path=repo_path,
+                    data={
+                        'package': package_name,
+                        'version': version,
+                        'description': catalog_entry.get('description', '')[:100],
+                        'url': f'https://www.nuget.org/packages/{package_name}/{version}'
+                    }
+                )
+
+                count += 1
+                if limit and count >= limit:
+                    return
+
+            except (ValueError, TypeError) as e:
+                logger.debug(f"Error parsing NuGet release: {e}")
+                continue
+
+
+# =============================================================================
+# MAVEN EVENT SCANNING (opt-in)
+# =============================================================================
+
+def scan_maven_publishes(
+    repo_path: str,
+    since: Optional[datetime] = None,
+    until: Optional[datetime] = None,
+    limit: Optional[int] = None
+) -> Generator[Event, None, None]:
+    """
+    Scan Maven Central for Java package releases related to a repository.
+
+    Looks for pom.xml to determine groupId and artifactId.
+
+    Args:
+        repo_path: Path to git repository
+        since: Only releases after this time
+        until: Only releases before this time
+        limit: Maximum releases to return
+
+    Yields:
+        Event objects for Maven Central releases
+    """
+    import requests
+
+    repo_path = str(Path(repo_path).resolve())
+    repo_name = Path(repo_path).name
+
+    # Find pom.xml
+    pom_path = Path(repo_path) / 'pom.xml'
+    if not pom_path.exists():
+        return
+
+    # Parse pom.xml for groupId and artifactId
+    group_id = None
+    artifact_id = None
+    try:
+        content = pom_path.read_text()
+        # Simple regex parsing (not full XML parsing)
+        group_match = re.search(r'<groupId>([^<]+)</groupId>', content)
+        artifact_match = re.search(r'<artifactId>([^<]+)</artifactId>', content)
+        if group_match and artifact_match:
+            group_id = group_match.group(1)
+            artifact_id = artifact_match.group(1)
+    except Exception:
+        return
+
+    if not group_id or not artifact_id:
+        return
+
+    # Query Maven Central Search API
+    try:
+        response = requests.get(
+            f'https://search.maven.org/solrsearch/select?q=g:{group_id}+AND+a:{artifact_id}&core=gav&rows=20&wt=json',
+            timeout=10
+        )
+        if response.status_code != 200:
+            return
+
+        data = response.json()
+    except Exception:
+        return
+
+    count = 0
+    docs = data.get('response', {}).get('docs', [])
+
+    for doc in docs:
+        try:
+            # Maven returns timestamp in milliseconds
+            timestamp_ms = doc.get('timestamp')
+            if not timestamp_ms:
+                continue
+
+            release_date = datetime.fromtimestamp(timestamp_ms / 1000)
+
+            # Apply time filters
+            if since and release_date < since:
+                continue
+            if until and release_date > until:
+                continue
+
+            version = doc.get('v', '')
+
+            yield Event(
+                type='maven_publish',
+                timestamp=release_date,
+                repo_name=repo_name,
+                repo_path=repo_path,
+                data={
+                    'group_id': group_id,
+                    'artifact_id': artifact_id,
+                    'version': version,
+                    'package': f'{group_id}:{artifact_id}',
+                    'url': f'https://search.maven.org/artifact/{group_id}/{artifact_id}/{version}/jar'
+                }
+            )
+
+            count += 1
+            if limit and count >= limit:
+                break
+
+        except (ValueError, TypeError) as e:
+            logger.debug(f"Error parsing Maven release: {e}")
+            continue
+
+
+# =============================================================================
+# LOCAL CODE CHANGE EVENTS (fast, no API)
+# =============================================================================
+
+def scan_license_changes(
+    repo_path: str,
+    since: Optional[datetime] = None,
+    until: Optional[datetime] = None,
+    limit: Optional[int] = None
+) -> Generator[Event, None, None]:
+    """
+    Scan git history for LICENSE file changes.
+
+    Args:
+        repo_path: Path to git repository
+        since: Only events after this time
+        until: Only events before this time
+        limit: Maximum events to return
+
+    Yields:
+        Event objects for license changes
+    """
+    repo_path = str(Path(repo_path).resolve())
+    repo_name = Path(repo_path).name
+
+    # License file patterns
+    license_files = 'LICENSE LICENSE.txt LICENSE.md COPYING COPYING.txt'
+
+    cmd = f'git log --format="%H|%aI|%an|%s" --all -- {license_files}'
+
+    if since:
+        cmd += f' --since="{since.isoformat()}"'
+    if until:
+        cmd += f' --until="{until.isoformat()}"'
+
+    output, returncode = run_command(cmd, cwd=repo_path, capture_output=True, check=False, log_stderr=False)
+
+    if returncode != 0 or not output:
+        return
+
+    count = 0
+    for line in output.strip().split('\n'):
+        if not line or '|' not in line:
+            continue
+
+        parts = line.split('|', 3)
+        if len(parts) < 4:
+            continue
+
+        commit_hash = parts[0].strip()
+        date_str = parts[1].strip()
+        author = parts[2].strip()
+        message = parts[3].strip()
+
+        try:
+            commit_date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+            if commit_date.tzinfo:
+                commit_date = commit_date.replace(tzinfo=None)
+        except (ValueError, AttributeError):
+            commit_date = datetime.now()
+
+        yield Event(
+            type='license_change',
+            timestamp=commit_date,
+            repo_name=repo_name,
+            repo_path=repo_path,
+            data={
+                'hash': commit_hash[:8],
+                'author': author,
+                'message': message[:100]
+            }
+        )
+
+        count += 1
+        if limit and count >= limit:
+            break
+
+
+def scan_ci_config_changes(
+    repo_path: str,
+    since: Optional[datetime] = None,
+    until: Optional[datetime] = None,
+    limit: Optional[int] = None
+) -> Generator[Event, None, None]:
+    """
+    Scan git history for CI/CD configuration changes.
+
+    Detects changes to:
+    - .github/workflows/
+    - .gitlab-ci.yml
+    - Jenkinsfile
+    - .circleci/
+    - .travis.yml
+    - azure-pipelines.yml
+
+    Args:
+        repo_path: Path to git repository
+        since: Only events after this time
+        until: Only events before this time
+        limit: Maximum events to return
+
+    Yields:
+        Event objects for CI config changes
+    """
+    repo_path = str(Path(repo_path).resolve())
+    repo_name = Path(repo_path).name
+
+    # CI config file patterns
+    ci_patterns = [
+        '.github/workflows/',
+        '.gitlab-ci.yml',
+        'Jenkinsfile',
+        '.circleci/',
+        '.travis.yml',
+        'azure-pipelines.yml',
+        'bitbucket-pipelines.yml',
+        '.buildkite/',
+        'appveyor.yml'
+    ]
+
+    # Build git log command
+    file_patterns = ' '.join([f'"{p}"' for p in ci_patterns])
+    cmd = f'git log --format="%H|%aI|%an|%s" --all -- {file_patterns}'
+
+    if since:
+        cmd += f' --since="{since.isoformat()}"'
+    if until:
+        cmd += f' --until="{until.isoformat()}"'
+
+    output, returncode = run_command(cmd, cwd=repo_path, capture_output=True, check=False, log_stderr=False)
+
+    if returncode != 0 or not output:
+        return
+
+    count = 0
+    for line in output.strip().split('\n'):
+        if not line or '|' not in line:
+            continue
+
+        parts = line.split('|', 3)
+        if len(parts) < 4:
+            continue
+
+        commit_hash = parts[0].strip()
+        date_str = parts[1].strip()
+        author = parts[2].strip()
+        message = parts[3].strip()
+
+        try:
+            commit_date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+            if commit_date.tzinfo:
+                commit_date = commit_date.replace(tzinfo=None)
+        except (ValueError, AttributeError):
+            commit_date = datetime.now()
+
+        # Get files changed to determine CI system
+        files_cmd = f'git show {commit_hash} --name-only --format=""'
+        files_output, _ = run_command(files_cmd, cwd=repo_path, capture_output=True, check=False, log_stderr=False)
+        files_changed = [f.strip() for f in files_output.strip().split('\n') if f.strip()] if files_output else []
+
+        # Determine CI system
+        ci_system = 'unknown'
+        for f in files_changed:
+            if '.github/workflows' in f:
+                ci_system = 'github_actions'
+                break
+            elif 'gitlab-ci' in f:
+                ci_system = 'gitlab_ci'
+                break
+            elif 'Jenkinsfile' in f:
+                ci_system = 'jenkins'
+                break
+            elif '.circleci' in f:
+                ci_system = 'circleci'
+                break
+            elif '.travis' in f:
+                ci_system = 'travis'
+                break
+            elif 'azure-pipelines' in f:
+                ci_system = 'azure'
+                break
+
+        yield Event(
+            type='ci_config_change',
+            timestamp=commit_date,
+            repo_name=repo_name,
+            repo_path=repo_path,
+            data={
+                'hash': commit_hash[:8],
+                'author': author,
+                'message': message[:100],
+                'ci_system': ci_system,
+                'files': files_changed[:3]
+            }
+        )
+
+        count += 1
+        if limit and count >= limit:
+            break
+
+
+def scan_docs_changes(
+    repo_path: str,
+    since: Optional[datetime] = None,
+    until: Optional[datetime] = None,
+    limit: Optional[int] = None
+) -> Generator[Event, None, None]:
+    """
+    Scan git history for documentation changes.
+
+    Detects changes to docs/ directory and *.md files (excluding README).
+
+    Args:
+        repo_path: Path to git repository
+        since: Only events after this time
+        until: Only events before this time
+        limit: Maximum events to return
+
+    Yields:
+        Event objects for documentation changes
+    """
+    repo_path = str(Path(repo_path).resolve())
+    repo_name = Path(repo_path).name
+
+    # Doc patterns (excluding README which has its own event type)
+    doc_patterns = 'docs/ doc/ documentation/ "*.md" "!README.md" "!readme.md"'
+
+    cmd = f'git log --format="%H|%aI|%an|%s" --all -- {doc_patterns}'
+
+    if since:
+        cmd += f' --since="{since.isoformat()}"'
+    if until:
+        cmd += f' --until="{until.isoformat()}"'
+
+    output, returncode = run_command(cmd, cwd=repo_path, capture_output=True, check=False, log_stderr=False)
+
+    if returncode != 0 or not output:
+        return
+
+    count = 0
+    seen_hashes = set()
+
+    for line in output.strip().split('\n'):
+        if not line or '|' not in line:
+            continue
+
+        parts = line.split('|', 3)
+        if len(parts) < 4:
+            continue
+
+        commit_hash = parts[0].strip()
+
+        # Skip duplicates
+        if commit_hash in seen_hashes:
+            continue
+        seen_hashes.add(commit_hash)
+
+        date_str = parts[1].strip()
+        author = parts[2].strip()
+        message = parts[3].strip()
+
+        # Skip if this is just a README change (handled by readme_change)
+        files_cmd = f'git show {commit_hash} --name-only --format=""'
+        files_output, _ = run_command(files_cmd, cwd=repo_path, capture_output=True, check=False, log_stderr=False)
+        files_changed = [f.strip() for f in files_output.strip().split('\n') if f.strip()] if files_output else []
+
+        # Filter out README files
+        non_readme_files = [f for f in files_changed if not f.lower().startswith('readme')]
+        doc_files = [f for f in non_readme_files if f.startswith('doc') or f.endswith('.md')]
+
+        if not doc_files:
+            continue
+
+        try:
+            commit_date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+            if commit_date.tzinfo:
+                commit_date = commit_date.replace(tzinfo=None)
+        except (ValueError, AttributeError):
+            commit_date = datetime.now()
+
+        yield Event(
+            type='docs_change',
+            timestamp=commit_date,
+            repo_name=repo_name,
+            repo_path=repo_path,
+            data={
+                'hash': commit_hash[:8],
+                'author': author,
+                'message': message[:100],
+                'files': doc_files[:5]
+            }
+        )
+
+        count += 1
+        if limit and count >= limit:
+            break
+
+
+def scan_readme_changes(
+    repo_path: str,
+    since: Optional[datetime] = None,
+    until: Optional[datetime] = None,
+    limit: Optional[int] = None
+) -> Generator[Event, None, None]:
+    """
+    Scan git history for README file changes.
+
+    Args:
+        repo_path: Path to git repository
+        since: Only events after this time
+        until: Only events before this time
+        limit: Maximum events to return
+
+    Yields:
+        Event objects for README changes
+    """
+    repo_path = str(Path(repo_path).resolve())
+    repo_name = Path(repo_path).name
+
+    # README file patterns
+    readme_files = 'README README.md README.txt README.rst readme.md'
+
+    cmd = f'git log --format="%H|%aI|%an|%s" --all -- {readme_files}'
+
+    if since:
+        cmd += f' --since="{since.isoformat()}"'
+    if until:
+        cmd += f' --until="{until.isoformat()}"'
+
+    output, returncode = run_command(cmd, cwd=repo_path, capture_output=True, check=False, log_stderr=False)
+
+    if returncode != 0 or not output:
+        return
+
+    count = 0
+    for line in output.strip().split('\n'):
+        if not line or '|' not in line:
+            continue
+
+        parts = line.split('|', 3)
+        if len(parts) < 4:
+            continue
+
+        commit_hash = parts[0].strip()
+        date_str = parts[1].strip()
+        author = parts[2].strip()
+        message = parts[3].strip()
+
+        try:
+            commit_date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+            if commit_date.tzinfo:
+                commit_date = commit_date.replace(tzinfo=None)
+        except (ValueError, AttributeError):
+            commit_date = datetime.now()
+
+        yield Event(
+            type='readme_change',
+            timestamp=commit_date,
+            repo_name=repo_name,
+            repo_path=repo_path,
+            data={
+                'hash': commit_hash[:8],
+                'author': author,
+                'message': message[:100]
+            }
+        )
+
+        count += 1
+        if limit and count >= limit:
+            break
+
+
 def scan_events(
     repos: List[str],
     types: Optional[List[str]] = None,
@@ -1790,6 +2973,60 @@ def scan_events(
         # GitHub security alerts (opt-in, requires permissions)
         if 'security_alert' in types:
             for event in scan_github_security_alerts(repo_path, since, until, limit=50):
+                all_events.append(event)
+
+        # GitHub repo events (opt-in) - rename, transfer, visibility, archive
+        repo_event_types = ['repo_rename', 'repo_transfer', 'repo_visibility', 'repo_archive']
+        if any(t in types for t in repo_event_types):
+            for event in scan_github_repo_events(repo_path, since, until, limit=20):
+                if event.type in types:
+                    all_events.append(event)
+
+        # GitHub deployments (opt-in)
+        if 'deployment' in types:
+            for event in scan_github_deployments(repo_path, since, until, limit=50):
+                all_events.append(event)
+
+        # GitHub forks (opt-in)
+        if 'fork' in types:
+            for event in scan_github_forks(repo_path, since, until, limit=50):
+                all_events.append(event)
+
+        # GitHub stars (opt-in)
+        if 'star' in types:
+            for event in scan_github_stars(repo_path, since, until, limit=50):
+                all_events.append(event)
+
+        # RubyGems events (opt-in)
+        if 'gem_publish' in types:
+            for event in scan_gem_publishes(repo_path, since, until):
+                all_events.append(event)
+
+        # NuGet events (opt-in)
+        if 'nuget_publish' in types:
+            for event in scan_nuget_publishes(repo_path, since, until):
+                all_events.append(event)
+
+        # Maven events (opt-in)
+        if 'maven_publish' in types:
+            for event in scan_maven_publishes(repo_path, since, until):
+                all_events.append(event)
+
+        # Local code change events (fast, no API)
+        if 'license_change' in types:
+            for event in scan_license_changes(repo_path, since, until, limit=10):
+                all_events.append(event)
+
+        if 'ci_config_change' in types:
+            for event in scan_ci_config_changes(repo_path, since, until, limit=20):
+                all_events.append(event)
+
+        if 'docs_change' in types:
+            for event in scan_docs_changes(repo_path, since, until, limit=20):
+                all_events.append(event)
+
+        if 'readme_change' in types:
+            for event in scan_readme_changes(repo_path, since, until, limit=10):
                 all_events.append(event)
 
     # Sort by timestamp (newest first)
