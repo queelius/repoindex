@@ -1,11 +1,16 @@
 """
-Event scanning command for ghops.
+Event scanning command for repoindex.
 
-Scans repositories for events (git tags, releases, commits) and outputs
-them as a stream. ghops is read-only: it observes and reports, external
-tools consume the stream and take actions.
+Scans repositories for events and outputs them as a stream.
+repoindex is read-only: it observes and reports, external tools consume the stream.
 
-Provides `ghops events` - unified event scanning command.
+Local events (default, fast):
+- git_tag, commit, branch, merge
+
+Remote events (opt-in, uses APIs):
+- --github: github_release, pr, issue, workflow_run
+- --pypi: pypi_publish
+- --cran: cran_publish
 """
 
 import click
@@ -14,7 +19,7 @@ import time
 import sys
 import logging
 from pathlib import Path
-from typing import Optional, Set
+from typing import Optional, Set, List
 
 logger = logging.getLogger(__name__)
 
@@ -22,8 +27,20 @@ logger = logging.getLogger(__name__)
 @click.command('events')
 @click.option('--type', '-t', 'event_types',
               multiple=True,
-              type=click.Choice(['git_tag', 'commit']),
-              help='Filter to specific event types (default: all)')
+              type=click.Choice([
+                  'git_tag', 'commit', 'branch', 'merge',
+                  'github_release', 'pr', 'issue', 'workflow_run',
+                  'pypi_publish', 'cran_publish'
+              ]),
+              help='Filter to specific event types')
+@click.option('--github', '-g', is_flag=True,
+              help='Include GitHub events (releases, PRs, issues, workflows)')
+@click.option('--pypi', is_flag=True,
+              help='Include PyPI publish events')
+@click.option('--cran', is_flag=True,
+              help='Include CRAN publish events')
+@click.option('--all', '-a', 'include_all', is_flag=True,
+              help='Include all event types (local + remote)')
 @click.option('--repo', '-r',
               help='Filter by repository name')
 @click.option('--since', '-s',
@@ -42,17 +59,25 @@ logger = logging.getLogger(__name__)
               help='Maximum events to output (default: 50)')
 @click.option('--pretty', '-p', is_flag=True,
               help='Human-readable table output (default: JSONL)')
-def events_handler(event_types, repo, since, until, watch, interval, limit, pretty):
+def events_handler(event_types, github, pypi, cran, include_all, repo, since, until, watch, interval, limit, pretty):
     """
     Scan repositories for events.
 
-    By default outputs JSONL (one JSON object per line) for easy piping
-    to external tools. Use --pretty for human-readable output.
+    By default scans local git events (fast). Use flags to include remote events.
 
     \b
-    Event Types (all shown by default, use --type to filter):
+    Local Events (default, fast):
       git_tag    Git tags (versions, releases)
       commit     Git commits
+      branch     Branch creation (from reflog)
+      merge      Merge commits
+
+    \b
+    Remote Events (opt-in, rate-limited):
+      --github   GitHub releases, PRs, issues, workflow runs
+      --pypi     PyPI package publishes
+      --cran     CRAN package publishes
+      --all      All event types
 
     \b
     Time Specifications:
@@ -61,29 +86,33 @@ def events_handler(event_types, repo, since, until, watch, interval, limit, pret
 
     \b
     Examples:
-      # All events in last 7 days (tags + commits)
+      # Local events in last 7 days (default)
       repoindex events --since 7d
 
       # Only git tags
       repoindex events --type git_tag --since 7d
 
-      # Only commits for a specific repo
-      repoindex events --type commit --repo myproject
+      # Include GitHub releases and PRs
+      repoindex events --github --since 7d
 
-      # Watch for new events, pipe to notification script
-      repoindex events --watch | ./notify-releases.sh
+      # Include PyPI publishes
+      repoindex events --pypi --since 30d
 
-      # Pretty print recent events
+      # All events (local + remote)
+      repoindex events --all --since 7d
+
+      # Watch for new events
+      repoindex events --watch --github
+
+      # Pretty print
       repoindex events --since 1d --pretty
-
-    \b
-    Output Format (JSONL):
-      {"id":"git_tag_repo_v1.0","type":"git_tag","timestamp":"2024-01-15T10:30:00",
-       "repo":"myrepo","path":"/path/to/repo","data":{"tag":"v1.0","commit":"abc123"}}
     """
     from ..config import load_config
     from ..utils import find_git_repos_from_config
-    from ..events import scan_events, parse_timespec
+    from ..events import (
+        scan_events, parse_timespec,
+        LOCAL_EVENT_TYPES, GITHUB_EVENT_TYPES, PYPI_EVENT_TYPES, CRAN_EVENT_TYPES, ALL_EVENT_TYPES
+    )
     from ..render import render_table
 
     try:
@@ -110,9 +139,8 @@ def events_handler(event_types, repo, since, until, watch, interval, limit, pret
         since_dt = parse_timespec(since) if since else None
         until_dt = parse_timespec(until) if until else None
 
-        # Default to all event types, --type filters down
-        all_types = ['git_tag', 'commit']
-        types = list(event_types) if event_types else all_types
+        # Build list of event types to scan
+        types = _build_event_types(event_types, github, pypi, cran, include_all)
 
         if watch:
             _run_watch_mode(repos, types, repo, interval, pretty)
@@ -143,6 +171,32 @@ def events_handler(event_types, repo, since, until, watch, interval, limit, pret
         return 1
 
 
+def _build_event_types(event_types, github: bool, pypi: bool, cran: bool, include_all: bool) -> List[str]:
+    """Build the list of event types based on flags."""
+    from ..events import LOCAL_EVENT_TYPES, GITHUB_EVENT_TYPES, PYPI_EVENT_TYPES, CRAN_EVENT_TYPES, ALL_EVENT_TYPES
+
+    # If specific types were provided via --type, use those
+    if event_types:
+        return list(event_types)
+
+    # If --all, return everything
+    if include_all:
+        return ALL_EVENT_TYPES.copy()
+
+    # Start with local types (default)
+    types = LOCAL_EVENT_TYPES.copy()
+
+    # Add remote types based on flags
+    if github:
+        types.extend(GITHUB_EVENT_TYPES)
+    if pypi:
+        types.extend(PYPI_EVENT_TYPES)
+    if cran:
+        types.extend(CRAN_EVENT_TYPES)
+
+    return types
+
+
 def _run_single_scan(repos, types, repo_filter, since, until, limit, pretty):
     """Run a single event scan."""
     from ..events import scan_events
@@ -167,13 +221,7 @@ def _run_single_scan(repos, types, repo_filter, since, until, limit, pretty):
         headers = ['type', 'repo', 'timestamp', 'details']
         rows = []
         for e in events:
-            if e.type == 'git_tag':
-                details = f"{e.data.get('tag', '')} - {e.data.get('message', '')[:40]}"
-            elif e.type == 'commit':
-                details = f"{e.data.get('hash', '')[:8]} - {e.data.get('message', '')[:40]}"
-            else:
-                details = str(e.data)[:50]
-
+            details = _get_event_details(e)
             rows.append([
                 e.type,
                 e.repo_name,
@@ -186,6 +234,38 @@ def _run_single_scan(repos, types, repo_filter, since, until, limit, pretty):
         # JSONL output
         for event in events:
             print(event.to_jsonl(), flush=True)
+
+
+def _get_event_details(event) -> str:
+    """Get a summary string for an event."""
+    e = event
+    d = e.data
+
+    if e.type == 'git_tag':
+        return f"{d.get('tag', '')} - {d.get('message', '')[:40]}"
+    elif e.type == 'commit':
+        return f"{d.get('hash', '')[:8]} - {d.get('message', '')[:40]}"
+    elif e.type == 'branch':
+        return f"{d.get('branch', '')} ({d.get('action', '')})"
+    elif e.type == 'merge':
+        branch = d.get('merged_branch', '')
+        return f"Merged {branch}" if branch else d.get('message', '')[:40]
+    elif e.type == 'github_release':
+        return f"{d.get('tag', '')} - {d.get('name', '')[:30]}"
+    elif e.type == 'pr':
+        state = 'merged' if d.get('merged') else d.get('state', '')
+        return f"#{d.get('number', '')} [{state}] {d.get('title', '')[:30]}"
+    elif e.type == 'issue':
+        return f"#{d.get('number', '')} [{d.get('state', '')}] {d.get('title', '')[:30]}"
+    elif e.type == 'workflow_run':
+        conclusion = d.get('conclusion', d.get('status', ''))
+        return f"{d.get('name', '')[:20]} [{conclusion}]"
+    elif e.type == 'pypi_publish':
+        return f"{d.get('package', '')} v{d.get('version', '')}"
+    elif e.type == 'cran_publish':
+        return f"{d.get('package', '')} v{d.get('version', '')}"
+    else:
+        return str(d)[:50]
 
 
 def _run_watch_mode(repos, types, repo_filter, interval, pretty):
@@ -241,24 +321,23 @@ def _run_watch_mode(repos, types, repo_filter, interval, pretty):
 
 def _print_event_pretty(event):
     """Print a single event in pretty format."""
-    from datetime import datetime
-
     timestamp = event.timestamp.strftime('%Y-%m-%d %H:%M:%S')
+    d = event.data
 
-    if event.type == 'git_tag':
-        tag = event.data.get('tag', 'unknown')
-        message = event.data.get('message', '')[:50]
-        click.echo(f"[{timestamp}] 🏷️  {event.repo_name}: {tag}")
-        if message:
-            click.echo(f"    {message}")
-    elif event.type == 'commit':
-        hash_short = event.data.get('hash', '')[:8]
-        message = event.data.get('message', '')[:50]
-        author = event.data.get('author', '')
-        click.echo(f"[{timestamp}] 📝 {event.repo_name}: {hash_short} by {author}")
-        if message:
-            click.echo(f"    {message}")
-    else:
-        click.echo(f"[{timestamp}] {event.type} {event.repo_name}")
+    emoji_map = {
+        'git_tag': '🏷️ ',
+        'commit': '📝',
+        'branch': '🌿',
+        'merge': '🔀',
+        'github_release': '🚀',
+        'pr': '🔃',
+        'issue': '🐛',
+        'workflow_run': '⚙️ ',
+        'pypi_publish': '📦',
+        'cran_publish': '📊',
+    }
 
+    emoji = emoji_map.get(event.type, '📌')
+    details = _get_event_details(event)
 
+    click.echo(f"[{timestamp}] {emoji} {event.type:15} {event.repo_name}: {details}")

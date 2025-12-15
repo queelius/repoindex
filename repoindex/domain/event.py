@@ -52,6 +52,33 @@ class Event:
         elif self.type == 'commit':
             hash_short = self.data.get('hash', 'unknown')[:8]
             return f"commit_{self.repo_name}_{hash_short}"
+        elif self.type == 'branch':
+            branch = self.data.get('branch', 'unknown')
+            action = self.data.get('action', '')
+            return f"branch_{self.repo_name}_{branch}_{action}"
+        elif self.type == 'merge':
+            hash_short = self.data.get('hash', 'unknown')[:8]
+            return f"merge_{self.repo_name}_{hash_short}"
+        elif self.type == 'github_release':
+            tag = self.data.get('tag', 'unknown')
+            return f"github_release_{self.repo_name}_{tag}"
+        elif self.type == 'pr':
+            number = self.data.get('number', 'unknown')
+            return f"pr_{self.repo_name}_{number}"
+        elif self.type == 'issue':
+            number = self.data.get('number', 'unknown')
+            return f"issue_{self.repo_name}_{number}"
+        elif self.type == 'workflow_run':
+            run_id = self.data.get('id', 'unknown')
+            return f"workflow_run_{self.repo_name}_{run_id}"
+        elif self.type == 'pypi_publish':
+            package = self.data.get('package', 'unknown')
+            version = self.data.get('version', 'unknown')
+            return f"pypi_publish_{package}_{version}"
+        elif self.type == 'cran_publish':
+            package = self.data.get('package', 'unknown')
+            version = self.data.get('version', 'unknown')
+            return f"cran_publish_{package}_{version}"
         else:
             ts = self.timestamp.strftime('%Y%m%d%H%M%S')
             return f"{self.type}_{self.repo_name}_{ts}"
