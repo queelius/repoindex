@@ -10,7 +10,7 @@ It provides a unified view across all your repositories, enabling queries, organ
 
 **Key Philosophy**: repoindex knows *about* your repos (metadata, tags, status), while Claude Code works *inside* them (editing, generating). Together they provide full portfolio awareness.
 
-**Current Version**: 0.9.1
+**Current Version**: 0.9.2
 
 **See also**: [DESIGN.md](DESIGN.md) for detailed design principles and architecture.
 
