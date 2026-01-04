@@ -23,7 +23,7 @@ def _build_config_vfs(config_node: Dict[str, Any], config: Dict[str, Any]):
     """
     # Add repos node with configured repository directories
     config_node["repos"] = {"type": "directory", "children": {}}
-    repos = config.get('general', {}).get('repository_directories', [])
+    repos = config.get('repository_directories', [])
     for i, repo_dir in enumerate(repos):
         # Use index as key to avoid conflicts
         key = f"dir_{i}"
@@ -71,17 +71,6 @@ def _build_config_vfs(config_node: Dict[str, Any], config: Dict[str, Any]):
                 "path": f"/config/pypi/{key}"
             }
 
-    # Add general settings (excluding repos which is already shown)
-    general_config = config.get('general', {})
-    if general_config:
-        config_node["general"] = {"type": "directory", "children": {}}
-        for key, value in general_config.items():
-            if key != 'repository_directories':  # Skip repos, shown separately
-                config_node["general"]["children"][key] = {
-                    "type": "config_value",
-                    "value": str(value),
-                    "path": f"/config/general/{key}"
-                }
 
 
 def build_vfs_structure(config: Dict[str, Any]) -> Dict[str, Any]:
@@ -90,7 +79,7 @@ def build_vfs_structure(config: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         VFS tree structure
     """
-    repo_dirs = config.get('general', {}).get('repository_directories', [])
+    repo_dirs = config.get('repository_directories', [])
     if not repo_dirs:
         repo_dirs = ['.']
 

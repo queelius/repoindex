@@ -71,7 +71,7 @@ class RepositoryService:
             Repository objects for each found repo
         """
         if paths is None:
-            paths = self.config.get('general', {}).get('repository_directories', [])
+            paths = self.config.get('repository_directories', [])
 
         exclude = set(exclude_patterns or [])
         exclude.update(EXCLUDE_DIRS)

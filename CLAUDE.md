@@ -53,44 +53,48 @@ Claude Code can run repoindex CLI commands directly. This is often more powerful
 ### Common Patterns
 
 ```bash
-# What happened across my repos recently?
-repoindex events --since 7d --pretty
-
-# Any security alerts?
-repoindex events --github --type security_alert --since 7d
+# Dashboard overview
+repoindex status
 
 # Repos with uncommitted changes
-repoindex status -r | jq 'select(.status.uncommitted_changes == true) | .name'
+repoindex query --dirty --pretty
 
-# Find Python repos with >10 stars
-repoindex query "language == 'Python' and stars > 10"
+# Find Python repos with stars
+repoindex query --language python --starred --pretty
+
+# What happened recently?
+repoindex events --since 7d --pretty
 
 # What got released this week?
 repoindex events --type git_tag --since 7d --pretty
 
-# Package publishes
-repoindex events --pypi --npm --since 30d
+# Raw SQL access
+repoindex sql "SELECT name, stars FROM repos ORDER BY stars DESC LIMIT 10"
 ```
 
-### Event Types (28 total)
+### Query Convenience Flags
 
-**Local (fast, default)**:
+```bash
+repoindex query --dirty              # Uncommitted changes
+repoindex query --language python    # Python repos
+repoindex query --recent 7d          # Recent commits
+repoindex query --tag "work/*"       # By tag
+repoindex query --no-license         # Missing license
+repoindex query --starred            # Has stars
+```
+
+### Event Types
+
+Events are populated by `refresh` and stored in the SQLite database:
 - `git_tag`, `commit`, `branch`, `merge`
-- `version_bump`, `deps_update`, `license_change`, `ci_config_change`, `docs_change`, `readme_change`
 
-**GitHub (--github)**:
-- `github_release`, `pr`, `issue`, `workflow_run`, `security_alert`
-- `repo_rename`, `repo_transfer`, `repo_visibility`, `repo_archive`
-
-**Registries**:
-- `--pypi`: pypi_publish
-- `--npm`: npm_publish
-- `--cargo`: cargo_publish
-- `--docker`: docker_publish
-- `--gem`: gem_publish
-- `--nuget`: nuget_publish
-- `--maven`: maven_publish
-- `--cran`: cran_publish
+Query events from the database:
+```bash
+repoindex events --since 7d --pretty
+repoindex events --type commit --since 30d
+repoindex events --repo myproject
+repoindex events --stats
+```
 
 ### Output Formats
 
@@ -307,36 +311,34 @@ mock_run_command.side_effect = [("output1", 0), ("output2", 0)]  # Multiple call
 - `rapidfuzz` - Fuzzy string matching for query language
 - `mcp` - Model Context Protocol server
 
-### Commands Implemented
+### Commands Implemented (11 commands)
 
-Core commands:
-- **list** - List repositories with deduplication and metadata
-- **status** - Repository status with git, license, package info
-- **get** - Clone repositories from GitHub
-- **update** - Update and sync repositories
-- **config** - Configuration management
-
-Organization & discovery:
-- **tag** - Hierarchical tag management (add, remove, move, list, tree)
-- **query** - Fuzzy search with custom query language
-- **stats** - Repository statistics
-
-Event tracking:
-- **events** - Scan for git events (tags, releases, commits)
-- **poll** - Continuous event monitoring
-
-MCP integration:
-- **mcp serve** - Start MCP server for LLM integration
+```
+repoindex
+├── status              # Dashboard: health overview
+├── query               # Human-friendly repo search with flags
+├── events              # Query events from database
+├── sql                 # Raw SQL queries + database management
+├── refresh             # Database sync (repos + events)
+├── tag                 # Organization (add/remove/list/tree)
+├── view                # Curated views (list/show/create/delete)
+├── config              # Settings (show/repos/init)
+├── mcp                 # LLM integration server
+├── claude              # Skill management (install/uninstall/show)
+└── shell               # Interactive mode with VFS navigation
+```
 
 ## Configuration
 
 Configuration is managed through `~/.repoindex/config.json` (or YAML). Use `REPOINDEX_CONFIG` environment variable to override location.
 
 Key configuration sections:
-- `general.repository_directories` - List of repo directories (supports ** glob patterns)
-- `github.token` - GitHub API token (or use REPOINDEX_GITHUB_TOKEN env var)
+- `repository_directories` - List of repo directories (supports ** glob patterns)
+- `github.token` - GitHub API token (or use GITHUB_TOKEN env var)
 - `github.rate_limit` - Retry configuration with exponential backoff
 - `repository_tags` - Manual tag assignments for repos
+
+The SQLite database (`~/.repoindex/repoindex.db`) is the canonical cache. Run `repoindex refresh` to populate.
 
 ### Rate Limiting
 GitHub API calls use intelligent rate limiting:
@@ -612,11 +614,10 @@ repoindex tag tree
 - Respects GitHub's rate limit reset time
 - Use `REPOINDEX_GITHUB_TOKEN` for higher limits
 
-### Event Scanning (Read-Only)
-- Use `repoindex events` to scan for git events (tags, commits)
-- Stateless, time-based filtering with `--since` and `--until`
-- Outputs JSONL by default for composability with external tools
-- `--watch` mode for continuous monitoring
+### Database-First Architecture
+- `refresh` populates the SQLite database with repos and events
+- `query`, `events`, `sql` all query from the database
+- No live scanning in query commands - database is the cache
 
 ### MCP Server
 - Start with `repoindex mcp serve`
@@ -625,21 +626,32 @@ repoindex tag tree
 
 ### Events Command Usage
 ```bash
-# Scan for events in the last 7 days (default)
+# Query events from database (default: last 7 days)
 repoindex events
 
-# Scan for events since a specific time
+# Events since specific time
 repoindex events --since 24h
 repoindex events --since 7d
-repoindex events --since 2024-01-15
 
-# Filter by event type
+# Filter by type
 repoindex events --type git_tag
 repoindex events --type commit
 
-# Continuous monitoring mode
-repoindex events --watch --interval 300
+# Filter by repository
+repoindex events --repo myproject
+
+# Summary statistics
+repoindex events --stats
 
 # Human-readable output
 repoindex events --pretty
+```
+
+### Refresh Command
+```bash
+repoindex refresh              # Smart refresh (changed repos only)
+repoindex refresh --full       # Force full refresh
+repoindex refresh --github     # Include GitHub metadata
+repoindex refresh --since 30d  # Events from last 30 days
+repoindex sql --reset          # Reset database (then refresh --full)
 ```

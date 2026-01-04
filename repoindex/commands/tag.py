@@ -335,7 +335,7 @@ def resolve_repository_path(repository: str, config: Dict[str, Any]) -> str:
         return os.path.abspath(repository)
 
     # Search for repository by name
-    repo_dirs = config.get("general", {}).get("repository_directories", [])
+    repo_dirs = config.get("repository_directories", [])
     for repo_path in find_git_repos_from_config(repo_dirs):
         if Path(repo_path).name == repository:
             return repo_path

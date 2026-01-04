@@ -71,7 +71,7 @@ class RepoIndexShell(cmd.Cmd):
             VFS tree structure
         """
         # Get all repositories
-        repo_dirs = self.config.get('general', {}).get('repository_directories', [])
+        repo_dirs = self.config.get('repository_directories', [])
         if not repo_dirs:
             repo_dirs = ['.']
 

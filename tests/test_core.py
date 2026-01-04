@@ -82,9 +82,7 @@ class TestListRepos:
     def test_list_repos_from_config(self, mock_load_config, fs):
         """Test listing repositories from configuration."""
         mock_load_config.return_value = {
-            "general": {
-                "repository_directories": ["/home/user/code", "/home/user/projects"]
-            }
+            "repository_directories": ["/home/user/code", "/home/user/projects"]
         }
         create_git_repo(fs, "/home/user/code/repo1")
         create_git_repo(fs, "/home/user/projects/repo2")

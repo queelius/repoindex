@@ -43,19 +43,17 @@ def repos_add(path, refresh):
     """
     config = load_config()
 
-    # Ensure general section exists
-    if 'general' not in config:
-        config['general'] = {}
-    if 'repository_directories' not in config['general']:
-        config['general']['repository_directories'] = []
+    # Ensure repository_directories exists
+    if 'repository_directories' not in config:
+        config['repository_directories'] = []
 
     # Check if path already exists
-    if path in config['general']['repository_directories']:
+    if path in config['repository_directories']:
         console.print(f"[yellow]Path already in configuration:[/yellow] {path}")
         return
 
     # Add the path
-    config['general']['repository_directories'].append(path)
+    config['repository_directories'].append(path)
 
     # Save configuration
     save_config(config)
@@ -97,11 +95,11 @@ def repos_remove(path):
     config = load_config()
 
     # Check if path exists in config
-    if 'general' not in config or 'repository_directories' not in config['general']:
+    repo_dirs = config.get('repository_directories', [])
+
+    if not repo_dirs:
         console.print("[yellow]No repository directories configured[/yellow]")
         return
-
-    repo_dirs = config['general']['repository_directories']
 
     if path not in repo_dirs:
         console.print(f"[yellow]Path not found in configuration:[/yellow] {path}")
@@ -112,7 +110,7 @@ def repos_remove(path):
 
     # Remove the path
     repo_dirs.remove(path)
-    config['general']['repository_directories'] = repo_dirs
+    config['repository_directories'] = repo_dirs
 
     # Save configuration
     save_config(config)
@@ -136,7 +134,7 @@ def repos_list(json_output):
     config = load_config()
 
     # Get repository directories
-    repo_dirs = config.get('general', {}).get('repository_directories', [])
+    repo_dirs = config.get('repository_directories', [])
 
     if not repo_dirs:
         if json_output:
@@ -193,7 +191,7 @@ def repos_clear(yes):
     config = load_config()
 
     # Get current paths
-    repo_dirs = config.get('general', {}).get('repository_directories', [])
+    repo_dirs = config.get('repository_directories', [])
 
     if not repo_dirs:
         console.print("[yellow]No repository directories configured[/yellow]")
@@ -211,7 +209,7 @@ def repos_clear(yes):
             return
 
     # Clear the list
-    config['general']['repository_directories'] = []
+    config['repository_directories'] = []
 
     # Save configuration
     save_config(config)

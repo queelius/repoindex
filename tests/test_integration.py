@@ -80,29 +80,43 @@ description = "A test package"
                     except json.JSONDecodeError:
                         self.fail(f"Line is not valid JSON: {line}")
     
-    def test_config_generate(self):
-        """Test config generation"""
-        result = self.run_ghops_command("config", "generate")
-        
+    def test_init_command(self):
+        """Test init command"""
+        # Override HOME to avoid writing to real config
+        env = os.environ.copy()
+        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        env['PYTHONPATH'] = project_root + (os.pathsep + env.get('PYTHONPATH', ''))
+        env['HOME'] = self.temp_dir  # Use temp dir as HOME
+
+        cmd = ["python", "-m", "repoindex.cli", "init", "-y", "-d", self.temp_dir]
+        result = subprocess.run(
+            cmd,
+            cwd=self.temp_dir,
+            capture_output=True,
+            text=True,
+            env=env
+        )
+
         self.assertEqual(result.returncode, 0)
-        self.assertIn("example configuration", result.stdout.lower())
-        
-        # Check that example file was created in the temp_dir
-        example_file = Path.home() / ".repoindexrc"
-        self.assertTrue(example_file.exists())
+        self.assertIn("Configuration saved", result.stdout)
+
+        # Check that config file was created in temp HOME
+        config_file = Path(self.temp_dir) / ".repoindex" / "config.json"
+        self.assertTrue(config_file.exists())
     
     def test_config_show(self):
         """Test config show command"""
         result = self.run_ghops_command("config", "show")
-        
+
         self.assertEqual(result.returncode, 0)
-        
+
         # Should output JSON configuration
         try:
             config_data = json.loads(result.stdout)
-            self.assertIn('pypi', config_data)
-            self.assertIn('social_media', config_data)
-            self.assertIn('logging', config_data)
+            self.assertIn('repository_directories', config_data)
+            self.assertIn('github', config_data)
+            self.assertIn('registries', config_data)
+            self.assertIn('cache', config_data)
         except json.JSONDecodeError:
             self.fail(f"Config show did not output valid JSON: {result.stdout}")
     
@@ -121,7 +135,8 @@ description = "A test package"
         # Config help
         result = self.run_ghops_command("config", "--help")
         self.assertEqual(result.returncode, 0)
-        self.assertIn("generate", result.stdout)  # Check for config-specific options
+        self.assertIn("show", result.stdout)  # Check for config-specific commands
+        self.assertIn("repos", result.stdout)  # Check for repos subcommand
     
     def test_invalid_command(self):
         """Test handling of invalid commands"""

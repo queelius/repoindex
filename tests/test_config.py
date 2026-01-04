@@ -1,5 +1,5 @@
 """
-Unit tests for ghops.config module
+Unit tests for repoindex.config module
 """
 import unittest
 import tempfile
@@ -13,19 +13,20 @@ from repoindex.config import (
     load_config,
     save_config,
     generate_config_example,
-    get_default_config
+    get_default_config,
+    get_repository_directories
 )
 
 
 class TestConfigManagement(unittest.TestCase):
     """Test configuration management functionality"""
-    
+
     def setUp(self):
         """Set up test environment"""
         self.temp_dir = tempfile.mkdtemp()
         self.original_home = os.environ.get('HOME')
         os.environ['HOME'] = self.temp_dir
-    
+
     def tearDown(self):
         """Clean up test environment"""
         if self.original_home:
@@ -33,153 +34,158 @@ class TestConfigManagement(unittest.TestCase):
         else:
             del os.environ['HOME']
         shutil.rmtree(self.temp_dir)
-    
+
     def test_get_default_config(self):
         """Test default configuration structure"""
         config = get_default_config()
-        
+
         # Check that all required sections exist
-        self.assertIn('pypi', config)
-        self.assertIn('social_media', config)
-        self.assertIn('logging', config)
-        
-        # Check PyPI config
-        self.assertIn('check_by_default', config['pypi'])
-        self.assertTrue(config['pypi']['check_by_default'])
-        
-        # Check social media config
-        self.assertIn('platforms', config['social_media'])
-        self.assertIn('posting', config['social_media'])
-        
-        # Check logging config
-        self.assertIn('level', config['logging'])
-        self.assertIn('format', config['logging'])
-    
+        self.assertIn('repository_directories', config)
+        self.assertIn('github', config)
+        self.assertIn('repository_tags', config)
+
+        # Check repository_directories is empty list by default
+        self.assertEqual(config['repository_directories'], [])
+
+        # Check GitHub config
+        self.assertIn('token', config['github'])
+        self.assertIn('rate_limit', config['github'])
+        self.assertEqual(config['github']['token'], '')
+
     def test_load_config_no_file(self):
         """Test loading config when no file exists"""
         config = load_config()
-        
+
         # Should return default config
         default_config = get_default_config()
-        self.assertEqual(config['pypi']['check_by_default'], 
-                        default_config['pypi']['check_by_default'])
-    
+        self.assertEqual(config['repository_directories'],
+                        default_config['repository_directories'])
+        self.assertEqual(config['github']['token'],
+                        default_config['github']['token'])
+
     def test_load_config_json_file(self):
         """Test loading config from JSON file"""
         config_data = {
-            'pypi': {'check_by_default': False},
-            'logging': {'level': 'DEBUG'}
+            'repository_directories': ['~/projects'],
+            'registries': {'pypi': False, 'npm': True}
         }
-        
+
         # Create .repoindex directory
-        ghops_dir = Path(self.temp_dir) / '.repoindex'
-        ghops_dir.mkdir(exist_ok=True)
-        config_path = ghops_dir / 'config.json'
+        repoindex_dir = Path(self.temp_dir) / '.repoindex'
+        repoindex_dir.mkdir(exist_ok=True)
+        config_path = repoindex_dir / 'config.json'
         with open(config_path, 'w') as f:
             json.dump(config_data, f)
-        
+
         config = load_config()
-        
-        self.assertFalse(config['pypi']['check_by_default'])
-        self.assertEqual(config['logging']['level'], 'DEBUG')
-    
+
+        self.assertEqual(config['repository_directories'], ['~/projects'])
+        self.assertFalse(config['registries']['pypi'])
+        self.assertTrue(config['registries']['npm'])
+
     def test_load_config_toml_file(self):
         """Test loading config from TOML file"""
         config_content = """
-[pypi]
-check_by_default = false
+[github]
+token = "test-token"
 
-[logging]
-level = "DEBUG"
+[registries]
+pypi = false
+npm = true
 """
-        
+
         # Create .repoindex directory
-        ghops_dir = Path(self.temp_dir) / '.repoindex'
-        ghops_dir.mkdir(exist_ok=True)
-        config_path = ghops_dir / 'config.toml'
+        repoindex_dir = Path(self.temp_dir) / '.repoindex'
+        repoindex_dir.mkdir(exist_ok=True)
+        config_path = repoindex_dir / 'config.toml'
         config_path.write_text(config_content)
-        
+
         config = load_config()
-        
-        self.assertFalse(config['pypi']['check_by_default'])
-        self.assertEqual(config['logging']['level'], 'DEBUG')
-    
-    @patch.dict(os.environ, {'REPOINDEX_PYPI_CHECK_BY_DEFAULT': 'false'})
-    def test_environment_override(self):
-        """Test environment variable override"""
+
+        self.assertEqual(config['github']['token'], 'test-token')
+        self.assertFalse(config['registries']['pypi'])
+        self.assertTrue(config['registries']['npm'])
+
+    @patch.dict(os.environ, {'GITHUB_TOKEN': 'env-token-123'})
+    def test_github_token_environment_override(self):
+        """Test GITHUB_TOKEN environment variable override"""
         config = load_config()
-        
+
         # Environment should override config file
-        self.assertFalse(config['pypi']['check_by_default'])
-    
-    @patch.dict(os.environ, {'REPOINDEX_SOCIAL_MEDIA_PLATFORMS_TWITTER_ENABLED': 'false'})
-    def test_nested_environment_override(self):
-        """Test nested environment variable override"""
-        config = load_config()
-        
-        # Check nested override
-        self.assertFalse(config['social_media']['platforms']['twitter']['enabled'])
-    
+        self.assertEqual(config['github']['token'], 'env-token-123')
+
     def test_save_config_json(self):
         """Test saving config to JSON file"""
         config_data = {
-            'pypi': {'check_by_default': False},
-            'logging': {'level': 'DEBUG'}
+            'repository_directories': ['/path/to/repos'],
+            'github': {'token': 'test-token'}
         }
-        
+
         save_config(config_data)
-        
+
         # Check in .repoindex directory
         config_path = Path(self.temp_dir) / '.repoindex' / 'config.json'
         self.assertTrue(config_path.exists())
-        
+
         with open(config_path, 'r') as f:
             saved_config = json.load(f)
-        
-        self.assertEqual(saved_config['pypi']['check_by_default'], False)
-        self.assertEqual(saved_config['logging']['level'], 'DEBUG')
-    
+
+        self.assertEqual(saved_config['repository_directories'], ['/path/to/repos'])
+        self.assertEqual(saved_config['github']['token'], 'test-token')
+
     def test_generate_config_example(self):
         """Test config example generation"""
         generate_config_example()
-        
-        config_path = Path(self.temp_dir) / '.repoindexrc.example'
+
+        config_path = Path(self.temp_dir) / '.repoindex' / 'config.example.yaml'
         self.assertTrue(config_path.exists())
-        
-        # Verify console output
-        # The output is now handled by logger, which goes to stderr in tests
-        # We can't directly capture logger output in unittest without more complex mocking
-        # For now, we'll just ensure the file is created.
+
+        # Verify content contains expected sections
+        content = config_path.read_text()
+        self.assertIn('repository_directories', content)
+        self.assertIn('github', content)
+        self.assertIn('repository_tags', content)
+
+    def test_get_repository_directories(self):
+        """Test get_repository_directories helper"""
+        config = {'repository_directories': ['/path1', '/path2']}
+        dirs = get_repository_directories(config)
+        self.assertEqual(dirs, ['/path1', '/path2'])
+
+        # Empty config
+        config = {}
+        dirs = get_repository_directories(config)
+        self.assertEqual(dirs, [])
 
 
 class TestConfigValidation(unittest.TestCase):
     """Test configuration validation"""
-    
+
     def test_merge_configs(self):
         """Test configuration merging"""
         from repoindex.config import merge_configs
-        
+
         base_config = {
-            'pypi': {'check_by_default': True, 'timeout': 30},
-            'logging': {'level': 'INFO'}
+            'github': {'token': '', 'rate_limit': {'max_retries': 3}},
+            'registries': {'pypi': True}
         }
-        
+
         override_config = {
-            'pypi': {'check_by_default': False},
-            'new_section': {'key': 'value'}
+            'github': {'token': 'my-token'},
+            'repository_directories': ['/new/path']
         }
-        
+
         merged = merge_configs(base_config, override_config)
-        
+
         # Should preserve base values not overridden
-        self.assertEqual(merged['pypi']['timeout'], 30)
-        self.assertEqual(merged['logging']['level'], 'INFO')
-        
+        self.assertEqual(merged['github']['rate_limit']['max_retries'], 3)
+        self.assertTrue(merged['registries']['pypi'])
+
         # Should override specified values
-        self.assertFalse(merged['pypi']['check_by_default'])
-        
+        self.assertEqual(merged['github']['token'], 'my-token')
+
         # Should add new sections
-        self.assertEqual(merged['new_section']['key'], 'value')
+        self.assertEqual(merged['repository_directories'], ['/new/path'])
 
 
 if __name__ == '__main__':

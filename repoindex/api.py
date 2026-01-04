@@ -115,9 +115,7 @@ class RepoIndex:
 
         # Override paths if provided
         if paths:
-            if 'general' not in self._config:
-                self._config['general'] = {}
-            self._config['general']['repository_directories'] = paths
+            self._config['repository_directories'] = paths
 
         # Override GitHub token if provided
         if github_token:

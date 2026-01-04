@@ -18,23 +18,11 @@ logging.basicConfig(
 )
 logger = logging.getLogger("repoindex")
 
-# Global stats dictionary
+# Global stats dictionary (minimal - most operations are read-only)
 stats = {
-    "cloned": 0,
-    "skipped": 0,
-    "updated": 0,
-    "committed": 0,
-    "pulled": 0,
-    "pushed": 0,
-    "conflicts": 0,
-    "conflicts_resolved": 0,
-    "licenses_added": 0,
-    "licenses_skipped": 0,
-    "repos_with_pages": 0,
+    "repos_scanned": 0,
+    "repos_with_docs": 0,
     "repos_with_packages": 0,
-    "published_packages": 0,
-    "outdated_packages": 0,
-    "social_posts": 0,
 }
 
 def get_config_path():
@@ -68,81 +56,6 @@ def get_config_path():
 
     # If no file exists, return default path for saving
     return repoindex_dir / 'config.json'
-
-def migrate_config_to_tags(config: dict) -> dict:
-    """
-    Migrate old metadata structure to new tag-based structure.
-    
-    Old structure:
-        repository_metadata: {
-            "path": {"organization": "x", "category": "y", "tags": ["a", "b"]}
-        }
-    
-    New structure:
-        repository_tags: {
-            "path": ["org:x", "category:y", "a", "b"]
-        }
-    """
-    # Check if we have old-style metadata
-    if "repository_metadata" in config and "repository_tags" not in config:
-        config["repository_tags"] = {}
-        
-        # Convert each metadata entry to tags
-        for path, metadata in config["repository_metadata"].items():
-            tags = []
-            
-            # Convert organization to org: tag
-            if org := metadata.get("organization"):
-                tags.append(f"org:{org}")
-            
-            # Convert category to category: tag
-            if category := metadata.get("category"):
-                tags.append(f"category:{category}")
-            
-            # Add existing tags
-            if existing_tags := metadata.get("tags"):
-                tags.extend(existing_tags)
-            
-            config["repository_tags"][path] = tags
-        
-        # Remove old metadata
-        del config["repository_metadata"]
-        
-        # Rebuild catalogs from tags
-        rebuild_catalogs_from_tags(config)
-    
-    return config
-
-
-def rebuild_catalogs_from_tags(config: dict) -> None:
-    """Rebuild catalog structure from repository tags."""
-    from .tags import parse_tag
-    
-    config["catalogs"] = {}
-    repo_tags = config.get("repository_tags", {})
-    
-    for path, tags in repo_tags.items():
-        for tag in tags:
-            key, value = parse_tag(tag)
-            
-            # Add to by_tag catalog
-            if "by_tag" not in config["catalogs"]:
-                config["catalogs"]["by_tag"] = {}
-            if tag not in config["catalogs"]["by_tag"]:
-                config["catalogs"]["by_tag"][tag] = []
-            if path not in config["catalogs"]["by_tag"][tag]:
-                config["catalogs"]["by_tag"][tag].append(path)
-            
-            # Add to by_key catalogs for key:value tags
-            if value is not None:
-                catalog_key = f"by_{key}"
-                if catalog_key not in config["catalogs"]:
-                    config["catalogs"][catalog_key] = {}
-                if value not in config["catalogs"][catalog_key]:
-                    config["catalogs"][catalog_key][value] = []
-                if path not in config["catalogs"][catalog_key][value]:
-                    config["catalogs"][catalog_key][value].append(path)
-
 
 def load_config():
     """Load configuration from file."""
@@ -179,10 +92,7 @@ def load_config():
     
     # Apply environment variable overrides
     config = apply_env_overrides(config)
-    
-    # Migrate old config format to new tag-based format
-    config = migrate_config_to_tags(config)
-    
+
     return config
 
 def save_config(config):
@@ -224,27 +134,23 @@ def save_config(config):
         logger.error(f"Error saving config to {config_path}: {e}")
 
 def get_default_config():
-    """Get default configuration."""
+    """
+    Get default configuration.
+
+    The config is intentionally minimal. repoindex is a read-only metadata index.
+    The SQLite database serves as the cache - no in-memory caching needed.
+
+    If no repository_directories are configured and no --dir is provided,
+    repoindex will use the current directory.
+    """
     return {
-        "general": {
-            "repository_directories": ["~/github"],  # List of directories or glob patterns
-            "git_user_name": "",
-            "git_user_email": "",
-            "github_username": "",
-            "max_concurrent_operations": 5,
-            "progress_bar": True
-        },
-        "language_detection": {
-            "skip_directories": [".git", "node_modules", "vendor", "venv", ".venv"],
-            "skip_hidden_directories": True,
-            "skip_file_extensions": [".min.js", ".min.css", ".map"],
-            "max_file_size_kb": 1024
-        },
-        "pypi": {
-            "check_by_default": True,
-            "timeout_seconds": 10,
-            "include_test_pypi": False
-        },
+        # Where to find repositories
+        # Empty by default - use --dir or configure explicitly
+        # Supports glob patterns: ~/github/** for recursive
+        "repository_directories": [],
+
+        # GitHub API access (optional, for richer metadata)
+        # Can also use GITHUB_TOKEN environment variable
         "github": {
             "token": "",
             "rate_limit": {
@@ -253,161 +159,63 @@ def get_default_config():
                 "respect_reset_time": True
             }
         },
-        "logging": {
-            "level": "INFO",
-            "format": "%(message)s"
-        },
-        "social_media": {
-            "platforms": {
-                "twitter": {
-                    "enabled": False,
-                    "api_key": "",
-                    "api_secret": "",
-                    "access_token": "",
-                    "access_token_secret": "",
-                    "templates": {
-                        "pypi_release": "🚀 New release: {package_name} v{version} is now available on PyPI! {pypi_url} #{package_name} #python #opensource",
-                        "github_pages": "📖 Updated documentation for {repo_name}: {pages_url} #docs #opensource",
-                        "random_highlight": "✨ Working on {repo_name}: {description} {repo_url} #{language} #coding"
-                    }
-                },
-                "linkedin": {
-                    "enabled": False,
-                    "access_token": "",
-                    "templates": {
-                        "pypi_release": "I'm excited to announce the release of {package_name} v{version}! This Python package {description}. Check it out on PyPI: {pypi_url}",
-                        "github_pages": "Updated the documentation for my {repo_name} project. You can view it here: {pages_url}",
-                        "random_highlight": "Currently working on {repo_name} - {description}. You can find the source code here: {repo_url}"
-                    }
-                },
-                "mastodon": {
-                    "enabled": False,
-                    "instance_url": "",
-                    "access_token": "",
-                    "templates": {
-                        "pypi_release": "🐍 {package_name} v{version} is live on PyPI! {pypi_url} #Python #OpenSource",
-                        "github_pages": "📚 Fresh docs for {repo_name}: {pages_url} #Documentation",
-                        "random_highlight": "🛠️ {repo_name}: {description} {repo_url} #{language}"
-                    }
-                }
-            },
-            "posting": {
-                "random_sample_size": 3,
-                "daily_limit": 5,
-                "min_hours_between_posts": 2,
-                "exclude_private": True,
-                "exclude_forks": True,
-                "minimum_stars": 0,
-                "hashtag_limit": 5
-            }
-        },
-        "service": {
-            "enabled": False,
-            "interval_minutes": 120,
-            "start_time": "09:00",
-            "reporting": {
-                "enabled": True,
-                "interval_hours": 24,
-                "include_stats": True,
-                "include_status": True,
-                "include_recent_activity": True
-            },
-            "notifications": {
-                "email": {
-                    "enabled": False,
-                    "smtp_server": "",
-                    "smtp_port": 587,
-                    "username": "",
-                    "password": "",
-                    "from_email": "",
-                    "to_email": "",
-                    "use_tls": True,
-                    "daily_summary": True,
-                    "error_alerts": True
-                }
-            }
-        },
-        "filters": {
-            "default_ignore_patterns": [
-                ".git",
-                "node_modules",
-                "__pycache__",
-                "*.egg-info",
-                ".venv",
-                "venv"
-            ],
-            "profiles": {}
-        },
-        "analytics": {
-            "google_analytics": {
-                "tracking_id": "",
-                "auto_setup_github_pages": False
-            }
-        }
+
+        # User-defined tags (managed by `repoindex tag` commands)
+        "repository_tags": {},
+
+        # NOTE: Legacy keys (registries, cache) are ignored if present in old configs
+        # The SQLite database is now the canonical cache
     }
 
 def generate_config_example():
     """Generate an example configuration file."""
-    config = get_default_config()
-    config_path = Path.home() / '.repoindexrc.example'
-    
-    # Add helpful comments to the example
-    if config_path.suffix.lower() in ['.toml']:
-        example_content = """# repoindex Configuration File
-# This file configures various aspects of repoindex behavior
+    config_path = Path.home() / '.repoindex' / 'config.example.yaml'
+    config_path.parent.mkdir(parents=True, exist_ok=True)
 
-[general]
-default_directory = "~/github"  # Default directory for operations
-git_user_name = ""              # Git user name (leave empty to use git config)
-git_user_email = ""             # Git user email (leave empty to use git config)
-github_username = ""            # GitHub username for API operations
-max_concurrent_operations = 5   # Number of concurrent operations
-progress_bar = true             # Show progress bars
+    example_content = """# repoindex Configuration
+# A read-only metadata index for git repositories
+# The SQLite database serves as the cache - run 'repoindex refresh' to populate
 
-[pypi]
-check_by_default = true         # Check PyPI status in status command
-timeout_seconds = 10            # Timeout for PyPI API requests
-include_test_pypi = false       # Also check test.pypi.org
+# Where to find repositories
+# Use glob patterns for recursive: ~/github/**
+# Leave empty to use current directory or --dir flag
+repository_directories:
+  - ~/github/**
+  # - ~/projects
+  # - /work/repos
 
-[social_media.platforms.twitter]
-enabled = false
-api_key = ""                    # Twitter API key
-api_secret = ""                 # Twitter API secret
-access_token = ""               # Twitter access token
-access_token_secret = ""        # Twitter access token secret
+# GitHub API (optional, for richer metadata)
+# Alternatively, set GITHUB_TOKEN environment variable
+github:
+  token: ""
+  rate_limit:
+    max_retries: 3
+    max_delay_seconds: 60
+    respect_reset_time: true
 
-[social_media.platforms.twitter.templates]
-pypi_release = "🚀 New release: {package_name} v{version} is now available on PyPI! {pypi_url} #{package_name} #python #opensource"
-github_pages = "📖 Updated documentation for {repo_name}: {pages_url} #docs #opensource"
-random_highlight = "✨ Working on {repo_name}: {description} {repo_url} #{language} #coding"
-
-[social_media.posting]
-random_sample_size = 3          # Number of repos to randomly highlight
-daily_limit = 5                 # Maximum posts per day
-min_hours_between_posts = 2     # Minimum time between posts
-exclude_private = true          # Don't post about private repos
-exclude_forks = true            # Don't post about forked repos
-minimum_stars = 0               # Minimum stars to post about a repo
-hashtag_limit = 5               # Maximum hashtags per post
-
-# Add more platform configurations as needed...
+# User-defined tags (managed by `repoindex tag` commands)
+# repository_tags:
+#   /path/to/repo: [tag1, tag2]
 """
-        config_path.write_text(example_content)
-    else:
-        with open(config_path, 'w') as f:
-            json.dump(config, f, indent=2)
-    
-    logger.info(f"✅ An example configuration file has been saved to {config_path}")
-    logger.info("Edit this file to configure repoindex for your needs.")
+    config_path.write_text(example_content)
+    logger.info(f"Example configuration saved to {config_path}")
+
 
 def generate_default_config():
-    """Generate a default configuration file at ~/.repoindexrc."""
-    config = get_default_config()
-    config_path = Path.home() / '.repoindexrc'
+    """Generate a minimal default configuration file."""
+    config_path = Path.home() / '.repoindex' / 'config.json'
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+
+    minimal_config = {
+        "repository_directories": [],
+        "repository_tags": {}
+    }
+
     with open(config_path, 'w') as f:
-        json.dump(config, f, indent=2)
-    logger.info(f"✅ Default configuration file has been saved to {config_path}")
-    logger.info("Edit this file to configure repoindex for your needs.")
+        json.dump(minimal_config, f, indent=2)
+
+    logger.info(f"Configuration file created at {config_path}")
+    logger.info("Add your repository directories or use --dir flag.")
 
 def merge_configs(base_config, override_config):
     """
@@ -436,59 +244,31 @@ def merge_configs(base_config, override_config):
 def apply_env_overrides(config):
     """
     Apply environment variable overrides to configuration.
-    Environment variables follow the pattern: REPOINDEX_SECTION_SUBSECTION_KEY
-    For example: REPOINDEX_PYPI_CHECK_BY_DEFAULT=false
+
+    Supports:
+    - GITHUB_TOKEN: GitHub API token (standard convention)
     """
-    env_prefix = "REPOINDEX_"
-    
-    for env_key, value in os.environ.items():
-        if not env_key.startswith(env_prefix):
-            continue
+    # Handle GITHUB_TOKEN (standard convention)
+    github_token = os.environ.get('GITHUB_TOKEN')
+    if github_token:
+        if 'github' not in config:
+            config['github'] = {}
+        config['github']['token'] = github_token
 
-        key_parts = env_key[len(env_prefix):].lower().split('_')
-        
-        # Convert value
-        if value.lower() in ('true', '1', 'yes', 'on'):
-            typed_value = True
-        elif value.lower() in ('false', '0', 'no', 'off'):
-            typed_value = False
-        elif value.isdigit():
-            typed_value = int(value)
-        else:
-            typed_value = value
-
-        current_level = config
-        i = 0
-        while i < len(key_parts):
-            # Find the longest key in current_level that is a prefix of the remaining key_parts
-            best_match_len = 0
-            matched_key = None
-
-            for config_key in current_level.keys():
-                config_key_parts_from_key = config_key.split('_')
-                if key_parts[i : i + len(config_key_parts_from_key)] == config_key_parts_from_key:
-                    if len(config_key_parts_from_key) > best_match_len:
-                        best_match_len = len(config_key_parts_from_key)
-                        matched_key = config_key
-            
-            if matched_key:
-                # If we are at the end of the env var, we have found the key to set
-                if i + best_match_len == len(key_parts):
-                    current_level[matched_key] = typed_value
-                    break
-                
-                # Otherwise, we descend into the dictionary
-                if isinstance(current_level[matched_key], dict):
-                    current_level = current_level[matched_key]
-                    i += best_match_len
-                else:
-                    # Path conflict, e.g., env var is longer but we found a non-dict value
-                    break 
-            else:
-                # No match found
-                break
-                
     return config
+
+
+def get_repository_directories(config: dict) -> list:
+    """
+    Get repository directories from config.
+
+    Args:
+        config: Configuration dictionary
+
+    Returns:
+        List of directory paths/patterns (empty if not configured)
+    """
+    return config.get('repository_directories', [])
 
 
 

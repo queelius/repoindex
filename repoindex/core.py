@@ -32,7 +32,7 @@ def list_repos(source, directory, recursive, dedup, dedup_details):
         repo_paths = find_git_repos(search_path, recursive)
     else:  # source == "config"
         config = load_config()
-        config_dirs = config.get("general", {}).get("repository_directories", ["~/github"])
+        config_dirs = config.get("repository_directories", [])
         for conf_dir in config_dirs:
             search_path = os.path.expanduser(conf_dir)
             # When using config, we search non-recursively by default, respecting the --recursive flag
@@ -83,7 +83,7 @@ def get_repositories_from_path(base_dir: str, recursive: bool = False) -> Genera
     if base_dir is None:
         # Use configured directories if no base_dir specified
         repo_paths = find_git_repos_from_config(
-            config.get('general', {}).get('repository_directories', []),
+            config.get('repository_directories', []),
             recursive
         )
         if repo_paths:
@@ -97,8 +97,7 @@ def get_repositories_from_path(base_dir: str, recursive: bool = False) -> Genera
     else:
         # User specified a directory - just use it directly
         from .utils import is_git_repo
-        import os
-        
+
         # Expand and normalize the path
         expanded_dir = os.path.expanduser(base_dir)
         expanded_dir = os.path.abspath(expanded_dir)
@@ -174,7 +173,7 @@ def _get_filtered_repositories(base_dir: str, recursive: bool, tag_filters: list
         repos = list(get_repositories_from_path(base_dir, recursive))
     else:
         # Only use config if no base_dir specified
-        repo_dirs = config.get("general", {}).get("repository_directories", [])
+        repo_dirs = config.get("repository_directories", [])
         repos = list(find_git_repos_from_config(repo_dirs))
     
     # Get filtered repos by tags

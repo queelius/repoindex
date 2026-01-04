@@ -35,7 +35,7 @@ class RepoIndexApp(App):
         config = load_config()
 
         # Find all repos
-        repo_dirs = config.get('general', {}).get('repository_directories', [])
+        repo_dirs = config.get('repository_directories', [])
         if not repo_dirs:
             repo_dirs = ['.']
 
