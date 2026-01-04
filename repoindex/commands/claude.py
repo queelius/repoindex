@@ -23,14 +23,14 @@ repoindex refresh
 # Dashboard overview
 repoindex status
 
-# Query with convenience flags
+# Query with convenience flags (pretty table by default)
 repoindex query --dirty                    # Repos with uncommitted changes
 repoindex query --language python          # Python repos
 repoindex query --recent 7d                # Repos with recent commits
 repoindex query --tag "work/*"             # Repos by tag
 
-# Events from last week
-repoindex events --since 7d --pretty
+# Events from last week (pretty table by default)
+repoindex events --since 7d
 ```
 
 ## Query Convenience Flags
@@ -84,10 +84,11 @@ repoindex sql -i
 Events are populated by `refresh` and queried with `events`:
 
 ```bash
-repoindex events --since 7d --pretty      # Last week
+repoindex events --since 7d               # Last week (pretty table)
 repoindex events --type commit --since 30d  # Commits only
 repoindex events --repo myproject           # Filter by repo
 repoindex events --stats                    # Summary statistics
+repoindex events --json                     # JSONL for piping
 ```
 
 ## Refresh
@@ -98,6 +99,23 @@ repoindex refresh --full       # Force full refresh
 repoindex refresh --github     # Include GitHub metadata
 repoindex refresh --since 30d  # Events from last 30 days
 repoindex sql --reset && repoindex refresh --full  # Full rebuild
+```
+
+## Output Formats
+
+Commands output pretty tables by default. Use `--json` for JSONL (for piping):
+
+```bash
+# Pretty tables (default)
+repoindex query --language python
+repoindex events --since 7d
+
+# JSONL for piping/scripting
+repoindex query --json --language python | jq '.name'
+repoindex events --json --since 7d | jq '.type' | sort | uniq -c
+
+# Brief output (just repo names)
+repoindex query --brief --dirty
 ```
 '''
 

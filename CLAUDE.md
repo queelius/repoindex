@@ -10,7 +10,7 @@ It provides a unified view across all your repositories, enabling queries, organ
 
 **Key Philosophy**: repoindex knows *about* your repos (metadata, tags, status), while Claude Code works *inside* them (editing, generating). Together they provide full portfolio awareness.
 
-**Current Version**: 0.8.2
+**Current Version**: 0.9.1
 
 **See also**: [DESIGN.md](DESIGN.md) for detailed design principles and architecture.
 
@@ -56,17 +56,20 @@ Claude Code can run repoindex CLI commands directly. This is often more powerful
 # Dashboard overview
 repoindex status
 
-# Repos with uncommitted changes
-repoindex query --dirty --pretty
+# Repos with uncommitted changes (pretty table by default)
+repoindex query --dirty
 
 # Find Python repos with stars
-repoindex query --language python --starred --pretty
+repoindex query --language python --starred
 
 # What happened recently?
-repoindex events --since 7d --pretty
+repoindex events --since 7d
 
 # What got released this week?
-repoindex events --type git_tag --since 7d --pretty
+repoindex events --type git_tag --since 7d
+
+# JSONL output for piping/scripting
+repoindex query --json --language python | jq '.name'
 
 # Raw SQL access
 repoindex sql "SELECT name, stars FROM repos ORDER BY stars DESC LIMIT 10"
@@ -90,22 +93,27 @@ Events are populated by `refresh` and stored in the SQLite database:
 
 Query events from the database:
 ```bash
-repoindex events --since 7d --pretty
+repoindex events --since 7d              # Pretty table (default)
 repoindex events --type commit --since 30d
 repoindex events --repo myproject
 repoindex events --stats
+repoindex events --json --since 7d       # JSONL for piping
 ```
 
 ### Output Formats
 
-All commands output JSONL by default:
+`query` and `events` output pretty tables by default. Use `--json` for JSONL:
 ```bash
-repoindex events --since 7d | jq '.type' | sort | uniq -c
-```
+# Default: pretty tables
+repoindex query --language python
+repoindex events --since 7d
 
-Use `--pretty` for human-readable tables:
-```bash
-repoindex events --since 7d --pretty
+# JSONL for piping/scripting
+repoindex query --json --language python | jq '.name'
+repoindex events --json --since 7d | jq '.type' | sort | uniq -c
+
+# Brief output (just repo names)
+repoindex query --brief --dirty
 ```
 
 ## CRITICAL DESIGN PRINCIPLES
@@ -116,11 +124,11 @@ repoindex events --since 7d --pretty
 - **Text streams are the universal interface**: JSONL is our text stream format
 
 ### 2. Output Format Rules
-- **DEFAULT is JSONL**: Every command outputs newline-delimited JSON by default
+- **Human-first for interactive commands**: `query` and `events` output pretty tables by default
+- **JSONL for scripting**: Use `--json` flag for JSONL output (pipeable)
 - **Stream, don't collect**: Output each object as it's processed
-- **NO --json flag**: JSONL is already JSON (one object per line)
-- **Human output is opt-in**: Use --pretty or --table for human-readable tables
 - **Errors go to stderr**: Keep stdout clean for piping
+- **Brief mode**: Use `--brief` for just repo names (one per line)
 
 ### 3. Architecture Layers
 ```
@@ -140,19 +148,19 @@ Commands (CLI) → Services → Infrastructure → Domain
 ### 5. Command Implementation Pattern
 ```python
 @click.command()
-@click.option('--pretty', is_flag=True, help='Display as formatted table')
-def status_handler(pretty):
-    """Show repository status."""
+@click.option('--json', 'output_json', is_flag=True, help='Output as JSONL')
+def query_handler(output_json):
+    """Query repositories."""
     # Get data as generator from service
-    repos = repo_service.get_repository_status(path)
+    repos = repo_service.query_repos()
 
-    if pretty:
-        # Collect and render as table
-        render.status_table(list(repos))
-    else:
-        # Stream JSONL (default)
+    if output_json:
+        # Stream JSONL for piping
         for repo in repos:
             print(json.dumps(repo), flush=True)
+    else:
+        # Pretty table (default for interactive commands)
+        render.repos_table(list(repos))
 ```
 
 ### 6. Error Handling
@@ -536,18 +544,17 @@ def apply_env_overrides(config):
 
 ### Output Format Guidelines
 
-**Default JSONL output**:
+**Default pretty output** (for interactive commands like `query`, `events`):
 ```python
-# Stream one JSON object per line
-for item in items:
-    print(json.dumps(item), flush=True)
+# Pretty table by default
+render.repos_table(list(repos))
 ```
 
-**Optional pretty output**:
+**JSONL output** (for scripting/piping):
 ```python
-if pretty:
-    from ..render import render_table
-    render_table(list(items), columns=['col1', 'col2'])
+if output_json:
+    for item in items:
+        print(json.dumps(item), flush=True)
 ```
 
 **Error output**:
@@ -626,7 +633,7 @@ repoindex tag tree
 
 ### Events Command Usage
 ```bash
-# Query events from database (default: last 7 days)
+# Query events from database (default: last 7 days, pretty table)
 repoindex events
 
 # Events since specific time
@@ -643,8 +650,8 @@ repoindex events --repo myproject
 # Summary statistics
 repoindex events --stats
 
-# Human-readable output
-repoindex events --pretty
+# JSONL output for scripting
+repoindex events --json --since 7d | jq '.type'
 ```
 
 ### Refresh Command
