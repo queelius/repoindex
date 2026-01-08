@@ -47,49 +47,73 @@ class QueryCompileError(Exception):
 
 
 # Field name mappings (DSL field -> SQL column)
+# v0.10.0: All GitHub fields now have explicit github_ prefix for provenance
 FIELD_MAPPINGS = {
-    # Direct mappings
+    # Local fields (no prefix - these are about the local git directory)
     'name': 'name',
     'path': 'path',
     'language': 'language',
     'branch': 'branch',
     'owner': 'owner',
-    'stars': 'stars',
-    'forks': 'forks',
-    'watchers': 'watchers',
     'description': 'description',
 
-    # Git status
+    # Git status (local)
     'is_clean': 'is_clean',
     'clean': 'is_clean',
     'uncommitted': 'uncommitted_changes',
+    'uncommitted_changes': 'uncommitted_changes',
     'ahead': 'ahead',
     'behind': 'behind',
+    'has_upstream': 'has_upstream',
 
-    # Flags
-    'is_fork': 'is_fork',
-    'is_archived': 'is_archived',
-    'archived': 'is_archived',
-    'is_private': 'is_private',
-    'private': 'is_private',
+    # Local flags
     'has_readme': 'has_readme',
     'has_license': 'has_license',
     'has_ci': 'has_ci',
-    'has_pages': 'has_pages',
 
-    # License
+    # License (local detection)
     'license': 'license_key',
     'license_key': 'license_key',
 
-    # Timestamps
-    'updated': 'updated_at',
-    'updated_at': 'updated_at',
-    'created': 'created_at',
-    'created_at': 'created_at',
-    'pushed': 'pushed_at',
-    'pushed_at': 'pushed_at',
+    # Local scan timestamp
     'scanned': 'scanned_at',
     'scanned_at': 'scanned_at',
+
+    # GitHub fields (explicit github_ prefix for provenance)
+    'github_stars': 'github_stars',
+    'github_forks': 'github_forks',
+    'github_watchers': 'github_watchers',
+    'github_is_fork': 'github_is_fork',
+    'github_is_archived': 'github_is_archived',
+    'github_is_private': 'github_is_private',
+    'github_has_issues': 'github_has_issues',
+    'github_has_wiki': 'github_has_wiki',
+    'github_has_pages': 'github_has_pages',
+    'github_open_issues': 'github_open_issues',
+    'github_topics': 'github_topics',
+
+    # GitHub timestamps
+    'github_updated_at': 'github_updated_at',
+    'github_created_at': 'github_created_at',
+    'github_pushed_at': 'github_pushed_at',
+
+    # Convenience aliases (map short forms to github_ prefixed columns)
+    # These will be deprecated in favor of explicit github_ prefix
+    'stars': 'github_stars',
+    'forks': 'github_forks',
+    'watchers': 'github_watchers',
+    'is_fork': 'github_is_fork',
+    'is_archived': 'github_is_archived',
+    'archived': 'github_is_archived',
+    'is_private': 'github_is_private',
+    'private': 'github_is_private',
+    'has_pages': 'github_has_pages',
+    'updated': 'github_updated_at',
+    'updated_at': 'github_updated_at',
+    'created': 'github_created_at',
+    'created_at': 'github_created_at',
+    'pushed': 'github_pushed_at',
+    'pushed_at': 'github_pushed_at',
 }
 
 
@@ -429,15 +453,15 @@ class QueryCompiler:
                 params.append(tag_pattern)
             return sql, params
 
-        if name in ('updated_within', 'updated_since'):
+        if name in ('updated_within', 'updated_since', 'github_updated_within', 'github_updated_since'):
             duration = args[0] if args else kwargs.get('duration', '30d')
             since_dt = self._parse_since(duration)
-            return "updated_at >= ?", [since_dt.isoformat()]
+            return "github_updated_at >= ?", [since_dt.isoformat()]
 
-        if name in ('created_within', 'created_since'):
+        if name in ('created_within', 'created_since', 'github_created_within', 'github_created_since'):
             duration = args[0] if args else kwargs.get('duration', '30d')
             since_dt = self._parse_since(duration)
-            return "created_at >= ?", [since_dt.isoformat()]
+            return "github_created_at >= ?", [since_dt.isoformat()]
 
         if name == 'is_published':
             registry = args[0] if args else None
@@ -563,9 +587,14 @@ class QueryCompiler:
     def _is_boolean_field(self, field: str) -> bool:
         """Check if a field is a boolean field."""
         boolean_fields = {
-            'is_clean', 'clean', 'is_fork', 'is_archived', 'archived',
-            'is_private', 'private', 'has_readme', 'has_license', 'has_ci',
-            'has_pages', 'has_upstream', 'uncommitted_changes', 'uncommitted'
+            # Local boolean fields
+            'is_clean', 'clean', 'has_readme', 'has_license', 'has_ci',
+            'has_upstream', 'uncommitted_changes', 'uncommitted',
+            # GitHub boolean fields (short aliases)
+            'is_fork', 'is_archived', 'archived', 'is_private', 'private', 'has_pages',
+            # GitHub boolean fields (explicit prefix)
+            'github_is_fork', 'github_is_archived', 'github_is_private',
+            'github_has_issues', 'github_has_wiki', 'github_has_pages',
         }
         return field.lower() in boolean_fields
 

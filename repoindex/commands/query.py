@@ -29,9 +29,14 @@ DSL_PATTERNS = [
 
 # Known boolean field names that should be treated as DSL predicates, not text search
 BOOLEAN_FIELDS = {
-    'is_clean', 'clean', 'is_fork', 'is_archived', 'archived',
-    'is_private', 'private', 'has_readme', 'has_license', 'has_ci',
-    'has_pages', 'has_upstream', 'uncommitted_changes', 'uncommitted'
+    # Local boolean fields
+    'is_clean', 'clean', 'has_readme', 'has_license', 'has_ci',
+    'has_upstream', 'uncommitted_changes', 'uncommitted',
+    # GitHub boolean fields (short aliases)
+    'is_fork', 'is_archived', 'archived', 'is_private', 'private', 'has_pages',
+    # GitHub boolean fields (explicit prefix)
+    'github_is_fork', 'github_is_archived', 'github_is_private',
+    'github_has_issues', 'github_has_wiki', 'github_has_pages',
 }
 
 
@@ -120,34 +125,36 @@ def _build_query_from_flags(
     if recent:
         predicates.append(f"has_event('commit', since='{recent}')")
 
-    # Starred repos
+    # Starred repos (GitHub stars)
     if starred:
-        predicates.append("stars > 0")
+        predicates.append("github_stars > 0")
 
     # Tag filters
     if tag:
         for t in tag:
             predicates.append(f"tagged('{t}')")
 
-    # Audit-style flags (use bare boolean predicates)
+    # Audit-style flags (use bare boolean predicates - local)
     if no_license:
         predicates.append("not has_license")
     if no_readme:
         predicates.append("not has_readme")
+
+    # GitHub archive status
     if archived:
-        predicates.append("archived")
+        predicates.append("github_is_archived")
 
-    # Visibility flags
+    # GitHub visibility flags
     if public:
-        predicates.append("not private")
+        predicates.append("not github_is_private")
     if private:
-        predicates.append("private")
+        predicates.append("github_is_private")
 
-    # Fork flags
+    # GitHub fork flags
     if fork:
-        predicates.append("is_fork")
+        predicates.append("github_is_fork")
     if no_fork:
-        predicates.append("not is_fork")
+        predicates.append("not github_is_fork")
 
     # Join predicates with 'and'
     if not predicates:
@@ -395,8 +402,8 @@ def _output_result(result: dict, fields: Optional[str], brief: bool = False):
             output['tags'] = result['tags']
         if result.get('language'):
             output['language'] = result['language']
-        if result.get('stars'):
-            output['stars'] = result['stars']
+        if result.get('github_stars'):
+            output['github_stars'] = result['github_stars']
         if 'branch' in result:
             output['branch'] = result['branch']
 
@@ -426,8 +433,8 @@ def _display_pretty_results(results: list, fields: Optional[str]):
         columns = ['name'] + [f.strip() for f in fields.split(',')]
     else:
         columns = ['name', 'language', 'branch']
-        if any(r.get('stars') for r in results):
-            columns.insert(2, 'stars')
+        if any(r.get('github_stars') for r in results):
+            columns.insert(2, 'github_stars')
         columns.append('tags')
 
     for col in columns:
@@ -446,8 +453,8 @@ def _display_pretty_results(results: list, fields: Optional[str]):
                     row.append(', '.join(tags[:3]) + f' (+{len(tags)-3})')
                 else:
                     row.append(', '.join(tags))
-            elif col == 'stars':
-                row.append(str(result.get('stars', 0) or 0))
+            elif col == 'github_stars':
+                row.append(str(result.get('github_stars', 0) or 0))
             elif '.' in col:
                 value = result
                 for part in col.split('.'):

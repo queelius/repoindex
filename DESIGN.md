@@ -1,18 +1,52 @@
 # repoindex Design Specification
 
-**Version**: 0.10.0 (planned)
+**Version**: 0.10.0
 **Status**: Approved Specification
-**Last Updated**: 2026-01-06
+**Last Updated**: 2026-01-07
 
 This document captures design decisions, architecture, and requirements for repoindex based on detailed discussion and analysis.
 
 ---
 
+## Philosophy
+
+### Tagline
+
+**"repoindex is a filesystem git catalog."**
+
+### Core Identity Statement
+
+repoindex indexes **local git directories** accessible via standard filesystem operations. The **filesystem path IS the canonical identity** of a repository — each local path is an independent entity regardless of remotes.
+
+External platforms (GitHub, GitLab, PyPI, CRAN) provide **optional enrichment metadata**, but repoindex has **no dependency on any single platform**. Platform-specific fields are namespaced (`github_stars`, `pypi_published`) to maintain clear provenance.
+
+Local git state (branch, is_clean, ahead/behind) is **inherently local** and never platform-specific.
+
+### Key Design Principles
+
+| Principle | Description |
+|-----------|-------------|
+| **Path is Identity** | Each filesystem path is a distinct indexed entity, even if multiple paths share a remote |
+| **Local-First** | Git directories on your filesystem are the primary objects being indexed |
+| **Platforms are Enrichment** | GitHub, PyPI, CRAN add metadata but don't define identity |
+| **No Platform Lock-in** | repoindex works fully offline; external APIs are opt-in |
+| **Explicit Provenance** | Platform fields are namespaced (github_*, pypi_*, cran_*) |
+| **No Deduplication by Remote** | ~/github/foo and ~/work/foo are separate entries even if same remote URL |
+
+### What repoindex Indexes
+
+**Primary Objects**: Local git directories accessible via filesystem operations
+
+**NOT Indexed**:
+- Remote-only repositories (things on GitHub you haven't cloned)
+- Non-git directories
+- Code content (we know *about* repos, not *inside* them)
+
+---
+
 ## Vision
 
-**repoindex is a collection-aware metadata index for git repositories.**
-
-It provides a unified view across all your repositories, enabling queries, organization, and integration with LLM tools like Claude Code.
+**repoindex provides a unified view across all your local repositories**, enabling queries, organization, and integration with LLM tools like Claude Code.
 
 ```
 Claude Code (deep work on ONE repo)
@@ -72,6 +106,74 @@ Different tools for different complexity levels:
 - Pretty output by default for interactive use
 - `--json` flag for machine-readable JSONL
 - Errors to stderr, data to stdout
+
+---
+
+## Field Namespacing (v0.10.0)
+
+All fields are categorized by their **source** and namespaced accordingly.
+
+### Local Fields (No Prefix)
+
+These are derivable from the local filesystem and git repository:
+
+| Field | Description |
+|-------|-------------|
+| `name` | Repository directory name |
+| `path` | Absolute filesystem path (THE identity) |
+| `branch` | Current git branch |
+| `remote_url` | Git remote URL (just metadata, not identity) |
+| `owner` | Parsed from remote URL |
+| `is_clean` | No uncommitted changes |
+| `ahead`, `behind` | Commits ahead/behind upstream |
+| `has_upstream` | Has tracking branch configured |
+| `uncommitted_changes` | Has staged/unstaged changes |
+| `untracked_files` | Count of untracked files |
+| `language`, `languages` | Detected from file extensions |
+| `description` | From README or local source |
+| `readme_content` | Full README text |
+| `license_key`, `license_name`, `license_file` | Detected license |
+| `has_readme`, `has_license`, `has_ci` | Boolean feature flags |
+| `scanned_at` | When this repo was last scanned |
+
+### GitHub Fields (`github_` Prefix)
+
+All fields from GitHub API are prefixed:
+
+| Field | Description |
+|-------|-------------|
+| `github_owner`, `github_name` | GitHub owner/repo |
+| `github_description` | GitHub repo description |
+| `github_stars`, `github_forks`, `github_watchers` | Counts |
+| `github_is_fork`, `github_is_private`, `github_is_archived` | Flags |
+| `github_has_issues`, `github_has_wiki`, `github_has_pages` | Feature flags |
+| `github_open_issues` | Open issue count |
+| `github_topics` | JSON array of topics |
+| `github_created_at`, `github_updated_at`, `github_pushed_at` | Timestamps |
+
+### PyPI Fields (`pypi_` Prefix)
+
+| Field | Description |
+|-------|-------------|
+| `pypi_name` | Package name on PyPI |
+| `pypi_version` | Published version |
+| `pypi_published` | Is published on PyPI |
+| `pypi_url` | PyPI package URL |
+
+### CRAN Fields (`cran_` Prefix)
+
+| Field | Description |
+|-------|-------------|
+| `cran_name` | Package name on CRAN |
+| `cran_version` | Published version |
+| `cran_published` | Is published on CRAN/Bioconductor |
+| `cran_url` | CRAN package URL |
+
+### NULL Semantics
+
+When querying platform fields on repos without that platform's metadata:
+- `github_stars > 0` → **excludes** repos with no GitHub metadata (NULL fails comparison)
+- Use `github_stars IS NOT NULL` to filter for repos with GitHub data
 
 ---
 
@@ -185,43 +287,75 @@ Storage impact: ~1-5MB for 143 repos. Acceptable.
 
 ### Flag-Based Queries (Primary Interface)
 
+Flags are split into **local flags** (no prefix) and **platform flags** (prefixed).
+
+#### Local Flags (Unprefixed)
+
 ```bash
-# Common filters (AND together)
+# Local git state - always available, no external API needed
 repoindex query --dirty              # Uncommitted changes
 repoindex query --clean              # Clean repos
-repoindex query --language python    # By language
-repoindex query --recent 7d          # Recent activity
-repoindex query --starred            # Has GitHub stars
-repoindex query --tag "work/*"       # By tag pattern
-repoindex query --no-license         # Missing license
+repoindex query --language python    # By detected language
+repoindex query --recent 7d          # Recent local commits
+repoindex query --tag "work/*"       # By user tag
+repoindex query --no-license         # Missing license file
 repoindex query --no-readme          # Missing README
+repoindex query --has-remote         # Has any remote URL configured
+```
 
-# Combine flags (implicit AND)
+#### Platform Flags (Prefixed)
+
+```bash
+# GitHub-specific - requires --enrich-github during refresh
+repoindex query --github-private     # Private on GitHub
+repoindex query --github-public      # Public on GitHub (not github_is_private)
+repoindex query --github-starred     # Has GitHub stars > 0
+repoindex query --github-fork        # Is a fork on GitHub
+repoindex query --github-no-fork     # Not a fork (original repo)
+repoindex query --github-archived    # Archived on GitHub
+```
+
+#### Combining Flags (Implicit AND)
+
+```bash
+# All flags AND together
 repoindex query --dirty --language python --recent 7d
+repoindex query --github-private --language python
 ```
 
 ### DSL Queries (Power Users)
 
+DSL uses **namespaced field names** directly:
+
 ```bash
-# Boolean logic
-repoindex query "language == 'Python' and stars > 10"
-repoindex query "dirty or recent('7d')"
-repoindex query "not archived and has_ci"
+# Local fields (no prefix)
+repoindex query "language == 'Python' and is_clean"
+repoindex query "not is_clean"  # dirty repos
+repoindex query "has_license and has_readme"
+
+# GitHub fields (github_ prefix)
+repoindex query "github_stars > 10"
+repoindex query "github_is_private"
+repoindex query "not github_is_archived and github_stars > 0"
+
+# Mixed local + platform
+repoindex query "language == 'Python' and github_stars > 10"
 
 # Functions
 repoindex query "has_event('commit', since='30d')"
 repoindex query "tagged('work/*')"
 repoindex query "updated_since('7d')"
 
-# Ordering and limits
-repoindex query "language == 'Python' order by stars desc limit 10"
+# Ordering and limits (uses namespaced fields)
+repoindex query "language == 'Python' order by github_stars desc limit 10"
 
 # View references
 repoindex query "@python-active and is_clean"
 
-# Explain mode (NEW)
-repoindex query --explain "language == 'Python' and stars > 10"
-# Shows: SELECT * FROM repos WHERE language = ? AND stars > ? [params: Python, 10]
+# Explain mode
+repoindex query --explain "language == 'Python' and github_stars > 10"
+# Shows: SQL: SELECT * FROM repos WHERE language = ? AND github_stars > ?
+#        Params: ['Python', 10]
 ```
 
 ### Raw SQL (Edge Cases)
@@ -353,21 +487,26 @@ repoindex refresh --full
 - Rescans all repos regardless of mtime
 - Does NOT delete existing events
 
-### With External Sources
+### With External Enrichment
+
+External platform metadata is **opt-in** via `--enrich-*` flags:
 
 ```bash
-# Explicit opt-in (config can set defaults)
-repoindex refresh --github    # Fetch GitHub metadata
-repoindex refresh --pypi      # Check PyPI publication
-repoindex refresh --cran      # Check CRAN publication
+# Explicit enrichment (config can set defaults)
+repoindex refresh --enrich-github  # Fetch GitHub metadata (stars, topics, etc.)
+repoindex refresh --enrich-pypi    # Check PyPI publication status
+repoindex refresh --enrich-cran    # Check CRAN publication status
+repoindex refresh --enrich-all     # Enable all external enrichment
 
 # Combined
-repoindex refresh --github --pypi --since 30d
+repoindex refresh --enrich-github --enrich-pypi --since 30d
 ```
+
+**Note**: Without enrichment flags, only local git state is scanned. Platform-specific fields will be NULL.
 
 ### Failure Behavior
 
-- **GitHub unreachable**: Fail fast if `--github` specified
+- **GitHub unreachable**: Fail fast if `--enrich-github` specified
 - **Individual repo errors**: Log warning, continue, track in `scan_errors` table
 - **Rate limit hit**: Proactive warning showing remaining quota
 
@@ -548,6 +687,17 @@ CREATE TABLE scan_errors (
 
 ## Removed/Deprecated
 
+### Breaking Changes in v0.10.0
+
+| Change | Migration |
+|--------|-----------|
+| Schema field renaming | `stars` → `github_stars`, `is_private` → `github_is_private`, etc. |
+| CLI flag renaming | `--private` → `--github-private`, `--github` → `--enrich-github` |
+| Remote-based deduplication removed | Multiple checkouts of same remote now appear as separate entries |
+| DSL field names | Use `github_stars`, not `stars` in queries |
+
+**Migration**: Run `repoindex sql --reset` then `repoindex refresh --full` after upgrading.
+
 ### Removed in v0.10.0
 
 | Item | Reason |
@@ -556,6 +706,8 @@ CREATE TABLE scan_errors (
 | Dependencies table | Not implemented, out of scope |
 | Repo snapshots table | Abandoned feature |
 | JSON config support | YAML only for simplicity |
+| `--private`, `--starred` flags | Use `--github-private`, `--github-starred` |
+| `--github`, `--pypi` refresh flags | Use `--enrich-github`, `--enrich-pypi` |
 
 ### Deprecated (Hidden)
 
@@ -603,10 +755,10 @@ def command(output_json):
 
 | Version | Changes |
 |---------|---------|
+| **0.10.0** | **Philosophy: "Filesystem git catalog"** - path is identity, namespaced fields, explicit platform flags, no remote dedup, MCP removed |
 | 0.9.2 | Documentation updates, pretty output default |
 | 0.9.1 | Bug fixes (status counts, events --pretty) |
 | 0.9.0 | CLI simplification, SQLite database |
-| 0.10.0 | (Planned) This specification |
 
 ---
 
@@ -618,3 +770,6 @@ Items for future consideration:
 2. **View parameters**: Template-style views with `$1`, `$2` placeholders?
 3. **Shell redesign**: What would a better VFS interface look like?
 4. **FTS queries**: How to expose full-text search in DSL/flags?
+5. **Full table split**: Should platform metadata move to separate tables (github_metadata, pypi_metadata)?
+6. **Hierarchical event sources**: Should event source be `git.local` vs `github.api` instead of simple `git`, `github`?
+7. **Multi-platform support**: GitLab, Bitbucket, etc. - same namespacing pattern?

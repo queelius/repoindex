@@ -267,7 +267,7 @@ def _list_repos(config: dict, output_json: bool, pretty: bool):
     try:
         with Database(config=config, read_only=True) as db:
             db.execute("""
-                SELECT name, path, language, branch, is_clean, stars
+                SELECT name, path, language, branch, is_clean, github_stars
                 FROM repos
                 ORDER BY name
             """)
@@ -300,17 +300,17 @@ def _print_repos_table(rows):
     table.add_column("Language")
     table.add_column("Branch")
     table.add_column("Status")
-    table.add_column("Stars", justify="right")
+    table.add_column("GitHub Stars", justify="right")
 
     for row in rows:
         status = "[green]clean[/green]" if row['is_clean'] else "[yellow]dirty[/yellow]"
-        stars = str(row['stars']) if row['stars'] else ""
+        github_stars = str(row['github_stars']) if row['github_stars'] else ""
         table.add_row(
             row['name'] or "",
             row['language'] or "",
             row['branch'] or "",
             status,
-            stars,
+            github_stars,
         )
 
     console.print(table)

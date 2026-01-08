@@ -77,7 +77,6 @@ class RepositoryService:
         exclude.update(EXCLUDE_DIRS)
 
         seen_paths: Set[str] = set()
-        seen_remotes: Set[str] = set()
 
         for path in paths:
             path = os.path.expanduser(path)
@@ -87,11 +86,11 @@ class RepositoryService:
                 import glob
                 for expanded in glob.glob(path, recursive=True):
                     yield from self._discover_path(
-                        expanded, recursive, exclude, seen_paths, seen_remotes
+                        expanded, recursive, exclude, seen_paths
                     )
             else:
                 yield from self._discover_path(
-                    path, recursive, exclude, seen_paths, seen_remotes
+                    path, recursive, exclude, seen_paths
                 )
 
     def _discover_path(
@@ -99,10 +98,14 @@ class RepositoryService:
         path: str,
         recursive: bool,
         exclude: Set[str],
-        seen_paths: Set[str],
-        seen_remotes: Set[str]
+        seen_paths: Set[str]
     ) -> Generator[Repository, None, None]:
-        """Discover repos from a single path."""
+        """
+        Discover repos from a single path.
+
+        v0.10.0: Filesystem path IS the canonical identity. No remote-URL deduplication.
+        Each local path is an independent entry even if multiple paths point to same remote.
+        """
         path = str(Path(path).resolve())
 
         if not os.path.isdir(path):
@@ -112,12 +115,6 @@ class RepositoryService:
         if self.git.is_git_repo(path):
             if path not in seen_paths:
                 repo = self._create_repo(path)
-                # Dedupe by remote URL
-                if repo.remote_url:
-                    normalized = self._normalize_url(repo.remote_url)
-                    if normalized in seen_remotes:
-                        return
-                    seen_remotes.add(normalized)
                 seen_paths.add(path)
                 yield repo
             return
@@ -138,7 +135,7 @@ class RepositoryService:
                     continue
 
                 yield from self._discover_path(
-                    entry.path, recursive, exclude, seen_paths, seen_remotes
+                    entry.path, recursive, exclude, seen_paths
                 )
         except PermissionError:
             logger.debug(f"Permission denied: {path}")

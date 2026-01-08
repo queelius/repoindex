@@ -508,7 +508,7 @@ class TestQueryCompiler(unittest.TestCase):
     def test_order_by(self):
         """Test ORDER BY clause."""
         result = compile_query("language == 'Python' order by stars desc")
-        self.assertIn("ORDER BY stars DESC", result.sql)
+        self.assertIn("ORDER BY github_stars DESC", result.sql)
         self.assertEqual(result.order_by, [('stars', 'desc')])
 
     def test_limit(self):
@@ -520,7 +520,7 @@ class TestQueryCompiler(unittest.TestCase):
     def test_order_by_and_limit(self):
         """Test ORDER BY and LIMIT together."""
         result = compile_query("stars > 50 order by updated desc limit 20")
-        self.assertIn("ORDER BY updated_at DESC", result.sql)
+        self.assertIn("ORDER BY github_updated_at DESC", result.sql)
         self.assertIn("LIMIT 20", result.sql)
 
     def test_has_event_function(self):

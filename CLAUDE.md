@@ -4,11 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**repoindex is a collection-aware metadata index for git repositories.**
+**"repoindex is a filesystem git catalog."**
 
-It provides a unified view across all your repositories, enabling queries, organization, and integration with LLM tools like Claude Code.
+It indexes **local git directories** accessible via standard filesystem operations. The **filesystem path IS the canonical identity** of a repository — each local path is an independent entity regardless of remotes.
 
-**Key Philosophy**: repoindex knows *about* your repos (metadata, tags, status), while Claude Code works *inside* them (editing, generating). Together they provide full portfolio awareness.
+External platforms (GitHub, PyPI, CRAN) provide **optional enrichment metadata**, but repoindex has **no dependency on any single platform**. Platform-specific fields are namespaced (`github_stars`, `pypi_published`) to maintain clear provenance.
 
 **Current Version**: 0.10.0
 
@@ -24,18 +24,19 @@ Claude Code (deep work on ONE repo)
          ▼
     repoindex (collection awareness)
          │
-         ├── /repos/...     → what exists
-         ├── /tags/...      → organization
-         ├── /stats/...     → aggregations
-         └── /events/...    → what happened
+         ├── query       → filter and search
+         ├── status      → health dashboard
+         ├── events      → what happened
+         └── tags        → organization
 ```
 
-### Core Principles
-1. **Collection, not content** - know *about* repos, not *inside* them
-2. **Metadata, not manipulation** - track state, don't edit files
-3. **Index, not IDE** - we're the catalog, not the workbench
-4. **Complement Claude Code** - provide context, not compete
-5. **CLI first** - compose with Unix tools via pipes
+### Core Principles (v0.10.0)
+1. **Path is Identity** - filesystem path defines a repo, not remote URL
+2. **Local-First** - works fully offline; external APIs are opt-in
+3. **Platforms are Enrichment** - GitHub, PyPI add metadata but don't define identity
+4. **Explicit Provenance** - platform fields are namespaced (`github_*`, `pypi_*`)
+5. **No Platform Lock-in** - no dependency on any single external system
+6. **CLI first** - compose with Unix tools via pipes
 
 ### Core Capabilities
 1. **Repository Discovery** - Find and track repos across directories
@@ -58,8 +59,8 @@ repoindex status
 # Repos with uncommitted changes (pretty table by default)
 repoindex query --dirty
 
-# Find Python repos with stars
-repoindex query --language python --starred
+# Find Python repos with GitHub stars
+repoindex query --language python --github-starred
 
 # What happened recently?
 repoindex events --since 7d
@@ -71,18 +72,30 @@ repoindex events --type git_tag --since 7d
 repoindex query --json --language python | jq '.name'
 
 # Raw SQL access
-repoindex sql "SELECT name, stars FROM repos ORDER BY stars DESC LIMIT 10"
+repoindex sql "SELECT name, github_stars FROM repos ORDER BY github_stars DESC LIMIT 10"
 ```
 
 ### Query Convenience Flags
 
+**Local flags** (no prefix - these are about the local git directory):
 ```bash
 repoindex query --dirty              # Uncommitted changes
-repoindex query --language python    # Python repos
-repoindex query --recent 7d          # Recent commits
+repoindex query --clean              # No uncommitted changes
+repoindex query --language python    # Python repos (detected locally)
+repoindex query --recent 7d          # Recent local commits
 repoindex query --tag "work/*"       # By tag
-repoindex query --no-license         # Missing license
-repoindex query --starred            # Has stars
+repoindex query --no-license         # Missing license file
+repoindex query --no-readme          # Missing README
+repoindex query --has-remote         # Has any remote URL
+```
+
+**GitHub flags** (explicit prefix - requires `--enrich-github` during refresh):
+```bash
+repoindex query --github-starred     # Has GitHub stars
+repoindex query --github-private     # Private on GitHub
+repoindex query --github-public      # Public on GitHub
+repoindex query --github-fork        # Is a fork on GitHub
+repoindex query --github-archived    # Archived on GitHub
 ```
 
 ### Event Types
@@ -311,6 +324,7 @@ mock_run_command.side_effect = [("output1", 0), ("output2", 0)]  # Multiple call
 - `packaging>=21.0` - Package version handling
 - `click` - CLI framework
 - `rapidfuzz` - Fuzzy string matching for query language
+- `pyyaml` - YAML configuration files
 
 ### Commands Implemented (10 commands)
 
@@ -325,7 +339,7 @@ repoindex
 ├── view                # Curated views (list/show/create/delete)
 ├── config              # Settings (show/repos/init)
 ├── claude              # Skill management (install/uninstall/show)
-└── shell               # Interactive mode with VFS navigation
+└── shell               # Interactive mode
 ```
 
 ## Configuration
@@ -363,12 +377,15 @@ We refactored to a clean layered architecture:
 
 ### Query Language
 - Simple boolean expressions with fuzzy matching via `rapidfuzz`
-- Path-based access to nested fields (e.g., `license.key`, `package.version`)
+- Path-based access to nested fields (e.g., `license.key`, `pypi_version`)
+- Platform fields are namespaced: `github_stars`, `github_is_private`, `pypi_published`
 - Operators: `==`, `!=`, `~=` (fuzzy), `>`, `<`, `contains`, `in`
 - Examples:
   - `"language ~= 'pyton'"` - fuzzy match Python
-  - `"'ml' in topics"` - check if 'ml' in topics list
-  - `"stars > 10 and language == 'Python'"` - multiple conditions
+  - `"'ml' in github_topics"` - check if 'ml' in GitHub topics list
+  - `"github_stars > 10 and language == 'Python'"` - multiple conditions
+  - `"github_is_private"` - repos that are private on GitHub
+  - `"pypi_published"` - repos published to PyPI
 
 ## Project Structure Notes
 
@@ -604,7 +621,7 @@ repoindex tag tree
 ## Important Implementation Notes
 
 ### Config Store Location
-- Default: `~/.repoindex/config.json`
+- Default: `~/.repoindex/config.yaml`
 - Set `REPOINDEX_CONFIG` to override
 
 ### Rate Limiting (GitHub API)
@@ -643,9 +660,12 @@ repoindex events --json --since 7d | jq '.type'
 
 ### Refresh Command
 ```bash
-repoindex refresh              # Smart refresh (changed repos only)
-repoindex refresh --full       # Force full refresh
-repoindex refresh --github     # Include GitHub metadata
-repoindex refresh --since 30d  # Events from last 30 days
-repoindex sql --reset          # Reset database (then refresh --full)
+repoindex refresh                  # Smart refresh (changed repos only)
+repoindex refresh --full           # Force full refresh
+repoindex refresh --enrich-github  # Include GitHub metadata
+repoindex refresh --enrich-pypi    # Include PyPI package status
+repoindex refresh --enrich-cran    # Include CRAN package status
+repoindex refresh --enrich-all     # Include all external metadata
+repoindex refresh --since 30d      # Events from last 30 days
+repoindex sql --reset              # Reset database (then refresh --full)
 ```

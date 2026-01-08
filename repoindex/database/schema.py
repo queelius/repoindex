@@ -13,7 +13,9 @@ import sqlite3
 from typing import List, Tuple
 
 # Current schema version - increment when schema changes
-CURRENT_VERSION = 1
+# v1: Initial schema
+# v2: Renamed GitHub fields with github_ prefix for explicit provenance
+CURRENT_VERSION = 2
 
 # Schema definition as SQL statements
 SCHEMA_V1 = """
@@ -54,32 +56,35 @@ CREATE TABLE IF NOT EXISTS repos (
     license_name TEXT,
     license_file TEXT,
 
-    -- GitHub metadata (nullable, fetched on demand)
+    -- GitHub metadata (nullable, fetched via --enrich-github)
+    -- All fields prefixed with github_ for explicit provenance
     github_owner TEXT,
     github_name TEXT,
     github_description TEXT,
-    stars INTEGER DEFAULT 0,
-    forks INTEGER DEFAULT 0,
-    watchers INTEGER DEFAULT 0,
-    open_issues INTEGER DEFAULT 0,
-    is_fork BOOLEAN DEFAULT 0,
-    is_private BOOLEAN DEFAULT 0,
-    is_archived BOOLEAN DEFAULT 0,
-    has_issues BOOLEAN DEFAULT 1,
-    has_wiki BOOLEAN DEFAULT 1,
-    has_pages BOOLEAN DEFAULT 0,
-    pages_url TEXT,
-    topics TEXT,  -- JSON array
+    github_stars INTEGER DEFAULT 0,
+    github_forks INTEGER DEFAULT 0,
+    github_watchers INTEGER DEFAULT 0,
+    github_open_issues INTEGER DEFAULT 0,
+    github_is_fork BOOLEAN DEFAULT 0,
+    github_is_private BOOLEAN DEFAULT 0,
+    github_is_archived BOOLEAN DEFAULT 0,
+    github_has_issues BOOLEAN DEFAULT 1,
+    github_has_wiki BOOLEAN DEFAULT 1,
+    github_has_pages BOOLEAN DEFAULT 0,
+    github_pages_url TEXT,
+    github_topics TEXT,  -- JSON array
 
     -- Flags (computed)
     has_readme BOOLEAN DEFAULT 0,
     has_license BOOLEAN DEFAULT 0,
     has_ci BOOLEAN DEFAULT 0,
 
-    -- Timestamps
-    created_at TIMESTAMP,
-    updated_at TIMESTAMP,
-    pushed_at TIMESTAMP,
+    -- GitHub timestamps (nullable, fetched via --enrich-github)
+    github_created_at TIMESTAMP,
+    github_updated_at TIMESTAMP,
+    github_pushed_at TIMESTAMP,
+
+    -- Local scan timestamp
     scanned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
     -- For smart refresh (mtime of .git/index)
@@ -141,8 +146,8 @@ CREATE TABLE IF NOT EXISTS scan_errors (
 CREATE INDEX IF NOT EXISTS idx_repos_name ON repos(name);
 CREATE INDEX IF NOT EXISTS idx_repos_language ON repos(language);
 CREATE INDEX IF NOT EXISTS idx_repos_owner ON repos(owner);
-CREATE INDEX IF NOT EXISTS idx_repos_updated ON repos(updated_at);
-CREATE INDEX IF NOT EXISTS idx_repos_stars ON repos(stars);
+CREATE INDEX IF NOT EXISTS idx_repos_github_updated ON repos(github_updated_at);
+CREATE INDEX IF NOT EXISTS idx_repos_github_stars ON repos(github_stars);
 CREATE INDEX IF NOT EXISTS idx_repos_scanned ON repos(scanned_at);
 
 CREATE INDEX IF NOT EXISTS idx_tags_tag ON tags(tag);
@@ -215,8 +220,8 @@ SELECT
     r.id as repo_id,
     r.name,
     r.language,
-    r.stars,
-    r.forks,
+    r.github_stars,
+    r.github_forks,
     COALESCE(commits_30d.cnt, 0) as commits_30d,
     COALESCE(commits_90d.cnt, 0) as commits_90d,
     COALESCE(tags_90d.cnt, 0) as tags_90d,
@@ -265,15 +270,39 @@ def get_schema_version(conn: sqlite3.Connection) -> int:
 
 
 def apply_schema(conn: sqlite3.Connection, version: int = CURRENT_VERSION) -> None:
-    """Apply schema to database."""
-    # For now, just apply V1
-    # Future versions would have migration logic here
-    if version >= 1:
-        conn.executescript(SCHEMA_V1)
-        conn.execute(
-            "INSERT OR REPLACE INTO _schema_info (version, description) VALUES (?, ?)",
-            (1, "Initial schema with repos, events, tags, publications, dependencies")
-        )
+    """
+    Apply schema to database.
+
+    Since repoindex is a cache that can be rebuilt from the filesystem,
+    we simply drop and recreate if the schema version doesn't match.
+    The database is ephemeral - the ground truth is in local git repos.
+    """
+    current = get_schema_version(conn)
+
+    # If schema version mismatch, drop everything and recreate
+    # No complex migration needed - this is just a cache
+    if current != 0 and current < CURRENT_VERSION:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"Schema version {current} -> {CURRENT_VERSION}, rebuilding cache")
+
+        # Drop all tables (cascade will handle FKs)
+        conn.executescript("""
+            DROP TABLE IF EXISTS repos_fts;
+            DROP TABLE IF EXISTS tags;
+            DROP TABLE IF EXISTS events;
+            DROP TABLE IF EXISTS publications;
+            DROP TABLE IF EXISTS scan_errors;
+            DROP TABLE IF EXISTS repos;
+            DROP TABLE IF EXISTS _schema_info;
+        """)
+
+    # Apply current schema
+    conn.executescript(SCHEMA_V1)
+    conn.execute(
+        "INSERT OR REPLACE INTO _schema_info (version, description) VALUES (?, ?)",
+        (CURRENT_VERSION, "v0.10.0: GitHub fields renamed with github_ prefix for explicit provenance")
+    )
 
     conn.commit()
 
