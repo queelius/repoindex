@@ -6,6 +6,7 @@ This is the primary way to sync the database with filesystem state.
 """
 
 import json
+import os
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -23,16 +24,43 @@ from ..database import (
     needs_refresh,
     get_repo_count,
     get_repo_by_path,
+    record_scan_error,
+    clear_scan_error_for_path,
+    get_scan_error_count,
 )
 from ..database.events import insert_events
 from ..services.repository_service import RepositoryService
 from ..events import scan_events
 
 
+def _resolve_external_flag(explicit: Optional[bool], external: bool, config_default: bool) -> bool:
+    """
+    Resolve an external source flag.
+
+    Priority: explicit flag > --external flag > config default
+
+    Args:
+        explicit: Explicit flag value (True/False/None)
+        external: Whether --external was passed
+        config_default: Default from config
+
+    Returns:
+        Whether to enable this source
+    """
+    if explicit is not None:
+        return explicit
+    if external:
+        return True
+    return config_default
+
+
 @click.command('refresh')
 @click.option('--full', is_flag=True, help='Force full refresh of all repos')
 @click.option('--since', default='90d', help='How far back to scan for events (e.g., 7d, 30d, 90d)')
-@click.option('--github', is_flag=True, help='Fetch GitHub metadata (stars, topics, etc.)')
+@click.option('--github/--no-github', default=None, help='Fetch GitHub metadata (stars, topics)')
+@click.option('--pypi/--no-pypi', default=None, help='Fetch PyPI package status')
+@click.option('--cran/--no-cran', default=None, help='Fetch CRAN package status')
+@click.option('--external', is_flag=True, help='Enable all external sources (github, pypi, cran)')
 @click.option('-d', '--dir', 'directory', type=click.Path(exists=True),
               help='Refresh specific directory instead of configured paths')
 @click.option('--dry-run', is_flag=True, help='Show what would be refreshed')
@@ -41,7 +69,10 @@ from ..events import scan_events
 def refresh_handler(
     full: bool,
     since: str,
-    github: bool,
+    github: Optional[bool],
+    pypi: Optional[bool],
+    cran: Optional[bool],
+    external: bool,
     directory: Optional[str],
     dry_run: bool,
     quiet: bool,
@@ -57,6 +88,10 @@ def refresh_handler(
     By default, performs a smart refresh that only updates repos
     that have changed since the last scan.
 
+    External sources (GitHub, PyPI, CRAN) are disabled by default
+    but can be enabled via flags or config. These make API calls
+    and can be slow for large collections.
+
     Examples:
 
         # Smart refresh (only changed repos)
@@ -68,6 +103,12 @@ def refresh_handler(
         # Include GitHub metadata
         repoindex refresh --github
 
+        # Include all external sources (slower)
+        repoindex refresh --external
+
+        # Include PyPI and CRAN package status
+        repoindex refresh --pypi --cran
+
         # Refresh specific directory
         repoindex refresh -d ~/projects
 
@@ -76,8 +117,24 @@ def refresh_handler(
 
         # Reset and rebuild: use sql --reset first
         repoindex sql --reset && repoindex refresh --full
+
+    External source config defaults (in config.yaml):
+
+        refresh:
+          external_sources:
+            github: true   # Enable by default
+            pypi: false    # Disabled by default
+            cran: false    # Disabled by default
     """
     config = load_config()
+
+    # Resolve external source flags using config defaults
+    # Priority: explicit flag > --external flag > config default > false
+    ext_config = config.get('refresh', {}).get('external_sources', {})
+
+    fetch_github = _resolve_external_flag(github, external, ext_config.get('github', False))
+    fetch_pypi = _resolve_external_flag(pypi, external, ext_config.get('pypi', False))
+    fetch_cran = _resolve_external_flag(cran, external, ext_config.get('cran', False))
 
     # Get paths to scan
     if directory:
@@ -90,6 +147,22 @@ def refresh_handler(
                 "hint": "Use 'repoindex init' or provide --dir"
             }))
             sys.exit(1)
+
+    # Check if configured paths exist and warn if not
+    missing_paths = []
+    for p in paths:
+        expanded = os.path.expanduser(p.rstrip('*').rstrip('/'))
+        if not os.path.exists(expanded):
+            missing_paths.append(p)
+
+    if missing_paths and not quiet:
+        click.echo(f"Warning: {len(missing_paths)} configured path(s) do not exist:", err=True)
+        for p in missing_paths[:3]:  # Show first 3
+            click.echo(f"  - {p}", err=True)
+        if len(missing_paths) > 3:
+            click.echo(f"  ... and {len(missing_paths) - 3} more", err=True)
+        click.echo("Use 'repoindex config repos list' to see configured paths.", err=True)
+        click.echo("", err=True)
 
     # Initialize service
     service = RepositoryService(config=config)
@@ -114,6 +187,13 @@ def refresh_handler(
         # Discover repositories
         repos = list(service.discover(paths=paths, recursive=True))
 
+        # Warn if no repos found
+        if not repos and not quiet:
+            click.echo("Warning: No repositories found in configured paths.", err=True)
+            click.echo("The database may contain stale data from previous scans.", err=True)
+            click.echo("Use 'repoindex config repos add <path>' to configure paths.", err=True)
+            click.echo("", err=True)
+
         if pretty:
             from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
             with Progress(
@@ -129,7 +209,9 @@ def refresh_handler(
                         db, service, repo, stats,
                         full=full,
                         since=since_datetime,
-                        github=github,
+                        fetch_github=fetch_github,
+                        fetch_pypi=fetch_pypi,
+                        fetch_cran=fetch_cran,
                         dry_run=dry_run,
                         quiet=quiet
                     )
@@ -140,7 +222,9 @@ def refresh_handler(
                     db, service, repo, stats,
                     full=full,
                     since=since_datetime,
-                    github=github,
+                    fetch_github=fetch_github,
+                    fetch_pypi=fetch_pypi,
+                    fetch_cran=fetch_cran,
                     dry_run=dry_run,
                     quiet=quiet
                 )
@@ -152,6 +236,7 @@ def refresh_handler(
 
         stats['end_time'] = datetime.now().isoformat()
         stats['total_repos'] = get_repo_count(db)
+        stats['total_scan_errors'] = get_scan_error_count(db)
 
     # Output results
     if quiet:
@@ -169,7 +254,9 @@ def _process_repo(
     stats: dict,
     full: bool,
     since: datetime,
-    github: bool,
+    fetch_github: bool,
+    fetch_pypi: bool,
+    fetch_cran: bool,
     dry_run: bool,
     quiet: bool,
 ):
@@ -188,7 +275,12 @@ def _process_repo(
             return
 
         # Enrich with status
-        enriched = service.get_status(repo, fetch_github=github)
+        enriched = service.get_status(
+            repo,
+            fetch_github=fetch_github,
+            fetch_pypi=fetch_pypi,
+            fetch_cran=fetch_cran
+        )
 
         # Load tags from config
         tags_from_config = service.config.get('repository_tags', {}).get(repo.path, [])
@@ -198,6 +290,9 @@ def _process_repo(
         # Upsert to database
         repo_id = upsert_repo(db, enriched)
         stats['updated'] += 1
+
+        # Clear any previous scan errors for this path
+        clear_scan_error_for_path(db, repo.path)
 
         # Always scan events
         if repo_id:
@@ -217,8 +312,22 @@ def _process_repo(
         if not quiet:
             click.echo(f"  Refreshed: {repo.name}", err=True)
 
+    except PermissionError as e:
+        stats['errors'] += 1
+        record_scan_error(db, repo.path, 'permission', str(e))
+        if not quiet:
+            click.echo(f"  Error (permission): {repo.name}: {e}", err=True)
+
     except Exception as e:
         stats['errors'] += 1
+        # Determine error type
+        error_type = 'git_error'
+        error_msg = str(e)
+        if 'not a git repository' in error_msg.lower():
+            error_type = 'not_git'
+        elif 'corrupt' in error_msg.lower():
+            error_type = 'corrupt'
+        record_scan_error(db, repo.path, error_type, error_msg)
         if not quiet:
             click.echo(f"  Error: {repo.name}: {e}", err=True)
 
@@ -251,6 +360,15 @@ def _parse_since(since_str: str) -> datetime:
             return now - timedelta(days=90)
 
 
+def _format_bytes(size: int) -> str:
+    """Format byte size as human readable string."""
+    for unit in ['B', 'KB', 'MB', 'GB']:
+        if size < 1024:
+            return f"{size:.1f} {unit}"
+        size /= 1024
+    return f"{size:.1f} TB"
+
+
 def _print_summary_pretty(stats: dict):
     """Print a pretty summary of refresh results."""
     from rich.console import Console
@@ -267,7 +385,8 @@ def _print_summary_pretty(stats: dict):
     table.add_row("Repos skipped", str(stats.get('skipped', 0)))
     table.add_row("Repos removed", str(stats.get('removed', 0)))
     table.add_row("Events added", str(stats.get('events_added', 0)))
-    table.add_row("Errors", str(stats.get('errors', 0)))
+    table.add_row("Errors (this run)", str(stats.get('errors', 0)))
+    table.add_row("Total scan errors", str(stats.get('total_scan_errors', 0)))
     table.add_row("Total in DB", str(stats.get('total_repos', 0)))
 
     console.print(table)
@@ -319,6 +438,9 @@ def db_handler(show_info: bool, show_path: bool, reset: bool):
 @click.option('--info', 'show_info', is_flag=True, help='Show database info')
 @click.option('--path', 'show_path', is_flag=True, help='Show database path')
 @click.option('--schema', 'show_schema', is_flag=True, help='Show database schema')
+@click.option('--stats', 'show_stats', is_flag=True, help='Show table statistics (row counts)')
+@click.option('--integrity', 'check_integrity', is_flag=True, help='Check database integrity')
+@click.option('--vacuum', 'do_vacuum', is_flag=True, help='Compact and optimize database')
 @click.option('--reset', 'do_reset', is_flag=True, help='Delete and recreate database')
 def sql_handler(
     query: Optional[str],
@@ -328,6 +450,9 @@ def sql_handler(
     show_info: bool,
     show_path: bool,
     show_schema: bool,
+    show_stats: bool,
+    check_integrity: bool,
+    do_vacuum: bool,
     do_reset: bool,
 ):
     """
@@ -344,6 +469,7 @@ def sql_handler(
         repoindex sql --info
         repoindex sql --path
         repoindex sql --schema
+        repoindex sql --stats
 
         # Query from file
         repoindex sql -f query.sql
@@ -354,7 +480,9 @@ def sql_handler(
         # Interactive shell
         repoindex sql -i
 
-        # Reset database
+        # Database maintenance
+        repoindex sql --integrity
+        repoindex sql --vacuum
         repoindex sql --reset
     """
     config = load_config()
@@ -382,6 +510,59 @@ def sql_handler(
                 if row['sql']:
                     print(row['sql'])
                     print()
+        return
+
+    if show_stats:
+        with Database(config=config, read_only=True) as db:
+            # Get all tables
+            db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '%_fts%' ORDER BY name")
+            tables = [row['name'] for row in db.fetchall()]
+
+            from rich.console import Console
+            from rich.table import Table
+
+            console = Console()
+            table = Table(title="Table Statistics")
+            table.add_column("Table", style="cyan")
+            table.add_column("Rows", style="green", justify="right")
+
+            for tbl in tables:
+                db.execute(f"SELECT COUNT(*) as count FROM {tbl}")
+                count = db.fetchone()['count']
+                table.add_row(tbl, str(count))
+
+            console.print(table)
+        return
+
+    if check_integrity:
+        with Database(config=config, read_only=True) as db:
+            db.execute("PRAGMA integrity_check")
+            result = db.fetchone()
+            if result and result[0] == 'ok':
+                click.echo("Database integrity check: OK", err=False)
+            else:
+                click.echo(f"Database integrity check failed: {result[0] if result else 'unknown error'}", err=True)
+                sys.exit(1)
+        return
+
+    if do_vacuum:
+        from ..database import get_db_path
+        import os
+
+        db_path = get_db_path(config)
+        size_before = os.path.getsize(db_path) if os.path.exists(db_path) else 0
+
+        with Database(config=config) as db:
+            db.execute("VACUUM")
+
+        size_after = os.path.getsize(db_path)
+        saved = size_before - size_after
+
+        click.echo(f"Database optimized.", err=False)
+        click.echo(f"  Size before: {_format_bytes(size_before)}", err=False)
+        click.echo(f"  Size after:  {_format_bytes(size_after)}", err=False)
+        if saved > 0:
+            click.echo(f"  Saved:       {_format_bytes(saved)}", err=False)
         return
 
     if interactive:

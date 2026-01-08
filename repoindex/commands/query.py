@@ -27,6 +27,13 @@ DSL_PATTERNS = [
     r'\bupdated_since\b', r'\bis_published\b', r"'[^']*'", r'"[^"]*"',
 ]
 
+# Known boolean field names that should be treated as DSL predicates, not text search
+BOOLEAN_FIELDS = {
+    'is_clean', 'clean', 'is_fork', 'is_archived', 'archived',
+    'is_private', 'private', 'has_readme', 'has_license', 'has_ci',
+    'has_pages', 'has_upstream', 'uncommitted_changes', 'uncommitted'
+}
+
 
 def _is_simple_text_query(query_string: str) -> bool:
     """
@@ -39,6 +46,10 @@ def _is_simple_text_query(query_string: str) -> bool:
     query_string = query_string.strip()
 
     if not query_string:
+        return False
+
+    # Check if it's a known boolean field (DSL predicate, not text search)
+    if query_string.lower() in BOOLEAN_FIELDS:
         return False
 
     for pattern in DSL_PATTERNS:
@@ -65,6 +76,10 @@ def _build_query_from_flags(
     no_license: bool,
     no_readme: bool,
     archived: bool,
+    public: bool,
+    private: bool,
+    fork: bool,
+    no_fork: bool,
 ) -> str:
     """Build a DSL query string from convenience flags."""
     predicates = []
@@ -114,13 +129,25 @@ def _build_query_from_flags(
         for t in tag:
             predicates.append(f"tagged('{t}')")
 
-    # Audit-style flags
+    # Audit-style flags (use bare boolean predicates)
     if no_license:
-        predicates.append("has_license == false")
+        predicates.append("not has_license")
     if no_readme:
-        predicates.append("has_readme == false")
+        predicates.append("not has_readme")
     if archived:
-        predicates.append("is_archived == true")
+        predicates.append("archived")
+
+    # Visibility flags
+    if public:
+        predicates.append("not private")
+    if private:
+        predicates.append("private")
+
+    # Fork flags
+    if fork:
+        predicates.append("is_fork")
+    if no_fork:
+        predicates.append("not is_fork")
 
     # Join predicates with 'and'
     if not predicates:
@@ -134,7 +161,7 @@ def _build_query_from_flags(
 @click.option('--brief', is_flag=True, help='Compact output: just repo names (one per line)')
 @click.option('--fields', help='Comma-separated list of fields to display')
 @click.option('--limit', type=int, help='Limit number of results')
-@click.option('--sql', 'show_sql', is_flag=True, help='Show compiled SQL without executing')
+@click.option('--explain', 'show_explain', is_flag=True, help='Show compiled SQL and params without executing')
 @click.option('--fts', is_flag=True, help='Use full-text search instead of DSL query')
 @click.option('--debug', is_flag=True, help='Enable debug logging')
 # Convenience flags
@@ -147,13 +174,17 @@ def _build_query_from_flags(
 @click.option('--no-license', is_flag=True, help='Repos without a license')
 @click.option('--no-readme', is_flag=True, help='Repos without a README')
 @click.option('--archived', is_flag=True, help='Archived repos only')
+@click.option('--public', is_flag=True, help='Public repos only')
+@click.option('--private', is_flag=True, help='Private repos only')
+@click.option('--fork', is_flag=True, help='Forked repos only')
+@click.option('--no-fork', is_flag=True, help='Non-forked repos only (original repos)')
 def query_handler(
     query_string: str,
     output_json: bool,
     brief: bool,
     fields: Optional[str],
     limit: Optional[int],
-    show_sql: bool,
+    show_explain: bool,
     fts: bool,
     debug: bool,
     # Convenience flags
@@ -166,6 +197,10 @@ def query_handler(
     no_license: bool,
     no_readme: bool,
     archived: bool,
+    public: bool,
+    private: bool,
+    fork: bool,
+    no_fork: bool,
 ):
     """
     Query repositories using a powerful query language.
@@ -208,8 +243,8 @@ def query_handler(
         repoindex query --no-license
         repoindex query --no-readme
 
-        # Show compiled SQL
-        repoindex query "language == 'Python'" --sql
+        # Show compiled SQL and params
+        repoindex query "language == 'Python'" --explain
     """
     config = load_config()
 
@@ -221,12 +256,13 @@ def query_handler(
         )
 
     # Build query from flags
-    has_flags = any([dirty, clean, language, recent, starred, tag, no_license, no_readme, archived])
+    has_flags = any([dirty, clean, language, recent, starred, tag, no_license, no_readme,
+                     archived, public, private, fork, no_fork])
     if has_flags:
         query_string = _build_query_from_flags(
             query_string if query_string else None,
             dirty, clean, language, recent, starred, list(tag),
-            no_license, no_readme, archived
+            no_license, no_readme, archived, public, private, fork, no_fork
         )
 
     # If no query and no flags, show all repos
@@ -249,16 +285,14 @@ def query_handler(
         if limit and not compiled.limit:
             compiled = compile_query(f"{query_string} limit {limit}", views=views)
 
-        if show_sql:
-            output = {
-                'sql': compiled.sql,
-                'params': compiled.params,
-            }
+        if show_explain:
+            # Pretty formatted explain output
+            click.echo(f"SQL: {compiled.sql}", err=False)
+            click.echo(f"Params: {compiled.params}", err=False)
             if compiled.order_by:
-                output['order_by'] = compiled.order_by
+                click.echo(f"Order by: {compiled.order_by}", err=False)
             if compiled.limit:
-                output['limit'] = compiled.limit
-            print(json.dumps(output, indent=2))
+                click.echo(f"Limit: {compiled.limit}", err=False)
             return
 
         _execute_sql_query(config, compiled, pretty, brief, fields, debug)

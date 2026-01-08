@@ -1,681 +1,620 @@
-# ghops Design Philosophy
+# repoindex Design Specification
 
-**Version**: 0.9.0 (proposed)
-**Status**: Living Document
+**Version**: 0.10.0 (planned)
+**Status**: Approved Specification
+**Last Updated**: 2026-01-06
 
-This document describes the design principles, architecture, and concrete abstractions for ghops.
+This document captures design decisions, architecture, and requirements for repoindex based on detailed discussion and analysis.
+
+---
 
 ## Vision
 
-**ghops is a collection-aware metadata index for git repositories.**
+**repoindex is a collection-aware metadata index for git repositories.**
 
 It provides a unified view across all your repositories, enabling queries, organization, and integration with LLM tools like Claude Code.
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                         Claude Code                             │
-│              (deep work on ONE repo at a time)                  │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-                              │ "What else do I have?"
-                              │ "Which repos need X?"
-                              │ "Show me my portfolio"
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                           ghops                                 │
-│              (collection awareness, metadata layer)             │
-│                                                                 │
-│   • What repos exist and where                                  │
-│   • Tags and organization                                       │
-│   • Registry status (PyPI, CRAN, npm, ...)                      │
-│   • Cross-repo queries                                          │
-│   • Event detection (new tags, releases, publishes)             │
-│   • Statistics and aggregations                                 │
-└─────────────────────────────────────────────────────────────────┘
+Claude Code (deep work on ONE repo)
+         │
+         │ "What else do I have?"
+         │ "Which repos need X?"
+         ▼
+    repoindex (collection awareness)
+         │
+         ├── query       → filter and search
+         ├── status      → health dashboard
+         ├── events      → what happened
+         └── tags        → organization
 ```
+
+### Target User
+
+**Power developers** with CLI proficiency managing multiple repositories. Documentation tone and features should assume comfort with Unix tools, SQL, and git internals.
+
+---
 
 ## Core Principles
 
 ### 1. Collection, Not Content
 
-ghops knows *about* repositories, not *inside* them.
+repoindex knows *about* repositories, not *inside* them.
 
 - ✓ "You have 45 Python repos"
 - ✓ "12 are published on PyPI"
-- ✓ "ghops was last tagged 2 days ago"
-- ✗ "This function has a bug on line 42"
-- ✗ "Here's a refactored version of your code"
+- ✓ "3 repos have uncommitted changes"
+- ✗ "This function has a bug"
+- ✗ "Here's refactored code"
 
-### 2. Metadata, Not Manipulation
+### 2. SQLite as Materialized View
 
-We track state; we don't edit files.
+The SQLite database is a **cache over git**, not a separate data store.
 
-- ✓ Query repository status
-- ✓ Track tags and organization
-- ✓ Detect events (new releases)
-- ✗ Edit source code
-- ✗ Generate documentation content
-- ✗ Write README files
+- Git repositories are the source of truth
+- Database reflects what git shows at scan time
+- Events are append-only (INSERT OR IGNORE by event_id)
+- Old events persist even if source changes
+- Manual reset: `sql --reset` + `refresh --full` when needed
 
-### 3. Index, Not IDE
+### 3. Three Query Layers
 
-We're the catalog, not the workbench.
+Different tools for different complexity levels:
 
-- ✓ "Find all repos with MIT license"
-- ✓ "Show unpublished Python packages"
-- ✗ "Build the documentation"
-- ✗ "Run the test suite"
+| Layer | Usage | Example |
+|-------|-------|---------|
+| **Flags (80%)** | Common filters, zero learning curve | `--dirty --language python` |
+| **DSL (15%)** | Complex logic, readable power | `has_event('commit', since='7d') and stars > 5` |
+| **SQL (5%)** | Full power, edge cases | `SELECT * FROM repos JOIN events...` |
 
-### 4. Complement Claude Code
+### 4. Unix Philosophy
 
-Don't duplicate what Claude Code already does well.
+- Compose via pipes: JSONL output streams to jq, grep, etc.
+- Pretty output by default for interactive use
+- `--json` flag for machine-readable JSONL
+- Errors to stderr, data to stdout
 
-| Claude Code Does | ghops Does |
-|------------------|------------|
-| Read/write files in a repo | Know about ALL repos |
-| Run git commands | Track events across repos |
-| Generate docs, READMEs | Provide context for generation |
-| Understand one codebase | Query across the collection |
-
-### 5. VFS as Primary Interface
-
-The virtual filesystem is the natural interface for both humans and LLMs.
-
-```
-/repos/                     → all repositories
-/repos/{name}/              → metadata for one repo
-/by-tag/{tag}/              → repos with this tag
-/by-language/{lang}/        → repos by language
-/stats/                     → aggregations
-/stats/languages            → count by language
-/stats/published            → published vs unpublished
-/events/                    → recent activity
-/events/recent              → last N events
-/events/repo/{name}/        → events for one repo
-```
-
-### 6. MCP Server for LLM Integration
-
-ghops exposes itself as an MCP (Model Context Protocol) server:
-
-- **Resources**: VFS paths providing read-only data
-- **Tools**: Actions like `tag()`, `query()`, `refresh()`
-
-This allows Claude Code (or any MCP client) to query the collection and take actions.
+---
 
 ## Architecture
 
+### Layered Structure
+
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        MCP Interface                            │
-│                   (Resources + Tools)                           │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-┌─────────────────────────────────────────────────────────────────┐
-│                      VFS Layer                                  │
-│        /repos/  /tags/  /stats/  /events/                       │
-└─────────────────────────────────────────────────────────────────┘
-                              │
-┌──────────────┬──────────────┬──────────────┬───────────────────┐
-│   Metadata   │    Tags      │    Stats     │     Events        │
-│    Store     │   System     │   Engine     │      Log          │
-└──────────────┴──────────────┴──────────────┴───────────────────┘
-                              │
-┌──────────────┬──────────────┬──────────────┬───────────────────┐
-│     Git      │    PyPI      │    CRAN      │     GitHub        │
-│   Scanner    │   Client     │   Client     │      API          │
-└──────────────┴──────────────┴──────────────┴───────────────────┘
+┌─────────────────────────────────────────────────────┐
+│                    CLI Layer                         │
+│  repoindex/commands/*.py                            │
+│  - Parse arguments (Click)                          │
+│  - Call services                                    │
+│  - Format output (pretty or JSONL)                  │
+└─────────────────────────┬───────────────────────────┘
+                          │
+┌─────────────────────────▼───────────────────────────┐
+│                  Service Layer                       │
+│  repoindex/services/*.py                            │
+│  - RepositoryService: discover, status, filter      │
+│  - TagService: add, remove, query tags              │
+│  - EventService: scan events                        │
+└─────────────────────────┬───────────────────────────┘
+                          │
+┌─────────────────────────▼───────────────────────────┐
+│                  Domain Layer                        │
+│  repoindex/domain/*.py                              │
+│  - Repository, Tag, Event dataclasses               │
+│  - Pure functions, no I/O                           │
+└─────────────────────────┬───────────────────────────┘
+                          │
+┌─────────────────────────▼───────────────────────────┐
+│               Infrastructure Layer                   │
+│  repoindex/infra/*.py                               │
+│  - GitClient, GitHubClient                          │
+│  - FileStore, Database                              │
+└─────────────────────────────────────────────────────┘
 ```
 
-### Core Components
+### Database Schema
 
-| Component | Purpose |
-|-----------|---------|
-| **Metadata Store** | Persistent cache of repo metadata |
-| **Tags System** | Hierarchical organization layer |
-| **Stats Engine** | Aggregations and counts |
-| **Event Log** | Track changes over time |
-| **Registry Clients** | PyPI, CRAN, npm status |
-| **VFS Layer** | Unified path-based interface |
-| **MCP Server** | LLM integration endpoint |
+Core tables with **changes from current**:
 
-## What's In Scope
+```sql
+-- KEEP: repos, tags, events, publications
+-- REMOVE: dependencies (not implemented, out of scope)
+-- REMOVE: repo_snapshots (abandoned feature)
+-- ADD: scan_errors (track failed repos)
 
-### Keep and Enhance
+CREATE TABLE scan_errors (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    path TEXT NOT NULL,
+    error_type TEXT NOT NULL,
+    error_message TEXT,
+    scanned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
 
-- `core.py` - Pure business logic
-- `tags.py` - Tag management
-- `query.py`, `simple_query.py` - Query language
-- `metadata.py` - Metadata store
-- `analytics_store.py` - Statistics
-- `events.py` - Stateless event scanning
-- `pypi.py`, `cran.py` - Registry clients
-- `shell/` - VFS interface (becomes central)
-- `config.py`, `utils.py` - Infrastructure
+### Full-Text Search
 
-### Out of Scope (Remove or Extract)
+Keep FTS5 index on repos with **full README content**:
 
-| Module | Reason |
-|--------|--------|
-| `integrations/clustering/` | Content analysis, not metadata |
-| `integrations/templates/` | Reads source files |
-| `integrations/timemachine/` | Content-focused |
-| `llm/content_generator.py` | LLM generates, not us |
-| `hugo_export.py` | Content generation |
-| `export_components*.py` | Portfolio generation |
+```sql
+CREATE VIRTUAL TABLE repos_fts USING fts5(
+    name,
+    description,
+    readme_content,
+    content='repos',
+    content_rowid='id'
+);
+```
 
-These should either be removed or extracted into separate tools that *consume* ghops data.
+Storage impact: ~1-5MB for 143 repos. Acceptable.
 
-### Gray Areas
+---
 
-| Module | Decision |
-|--------|----------|
-| `docs.py` | Keep detection, remove building |
-| `audit.py` | Keep (health checks are metadata queries) |
-| `tui/` | Keep for direct human use (optional) |
-| License detection | Keep (metadata extraction is okay) |
+## Commands (11 total)
 
-## Event Model
+### Core Commands
 
-Events answer "what happened?" across the collection.
+| Command | Purpose | Output Default |
+|---------|---------|----------------|
+| `status` | Health dashboard | Pretty table |
+| `query` | Filter repositories | Pretty table |
+| `events` | Query event history | Pretty table |
+| `sql` | Raw SQL + DB maintenance | Pretty table |
+| `refresh` | Sync database from git | Progress output |
 
-**Key principle**: ghops is read-only. It scans and reports events; external tools act on them.
+### Organization Commands
+
+| Command | Purpose |
+|---------|---------|
+| `tag add/remove/list/tree` | Manage tags |
+| `view list/show/create/delete` | Saved queries |
+| `config show/repos/init` | Configuration |
+
+### Integration Commands
+
+| Command | Purpose |
+|---------|---------|
+| `claude install/uninstall/show` | Claude Code skill |
+| `shell` | Interactive VFS navigation |
+
+### Removed Commands
+
+- **MCP server**: Delete `repoindex/mcp/` entirely. CLI is sufficient for Claude Code integration via the skill.
+
+---
+
+## Query System
+
+### Flag-Based Queries (Primary Interface)
+
+```bash
+# Common filters (AND together)
+repoindex query --dirty              # Uncommitted changes
+repoindex query --clean              # Clean repos
+repoindex query --language python    # By language
+repoindex query --recent 7d          # Recent activity
+repoindex query --starred            # Has GitHub stars
+repoindex query --tag "work/*"       # By tag pattern
+repoindex query --no-license         # Missing license
+repoindex query --no-readme          # Missing README
+
+# Combine flags (implicit AND)
+repoindex query --dirty --language python --recent 7d
+```
+
+### DSL Queries (Power Users)
+
+```bash
+# Boolean logic
+repoindex query "language == 'Python' and stars > 10"
+repoindex query "dirty or recent('7d')"
+repoindex query "not archived and has_ci"
+
+# Functions
+repoindex query "has_event('commit', since='30d')"
+repoindex query "tagged('work/*')"
+repoindex query "updated_since('7d')"
+
+# Ordering and limits
+repoindex query "language == 'Python' order by stars desc limit 10"
+
+# View references
+repoindex query "@python-active and is_clean"
+
+# Explain mode (NEW)
+repoindex query --explain "language == 'Python' and stars > 10"
+# Shows: SELECT * FROM repos WHERE language = ? AND stars > ? [params: Python, 10]
+```
+
+### Raw SQL (Edge Cases)
+
+```bash
+# Direct queries
+repoindex sql "SELECT name, stars FROM repos ORDER BY stars DESC LIMIT 10"
+
+# Interactive shell
+repoindex sql -i
+
+# DB maintenance (NEW)
+repoindex sql --info       # Path, size, version
+repoindex sql --schema     # Show tables
+repoindex sql --stats      # Row counts, sizes
+repoindex sql --integrity  # Check for corruption
+repoindex sql --vacuum     # Optimize/compact
+repoindex sql --reset      # Drop and recreate
+```
+
+---
+
+## Tag System
+
+### Tag Sources
+
+Tags come from three sources, all coexisting:
+
+| Source | Examples | Editable |
+|--------|----------|----------|
+| **User** (explicit) | `work/active`, `priority:high` | Yes |
+| **System** (implicit) | `lang:python`, `dir:github`, `repo:myproject` | No |
+| **Provider** (GitHub) | `topic:machine-learning`, `license:mit` | No |
+
+### Reserved Namespaces
+
+System-only prefixes that users cannot create:
+
+- `lang:` - Auto-detected language
+- `dir:` - Parent directory name
+- `repo:` - Repository name
+- `type:` - Project type (node, python, rust)
+- `ci:` - CI system detected
+- `has:` - Feature detection (readme, license, tests)
+
+### Tag Operations
+
+```bash
+# Add/remove user tags
+repoindex tag add myproject work/active topic:ml
+repoindex tag remove myproject work/active
+
+# Query by tag
+repoindex tag list                    # All tags
+repoindex tag list -t "work/*"        # Repos with tag
+repoindex tag tree                    # Hierarchical view
+```
+
+---
+
+## Event System
+
+### Event Model
+
+Events are **append-only observations** of git history:
+
+- Scanned from git on `refresh`
+- Deduplicated by stable `event_id`
+- Never deleted (historical record)
+- Time-bounded by `--since` on refresh
 
 ### Event Types
 
+Currently implemented:
+- `git_tag` - Tag created
+- `commit` - Commit pushed
+
+### Event Queries
+
+```bash
+# Query events (pretty by default)
+repoindex events                      # Last 7 days
+repoindex events --since 30d          # Custom window
+repoindex events --type git_tag       # Filter by type
+repoindex events --repo myproject     # Filter by repo
+repoindex events --stats              # Summary statistics
+repoindex events --json               # JSONL for piping
 ```
-git_tag         - New tag created
-commit          - New commits pushed
-```
-
-Future (when registry clients are enhanced):
-```
-pypi_publish    - Package published to PyPI
-cran_publish    - Package published to CRAN
-github_release  - GitHub release created
-```
-
-### Event Flow (Stateless)
-
-```
-1. User runs: ghops events --since 7d
-2. ghops scans git repos for tags/commits
-3. Events streamed as JSONL to stdout
-4. External tools consume the stream
-5. External tools decide what action to take
-
-Example pipeline:
-$ ghops events --since 1d --type git_tag | ./notify-releases.sh
-$ ghops events --watch | jq 'select(.type == "git_tag")' | ./post-to-slack.sh
-```
-
-### Design Rationale
-
-- **No dispatch mechanism**: ghops observes, doesn't act
-- **No state tracking**: Each scan is independent
-- **Time-based filtering**: `--since` and `--until` replace "last seen" state
-- **Composable output**: JSONL enables Unix pipelines
-
-## MCP Server Interface
-
-### Resources (Read-Only)
-
-```
-repo://list                    → all repos with basic metadata
-repo://{name}                  → full metadata for one repo
-repo://{name}/status           → git status
-repo://{name}/package          → package info (PyPI/CRAN)
-
-tags://list                    → all tags
-tags://tree                    → hierarchical view
-tags://{tag}/repos             → repos with this tag
-
-stats://summary                → overall statistics
-stats://languages              → count by language
-stats://published              → registry publication status
-
-events://recent                → recent events
-events://repo/{name}           → events for one repo
-events://type/{type}           → events by type
-```
-
-### Tools (Actions)
-
-```
-ghops_tag(repo, tag)           → add tag to repo
-ghops_untag(repo, tag)         → remove tag
-ghops_query(expression)        → run query, return matching repos
-ghops_refresh(repo?)           → refresh metadata (one or all)
-ghops_stats(groupby)           → get statistics
-```
-
-## Example LLM Workflows
-
-### "Which Python repos aren't on PyPI?"
-
-```
-1. LLM calls: ghops_query("language == 'Python' and not published")
-2. ghops returns: [{name: "my-tool", path: "/home/..."}, ...]
-3. LLM presents results to user
-```
-
-### "Post about my latest release"
-
-```
-1. LLM reads: events://recent
-2. Sees: {type: "git_tag", repo: "ghops", tag: "v2.0.0", ...}
-3. LLM reads: repo://ghops (gets full context)
-4. LLM generates post text (Claude Code does this, not ghops)
-5. LLM calls external tool to post (or user copies text)
-```
-
-### "Organize my ML projects"
-
-```
-1. LLM reads: repo://list
-2. LLM identifies ML-related repos from descriptions/topics
-3. LLM calls: ghops_tag("repo1", "topic:ml")
-4. LLM calls: ghops_tag("repo2", "topic:ml")
-5. User can now query: tags://topic:ml/repos
-```
-
-## Migration Path
-
-### Phase 1: Document & Clean
-- Document design principles (this file)
-- Remove out-of-scope modules
-- Update CLAUDE.md
-
-### Phase 2: Enhance Core
-- Strengthen VFS layer
-- Add statistics engine
-- Improve event tracking
-
-### Phase 3: MCP Server
-- Implement MCP protocol
-- Expose resources
-- Implement tools
-
-### Phase 4: Integration
-- Test with Claude Code
-- Iterate on interface
-- Document for users
 
 ---
 
-## Refined Architecture
+## Status Dashboard
 
-### Design Invariants
+The `status` command shows a **full dashboard** with:
 
-These are non-negotiable constraints that every component must respect:
+### Counts
+- Total repositories, events, tags
+- Database size, last refresh time
 
-1. **JSONL is the universal interface** - Default output is newline-delimited JSON
-2. **Generators over collections** - Stream data, don't buffer in memory
-3. **Pure core, thin commands** - Business logic in services, CLI is orchestration
-4. **Fail gracefully, continue processing** - One bad repo doesn't stop the scan
-5. **Explicit over magic** - No hidden behavior, clear flags for options
+### Health Warnings
+- Repos with uncommitted changes (dirty)
+- Repos not scanned recently (stale)
+- Scan errors from last refresh
 
-### Layered Architecture
+### Action Suggestions
+- "Run `refresh` to update database" if stale
+- "Run `refresh --github` to fetch GitHub metadata"
 
-```
-┌─────────────────────────────────────────────────────────┐
-│                    CLI Layer                            │
-│  ghops/commands/*.py                                    │
-│  - Parse arguments (Click)                              │
-│  - Call services                                        │
-│  - Format output (JSONL or pretty)                      │
-└─────────────────────────┬───────────────────────────────┘
-                          │
-┌─────────────────────────▼───────────────────────────────┐
-│                  Service Layer                          │
-│  ghops/services/*.py                                    │
-│  - RepositoryService: discover, status, filter          │
-│  - TagService: add, remove, query tags                  │
-│  - EventService: scan events                            │
-│  - MetadataService: persist, refresh metadata           │
-└─────────────────────────┬───────────────────────────────┘
-                          │
-┌─────────────────────────▼───────────────────────────────┐
-│                  Domain Layer                           │
-│  ghops/domain/*.py                                      │
-│  - Repository, Tag, Event dataclasses                   │
-│  - Pure functions for filtering, transformation         │
-│  - No I/O, no side effects                              │
-└─────────────────────────┬───────────────────────────────┘
-                          │
-┌─────────────────────────▼───────────────────────────────┐
-│               Infrastructure Layer                      │
-│  ghops/infra/*.py                                       │
-│  - GitClient: shell out to git                          │
-│  - GitHubClient: GitHub API with rate limiting          │
-│  - FileStore: JSON/YAML persistence                     │
-│  - Config: configuration loading                        │
-└─────────────────────────────────────────────────────────┘
+---
+
+## Refresh Behavior
+
+### Default (Smart Refresh)
+
+```bash
+repoindex refresh
 ```
 
-### Key Abstractions
+- Scans repos where `.git/index` mtime changed since last scan
+- Inserts new events (INSERT OR IGNORE)
+- Updates repo metadata
 
-#### Repository (Domain Object)
+### Full Refresh
+
+```bash
+repoindex refresh --full
+```
+
+- Rescans all repos regardless of mtime
+- Does NOT delete existing events
+
+### With External Sources
+
+```bash
+# Explicit opt-in (config can set defaults)
+repoindex refresh --github    # Fetch GitHub metadata
+repoindex refresh --pypi      # Check PyPI publication
+repoindex refresh --cran      # Check CRAN publication
+
+# Combined
+repoindex refresh --github --pypi --since 30d
+```
+
+### Failure Behavior
+
+- **GitHub unreachable**: Fail fast if `--github` specified
+- **Individual repo errors**: Log warning, continue, track in `scan_errors` table
+- **Rate limit hit**: Proactive warning showing remaining quota
+
+---
+
+## Configuration
+
+### Format
+
+**YAML only** (remove JSON support for simplicity):
+
+```yaml
+# ~/.repoindex/config.yaml
+
+general:
+  repository_directories:
+    - ~/github
+    - ~/projects/*/repos
+
+github:
+  token: ${GITHUB_TOKEN}  # Environment variable reference
+  rate_limit:
+    max_retries: 3
+    max_delay_seconds: 60
+
+refresh:
+  default_since: 30d
+  enable_pypi: false
+  enable_cran: false
+
+repository_tags:
+  /home/user/github/myproject:
+    - work/active
+    - priority:high
+```
+
+### Environment Variables
+
+- `REPOINDEX_CONFIG` - Config file path
+- `GITHUB_TOKEN` or `REPOINDEX_GITHUB_TOKEN` - GitHub API token
+
+### Path Handling
+
+- Non-existent paths: **Warn once**, continue
+- Glob patterns supported: `~/github/**`
+
+---
+
+## Claude Code Integration
+
+### Skill Management
+
+```bash
+repoindex claude install [--global]   # Install skill
+repoindex claude uninstall [--global] # Remove skill
+repoindex claude show                 # Show status
+repoindex claude content              # Print skill content
+```
+
+### Skill Generation
+
+Skill content should be **generated from CLI introspection**:
+
+- Extract commands and options from Click
+- Build examples dynamically
+- Include version number
+- Warn and confirm before overwriting existing skill
+
+### Skill Location
+
+- Global: `~/.claude/commands/repoindex.md`
+- Local: `./.claude/commands/repoindex.md`
+
+---
+
+## Views Feature
+
+### Purpose
+
+Save named queries for reuse.
+
+### Storage
+
+Views store **DSL expressions** (not raw SQL):
+
+```bash
+repoindex view create python-active "language == 'Python' and has_event('commit', since='30d')"
+repoindex view list
+repoindex view show python-active
+repoindex view delete python-active
+```
+
+### Usage
+
+Reference views in queries with `@`:
+
+```bash
+repoindex query "@python-active and is_clean"
+```
+
+### Future Enhancement
+
+Consider making views composable (views referencing other views) and/or parameterized (view templates).
+
+---
+
+## Shell (VFS Interface)
+
+### Status
+
+**Needs redesign** - keep but lower priority.
+
+### Current Concept
+
+Interactive navigation of repository collection:
+
+```
+/repos/           # All repositories
+/repos/myproject/ # Single repo metadata
+/tags/            # Tag hierarchy
+/events/          # Recent events
+```
+
+### Planned Improvements
+
+- Better navigation UX
+- Integration with query system
+- Possibly FUSE mount for filesystem access
+
+---
+
+## Output Formats
+
+### Default: Pretty Tables
+
+```bash
+repoindex query --dirty
+# Shows formatted table with columns
+```
+
+### JSONL for Piping
+
+```bash
+repoindex query --json --dirty | jq '.name'
+```
+
+### Brief Mode
+
+```bash
+repoindex query --brief --dirty
+# Just repo names, one per line
+```
+
+---
+
+## Error Handling
+
+### Scan Errors
+
+Tracked in `scan_errors` table:
+
+```sql
+CREATE TABLE scan_errors (
+    id INTEGER PRIMARY KEY,
+    path TEXT NOT NULL,
+    error_type TEXT NOT NULL,    -- 'permission', 'corrupt', 'not_git'
+    error_message TEXT,
+    scanned_at TIMESTAMP
+);
+```
+
+### Display
+
+- Show error count in `status` dashboard
+- List errors with `repoindex sql "SELECT * FROM scan_errors"`
+
+---
+
+## Removed/Deprecated
+
+### Removed in v0.10.0
+
+| Item | Reason |
+|------|--------|
+| MCP server (`repoindex/mcp/`) | CLI sufficient, complexity not justified |
+| Dependencies table | Not implemented, out of scope |
+| Repo snapshots table | Abandoned feature |
+| JSON config support | YAML only for simplicity |
+
+### Deprecated (Hidden)
+
+| Item | Replacement |
+|------|-------------|
+| `db` command | Use `sql --info`, `sql --reset`, etc. |
+
+---
+
+## Development Guidelines
+
+### Testing
+
+- 604+ tests in `tests/` directory
+- Use pyfakefs for filesystem mocking
+- Run with coverage: `pytest --cov=repoindex --cov-report=html`
+- Target: >86% coverage
+
+### Adding Commands
+
+1. Create `repoindex/commands/your_command.py`
+2. Use service layer for business logic
+3. Register in `repoindex/cli.py`
+4. Write tests in `tests/test_your_command.py`
+5. Update skill content generation
+
+### Output Pattern
 
 ```python
-@dataclass(frozen=True)
-class Repository:
-    """Immutable representation of a git repository."""
-    path: str
-    name: str
+@click.command()
+@click.option('--json', 'output_json', is_flag=True)
+def command(output_json):
+    results = service.get_data()
 
-    # Git state
-    branch: str
-    clean: bool
-    remote_url: Optional[str] = None
-
-    # Derived metadata
-    owner: Optional[str] = None
-    language: Optional[str] = None
-    license: Optional[str] = None
-
-    # Organization
-    tags: FrozenSet[Tag] = frozenset()
-
-    # External state (optional, fetched on demand)
-    github: Optional[GitHubMetadata] = None
-    package: Optional[PackageMetadata] = None
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Serialize for JSON output."""
-
-    @classmethod
-    def from_path(cls, path: str) -> 'Repository':
-        """Construct from filesystem path."""
-```
-
-#### Tag (Value Object)
-
-```python
-@dataclass(frozen=True)
-class Tag:
-    """Structured tag with optional hierarchy."""
-    value: str                    # Full tag string: "topic:ml/research"
-    key: Optional[str] = None     # Namespace: "topic"
-    segments: Tuple[str] = ()     # Path segments: ("ml", "research")
-    source: TagSource = TagSource.EXPLICIT
-
-    @classmethod
-    def parse(cls, tag_string: str) -> 'Tag':
-        """Parse 'topic:ml/research' into structured Tag."""
-
-    def matches(self, pattern: str) -> bool:
-        """Check if tag matches pattern like 'topic:*' or 'ml/*'."""
-
-class TagSource(Enum):
-    EXPLICIT = "explicit"      # User-assigned
-    IMPLICIT = "implicit"      # Auto-generated (lang:python, repo:name)
-    PROVIDER = "provider"      # From GitHub topics, etc.
-```
-
-#### Event (Domain Object)
-
-```python
-@dataclass
-class Event:
-    """An event that occurred in or related to a repository."""
-    type: str                     # git_tag, commit
-    timestamp: datetime
-    repo_name: str
-    repo_path: str
-    data: Dict[str, Any]
-
-    @property
-    def id(self) -> str:
-        """Stable unique identifier."""
-
-    def to_dict(self) -> Dict[str, Any]:
-        """Serialize for JSON output."""
-
-    def to_jsonl(self) -> str:
-        """Single-line JSON for streaming."""
-```
-
-#### Result (Output Wrapper)
-
-```python
-@dataclass
-class Result:
-    """Unified command result for consistent output."""
-    success: bool
-    data: List[Dict[str, Any]]
-    errors: List[Dict[str, Any]] = field(default_factory=list)
-    count: int = 0
-
-    def to_jsonl(self) -> Generator[str, None, None]:
-        """Yield JSONL lines."""
-        for item in self.data:
-            yield json.dumps(item)
-        for error in self.errors:
-            yield json.dumps({"error": error})
-```
-
-### Service Contracts
-
-#### RepositoryService
-
-```python
-class RepositoryService:
-    """Discovers and queries repositories."""
-
-    def discover(self, paths: Optional[List[str]] = None) -> Generator[Repository]:
-        """Discover repositories from paths or config."""
-
-    def get_status(self, repo: Repository, fetch_github: bool = False) -> Repository:
-        """Enrich repository with current status."""
-
-    def filter(self, repos: Iterable[Repository], query: Query) -> Generator[Repository]:
-        """Filter repositories by query expression."""
-```
-
-#### TagService
-
-```python
-class TagService:
-    """Manages repository tags."""
-
-    def add(self, repo: Repository, tag: Tag) -> None:
-        """Add tag to repository."""
-
-    def remove(self, repo: Repository, tag: Tag) -> None:
-        """Remove tag from repository."""
-
-    def get_tags(self, repo: Repository) -> Set[Tag]:
-        """Get all tags for repository (explicit + implicit)."""
-
-    def query(self, pattern: str) -> Generator[Repository]:
-        """Find repositories matching tag pattern."""
-```
-
-#### EventService
-
-```python
-class EventService:
-    """Scans repositories for events (stateless)."""
-
-    def scan(
-        self,
-        repos: Iterable[Repository],
-        types: Optional[List[str]] = None,
-        since: Optional[datetime] = None,
-        until: Optional[datetime] = None,
-    ) -> Generator[Event]:
-        """Scan repositories for events."""
-```
-
-### Infrastructure Contracts
-
-#### GitClient
-
-```python
-class GitClient:
-    """Abstraction over git commands."""
-
-    def status(self, path: str) -> GitStatus:
-        """Get repository status (branch, clean, ahead/behind)."""
-
-    def remote_url(self, path: str, remote: str = "origin") -> Optional[str]:
-        """Get remote URL."""
-
-    def tags(self, path: str, since: Optional[datetime] = None) -> List[GitTag]:
-        """List git tags."""
-
-    def log(self, path: str, limit: int = 50) -> List[GitCommit]:
-        """Get commit log."""
-```
-
-#### GitHubClient
-
-```python
-class GitHubClient:
-    """GitHub API with rate limiting and caching."""
-
-    def get_repo(self, owner: str, name: str) -> Optional[GitHubRepo]:
-        """Fetch repository metadata."""
-
-    def get_topics(self, owner: str, name: str) -> List[str]:
-        """Fetch repository topics."""
-
-    def check_published(self, owner: str, name: str) -> bool:
-        """Check if repo exists and is public."""
-```
-
-### Command Pattern
-
-Every command follows this structure:
-
-```python
-@click.command('status')
-@click.option('--pretty', '-p', is_flag=True, help='Human-readable output')
-@click.option('--github/--no-github', default=None, help='Fetch GitHub metadata')
-@click.argument('path', default='/', required=False)
-def status_handler(pretty: bool, github: Optional[bool], path: str):
-    """Show repository status."""
-    # 1. Load configuration
-    config = load_config()
-
-    # 2. Create services (dependency injection)
-    repo_service = RepositoryService(GitClient(), config)
-
-    # 3. Get data as generator
-    repos = repo_service.discover(path)
-
-    # 4. Enrich if needed
-    if github:
-        repos = (repo_service.get_status(r, fetch_github=True) for r in repos)
-
-    # 5. Output (JSONL default, --pretty for tables)
-    output.emit(repos, pretty=pretty)
-```
-
-### Output Module
-
-```python
-# ghops/output.py
-
-def emit(items: Iterable[Any], pretty: bool = False):
-    """Emit items as JSONL or pretty table."""
-    if pretty:
-        items = list(items)
-        if items:
-            render_table(items)
-        else:
-            click.echo("No results found")
-    else:
-        for item in items:
-            if hasattr(item, 'to_dict'):
-                item = item.to_dict()
+    if output_json:
+        for item in results:
             print(json.dumps(item), flush=True)
-
-def emit_error(error: str, context: Dict = None):
-    """Emit error to stderr as JSON."""
-    obj = {"error": error}
-    if context:
-        obj["context"] = context
-    print(json.dumps(obj), file=sys.stderr)
+    else:
+        render.table(list(results))
 ```
 
 ---
 
-## Proposed File Structure
+## Version History
 
-```
-ghops/
-├── __init__.py
-├── cli.py                    # Click entry point (thin)
-├── output.py                 # JSONL/pretty output helpers
-├── config.py                 # Configuration loading
-│
-├── domain/                   # Pure domain objects
-│   ├── __init__.py
-│   ├── repository.py         # Repository dataclass
-│   ├── tag.py                # Tag dataclass
-│   ├── event.py              # Event dataclass (moved from events.py)
-│   └── query.py              # Query parsing and execution
-│
-├── services/                 # Business logic
-│   ├── __init__.py
-│   ├── repository_service.py # Discovery, status, filtering
-│   ├── tag_service.py        # Tag management
-│   ├── event_service.py      # Event scanning
-│   └── metadata_service.py   # Persistence, refresh
-│
-├── infra/                    # External integrations
-│   ├── __init__.py
-│   ├── git_client.py         # Git operations
-│   ├── github_client.py      # GitHub API
-│   ├── pypi_client.py        # PyPI API
-│   ├── cran_client.py        # CRAN API
-│   └── file_store.py         # JSON/YAML persistence
-│
-├── commands/                 # CLI commands (thin wrappers)
-│   ├── __init__.py
-│   ├── status.py
-│   ├── events.py
-│   ├── tag.py
-│   ├── query.py
-│   └── ...
-│
-├── shell/                    # Interactive shell
-│   └── shell.py
-│
-└── mcp/                      # MCP server
-    ├── __init__.py
-    └── server.py
-```
+| Version | Changes |
+|---------|---------|
+| 0.9.2 | Documentation updates, pretty output default |
+| 0.9.1 | Bug fixes (status counts, events --pretty) |
+| 0.9.0 | CLI simplification, SQLite database |
+| 0.10.0 | (Planned) This specification |
 
 ---
 
-## Known Technical Debt
+## Open Questions
 
-Issues to address during refactoring:
+Items for future consideration:
 
-| Issue | Location | Fix |
-|-------|----------|-----|
-| Duplicate `get_remote_url()` | utils.py (lines 65, 290) | Keep git command version, remove parser version |
-| Circular imports | core.py ↔ commands/ | Move shared logic to services layer |
-| Monolithic function | core.py `get_repository_status()` | Split into RepositoryService methods |
-| Tag logic scattered | tags.py, catalog.py, core.py | Consolidate into TagService |
-| Language detection duplicated | metadata.py, tags.py | Single implementation in domain/repository.py |
-| Inconsistent return types | Various | All services return generators |
-| Global state | `_store` in metadata.py | Inject MetadataService as dependency |
-
----
-
-## Summary
-
-| Aspect | Before | After |
-|--------|--------|-------|
-| Output format | Mixed | JSONL default, `--pretty` opt-in |
-| Return types | Dict, List, Generator | Always Generator from services |
-| Side effects | Scattered | Isolated in infra layer |
-| Tag system | Fragmented | Unified TagService |
-| Repository data | Dict with path string | Repository dataclass |
-| Error handling | Mixed | Yield errors, continue processing |
-| Configuration | Loaded everywhere | Injected via services |
-| Testing | Hard to mock | Pure domain, mockable infra |
+1. **View composition**: Allow views to reference other views?
+2. **View parameters**: Template-style views with `$1`, `$2` placeholders?
+3. **Shell redesign**: What would a better VFS interface look like?
+4. **FTS queries**: How to expose full-text search in DSL/flags?

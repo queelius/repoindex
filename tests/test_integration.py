@@ -62,33 +62,29 @@ description = "A test package"
         return result
     
     def test_status_command_json_output(self):
-        """Test status command with JSONL output"""
-        # Use -d to specify the temp directory containing our test repo
-        result = self.run_ghops_command("status", "-d", self.temp_dir, "--no-pypi", "--no-pages", "--no-table")
+        """Test status command with JSON output"""
+        result = self.run_ghops_command("status", "--json")
 
         self.assertEqual(result.returncode, 0)
 
-        # Parse JSONL output (each line should be valid JSON)
-        lines = result.stdout.strip().split('\n')
-        if lines and lines[0]:  # If there's output
-            for line in lines:
-                if line.strip():  # Skip empty lines
-                    try:
-                        repo_data = json.loads(line)
-                        self.assertIn('name', repo_data)
-                        self.assertIn('status', repo_data)
-                    except json.JSONDecodeError:
-                        self.fail(f"Line is not valid JSON: {line}")
+        # Parse JSON output
+        if result.stdout.strip():
+            try:
+                status_data = json.loads(result.stdout)
+                # Status command outputs a dashboard summary object
+                self.assertIsInstance(status_data, dict)
+            except json.JSONDecodeError:
+                self.fail(f"Output is not valid JSON: {result.stdout}")
     
     def test_init_command(self):
-        """Test init command"""
+        """Test config init command"""
         # Override HOME to avoid writing to real config
         env = os.environ.copy()
         project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         env['PYTHONPATH'] = project_root + (os.pathsep + env.get('PYTHONPATH', ''))
         env['HOME'] = self.temp_dir  # Use temp dir as HOME
 
-        cmd = ["python", "-m", "repoindex.cli", "init", "-y", "-d", self.temp_dir]
+        cmd = ["python", "-m", "repoindex.cli", "config", "init", "-y", "-d", self.temp_dir]
         result = subprocess.run(
             cmd,
             cwd=self.temp_dir,
@@ -98,10 +94,10 @@ description = "A test package"
         )
 
         self.assertEqual(result.returncode, 0)
-        self.assertIn("Configuration saved", result.stdout)
+        self.assertIn("Configuration created", result.stdout)
 
-        # Check that config file was created in temp HOME
-        config_file = Path(self.temp_dir) / ".repoindex" / "config.json"
+        # Check that config file was created in temp HOME (now YAML)
+        config_file = Path(self.temp_dir) / ".repoindex" / "config.yaml"
         self.assertTrue(config_file.exists())
     
     def test_config_show(self):
@@ -115,8 +111,7 @@ description = "A test package"
             config_data = json.loads(result.stdout)
             self.assertIn('repository_directories', config_data)
             self.assertIn('github', config_data)
-            self.assertIn('registries', config_data)
-            self.assertIn('cache', config_data)
+            self.assertIn('repository_tags', config_data)
         except json.JSONDecodeError:
             self.fail(f"Config show did not output valid JSON: {result.stdout}")
     
@@ -130,7 +125,7 @@ description = "A test package"
         # Status help
         result = self.run_ghops_command("status", "--help")
         self.assertEqual(result.returncode, 0)
-        self.assertNotIn("--json", result.stdout)  # --json option removed
+        self.assertIn("--json", result.stdout)  # --json option for scripting
         
         # Config help
         result = self.run_ghops_command("config", "--help")
@@ -144,13 +139,13 @@ description = "A test package"
         
         self.assertNotEqual(result.returncode, 0)
     
-    def test_status_with_performance_flags(self):
-        """Test status command with performance optimization flags"""
-        # Use -d to specify the temp directory
-        result = self.run_ghops_command("status", "-d", self.temp_dir, "--no-pypi", "--no-pages")
+    def test_status_with_json_flag(self):
+        """Test status command with JSON output flag"""
+        result = self.run_ghops_command("status", "--json")
 
         self.assertEqual(result.returncode, 0)
-        # Should complete faster without external API calls
+        # JSON output should be valid
+        self.assertIn("{", result.stdout)
 
 
 class TestCLIErrorHandling(unittest.TestCase):
@@ -183,20 +178,20 @@ class TestCLIErrorHandling(unittest.TestCase):
         )
         return result
     
-    def test_status_no_repositories(self):
-        """Test status command when no repositories are found"""
-        # Use -d to specify the temp directory (which has no git repos)
-        result = self.run_ghops_command("status", "-d", self.temp_dir, "--no-pypi", "--no-pages", "--no-table")
+    def test_status_empty_database(self):
+        """Test status command with empty database"""
+        # Status shows dashboard from database, works even with no repos
+        result = self.run_ghops_command("status", "--json")
 
-        # Exit code 64 = NO_REPOS_FOUND (expected when no repos in directory)
-        self.assertEqual(result.returncode, 64)
-        # Output should be a JSON error message
-        try:
-            error_data = json.loads(result.stdout)
-            self.assertIn('error', error_data)
-            self.assertEqual(error_data['type'], 'NoReposFoundError')
-        except json.JSONDecodeError:
-            self.fail(f"Output is not valid JSON: {result.stdout}")
+        # Should succeed even with empty database
+        self.assertEqual(result.returncode, 0)
+        # Output should be valid JSON
+        if result.stdout.strip():
+            try:
+                status_data = json.loads(result.stdout)
+                self.assertIsInstance(status_data, dict)
+            except json.JSONDecodeError:
+                self.fail(f"Output is not valid JSON: {result.stdout}")
     
 
 

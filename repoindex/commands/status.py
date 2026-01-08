@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 import click
 
 from ..config import load_config
-from ..database import Database, get_database_info
+from ..database import Database, get_database_info, get_scan_errors, get_scan_error_count
 
 
 @click.command(name='status')
@@ -120,13 +120,28 @@ def _pretty_dashboard(config: dict, db_info: dict):
             console.print(f"  Tags:       {activity['tags']} new releases")
         console.print()
 
-    # Footer
-    if not db.get('last_refresh'):
-        console.print("[dim]Run 'repoindex refresh' to populate the database.[/dim]")
-    elif db['repos'] == 0:
-        console.print("[dim]No repositories indexed. Check your configuration with 'repoindex config show'.[/dim]")
-    else:
-        console.print("[dim]Run 'repoindex refresh' to update, 'repoindex query' to search.[/dim]")
+    # Warnings section
+    if data['warnings']:
+        console.print("[bold red]Warnings:[/bold red]")
+        for warning in data['warnings']:
+            console.print(f"  [yellow]![/yellow] {warning}")
+        console.print()
+
+    # Suggestions section
+    if data['suggestions']:
+        console.print("[bold]Suggestions:[/bold]")
+        for suggestion in data['suggestions']:
+            console.print(f"  [dim]→[/dim] {suggestion}")
+        console.print()
+
+    # Footer (only if no suggestions were shown)
+    if not data['suggestions']:
+        if not db.get('last_refresh'):
+            console.print("[dim]Run 'repoindex refresh' to populate the database.[/dim]")
+        elif db['repos'] == 0:
+            console.print("[dim]No repositories indexed. Check your configuration with 'repoindex config show'.[/dim]")
+        else:
+            console.print("[dim]Run 'repoindex query' to search your repositories.[/dim]")
 
 
 def _gather_dashboard_data(config: dict, db_info: dict) -> dict:
@@ -142,7 +157,11 @@ def _gather_dashboard_data(config: dict, db_info: dict) -> dict:
         'health': {
             'clean': 0,
             'dirty': 0,
+            'scan_errors': 0,
+            'stale_repos': 0,  # Not scanned in 7+ days
         },
+        'warnings': [],  # List of warning messages
+        'suggestions': [],  # Actionable suggestions
         'languages': [],
         'recent_activity': {
             'since': '7 days',
@@ -204,6 +223,38 @@ def _gather_dashboard_data(config: dict, db_info: dict) -> dict:
             """, (since_str,))
             row = db.fetchone()
             data['recent_activity']['active_repos'] = row['count'] if row else 0
+
+            # Get scan error count
+            data['health']['scan_errors'] = get_scan_error_count(db)
+
+            # Get stale repos (not scanned in 7+ days)
+            stale_threshold = (datetime.now() - timedelta(days=7)).strftime('%Y-%m-%d')
+            db.execute("""
+                SELECT COUNT(*) as count FROM repos
+                WHERE scanned_at < ? OR scanned_at IS NULL
+            """, (stale_threshold,))
+            row = db.fetchone()
+            data['health']['stale_repos'] = row['count'] if row else 0
+
+            # Generate warnings
+            if data['health']['dirty'] > 0:
+                data['warnings'].append(f"{data['health']['dirty']} repos have uncommitted changes")
+
+            if data['health']['scan_errors'] > 0:
+                data['warnings'].append(f"{data['health']['scan_errors']} repos failed to scan")
+
+            if data['health']['stale_repos'] > 0:
+                data['warnings'].append(f"{data['health']['stale_repos']} repos not scanned in 7+ days")
+
+            # Generate suggestions
+            if data['health']['stale_repos'] > 0 or data['health']['scan_errors'] > 0:
+                data['suggestions'].append("Run 'repoindex refresh' to update the database")
+
+            if data['health']['scan_errors'] > 0:
+                data['suggestions'].append("Run 'repoindex sql \"SELECT * FROM scan_errors\"' to see failures")
+
+            if data['database']['repos'] == 0:
+                data['suggestions'].append("Check configuration with 'repoindex config show'")
 
     except Exception:
         pass  # Database might not exist yet

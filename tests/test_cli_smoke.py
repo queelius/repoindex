@@ -77,7 +77,7 @@ class TestCLISmokeWithRealConfig(unittest.TestCase):
         self.assertIn('repository_directories', config)
         self.assertIsInstance(config['repository_directories'], list)
         self.assertIn('github', config)
-        self.assertIn('registries', config)
+        self.assertIn('repository_tags', config)  # Updated from 'registries'
 
     def test_status_dashboard_json(self):
         """status --json should return dashboard data."""

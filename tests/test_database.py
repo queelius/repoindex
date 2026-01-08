@@ -174,7 +174,7 @@ class TestSchema(unittest.TestCase):
         tables = [row['name'] for row in cursor.fetchall()]
 
         expected_tables = ['repos', 'events', 'tags', 'publications',
-                          'dependencies', 'repo_snapshots', '_schema_info']
+                          'scan_errors', '_schema_info']
         for table in expected_tables:
             self.assertIn(table, tables)
 

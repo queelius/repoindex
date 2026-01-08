@@ -12,7 +12,6 @@ from repoindex.commands.view import view_cmd
 from repoindex.commands.query import query_handler
 from repoindex.commands.shell import shell_handler
 from repoindex.commands.events import events_handler
-from repoindex.commands.mcp import mcp_handler
 from repoindex.commands.refresh import refresh_handler, db_handler, sql_handler
 from repoindex.commands.claude import claude_handler
 
@@ -45,7 +44,6 @@ cli.add_command(events_handler, name='events')
 cli.add_command(sql_handler, name='sql')
 cli.add_command(refresh_handler, name='refresh')
 cli.add_command(shell_handler, name='shell')
-cli.add_command(mcp_handler, name='mcp')
 
 # Command groups
 cli.add_command(tag_cmd)

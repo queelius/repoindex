@@ -56,6 +56,14 @@ from .query_compiler import (
     QueryCompiler,
     QueryCompileError,
 )
+from .errors import (
+    ensure_scan_errors_table,
+    record_scan_error,
+    get_scan_errors,
+    get_scan_error_count,
+    clear_scan_errors,
+    clear_scan_error_for_path,
+)
 
 __all__ = [
     # Connection
@@ -100,4 +108,11 @@ __all__ = [
     'CompiledQuery',
     'QueryCompiler',
     'QueryCompileError',
+    # Scan errors
+    'ensure_scan_errors_table',
+    'record_scan_error',
+    'get_scan_errors',
+    'get_scan_error_count',
+    'clear_scan_errors',
+    'clear_scan_error_for_path',
 ]

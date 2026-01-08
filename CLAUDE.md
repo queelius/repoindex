@@ -10,7 +10,7 @@ It provides a unified view across all your repositories, enabling queries, organ
 
 **Key Philosophy**: repoindex knows *about* your repos (metadata, tags, status), while Claude Code works *inside* them (editing, generating). Together they provide full portfolio awareness.
 
-**Current Version**: 0.9.2
+**Current Version**: 0.10.0
 
 **See also**: [DESIGN.md](DESIGN.md) for detailed design principles and architecture.
 
@@ -35,8 +35,7 @@ Claude Code (deep work on ONE repo)
 2. **Metadata, not manipulation** - track state, don't edit files
 3. **Index, not IDE** - we're the catalog, not the workbench
 4. **Complement Claude Code** - provide context, not compete
-5. **VFS interface** - navigable, queryable structure
-6. **MCP server** - LLM integration endpoint
+5. **CLI first** - compose with Unix tools via pipes
 
 ### Core Capabilities
 1. **Repository Discovery** - Find and track repos across directories
@@ -48,7 +47,7 @@ Claude Code (deep work on ONE repo)
 
 ## Using repoindex with Claude Code
 
-Claude Code can run repoindex CLI commands directly. This is often more powerful than MCP since you can compose with Unix tools.
+Claude Code can run repoindex CLI commands directly. Compose with Unix tools via pipes.
 
 ### Common Patterns
 
@@ -299,11 +298,6 @@ mock_run_command.side_effect = [("output1", 0), ("output2", 0)]  # Multiple call
 - `repoindex/events.py` - Stateless event scanning (git tags, commits)
 - `repoindex/tags.py` - Tag management and implicit tag generation
 
-### MCP Server
-- `repoindex/mcp/server.py` - MCP server implementation
-- Uses MCPContext for shared state
-- Exposes resources and tools for LLM integration
-
 ### Key Design Patterns
 - **Layered Architecture**: Domain → Infrastructure → Services → Commands
 - **Dependency Injection**: Services receive clients via constructor
@@ -317,9 +311,8 @@ mock_run_command.side_effect = [("output1", 0), ("output2", 0)]  # Multiple call
 - `packaging>=21.0` - Package version handling
 - `click` - CLI framework
 - `rapidfuzz` - Fuzzy string matching for query language
-- `mcp` - Model Context Protocol server
 
-### Commands Implemented (11 commands)
+### Commands Implemented (10 commands)
 
 ```
 repoindex
@@ -331,14 +324,13 @@ repoindex
 ├── tag                 # Organization (add/remove/list/tree)
 ├── view                # Curated views (list/show/create/delete)
 ├── config              # Settings (show/repos/init)
-├── mcp                 # LLM integration server
 ├── claude              # Skill management (install/uninstall/show)
 └── shell               # Interactive mode with VFS navigation
 ```
 
 ## Configuration
 
-Configuration is managed through `~/.repoindex/config.json` (or YAML). Use `REPOINDEX_CONFIG` environment variable to override location.
+Configuration is managed through `~/.repoindex/config.yaml` (YAML is the only supported format for new configurations; existing JSON configs are auto-migrated). Use `REPOINDEX_CONFIG` environment variable to override location.
 
 Key configuration sections:
 - `repository_directories` - List of repo directories (supports ** glob patterns)
@@ -625,11 +617,6 @@ repoindex tag tree
 - `refresh` populates the SQLite database with repos and events
 - `query`, `events`, `sql` all query from the database
 - No live scanning in query commands - database is the cache
-
-### MCP Server
-- Start with `repoindex mcp serve`
-- Exposes resources: `repo://list`, `tags://list`, `stats://summary`
-- Exposes tools: `repoindex_tag`, `repoindex_untag`, `repoindex_query`, `repoindex_refresh`, `repoindex_stats`
 
 ### Events Command Usage
 ```bash

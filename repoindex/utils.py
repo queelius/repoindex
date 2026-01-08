@@ -214,13 +214,14 @@ def is_git_repo(path):
     """Check if a given path is a Git repository."""
     return os.path.isdir(os.path.join(path, '.git'))
 
-def find_git_repos(base_dirs, recursive=False, exclude_patterns=None):
+def find_git_repos(base_dirs, recursive=False, exclude_patterns=None, max_repos=None):
     """Find all git repositories in a given directory or list of directories.
 
     Args:
         base_dirs: Directory or list of directories to search
         recursive: Whether to search recursively
         exclude_patterns: Additional patterns to exclude (e.g., ['_deps', 'build'])
+        max_repos: Maximum number of repos to find (None = unlimited)
     """
     repos = set()
     if isinstance(base_dirs, str):
@@ -259,6 +260,10 @@ def find_git_repos(base_dirs, recursive=False, exclude_patterns=None):
         return any(part in default_excludes or part.startswith('build') for part in path_parts)
 
     for base_dir in base_dirs:
+        # Check max_repos limit
+        if max_repos and len(repos) >= max_repos:
+            break
+
         # If the base_dir itself is a repo, and we are not in recursive mode, add it.
         if is_git_repo(base_dir) and not recursive:
             repos.add(base_dir)
@@ -269,10 +274,16 @@ def find_git_repos(base_dirs, recursive=False, exclude_patterns=None):
             for root, dirs, _ in os.walk(base_dir):
                 if '.git' in dirs:
                     repos.add(root)
+                    # Check max_repos limit
+                    if max_repos and len(repos) >= max_repos:
+                        break
                     # Once we find a .git dir, don't go deeper into that subdirectory
                     dirs[:] = [d for d in dirs if d != '.git']
                 # Prune excluded directories to speed up search
                 dirs[:] = [d for d in dirs if not should_exclude_dir(d, os.path.join(root, d))]
+            # Break outer loop if max reached
+            if max_repos and len(repos) >= max_repos:
+                break
         # If not recursive, just check the immediate subdirectories.
         else:
             try:
@@ -282,6 +293,9 @@ def find_git_repos(base_dirs, recursive=False, exclude_patterns=None):
                         # Skip excluded directories
                         if not should_exclude_dir(item, item_path):
                             repos.add(item_path)
+                            # Check max_repos limit
+                            if max_repos and len(repos) >= max_repos:
+                                break
             except FileNotFoundError:
                 logger.warning(f"Directory not found: {base_dir}")
 

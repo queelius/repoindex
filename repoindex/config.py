@@ -30,8 +30,10 @@ def get_config_path():
 
     Checks in order:
     1. REPOINDEX_CONFIG environment variable
-    2. ~/.repoindex/ directory (new location)
+    2. ~/.repoindex/ directory (YAML preferred)
     3. ~/.ghops/ directory (legacy location for backward compatibility)
+
+    Note: JSON/TOML configs are auto-migrated to YAML on first load.
     """
     # Check for environment variable override
     if 'REPOINDEX_CONFIG' in os.environ:
@@ -39,96 +41,153 @@ def get_config_path():
         if path.exists():
             return path
 
-    # Check ~/.repoindex/ directory (new location)
+    # Check ~/.repoindex/ directory (YAML preferred)
     repoindex_dir = Path.home() / '.repoindex'
-    for filename in ['config.json', 'config.toml', 'config.yaml', 'config.yml']:
+    # Prefer YAML, then check legacy formats
+    for filename in ['config.yaml', 'config.yml', 'config.json', 'config.toml']:
         path = repoindex_dir / filename
         if path.exists() and path.stat().st_size > 10:  # Not empty/trivial
             return path
 
     # Check ~/.ghops/ directory (legacy location for backward compatibility)
     ghops_dir = Path.home() / '.ghops'
-    for filename in ['config.json', 'config.toml', 'config.yaml', 'config.yml']:
+    for filename in ['config.yaml', 'config.yml', 'config.json', 'config.toml']:
         path = ghops_dir / filename
         if path.exists():
             logger.debug(f"Using legacy config from {path}")
             return path
 
-    # If no file exists, return default path for saving
-    return repoindex_dir / 'config.json'
+    # If no file exists, return default YAML path for saving
+    return repoindex_dir / 'config.yaml'
+
+
+def migrate_config_to_yaml(config_path: Path) -> Path:
+    """
+    Migrate JSON/TOML config to YAML format.
+
+    Creates a backup of the original file (e.g., config.json.bak)
+    and writes a new config.yaml file.
+
+    Args:
+        config_path: Path to existing JSON/TOML config file
+
+    Returns:
+        Path to the new YAML config file
+    """
+    if config_path.suffix.lower() in ['.yaml', '.yml']:
+        return config_path  # Already YAML
+
+    try:
+        import yaml
+    except ImportError:
+        logger.warning("PyYAML not installed, cannot migrate to YAML")
+        return config_path
+
+    # Load the existing config
+    try:
+        if config_path.suffix.lower() == '.toml':
+            with open(config_path, 'rb') as f:
+                config_data = tomllib.load(f)
+        else:
+            with open(config_path, 'r') as f:
+                config_data = json.load(f)
+    except Exception as e:
+        logger.warning(f"Could not read config for migration: {e}")
+        return config_path
+
+    # Create backup
+    backup_path = config_path.with_suffix(config_path.suffix + '.bak')
+    try:
+        import shutil
+        shutil.copy2(config_path, backup_path)
+        logger.info(f"Backed up config to {backup_path}")
+    except Exception as e:
+        logger.warning(f"Could not create backup: {e}")
+        return config_path
+
+    # Write new YAML config
+    yaml_path = config_path.parent / 'config.yaml'
+    try:
+        with open(yaml_path, 'w') as f:
+            yaml.safe_dump(config_data, f, default_flow_style=False, sort_keys=False)
+        logger.info(f"Migrated config to YAML: {yaml_path}")
+
+        # Remove old config file (backup exists)
+        try:
+            config_path.unlink()
+            logger.debug(f"Removed old config file: {config_path}")
+        except Exception:
+            pass  # Non-critical
+
+        return yaml_path
+    except Exception as e:
+        logger.warning(f"Could not write YAML config: {e}")
+        return config_path
 
 def load_config():
-    """Load configuration from file."""
+    """Load configuration from file.
+
+    Automatically migrates JSON/TOML configs to YAML format.
+    """
     config_path = get_config_path()
-    
+
+    # Auto-migrate non-YAML configs
+    if config_path.exists() and config_path.suffix.lower() not in ['.yaml', '.yml']:
+        config_path = migrate_config_to_yaml(config_path)
+
     # Start with default config
     config = get_default_config()
-    
+
     # Load from file if it exists
     if config_path.exists():
         try:
             if config_path.suffix.lower() in ['.toml']:
+                # TOML is deprecated but still readable
                 with open(config_path, 'rb') as f:
                     file_config = tomllib.load(f)
             elif config_path.suffix.lower() in ['.yaml', '.yml']:
-                try:
-                    import yaml
-                    with open(config_path, 'r') as f:
-                        file_config = yaml.safe_load(f)
-                except ImportError:
-                    logger.warning("PyYAML not installed. Install with 'pip install pyyaml' for YAML support.")
-                    # Fall back to JSON
-                    with open(config_path, 'r') as f:
-                        file_config = json.load(f)
+                import yaml
+                with open(config_path, 'r') as f:
+                    file_config = yaml.safe_load(f) or {}
             else:
-                # Default to JSON format
+                # JSON is deprecated but still readable
                 with open(config_path, 'r') as f:
                     file_config = json.load(f)
-            
+
             # Merge file config with defaults
             config = merge_configs(config, file_config)
         except Exception as e:
             logger.error(f"Error loading config from {config_path}: {e}")
-    
+
     # Apply environment variable overrides
     config = apply_env_overrides(config)
 
     return config
 
 def save_config(config):
-    """Save configuration to file."""
+    """Save configuration to file.
+
+    Always saves as YAML (the only supported format for writing).
+    """
     config_path = get_config_path()
-    
+
+    # Always use YAML for new saves
+    if config_path.suffix.lower() not in ['.yaml', '.yml']:
+        config_path = config_path.parent / 'config.yaml'
+
+    try:
+        import yaml
+    except ImportError:
+        logger.error("PyYAML not installed. Install with 'pip install pyyaml'")
+        return
+
     try:
         # Create directory if it doesn't exist
         config_path.parent.mkdir(parents=True, exist_ok=True)
-        
-        if config_path.suffix.lower() in ['.toml']:
-            # For TOML we need toml library for writing (tomllib is read-only)
-            try:
-                import toml
-                with open(config_path, 'w') as f:
-                    toml.dump(config, f)
-            except ImportError:
-                logger.warning("toml library not installed. Saving as JSON instead.")
-                config_path = config_path.with_suffix('.json')
-                with open(config_path, 'w') as f:
-                    json.dump(config, f, indent=2)
-        elif config_path.suffix.lower() in ['.yaml', '.yml']:
-            try:
-                import yaml
-                with open(config_path, 'w') as f:
-                    yaml.safe_dump(config, f, default_flow_style=False)
-            except ImportError:
-                logger.warning("PyYAML not installed. Saving as JSON instead.")
-                config_path = config_path.with_suffix('.json')
-                with open(config_path, 'w') as f:
-                    json.dump(config, f, indent=2)
-        else:
-            # Default to JSON format
-            with open(config_path, 'w') as f:
-                json.dump(config, f, indent=2)
-        
+
+        with open(config_path, 'w') as f:
+            yaml.safe_dump(config, f, default_flow_style=False, sort_keys=False)
+
         logger.info(f"Configuration saved to {config_path}")
     except Exception as e:
         logger.error(f"Error saving config to {config_path}: {e}")
@@ -163,6 +222,16 @@ def get_default_config():
         # User-defined tags (managed by `repoindex tag` commands)
         "repository_tags": {},
 
+        # Refresh command defaults for external sources
+        # These slow operations are opt-in by default
+        "refresh": {
+            "external_sources": {
+                "github": False,   # GitHub API (stars, topics) - moderate speed
+                "pypi": False,     # PyPI package status - slow
+                "cran": False,     # CRAN package status - slow
+            }
+        },
+
         # NOTE: Legacy keys (registries, cache) are ignored if present in old configs
         # The SQLite database is now the canonical cache
     }
@@ -196,15 +265,30 @@ github:
 # User-defined tags (managed by `repoindex tag` commands)
 # repository_tags:
 #   /path/to/repo: [tag1, tag2]
+
+# Refresh command defaults for external sources
+# These slow operations are opt-in by default
+# Use --external flag to enable all, or individual flags
+refresh:
+  external_sources:
+    github: false   # GitHub API (stars, topics) - moderate speed
+    pypi: false     # PyPI package status - slow
+    cran: false     # CRAN package status - slow
 """
     config_path.write_text(example_content)
     logger.info(f"Example configuration saved to {config_path}")
 
 
 def generate_default_config():
-    """Generate a minimal default configuration file."""
-    config_path = Path.home() / '.repoindex' / 'config.json'
+    """Generate a minimal default configuration file (YAML)."""
+    config_path = Path.home() / '.repoindex' / 'config.yaml'
     config_path.parent.mkdir(parents=True, exist_ok=True)
+
+    try:
+        import yaml
+    except ImportError:
+        logger.error("PyYAML not installed. Install with 'pip install pyyaml'")
+        return
 
     minimal_config = {
         "repository_directories": [],
@@ -212,7 +296,7 @@ def generate_default_config():
     }
 
     with open(config_path, 'w') as f:
-        json.dump(minimal_config, f, indent=2)
+        yaml.safe_dump(minimal_config, f, default_flow_style=False, sort_keys=False)
 
     logger.info(f"Configuration file created at {config_path}")
     logger.info("Add your repository directories or use --dir flag.")

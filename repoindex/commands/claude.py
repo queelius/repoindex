@@ -11,8 +11,21 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-# Skill definition - the prompt that teaches Claude how to use repoindex
-SKILL_CONTENT = '''Use repoindex to explore and query the user's repository collection.
+def get_version() -> str:
+    """Get repoindex version from package metadata."""
+    try:
+        from importlib.metadata import version
+        return version('repoindex')
+    except Exception:
+        return 'unknown'
+
+
+def generate_skill_content() -> str:
+    """Generate skill content with current version."""
+    version = get_version()
+    return f'''Use repoindex to explore and query the user's repository collection.
+
+**Version**: {version}
 
 ## Quick Start
 
@@ -184,7 +197,7 @@ def install(global_install: bool, force: bool):
     skill_path.parent.mkdir(parents=True, exist_ok=True)
 
     # Write skill file
-    skill_path.write_text(SKILL_CONTENT)
+    skill_path.write_text(generate_skill_content())
 
     click.echo(f"Installed repoindex skill ({location})")
     click.echo(f"  Path: {skill_path}")
@@ -248,4 +261,4 @@ def show():
 @claude_handler.command('content')
 def content():
     """Print the skill content (for manual installation)."""
-    print(SKILL_CONTENT)
+    print(generate_skill_content())

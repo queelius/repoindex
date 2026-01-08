@@ -161,8 +161,8 @@ registries:
                 # This tests the error handling path
                 pass
 
-    def test_config_path_priority_json_before_yaml(self):
-        """Test that JSON config is preferred over YAML when both exist."""
+    def test_config_path_priority_yaml_before_json(self):
+        """Test that YAML config is preferred over JSON when both exist."""
         from repoindex.config import get_config_path
 
         # Given: Both JSON and YAML configs exist
@@ -174,8 +174,8 @@ registries:
         # When: We get config path
         path = get_config_path()
 
-        # Then: It should prefer JSON
-        self.assertEqual(path.suffix, '.json')
+        # Then: It should prefer YAML (YAML is now the primary format)
+        self.assertEqual(path.suffix, '.yaml')
 
 
 class TestConfigSaving(unittest.TestCase):
@@ -205,15 +205,16 @@ class TestConfigSaving(unittest.TestCase):
         # When: We save config
         save_config(config)
 
-        # Then: Directory and file should exist
-        config_path = Path(self.temp_dir) / '.repoindex' / 'config.json'
+        # Then: Directory and file should exist (YAML is default format now)
+        config_path = Path(self.temp_dir) / '.repoindex' / 'config.yaml'
         self.assertTrue(config_path.exists())
+        import yaml
         with open(config_path) as f:
-            saved = json.load(f)
+            saved = yaml.safe_load(f)
         self.assertEqual(saved['repository_directories'], ['~/repos/**'])
 
     def test_save_config_preserves_indentation(self):
-        """Test that saved JSON is properly formatted."""
+        """Test that saved YAML is properly formatted."""
         from repoindex.config import save_config
 
         # Given: A config to save
@@ -222,11 +223,11 @@ class TestConfigSaving(unittest.TestCase):
         # When: We save config
         save_config(config)
 
-        # Then: File should be indented
-        config_path = Path(self.temp_dir) / '.repoindex' / 'config.json'
+        # Then: File should be indented (YAML is default format now)
+        config_path = Path(self.temp_dir) / '.repoindex' / 'config.yaml'
         content = config_path.read_text()
         self.assertIn('\n', content)  # Has newlines (formatted)
-        self.assertIn('  ', content)  # Has indentation
+        self.assertIn('repository_directories', content)  # Has key
 
 
 class TestGenerateDefaultConfig(unittest.TestCase):
@@ -253,11 +254,12 @@ class TestGenerateDefaultConfig(unittest.TestCase):
         # When: We generate default config
         generate_default_config()
 
-        # Then: Config file should exist with minimal structure
-        config_path = Path(self.temp_dir) / '.repoindex' / 'config.json'
+        # Then: Config file should exist with minimal structure (YAML format now)
+        config_path = Path(self.temp_dir) / '.repoindex' / 'config.yaml'
         self.assertTrue(config_path.exists())
+        import yaml
         with open(config_path) as f:
-            config = json.load(f)
+            config = yaml.safe_load(f)
         self.assertIn('repository_directories', config)
         self.assertIn('repository_tags', config)
         self.assertEqual(config['repository_directories'], [])
@@ -385,8 +387,8 @@ class TestConfigPathEdgeCases(unittest.TestCase):
         # When: We get config path
         path = get_config_path()
 
-        # Then: It should return the default path
-        expected = Path(self.temp_dir) / '.repoindex' / 'config.json'
+        # Then: It should return the default YAML path
+        expected = Path(self.temp_dir) / '.repoindex' / 'config.yaml'
         self.assertEqual(path, expected)
 
     def test_get_config_path_skips_empty_files(self):
@@ -396,13 +398,13 @@ class TestConfigPathEdgeCases(unittest.TestCase):
         # Given: A nearly empty config file (less than 10 bytes)
         repoindex_dir = Path(self.temp_dir) / '.repoindex'
         repoindex_dir.mkdir()
-        (repoindex_dir / 'config.json').write_text('{}')  # 2 bytes
+        (repoindex_dir / 'config.yaml').write_text('{}')  # 2 bytes
 
         # When: We get config path
         path = get_config_path()
 
         # Then: It should return default path (skipping the tiny file)
-        expected = Path(self.temp_dir) / '.repoindex' / 'config.json'
+        expected = Path(self.temp_dir) / '.repoindex' / 'config.yaml'
         self.assertEqual(path, expected)
 
     def test_get_config_path_finds_toml_files(self):

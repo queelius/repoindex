@@ -114,8 +114,8 @@ npm = true
         # Environment should override config file
         self.assertEqual(config['github']['token'], 'env-token-123')
 
-    def test_save_config_json(self):
-        """Test saving config to JSON file"""
+    def test_save_config_yaml(self):
+        """Test saving config to YAML file"""
         config_data = {
             'repository_directories': ['/path/to/repos'],
             'github': {'token': 'test-token'}
@@ -123,12 +123,13 @@ npm = true
 
         save_config(config_data)
 
-        # Check in .repoindex directory
-        config_path = Path(self.temp_dir) / '.repoindex' / 'config.json'
+        # Check in .repoindex directory (now saves as YAML)
+        config_path = Path(self.temp_dir) / '.repoindex' / 'config.yaml'
         self.assertTrue(config_path.exists())
 
+        import yaml
         with open(config_path, 'r') as f:
-            saved_config = json.load(f)
+            saved_config = yaml.safe_load(f)
 
         self.assertEqual(saved_config['repository_directories'], ['/path/to/repos'])
         self.assertEqual(saved_config['github']['token'], 'test-token')

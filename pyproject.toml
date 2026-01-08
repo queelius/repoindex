@@ -4,12 +4,12 @@ build-backend = "hatchling.build"
 
 [project]
 name = "repoindex"
-version = "0.9.2"
+version = "0.10.0"
 description = "A collection-aware metadata index for git repositories"
 readme = "README.md"
 license-files = [ "LICEN[CS]E.*",]
 requires-python = ">=3.7"
-keywords = [ "git", "github", "repository", "metadata", "index", "cli", "mcp",]
+keywords = [ "git", "github", "repository", "metadata", "index", "cli",]
 classifiers = [ "Development Status :: 4 - Beta", "Topic :: Software Development :: Version Control :: Git", "Operating System :: OS Independent", "Programming Language :: Python :: 3",]
 dependencies = [ "pathlib", "toml", "requests>=2.25.0", "packaging>=21.0", "click>=8.0.0", "rich>=13.0.0", "tweepy", "rapidfuzz", "pyyaml>=5.0.0",]
 [[project.authors]]

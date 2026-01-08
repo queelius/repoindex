@@ -185,7 +185,9 @@ class RepositoryService:
     def get_status(
         self,
         repo: Repository,
-        fetch_github: bool = False
+        fetch_github: bool = False,
+        fetch_pypi: bool = False,
+        fetch_cran: bool = False
     ) -> Repository:
         """
         Enrich repository with current status.
@@ -193,6 +195,8 @@ class RepositoryService:
         Args:
             repo: Repository to enrich
             fetch_github: Whether to fetch GitHub metadata
+            fetch_pypi: Whether to fetch PyPI package status
+            fetch_cran: Whether to fetch CRAN package status
 
         Returns:
             New Repository with status information
@@ -231,6 +235,24 @@ class RepositoryService:
             github_metadata = self._fetch_github_metadata(repo.owner, repo.name)
             if github_metadata:
                 updated = replace(updated, github=github_metadata)
+
+        # Fetch PyPI package status if requested
+        if fetch_pypi:
+            package_metadata = self._fetch_pypi_metadata(repo.path)
+            if package_metadata:
+                updated = replace(updated, package=package_metadata)
+
+        # Fetch CRAN package status if requested
+        if fetch_cran:
+            cran_metadata = self._fetch_cran_metadata(repo.path)
+            if cran_metadata:
+                # Merge with existing package metadata or use CRAN data
+                if updated.package:
+                    # Repo already has Python package info, add CRAN as separate field
+                    # For now, prefer PyPI if both exist
+                    pass
+                else:
+                    updated = replace(updated, package=cran_metadata)
 
         return updated
 
@@ -357,6 +379,52 @@ class RepositoryService:
             updated_at=repo_data.updated_at,
             pushed_at=repo_data.pushed_at,
         )
+
+    def _fetch_pypi_metadata(self, path: str) -> Optional[PackageMetadata]:
+        """Fetch PyPI package metadata for repository."""
+        try:
+            from ..pypi import detect_pypi_package
+
+            pypi_info = detect_pypi_package(path)
+            if not pypi_info.get('package_name'):
+                return None
+
+            return PackageMetadata(
+                name=pypi_info.get('package_name', ''),
+                version=pypi_info.get('local_version', ''),
+                registry='pypi',
+                published=pypi_info.get('is_published', False),
+                registry_url=pypi_info.get('pypi_info', {}).get('url', ''),
+                registry_version=pypi_info.get('pypi_info', {}).get('version', ''),
+            )
+        except Exception as e:
+            logger.debug(f"Failed to fetch PyPI metadata for {path}: {e}")
+            return None
+
+    def _fetch_cran_metadata(self, path: str) -> Optional[PackageMetadata]:
+        """Fetch CRAN/Bioconductor package metadata for repository."""
+        try:
+            from ..cran import detect_r_package
+
+            r_info = detect_r_package(path)
+            if not r_info.get('package_name'):
+                return None
+
+            # Use the detected registry (cran or bioconductor)
+            registry = r_info.get('registry', 'cran')
+            registry_info = r_info.get('cran_info') or r_info.get('bioconductor_info') or {}
+
+            return PackageMetadata(
+                name=r_info.get('package_name', ''),
+                version=r_info.get('local_version', ''),
+                registry=registry,
+                published=r_info.get('is_published', False),
+                registry_url=registry_info.get('url', ''),
+                registry_version=registry_info.get('version', ''),
+            )
+        except Exception as e:
+            logger.debug(f"Failed to fetch CRAN/R metadata for {path}: {e}")
+            return None
 
     def filter_by_query(
         self,

@@ -16,6 +16,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import yaml
+
 
 class CLITestBase(unittest.TestCase):
     """Base class for CLI tests with common setup/teardown."""
@@ -28,7 +30,7 @@ class CLITestBase(unittest.TestCase):
     def setUp(self):
         """Set up test environment with temp directories."""
         self.temp_dir = tempfile.mkdtemp()
-        self.config_path = Path(self.temp_dir) / "config.json"
+        self.config_path = Path(self.temp_dir) / "config.yaml"  # Now YAML
         self.repos_dir = Path(self.temp_dir) / "repos"
         self.repos_dir.mkdir(parents=True)
 
@@ -37,9 +39,9 @@ class CLITestBase(unittest.TestCase):
         shutil.rmtree(self.temp_dir, ignore_errors=True)
 
     def write_config(self, config: dict):
-        """Write a config file to the temp directory."""
+        """Write a YAML config file to the temp directory."""
         with open(self.config_path, "w") as f:
-            json.dump(config, f, indent=2)
+            yaml.safe_dump(config, f, default_flow_style=False)
 
     def create_git_repo(self, name: str, with_files: dict = None) -> Path:
         """
@@ -194,7 +196,7 @@ class TestInitCommand(CLITestBase):
         """
         Run repoindex config init without --config (since init creates config).
 
-        Uses HOME env var to control where config is saved (~/.repoindex/config.json).
+        Uses HOME env var to control where config is saved (~/.repoindex/config.yaml).
         """
         cmd = ["python", "-m", "repoindex.cli"] + list(args)
         env = os.environ.copy()
@@ -228,18 +230,18 @@ class TestInitCommand(CLITestBase):
         repo = self.create_git_repo("test-project")
 
         # When: We run config init with -y -d pointing to our repos directory
-        # Note: init creates config at ~/.repoindex/config.json (we override HOME)
+        # Note: init creates config at ~/.repoindex/config.yaml (we override HOME)
         result = self.run_init_cli("config", "init", "-y", "-d", str(self.repos_dir))
 
         # Then: The command should succeed and mention creating config
         self.assertEqual(result.returncode, 0)
         self.assertIn("Configuration created", result.stdout)
 
-        # Verify config file was created at the default location
-        expected_config_path = Path(self.temp_dir) / ".repoindex" / "config.json"
+        # Verify config file was created at the default location (now YAML)
+        expected_config_path = Path(self.temp_dir) / ".repoindex" / "config.yaml"
         self.assertTrue(expected_config_path.exists())
         with open(expected_config_path) as f:
-            created_config = json.load(f)
+            created_config = yaml.safe_load(f)
         self.assertIn("repository_directories", created_config)
 
     def test_init_with_directory_creates_config(self):
@@ -255,8 +257,8 @@ class TestInitCommand(CLITestBase):
         self.assertEqual(result.returncode, 0)
         self.assertIn("Configuration created", result.stdout)
 
-        # Verify config file was created
-        expected_config_path = Path(self.temp_dir) / ".repoindex" / "config.json"
+        # Verify config file was created (now YAML)
+        expected_config_path = Path(self.temp_dir) / ".repoindex" / "config.yaml"
         self.assertTrue(expected_config_path.exists())
 
 
@@ -319,9 +321,9 @@ class TestConfigReposCommands(CLITestBase):
         self.assertEqual(result.returncode, 0)
         self.assertIn("Added repository directory", result.stdout)
 
-        # Verify the config file was updated
+        # Verify the config file was updated (now YAML)
         with open(self.config_path) as f:
-            updated_config = json.load(f)
+            updated_config = yaml.safe_load(f)
         self.assertIn("~/new-repos/**", updated_config["repository_directories"])
 
     def test_config_repos_add_duplicate_path(self):
@@ -354,9 +356,9 @@ class TestConfigReposCommands(CLITestBase):
         self.assertEqual(result.returncode, 0)
         self.assertIn("Removed repository directory", result.stdout)
 
-        # Verify the config file was updated
+        # Verify the config file was updated (now YAML)
         with open(self.config_path) as f:
-            updated_config = json.load(f)
+            updated_config = yaml.safe_load(f)
         self.assertNotIn("~/path-a/**", updated_config["repository_directories"])
         self.assertIn("~/path-b/**", updated_config["repository_directories"])
 
@@ -423,9 +425,9 @@ class TestConfigReposCommands(CLITestBase):
         self.assertEqual(result.returncode, 0)
         self.assertIn("Cleared all repository directories", result.stdout)
 
-        # Verify the config file was updated
+        # Verify the config file was updated (now YAML)
         with open(self.config_path) as f:
-            updated_config = json.load(f)
+            updated_config = yaml.safe_load(f)
         self.assertEqual(updated_config["repository_directories"], [])
 
 

@@ -20,6 +20,31 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
+class RateLimitStatus:
+    """GitHub API rate limit status."""
+    remaining: int
+    limit: int
+    reset_time: int  # Unix timestamp
+    used: int
+
+    @property
+    def reset_datetime(self) -> datetime:
+        """Get reset time as datetime."""
+        return datetime.fromtimestamp(self.reset_time)
+
+    @property
+    def minutes_until_reset(self) -> int:
+        """Minutes until rate limit resets."""
+        now = int(time.time())
+        return max(0, (self.reset_time - now) // 60)
+
+    @property
+    def is_low(self) -> bool:
+        """Check if rate limit is getting low (< 100 remaining)."""
+        return self.remaining < 100
+
+
+@dataclass
 class GitHubRepo:
     """GitHub repository metadata."""
     owner: str
@@ -139,6 +164,90 @@ class GitHubClient:
         self.base_delay = base_delay
         self.max_delay = max_delay
         self._use_gh_cli = self._check_gh_cli()
+        self._rate_limit_status: Optional[RateLimitStatus] = None
+
+    def _update_rate_limit_from_headers(self, headers: Dict[str, str]) -> None:
+        """Update rate limit status from response headers."""
+        try:
+            remaining = int(headers.get('X-RateLimit-Remaining', -1))
+            limit = int(headers.get('X-RateLimit-Limit', -1))
+            reset_time = int(headers.get('X-RateLimit-Reset', 0))
+            used = int(headers.get('X-RateLimit-Used', 0))
+
+            if remaining >= 0 and limit >= 0:
+                self._rate_limit_status = RateLimitStatus(
+                    remaining=remaining,
+                    limit=limit,
+                    reset_time=reset_time,
+                    used=used
+                )
+
+                if self._rate_limit_status.is_low:
+                    logger.warning(
+                        f"GitHub API rate limit low: {remaining}/{limit} remaining, "
+                        f"resets in {self._rate_limit_status.minutes_until_reset} minutes"
+                    )
+        except (ValueError, TypeError):
+            pass  # Ignore parsing errors
+
+    def get_rate_limit_status(self) -> Optional[RateLimitStatus]:
+        """
+        Get current rate limit status.
+
+        Returns the cached status from the last API call, or fetches
+        fresh status if no cached data is available.
+
+        Returns:
+            RateLimitStatus or None if unavailable
+        """
+        if self._rate_limit_status is None:
+            # Fetch fresh rate limit status
+            self._fetch_rate_limit()
+        return self._rate_limit_status
+
+    def _fetch_rate_limit(self) -> None:
+        """Fetch rate limit status from GitHub API."""
+        if self._use_gh_cli:
+            try:
+                result = subprocess.run(
+                    ['gh', 'api', 'rate_limit'],
+                    capture_output=True,
+                    text=True,
+                    timeout=10
+                )
+                if result.returncode == 0 and result.stdout:
+                    data = json.loads(result.stdout)
+                    core = data.get('rate', {})
+                    self._rate_limit_status = RateLimitStatus(
+                        remaining=core.get('remaining', 0),
+                        limit=core.get('limit', 0),
+                        reset_time=core.get('reset', 0),
+                        used=core.get('used', 0)
+                    )
+                    return
+            except (subprocess.TimeoutExpired, json.JSONDecodeError, FileNotFoundError):
+                pass
+
+        # Fall back to requests
+        try:
+            import requests
+            url = "https://api.github.com/rate_limit"
+            headers = {'Accept': 'application/vnd.github.v3+json', 'User-Agent': 'repoindex'}
+            if self.token:
+                headers['Authorization'] = f'token {self.token}'
+
+            response = requests.get(url, headers=headers, timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                core = data.get('rate', {})
+                self._rate_limit_status = RateLimitStatus(
+                    remaining=core.get('remaining', 0),
+                    limit=core.get('limit', 0),
+                    reset_time=core.get('reset', 0),
+                    used=core.get('used', 0)
+                )
+        except Exception:
+            pass
 
     def _check_gh_cli(self) -> bool:
         """Check if gh CLI is available and authenticated."""
@@ -189,6 +298,9 @@ class GitHubClient:
         for attempt in range(self.max_retries):
             try:
                 response = requests.get(url, headers=headers, timeout=30)
+
+                # Track rate limit from headers
+                self._update_rate_limit_from_headers(response.headers)
 
                 if response.status_code == 200:
                     return response.json()

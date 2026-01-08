@@ -209,9 +209,10 @@ class TestConfigInitCLI(unittest.TestCase):
 
         # Then: Config should have ** pattern
         self.assertEqual(result.returncode, 0)
-        config_path = Path(self.temp_dir) / ".repoindex" / "config.json"
+        config_path = Path(self.temp_dir) / ".repoindex" / "config.yaml"
+        import yaml
         with open(config_path) as f:
-            config = json.load(f)
+            config = yaml.safe_load(f)
 
         # Should end with /**
         self.assertTrue(any("**" in d for d in config["repository_directories"]))
@@ -226,9 +227,10 @@ class TestConfigInitCLI(unittest.TestCase):
 
         # Then: Config should NOT have ** pattern
         self.assertEqual(result.returncode, 0)
-        config_path = Path(self.temp_dir) / ".repoindex" / "config.json"
+        config_path = Path(self.temp_dir) / ".repoindex" / "config.yaml"
+        import yaml
         with open(config_path) as f:
-            config = json.load(f)
+            config = yaml.safe_load(f)
 
         # Should NOT end with /**
         self.assertFalse(any("**" in d for d in config["repository_directories"]))
@@ -243,9 +245,10 @@ class TestConfigInitCLI(unittest.TestCase):
 
         # Then: Config should use ~ prefix
         self.assertEqual(result.returncode, 0)
-        config_path = Path(self.temp_dir) / ".repoindex" / "config.json"
+        config_path = Path(self.temp_dir) / ".repoindex" / "config.yaml"
+        import yaml
         with open(config_path) as f:
-            config = json.load(f)
+            config = yaml.safe_load(f)
 
         # Should start with ~
         self.assertTrue(any(d.startswith("~") for d in config["repository_directories"]))
@@ -274,7 +277,7 @@ class TestConfigInitCLI(unittest.TestCase):
         self.assertEqual(result.returncode, 0)
         config_dir = Path(self.temp_dir) / ".repoindex"
         self.assertTrue(config_dir.exists())
-        self.assertTrue((config_dir / "config.json").exists())
+        self.assertTrue((config_dir / "config.yaml").exists())
 
     def test_config_init_output_shows_next_steps(self):
         """Test that config init output includes helpful next steps."""

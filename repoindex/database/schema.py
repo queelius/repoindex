@@ -128,27 +128,13 @@ CREATE TABLE IF NOT EXISTS publications (
     FOREIGN KEY (repo_id) REFERENCES repos(id) ON DELETE CASCADE
 );
 
--- Dependencies table (extracted from package manifests)
-CREATE TABLE IF NOT EXISTS dependencies (
+-- Scan errors (track failed repos during refresh)
+CREATE TABLE IF NOT EXISTS scan_errors (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    repo_id INTEGER NOT NULL,
-    package_name TEXT NOT NULL,
-    package_registry TEXT,  -- 'pypi', 'npm', etc.
-    version_spec TEXT,
-    dep_type TEXT DEFAULT 'runtime',  -- 'runtime', 'dev', 'optional'
-    FOREIGN KEY (repo_id) REFERENCES repos(id) ON DELETE CASCADE
-);
-
--- Historical snapshots (for trending analysis)
-CREATE TABLE IF NOT EXISTS repo_snapshots (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    repo_id INTEGER NOT NULL,
-    captured_at DATE NOT NULL,
-    stars INTEGER,
-    forks INTEGER,
-    open_issues INTEGER,
-    UNIQUE (repo_id, captured_at),
-    FOREIGN KEY (repo_id) REFERENCES repos(id) ON DELETE CASCADE
+    path TEXT NOT NULL,
+    error_type TEXT NOT NULL,  -- 'permission', 'corrupt', 'not_git', 'git_error'
+    error_message TEXT,
+    scanned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Indexes for fast queries
@@ -170,11 +156,7 @@ CREATE INDEX IF NOT EXISTS idx_events_repo_type_ts ON events(repo_id, type, time
 CREATE INDEX IF NOT EXISTS idx_publications_registry ON publications(registry);
 CREATE INDEX IF NOT EXISTS idx_publications_package ON publications(package_name);
 
-CREATE INDEX IF NOT EXISTS idx_dependencies_package ON dependencies(package_name);
-CREATE INDEX IF NOT EXISTS idx_dependencies_repo ON dependencies(repo_id);
-
-CREATE INDEX IF NOT EXISTS idx_snapshots_repo ON repo_snapshots(repo_id);
-CREATE INDEX IF NOT EXISTS idx_snapshots_date ON repo_snapshots(captured_at);
+CREATE INDEX IF NOT EXISTS idx_scan_errors_path ON scan_errors(path);
 
 -- Full-text search on repos (name, description, readme)
 CREATE VIRTUAL TABLE IF NOT EXISTS repos_fts USING fts5(

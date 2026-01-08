@@ -46,8 +46,6 @@ nav:
     - Repository Audit: audit-command.md
     - Documentation: docs-command.md
     - List: list-command.md
-  - MCP Server:
-    - Overview: mcp/overview.md
   - Reference:
     - Architecture: architecture-vision.md
     - Design Decisions: design/CLI_DESIGN_DECISIONS.md
