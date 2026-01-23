@@ -6,7 +6,7 @@ Views are curated collections of repositories with overlays and annotations.
 """
 
 from typing import (
-    Dict, Any, List, Optional, Generator, Set, Callable
+    Dict, Any, List, Optional, Callable
 )
 from pathlib import Path
 import logging
@@ -14,7 +14,6 @@ import os
 import fnmatch
 import yaml
 import json
-from datetime import datetime
 
 from ..domain import Repository
 from ..domain.view import (
@@ -116,7 +115,7 @@ class ViewService:
         for name, view_dict in views_data.items():
             self._specs[name] = ViewSpec.from_dict(name, view_dict)
 
-        logger.info(f"Loaded {len(self._specs)} views and {len(self._templates)} templates from {path}")
+        logger.debug(f"Loaded {len(self._specs)} views and {len(self._templates)} templates from {path}")
 
     def save(self, path: Optional[str] = None) -> None:
         """
@@ -141,7 +140,7 @@ class ViewService:
             else:
                 yaml.safe_dump(data, f, default_flow_style=False, sort_keys=False)
 
-        logger.info(f"Saved {len(self._specs)} views to {path}")
+        logger.debug(f"Saved {len(self._specs)} views to {path}")
 
     def get_spec(self, name: str) -> Optional[ViewSpec]:
         """Get a view specification by name."""

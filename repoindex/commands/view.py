@@ -9,20 +9,18 @@ abstraction, composition, and closure.
 import click
 import json
 import sys
-from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import Dict, Any, Optional
 
 from ..config import load_config
-from ..utils import find_git_repos_from_config
 from ..services import ViewService, RepositoryService
-from ..domain.view import ViewSpec, ViewMetadata, Overlay, Annotation, OrderSpec
+from ..domain.view import ViewSpec, ViewMetadata, Overlay, Annotation
 from rich.console import Console
 from rich.table import Table
-from rich.tree import Tree
 from rich.panel import Panel
 from rich.markdown import Markdown
 
 console = Console()
+console_err = Console(stderr=True)
 
 
 def get_view_service() -> ViewService:
@@ -63,27 +61,48 @@ def view_cmd():
         repoindex view list
         repoindex view show portfolio
         repoindex view create myview --repos repo1 repo2
-        repoindex view eval portfolio --pretty
+        repoindex view eval portfolio
     """
     pass
 
 
 @view_cmd.command('list')
-@click.option('--pretty', is_flag=True, help='Display as formatted table')
+@click.option('--json', 'output_json', is_flag=True, help='Output as JSONL')
 @click.option('--templates', is_flag=True, help='Include templates')
-def view_list(pretty: bool, templates: bool):
+def view_list(output_json: bool, templates: bool):
     """List all defined views.
 
     Examples:
         repoindex view list
-        repoindex view list --pretty
         repoindex view list --templates
+        repoindex view list --json | jq '.name'
     """
     service = get_view_service()
     views = service.list_views()
     template_names = service.list_templates() if templates else []
 
-    if pretty:
+    if output_json:
+        # JSONL output
+        for name in views:
+            spec = service.get_spec(name)
+            output = {
+                "name": name,
+                "type": "view",
+                **spec.to_dict()
+            }
+            print(json.dumps(output), flush=True)
+
+        if templates:
+            for name in template_names:
+                tmpl = service.get_template(name)
+                output = {
+                    "name": name,
+                    "type": "template",
+                    **tmpl.to_dict()
+                }
+                print(json.dumps(output), flush=True)
+    else:
+        # Pretty table (default)
         if views:
             table = Table(title="Views")
             table.add_column("Name", style="cyan")
@@ -112,66 +131,46 @@ def view_list(pretty: bool, templates: bool):
                 table.add_row(name, params)
 
             console.print(table)
-    else:
-        # JSONL output
-        for name in views:
-            spec = service.get_spec(name)
-            output = {
-                "name": name,
-                "type": "view",
-                **spec.to_dict()
-            }
-            print(json.dumps(output), flush=True)
-
-        if templates:
-            for name in template_names:
-                tmpl = service.get_template(name)
-                output = {
-                    "name": name,
-                    "type": "template",
-                    **tmpl.to_dict()
-                }
-                print(json.dumps(output), flush=True)
 
 
 @view_cmd.command('show')
 @click.argument('name')
-@click.option('--pretty', is_flag=True, help='Display as formatted output')
-def view_show(name: str, pretty: bool):
+@click.option('--json', 'output_json', is_flag=True, help='Output as JSON')
+def view_show(name: str, output_json: bool):
     """Show view specification (unevaluated).
 
     NAME: Name of the view to show
 
     Examples:
         repoindex view show portfolio
-        repoindex view show portfolio --pretty
+        repoindex view show portfolio --json
     """
     service = get_view_service()
     spec = service.get_spec(name)
 
     if not spec:
-        console.print(f"[red]View not found: {name}[/red]", err=True)
+        console_err.print(f"[red]View not found: {name}[/red]")
         sys.exit(1)
 
-    if pretty:
-        _render_spec_pretty(spec)
-    else:
+    if output_json:
         print(json.dumps({"name": name, **spec.to_dict()}, indent=2))
+    else:
+        _render_spec_pretty(spec)
 
 
 @view_cmd.command('eval')
 @click.argument('name')
-@click.option('--pretty', is_flag=True, help='Display as formatted table')
+@click.option('--json', 'output_json', is_flag=True, help='Output as JSON')
 @click.option('--full', is_flag=True, help='Include overlay and annotation details')
-def view_eval(name: str, pretty: bool, full: bool):
+def view_eval(name: str, output_json: bool, full: bool):
     """Evaluate a view and show resolved repositories.
 
     NAME: Name of the view to evaluate
 
     Examples:
         repoindex view eval portfolio
-        repoindex view eval portfolio --pretty
         repoindex view eval portfolio --full
+        repoindex view eval portfolio --json
     """
     service = get_view_service()
     config = load_config()
@@ -180,18 +179,18 @@ def view_eval(name: str, pretty: bool, full: bool):
     view = service.evaluate(name, repo_lookup, all_repos)
 
     if not view:
-        console.print(f"[red]View not found: {name}[/red]", err=True)
+        console_err.print(f"[red]View not found: {name}[/red]")
         sys.exit(1)
 
-    if pretty:
-        _render_view_pretty(view, repo_lookup, full)
-    else:
-        # JSONL output
+    if output_json:
+        # JSON output
         output = view.to_dict()
         if not full:
             # Slim output without overlay/annotation details
             output['entries'] = [{"repo": e['repo']} for e in output['entries']]
         print(json.dumps(output))
+    else:
+        _render_view_pretty(view, repo_lookup, full)
 
 
 @view_cmd.command('create')
@@ -225,8 +224,8 @@ def view_create(
 
     # Check if view already exists
     if service.get_spec(name):
-        console.print(f"[red]View already exists: {name}[/red]", err=True)
-        console.print("[dim]Use 'repoindex view update' to modify or delete first.[/dim]")
+        console_err.print(f"[red]View already exists: {name}[/red]")
+        console_err.print("[dim]Use 'repoindex view update' to modify or delete first.[/dim]")
         sys.exit(1)
 
     # Build the spec
@@ -243,7 +242,7 @@ def view_create(
     service.add_spec(spec)
     service.save()
 
-    console.print(f"[green]Created view: {name}[/green]")
+    console_err.print(f"[green]Created view: {name}[/green]")
     _render_spec_pretty(spec)
 
 
@@ -263,31 +262,31 @@ def view_delete(name: str, force: bool):
 
     spec = service.get_spec(name)
     if not spec:
-        console.print(f"[red]View not found: {name}[/red]", err=True)
+        console_err.print(f"[red]View not found: {name}[/red]")
         sys.exit(1)
 
     if not force:
         if not click.confirm(f"Delete view '{name}'?"):
-            console.print("[dim]Cancelled.[/dim]")
+            console_err.print("[dim]Cancelled.[/dim]")
             return
 
     service.remove_spec(name)
     service.save()
 
-    console.print(f"[green]Deleted view: {name}[/green]")
+    console_err.print(f"[green]Deleted view: {name}[/green]")
 
 
 @view_cmd.command('repos')
 @click.argument('repo_name')
-@click.option('--pretty', is_flag=True, help='Display as formatted output')
-def view_repos(repo_name: str, pretty: bool):
+@click.option('--json', 'output_json', is_flag=True, help='Output as JSONL')
+def view_repos(repo_name: str, output_json: bool):
     """Show which views contain a repository.
 
     REPO_NAME: Name of the repository to look up
 
     Examples:
         repoindex view repos repoindex
-        repoindex view repos myproject --pretty
+        repoindex view repos myproject --json | jq '.view'
     """
     service = get_view_service()
     config = load_config()
@@ -305,7 +304,10 @@ def view_repos(repo_name: str, pretty: bool):
                 "has_annotation": bool(entry.annotation.to_dict()) if entry else False
             })
 
-    if pretty:
+    if output_json:
+        for v in views_containing:
+            print(json.dumps({"repo": repo_name, **v}), flush=True)
+    else:
         if views_containing:
             console.print(f"[cyan]{repo_name}[/cyan] appears in {len(views_containing)} view(s):\n")
             for v in views_containing:
@@ -318,9 +320,6 @@ def view_repos(repo_name: str, pretty: bool):
                 console.print(f"  • {v['view']}{extra_str}")
         else:
             console.print(f"[dim]{repo_name} is not in any views.[/dim]")
-    else:
-        for v in views_containing:
-            print(json.dumps({"repo": repo_name, **v}), flush=True)
 
 
 @view_cmd.command('overlay')
@@ -351,7 +350,7 @@ def view_overlay(
     spec = service.get_spec(view_name)
 
     if not spec:
-        console.print(f"[red]View not found: {view_name}[/red]", err=True)
+        console_err.print(f"[red]View not found: {view_name}[/red]", stderr=True)
         sys.exit(1)
 
     # Get existing overlays/annotations
@@ -379,7 +378,6 @@ def view_overlay(
         )
 
     # Create updated spec (immutable, so we recreate)
-    from dataclasses import replace
     # ViewSpec is frozen, need to create new one
     new_spec = ViewSpec(
         name=spec.name,
@@ -404,7 +402,7 @@ def view_overlay(
     service.add_spec(new_spec)
     service.save()
 
-    console.print(f"[green]Updated overlay for {repo_name} in {view_name}[/green]")
+    console_err.print(f"[green]Updated overlay for {repo_name} in {view_name}[/green]")
 
 
 # =============================================================================
