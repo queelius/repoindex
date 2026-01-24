@@ -6,13 +6,15 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
+        <meta name="description" content="Collection-aware metadata index for git repositories">
       
       
       
-        <link rel="prev" href="../api/integrations/">
+      
+        <link rel="prev" href="../shell-vfs/">
       
       
-        <link rel="next" href="../changelog/">
+        <link rel="next" href="../design/CLI_DESIGN_DECISIONS/">
       
       
       <link rel="icon" href="../assets/images/favicon.png">
@@ -256,33 +258,14 @@
   
   
   
-    <li class="md-tabs__item">
-      <a href="../usage/" class="md-tabs__link">
-        
-  
-  
-    
-  
-  Usage
-
-      </a>
-    </li>
-  
-
-      
-        
-  
-  
-  
-  
     
     
       <li class="md-tabs__item">
-        <a href="../catalog-query/" class="md-tabs__link">
+        <a href="../usage/" class="md-tabs__link">
           
   
   
-  Commands
+  Core
 
         </a>
       </li>
@@ -298,11 +281,11 @@
     
     
       <li class="md-tabs__item">
-        <a href="../integrations/overview/" class="md-tabs__link">
+        <a href="../events/overview/" class="md-tabs__link">
           
   
   
-  Integrations
+  Events
 
         </a>
       </li>
@@ -318,31 +301,11 @@
     
     
       <li class="md-tabs__item">
-        <a href="../tutorials/" class="md-tabs__link">
+        <a href="../shell-vfs/" class="md-tabs__link">
           
   
   
-  Tutorials
-
-        </a>
-      </li>
-    
-  
-
-      
-        
-  
-  
-  
-  
-    
-    
-      <li class="md-tabs__item">
-        <a href="../api/integrations/" class="md-tabs__link">
-          
-  
-  
-  API Reference
+  Interactive
 
         </a>
       </li>
@@ -357,17 +320,18 @@
     
   
   
-    <li class="md-tabs__item md-tabs__item--active">
-      <a href="./" class="md-tabs__link">
-        
-  
-  
     
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="./" class="md-tabs__link">
+          
   
-  Architecture
+  
+  Reference
 
-      </a>
-    </li>
+        </a>
+      </li>
+    
   
 
       
@@ -403,25 +367,6 @@
     
   
   Contributing
-
-      </a>
-    </li>
-  
-
-      
-        
-  
-  
-  
-  
-    <li class="md-tabs__item">
-      <a href="../future-plans/" class="md-tabs__link">
-        
-  
-  
-    
-  
-  Future Plans
 
       </a>
     </li>
@@ -525,28 +470,6 @@
   
   
   
-    <li class="md-nav__item">
-      <a href="../usage/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Usage
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
     
     
     
@@ -561,15 +484,15 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
         
           
-          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
             
   
   
   <span class="md-ellipsis">
-    Commands
+    Core
     
   </span>
   
@@ -577,12 +500,35 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
-            Commands
+            Core
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Usage Guide
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
             
               
                 
@@ -596,99 +542,7 @@
   
   
   <span class="md-ellipsis">
-    Organization & Discovery
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../audit-command/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Repository Audit
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../export-command/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Portfolio Export
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../docs-command/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Documentation
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../list-command/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    List
+    Query Language
     
   </span>
   
@@ -749,15 +603,15 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
         
           
-          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
             
   
   
   <span class="md-ellipsis">
-    Integrations
+    Events
     
   </span>
   
@@ -765,10 +619,10 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
             <span class="md-nav__icon md-icon"></span>
-            Integrations
+            Events
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
             
@@ -779,7 +633,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../integrations/overview/" class="md-nav__link">
+      <a href="../events/overview/" class="md-nav__link">
         
   
   
@@ -802,35 +656,12 @@
   
   
     <li class="md-nav__item">
-      <a href="../integrations/clustering/" class="md-nav__link">
+      <a href="../events/event-types/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
-    Repository Clustering
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../integrations/workflow/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Workflow Orchestration
+    Event Types Reference
     
   </span>
   
@@ -868,15 +699,15 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
         
           
-          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
             
   
   
   <span class="md-ellipsis">
-    Tutorials
+    Interactive
     
   </span>
   
@@ -884,118 +715,93 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Interactive
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../shell-vfs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Shell & VFS
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    Reference
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_6">
             <span class="md-nav__icon md-icon"></span>
-            Tutorials
+            Reference
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
             
               
                 
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../tutorials/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Jupyter Notebooks
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    
-    
-    
-    
-      
-      
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
-        
-          
-          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
-            
-  
-  
-  <span class="md-ellipsis">
-    API Reference
-    
-  </span>
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_7">
-            <span class="md-nav__icon md-icon"></span>
-            API Reference
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../api/integrations/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Integration API
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
-      
-      
   
   
     
@@ -1222,6 +1028,83 @@
     </li>
   
 
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/CLI_DESIGN_DECISIONS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Design Decisions
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/GIT_COMMANDS_DESIGN/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Git Commands Design
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/VERSION_MANAGEMENT_IMPLEMENTATION/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Version Management
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
     
       
       
@@ -1258,28 +1141,6 @@
   
   <span class="md-ellipsis">
     Contributing
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../future-plans/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Future Plans
     
   </span>
   
@@ -1328,119 +1189,119 @@
 <li><strong>Human-friendly</strong>: Use <code>--pretty</code> flag when you want formatted tables</li>
 </ul>
 <h3 id="pipeline-examples">Pipeline Examples</h3>
-<pre><code class="language-bash"># Find Python projects with uncommitted changes
-repoindex status | jq 'select(.has_uncommitted_changes == true and .language == &quot;Python&quot;)'
-
-# List repos with both GitHub and PyPI presence  
-repoindex list | jq 'select(.topics | contains([&quot;pypi&quot;]) and .provider == &quot;github&quot;)'
-
-# Get total stars across all projects
-repoindex query &quot;provider == 'github'&quot; | jq -s 'map(.stargazers_count // 0) | add'
-
-# Find outdated documentation
-repoindex metadata refresh | \
-  jq 'select(.has_pages == true and (.pushed_at | fromdateiso8601) &lt; (now - 86400 * 30))'
-
-# Export active projects to Hugo
-repoindex query &quot;has_uncommitted or open_issues_count &gt; 0&quot; | \
-  repoindex export --format hugo --stdin
-
-# Chain operations: find, update, and report
-repoindex list | \
-  jq 'select(.language == &quot;Python&quot; and .topics | contains([&quot;cli&quot;]))' | \
-  jq -r '.path' | \
-  xargs -I {} repoindex update {} | \
-  jq '{repo: .name, status: .update_status}'
-
-# Complex aggregation: repos by language
-repoindex list | \
-  jq -s 'group_by(.language) | 
-    map({language: .[0].language, count: length, stars: map(.stargazers_count // 0) | add})'
-</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># Find Python projects with uncommitted changes</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>repoindex<span class="w"> </span>status<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">&#39;select(.has_uncommitted_changes == true and .language == &quot;Python&quot;)&#39;</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="c1"># List repos with both GitHub and PyPI presence  </span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>repoindex<span class="w"> </span>query<span class="w"> </span>--json<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">&#39;select(.topics | contains([&quot;pypi&quot;]) and .provider == &quot;github&quot;)&#39;</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="c1"># Get total stars across all projects</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>repoindex<span class="w"> </span>query<span class="w"> </span><span class="s2">&quot;provider == &#39;github&#39;&quot;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span>-s<span class="w"> </span><span class="s1">&#39;map(.stargazers_count // 0) | add&#39;</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="c1"># Find outdated documentation</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>repoindex<span class="w"> </span>metadata<span class="w"> </span>refresh<span class="w"> </span><span class="p">|</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="w">  </span>jq<span class="w"> </span><span class="s1">&#39;select(.has_pages == true and (.pushed_at | fromdateiso8601) &lt; (now - 86400 * 30))&#39;</span>
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="c1"># Export active projects to Hugo</span>
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>repoindex<span class="w"> </span>query<span class="w"> </span><span class="s2">&quot;has_uncommitted or open_issues_count &gt; 0&quot;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="w">  </span>repoindex<span class="w"> </span><span class="nb">export</span><span class="w"> </span>--format<span class="w"> </span>hugo<span class="w"> </span>--stdin
+<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>
+<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a><span class="c1"># Chain operations: find, update, and report</span>
+<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>repoindex<span class="w"> </span>query<span class="w"> </span>--json<span class="w"> </span><span class="p">|</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-20" name="__codelineno-0-20" href="#__codelineno-0-20"></a><span class="w">  </span>jq<span class="w"> </span><span class="s1">&#39;select(.language == &quot;Python&quot; and .topics | contains([&quot;cli&quot;]))&#39;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-21" name="__codelineno-0-21" href="#__codelineno-0-21"></a><span class="w">  </span>jq<span class="w"> </span>-r<span class="w"> </span><span class="s1">&#39;.path&#39;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-22" name="__codelineno-0-22" href="#__codelineno-0-22"></a><span class="w">  </span>xargs<span class="w"> </span>-I<span class="w"> </span><span class="o">{}</span><span class="w"> </span>repoindex<span class="w"> </span>update<span class="w"> </span><span class="o">{}</span><span class="w"> </span><span class="p">|</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-23" name="__codelineno-0-23" href="#__codelineno-0-23"></a><span class="w">  </span>jq<span class="w"> </span><span class="s1">&#39;{repo: .name, status: .update_status}&#39;</span>
+<a id="__codelineno-0-24" name="__codelineno-0-24" href="#__codelineno-0-24"></a>
+<a id="__codelineno-0-25" name="__codelineno-0-25" href="#__codelineno-0-25"></a><span class="c1"># Complex aggregation: repos by language</span>
+<a id="__codelineno-0-26" name="__codelineno-0-26" href="#__codelineno-0-26"></a>repoindex<span class="w"> </span>query<span class="w"> </span>--json<span class="w"> </span><span class="p">|</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-0-27" name="__codelineno-0-27" href="#__codelineno-0-27"></a><span class="w">  </span>jq<span class="w"> </span>-s<span class="w"> </span><span class="s1">&#39;group_by(.language) | </span>
+<a id="__codelineno-0-28" name="__codelineno-0-28" href="#__codelineno-0-28"></a><span class="s1">    map({language: .[0].language, count: length, stars: map(.stargazers_count // 0) | add})&#39;</span>
+</code></pre></div>
 <h3 id="structured-output-schema">Structured Output Schema</h3>
 <p>Every command returns predictable JSON structures:</p>
-<pre><code class="language-json">// repoindex status output
-{
-  &quot;path&quot;: &quot;/home/user/projects/myrepo&quot;,
-  &quot;name&quot;: &quot;myrepo&quot;,
-  &quot;provider&quot;: &quot;github&quot;,
-  &quot;has_uncommitted_changes&quot;: true,
-  &quot;branch&quot;: &quot;main&quot;,
-  &quot;language&quot;: &quot;Python&quot;,
-  &quot;stargazers_count&quot;: 42
-}
-
-// repoindex query output  
-{
-  &quot;path&quot;: &quot;/home/user/projects/myrepo&quot;,
-  &quot;name&quot;: &quot;myrepo&quot;,
-  &quot;tags&quot;: [&quot;lang:python&quot;, &quot;tool:cli&quot;],
-  &quot;language&quot;: &quot;Python&quot;,
-  &quot;stars&quot;: 42
-}
-</code></pre>
-<p>This enables powerful workflows:</p>
-<pre><code class="language-bash"># Morning routine: check what needs attention
-repoindex status | jq -r '
-  select(.has_uncommitted_changes or .open_issues_count &gt; 0) | 
-  &quot;\(.name): \(
-    if .has_uncommitted_changes then &quot;uncommitted changes&quot; else &quot;&quot; end
-  ) \(
-    if .open_issues_count &gt; 0 then &quot;\(.open_issues_count) issues&quot; else &quot;&quot; end
-  )&quot;'
-</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1">// repoindex status output</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="p">{</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="nt">&quot;path&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;/home/user/projects/myrepo&quot;</span><span class="p">,</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="w">  </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;myrepo&quot;</span><span class="p">,</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="w">  </span><span class="nt">&quot;provider&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;github&quot;</span><span class="p">,</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="w">  </span><span class="nt">&quot;has_uncommitted_changes&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">true</span><span class="p">,</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">  </span><span class="nt">&quot;branch&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;main&quot;</span><span class="p">,</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="w">  </span><span class="nt">&quot;language&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Python&quot;</span><span class="p">,</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="w">  </span><span class="nt">&quot;stargazers_count&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">42</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="p">}</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="c1">// repoindex query output  </span>
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="p">{</span>
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a><span class="w">  </span><span class="nt">&quot;path&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;/home/user/projects/myrepo&quot;</span><span class="p">,</span>
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a><span class="w">  </span><span class="nt">&quot;name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;myrepo&quot;</span><span class="p">,</span>
+<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="w">  </span><span class="nt">&quot;tags&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;lang:python&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;tool:cli&quot;</span><span class="p">],</span>
+<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a><span class="w">  </span><span class="nt">&quot;language&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;Python&quot;</span><span class="p">,</span>
+<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a><span class="w">  </span><span class="nt">&quot;stars&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">42</span>
+<a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a><span class="p">}</span>
+</code></pre></div>
+<p>This enables powerful workflows:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Morning routine: check what needs attention</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>repoindex<span class="w"> </span>status<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span>-r<span class="w"> </span><span class="s1">&#39;</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="s1">  select(.has_uncommitted_changes or .open_issues_count &gt; 0) | </span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="s1">  &quot;\(.name): \(</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="s1">    if .has_uncommitted_changes then &quot;uncommitted changes&quot; else &quot;&quot; end</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="s1">  ) \(</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="s1">    if .open_issues_count &gt; 0 then &quot;\(.open_issues_count) issues&quot; else &quot;&quot; end</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="s1">  )&quot;&#39;</span>
+</code></pre></div></p>
 <h3 id="repoindex-repository-operations"><code>repoindex</code> - Repository Operations</h3>
-<p><strong>Focus</strong>: Direct operations on git repositories</p>
-<pre><code class="language-bash">repoindex status     # Repository health and metadata
-repoindex sync       # Sync with remotes
-repoindex clean      # Cleanup operations
-repoindex backup     # Archive repositories
-repoindex migrate    # Move between services (GitHub -&gt; GitLab)
-repoindex health     # Check repository integrity
-</code></pre>
+<p><strong>Focus</strong>: Direct operations on git repositories
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>repoindex<span class="w"> </span>status<span class="w">     </span><span class="c1"># Repository health and metadata</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>repoindex<span class="w"> </span>sync<span class="w">       </span><span class="c1"># Sync with remotes</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>repoindex<span class="w"> </span>clean<span class="w">      </span><span class="c1"># Cleanup operations</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>repoindex<span class="w"> </span>backup<span class="w">     </span><span class="c1"># Archive repositories</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>repoindex<span class="w"> </span>migrate<span class="w">    </span><span class="c1"># Move between services (GitHub -&gt; GitLab)</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>repoindex<span class="w"> </span>health<span class="w">     </span><span class="c1"># Check repository integrity</span>
+</code></pre></div></p>
 <h3 id="ghj-github-metadata-search"><code>ghj</code> - GitHub Metadata &amp; Search</h3>
-<p><strong>Focus</strong>: GitHub API data mining and analysis</p>
-<pre><code class="language-bash">ghj search --query &quot;language:python stars:&gt;100&quot;
-ghj analyze --user username
-ghj export --format csv
-</code></pre>
+<p><strong>Focus</strong>: GitHub API data mining and analysis
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>ghj<span class="w"> </span>search<span class="w"> </span>--query<span class="w"> </span><span class="s2">&quot;language:python stars:&gt;100&quot;</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>ghj<span class="w"> </span>analyze<span class="w"> </span>--user<span class="w"> </span>username
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>ghj<span class="w"> </span><span class="nb">export</span><span class="w"> </span>--format<span class="w"> </span>csv
+</code></pre></div></p>
 <h3 id="repodocs-documentation-generation"><code>repodocs</code> - Documentation Generation</h3>
-<p><strong>Focus</strong>: Transform repositories into documentation sites</p>
-<pre><code class="language-bash">repodocs generate --input repos.jsonl --output-dir ./site
-repodocs hugo --theme academic
-repodocs search-index --engine lunr
-</code></pre>
+<p><strong>Focus</strong>: Transform repositories into documentation sites
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>repodocs<span class="w"> </span>generate<span class="w"> </span>--input<span class="w"> </span>repos.jsonl<span class="w"> </span>--output-dir<span class="w"> </span>./site
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>repodocs<span class="w"> </span>hugo<span class="w"> </span>--theme<span class="w"> </span>academic
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>repodocs<span class="w"> </span>search-index<span class="w"> </span>--engine<span class="w"> </span>lunr
+</code></pre></div></p>
 <h2 id="data-flow-architecture">Data Flow Architecture</h2>
-<pre><code>┌─────────┐    JSONL    ┌──────────┐    JSONL    ┌──────────┐
-│  repoindex  │──────────→  │    jq    │──────────→  │ repodocs │
-│ status  │             │ filter   │             │ generate │
-└─────────┘             └──────────┘             └──────────┘
-     │                       │                       │
-     │                       ▼                       ▼
-     │                  ┌──────────┐             ┌──────────┐
-     │                  │   ghj    │             │   Hugo   │
-     │                  │ enrich   │             │   Site   │
-     │                  └──────────┘             └──────────┘
-     │
-     ▼ JSONL
-┌──────────┐
-│ Custom   │
-│ Scripts  │
-└──────────┘
-</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>┌─────────┐    JSONL    ┌──────────┐    JSONL    ┌──────────┐
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>│  repoindex  │──────────→  │    jq    │──────────→  │ repodocs │
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>│ status  │             │ filter   │             │ generate │
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>└─────────┘             └──────────┘             └──────────┘
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>     │                       │                       │
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>     │                       ▼                       ▼
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>     │                  ┌──────────┐             ┌──────────┐
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>     │                  │   ghj    │             │   Hugo   │
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>     │                  │ enrich   │             │   Site   │
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>     │                  └──────────┘             └──────────┘
+<a id="__codelineno-6-11" name="__codelineno-6-11" href="#__codelineno-6-11"></a>     │
+<a id="__codelineno-6-12" name="__codelineno-6-12" href="#__codelineno-6-12"></a>     ▼ JSONL
+<a id="__codelineno-6-13" name="__codelineno-6-13" href="#__codelineno-6-13"></a>┌──────────┐
+<a id="__codelineno-6-14" name="__codelineno-6-14" href="#__codelineno-6-14"></a>│ Custom   │
+<a id="__codelineno-6-15" name="__codelineno-6-15" href="#__codelineno-6-15"></a>│ Scripts  │
+<a id="__codelineno-6-16" name="__codelineno-6-16" href="#__codelineno-6-16"></a>└──────────┘
+</code></pre></div>
 <h2 id="repoindex-export-group-proposal">repoindex Export Group Proposal</h2>
 <p>For the export functionality in <code>repoindex</code>, focus on repository-level operations:</p>
 <h3 id="export-operations">Export Operations</h3>
-<pre><code class="language-bash"># Repository migration
-repoindex export github-to-gitlab --repos repos.jsonl
-repoindex export backup --format tar.gz
-repoindex export clone-bundle --include-lfs
-
-# Integration exports
-repoindex export dashboard --format json    # For external dashboards
-repoindex export metrics --format prometheus
-repoindex export inventory --format csv
-</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># Repository migration</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>repoindex<span class="w"> </span><span class="nb">export</span><span class="w"> </span>github-to-gitlab<span class="w"> </span>--repos<span class="w"> </span>repos.jsonl
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>repoindex<span class="w"> </span><span class="nb">export</span><span class="w"> </span>backup<span class="w"> </span>--format<span class="w"> </span>tar.gz
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>repoindex<span class="w"> </span><span class="nb">export</span><span class="w"> </span>clone-bundle<span class="w"> </span>--include-lfs
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="c1"># Integration exports</span>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>repoindex<span class="w"> </span><span class="nb">export</span><span class="w"> </span>dashboard<span class="w"> </span>--format<span class="w"> </span>json<span class="w">    </span><span class="c1"># For external dashboards</span>
+<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>repoindex<span class="w"> </span><span class="nb">export</span><span class="w"> </span>metrics<span class="w"> </span>--format<span class="w"> </span>prometheus
+<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>repoindex<span class="w"> </span><span class="nb">export</span><span class="w"> </span>inventory<span class="w"> </span>--format<span class="w"> </span>csv
+</code></pre></div>
 <h3 id="not-in-repoindex-export">NOT in repoindex export</h3>
 <ul>
 <li>Documentation generation (belongs in <code>repodocs</code>)</li>
@@ -1448,32 +1309,32 @@ repoindex export inventory --format csv
 <li>Static site generation (belongs in <code>repodocs</code>)</li>
 </ul>
 <h2 id="example-workflow">Example Workflow</h2>
-<pre><code class="language-bash"># 1. Discover and analyze repositories
-repoindex status --recursive &gt; repos.jsonl
-
-# 2. Filter for specific criteria
-cat repos.jsonl | jq 'select(.github.on_github and .license.name)' &gt; public-repos.jsonl
-
-# 3. Migrate to GitLab
-repoindex export github-to-gitlab --input public-repos.jsonl
-
-# 4. Generate documentation site
-repodocs generate --input public-repos.jsonl --template hugo-academic
-
-# 5. Enrich with GitHub API data
-ghj enrich --input public-repos.jsonl &gt; enriched-repos.jsonl
-</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># 1. Discover and analyze repositories</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>repoindex<span class="w"> </span>status<span class="w"> </span>--recursive<span class="w"> </span>&gt;<span class="w"> </span>repos.jsonl
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="c1"># 2. Filter for specific criteria</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>cat<span class="w"> </span>repos.jsonl<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">&#39;select(.github.on_github and .license.name)&#39;</span><span class="w"> </span>&gt;<span class="w"> </span>public-repos.jsonl
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="c1"># 3. Migrate to GitLab</span>
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>repoindex<span class="w"> </span><span class="nb">export</span><span class="w"> </span>github-to-gitlab<span class="w"> </span>--input<span class="w"> </span>public-repos.jsonl
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a>
+<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="c1"># 4. Generate documentation site</span>
+<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a>repodocs<span class="w"> </span>generate<span class="w"> </span>--input<span class="w"> </span>public-repos.jsonl<span class="w"> </span>--template<span class="w"> </span>hugo-academic
+<a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a>
+<a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a><span class="c1"># 5. Enrich with GitHub API data</span>
+<a id="__codelineno-8-14" name="__codelineno-8-14" href="#__codelineno-8-14"></a>ghj<span class="w"> </span>enrich<span class="w"> </span>--input<span class="w"> </span>public-repos.jsonl<span class="w"> </span>&gt;<span class="w"> </span>enriched-repos.jsonl
+</code></pre></div>
 <h2 id="plugin-architecture-for-repoindex">Plugin Architecture for repoindex</h2>
-<pre><code class="language-python"># repoindex/plugins/export/gitlab.py
-@click.command(&quot;gitlab&quot;)
-@click.option(&quot;--input&quot;, type=click.File('r'))
-def export_to_gitlab(input):
-    &quot;&quot;&quot;Export repositories to GitLab.&quot;&quot;&quot;
-    for line in input:
-        repo = json.loads(line)
-        # Migration logic here
-        yield {&quot;repo&quot;: repo[&quot;name&quot;], &quot;status&quot;: &quot;migrated&quot;, &quot;url&quot;: new_url}
-</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1"># repoindex/plugins/export/gitlab.py</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="nd">@click</span><span class="o">.</span><span class="n">command</span><span class="p">(</span><span class="s2">&quot;gitlab&quot;</span><span class="p">)</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span><span class="s2">&quot;--input&quot;</span><span class="p">,</span> <span class="nb">type</span><span class="o">=</span><span class="n">click</span><span class="o">.</span><span class="n">File</span><span class="p">(</span><span class="s1">&#39;r&#39;</span><span class="p">))</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="k">def</span><span class="w"> </span><span class="nf">export_to_gitlab</span><span class="p">(</span><span class="nb">input</span><span class="p">):</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Export repositories to GitLab.&quot;&quot;&quot;</span>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>    <span class="k">for</span> <span class="n">line</span> <span class="ow">in</span> <span class="nb">input</span><span class="p">:</span>
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>        <span class="n">repo</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">line</span><span class="p">)</span>
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>        <span class="c1"># Migration logic here</span>
+<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>        <span class="k">yield</span> <span class="p">{</span><span class="s2">&quot;repo&quot;</span><span class="p">:</span> <span class="n">repo</span><span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">],</span> <span class="s2">&quot;status&quot;</span><span class="p">:</span> <span class="s2">&quot;migrated&quot;</span><span class="p">,</span> <span class="s2">&quot;url&quot;</span><span class="p">:</span> <span class="n">new_url</span><span class="p">}</span>
+</code></pre></div>
 <h2 id="benefits-of-this-architecture">Benefits of This Architecture</h2>
 <ol>
 <li><strong>Focused Tools</strong>: Each tool has a clear, single responsibility</li>

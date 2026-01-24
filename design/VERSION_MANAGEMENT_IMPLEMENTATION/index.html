@@ -6,9 +6,15 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
+        <meta name="description" content="Collection-aware metadata index for git repositories">
       
       
       
+      
+        <link rel="prev" href="../GIT_COMMANDS_DESIGN/">
+      
+      
+        <link rel="next" href="../../changelog/">
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
@@ -16,7 +22,7 @@
     
     
       
-        <title>Version Management Implementation - repoindex</title>
+        <title>Version Management - repoindex</title>
       
     
     
@@ -102,7 +108,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Version Management Implementation
+              Version Management
             
           </span>
         </div>
@@ -252,33 +258,14 @@
   
   
   
-    <li class="md-tabs__item">
-      <a href="../../usage/" class="md-tabs__link">
-        
-  
-  
-    
-  
-  Usage
-
-      </a>
-    </li>
-  
-
-      
-        
-  
-  
-  
-  
     
     
       <li class="md-tabs__item">
-        <a href="../../catalog-query/" class="md-tabs__link">
+        <a href="../../usage/" class="md-tabs__link">
           
   
   
-  Commands
+  Core
 
         </a>
       </li>
@@ -294,11 +281,11 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../integrations/overview/" class="md-tabs__link">
+        <a href="../../events/overview/" class="md-tabs__link">
           
   
   
-  Integrations
+  Events
 
         </a>
       </li>
@@ -314,11 +301,11 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../tutorials/" class="md-tabs__link">
+        <a href="../../shell-vfs/" class="md-tabs__link">
           
   
   
-  Tutorials
+  Interactive
 
         </a>
       </li>
@@ -330,38 +317,21 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../../api/integrations/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../../architecture-vision/" class="md-tabs__link">
           
   
   
-  API Reference
+  Reference
 
         </a>
       </li>
     
-  
-
-      
-        
-  
-  
-  
-  
-    <li class="md-tabs__item">
-      <a href="../../architecture-vision/" class="md-tabs__link">
-        
-  
-  
-    
-  
-  Architecture
-
-      </a>
-    </li>
   
 
       
@@ -397,25 +367,6 @@
     
   
   Contributing
-
-      </a>
-    </li>
-  
-
-      
-        
-  
-  
-  
-  
-    <li class="md-tabs__item">
-      <a href="../../future-plans/" class="md-tabs__link">
-        
-  
-  
-    
-  
-  Future Plans
 
       </a>
     </li>
@@ -519,28 +470,6 @@
   
   
   
-    <li class="md-nav__item">
-      <a href="../../usage/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Usage
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
     
     
     
@@ -555,15 +484,15 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
         
           
-          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
             
   
   
   <span class="md-ellipsis">
-    Commands
+    Core
     
   </span>
   
@@ -571,12 +500,35 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
-            Commands
+            Core
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Usage Guide
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
             
               
                 
@@ -590,99 +542,7 @@
   
   
   <span class="md-ellipsis">
-    Organization & Discovery
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../audit-command/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Repository Audit
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../export-command/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Portfolio Export
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../docs-command/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Documentation
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../list-command/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    List
+    Query Language
     
   </span>
   
@@ -743,15 +603,15 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
         
           
-          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
             
   
   
   <span class="md-ellipsis">
-    Integrations
+    Events
     
   </span>
   
@@ -759,10 +619,10 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
             <span class="md-nav__icon md-icon"></span>
-            Integrations
+            Events
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
             
@@ -773,7 +633,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../integrations/overview/" class="md-nav__link">
+      <a href="../../events/overview/" class="md-nav__link">
         
   
   
@@ -796,35 +656,12 @@
   
   
     <li class="md-nav__item">
-      <a href="../../integrations/clustering/" class="md-nav__link">
+      <a href="../../events/event-types/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
-    Repository Clustering
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../integrations/workflow/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Workflow Orchestration
+    Event Types Reference
     
   </span>
   
@@ -862,15 +699,15 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
         
           
-          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
             
   
   
   <span class="md-ellipsis">
-    Tutorials
+    Interactive
     
   </span>
   
@@ -878,118 +715,93 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Interactive
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../shell-vfs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Shell & VFS
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    Reference
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_6">
             <span class="md-nav__icon md-icon"></span>
-            Tutorials
+            Reference
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
             
               
                 
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../tutorials/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Jupyter Notebooks
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    
-    
-    
-    
-      
-      
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
-        
-          
-          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
-            
-  
-  
-  <span class="md-ellipsis">
-    API Reference
-    
-  </span>
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_7">
-            <span class="md-nav__icon md-icon"></span>
-            API Reference
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../api/integrations/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Integration API
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
-      
-      
   
   
   
@@ -1006,6 +818,518 @@
   
 
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CLI_DESIGN_DECISIONS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Design Decisions
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../GIT_COMMANDS_DESIGN/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Git Commands Design
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Version Management
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    Version Management
+    
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      Overview
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#features-implemented" class="md-nav__link">
+    <span class="md-ellipsis">
+      Features Implemented
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Features Implemented">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#1-version-bumping" class="md-nav__link">
+    <span class="md-ellipsis">
+      1. Version Bumping
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#2-version-setting" class="md-nav__link">
+    <span class="md-ellipsis">
+      2. Version Setting
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#3-version-only-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      3. Version-Only Mode
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#4-combined-with-publishing" class="md-nav__link">
+    <span class="md-ellipsis">
+      4. Combined with Publishing
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#supported-package-types" class="md-nav__link">
+    <span class="md-ellipsis">
+      Supported Package Types
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Supported Package Types">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#python-pep-440" class="md-nav__link">
+    <span class="md-ellipsis">
+      Python (PEP 440)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#nodejs-semver" class="md-nav__link">
+    <span class="md-ellipsis">
+      Node.js (semver)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rust-semver" class="md-nav__link">
+    <span class="md-ellipsis">
+      Rust (semver)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#c-varies" class="md-nav__link">
+    <span class="md-ellipsis">
+      C++ (varies)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#go-semver-via-git-tags" class="md-nav__link">
+    <span class="md-ellipsis">
+      Go (semver via git tags)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ruby-semver" class="md-nav__link">
+    <span class="md-ellipsis">
+      Ruby (semver)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#implementation-details" class="md-nav__link">
+    <span class="md-ellipsis">
+      Implementation Details
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Implementation Details">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#architecture" class="md-nav__link">
+    <span class="md-ellipsis">
+      Architecture
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#version-bumping-algorithm" class="md-nav__link">
+    <span class="md-ellipsis">
+      Version Bumping Algorithm
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#file-detection-updates" class="md-nav__link">
+    <span class="md-ellipsis">
+      File Detection &amp; Updates
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#integration-with-publish-workflow" class="md-nav__link">
+    <span class="md-ellipsis">
+      Integration with Publish Workflow
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Integration with Publish Workflow">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#workflow-order" class="md-nav__link">
+    <span class="md-ellipsis">
+      Workflow Order
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dry-run-support" class="md-nav__link">
+    <span class="md-ellipsis">
+      Dry-Run Support
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#usage-examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      Usage Examples
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Usage Examples">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#scenario-1-patch-release" class="md-nav__link">
+    <span class="md-ellipsis">
+      Scenario 1: Patch Release
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#scenario-2-minor-release-with-new-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      Scenario 2: Minor Release with New Features
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#scenario-3-major-breaking-changes" class="md-nav__link">
+    <span class="md-ellipsis">
+      Scenario 3: Major Breaking Changes
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#scenario-4-pre-release-version-sync" class="md-nav__link">
+    <span class="md-ellipsis">
+      Scenario 4: Pre-Release Version Sync
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#scenario-5-bulk-version-updates" class="md-nav__link">
+    <span class="md-ellipsis">
+      Scenario 5: Bulk Version Updates
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cli-options-summary" class="md-nav__link">
+    <span class="md-ellipsis">
+      CLI Options Summary
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      Configuration
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#error-handling" class="md-nav__link">
+    <span class="md-ellipsis">
+      Error Handling
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      Testing
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#files-createdmodified" class="md-nav__link">
+    <span class="md-ellipsis">
+      Files Created/Modified
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Files Created/Modified">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#new-files-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      New Files (1)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#modified-files-1" class="md-nav__link">
+    <span class="md-ellipsis">
+      Modified Files (1)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#future-enhancements" class="md-nav__link">
+    <span class="md-ellipsis">
+      Future Enhancements
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Future Enhancements">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#potential-additions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Potential Additions
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#example-future-usage" class="md-nav__link">
+    <span class="md-ellipsis">
+      Example Future Usage
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#benefits" class="md-nav__link">
+    <span class="md-ellipsis">
+      Benefits
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#best-practices" class="md-nav__link">
+    <span class="md-ellipsis">
+      Best Practices
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#statistics" class="md-nav__link">
+    <span class="md-ellipsis">
+      Statistics
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -1054,28 +1378,6 @@
   
 
     
-      
-      
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../future-plans/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Future Plans
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-    
   </ul>
 </nav>
                   </div>
@@ -1101,40 +1403,40 @@
 <p>Added comprehensive version management to the <code>repoindex publish</code> command, supporting automatic version bumping and setting across multiple package ecosystems.</p>
 <h2 id="features-implemented">Features Implemented</h2>
 <h3 id="1-version-bumping">1. Version Bumping</h3>
-<p><strong>Usage</strong>:</p>
-<pre><code class="language-bash">repoindex publish --bump-version patch     # 1.0.0 → 1.0.1
-repoindex publish --bump-version minor     # 1.0.0 → 1.1.0
-repoindex publish --bump-version major     # 1.0.0 → 2.0.0
-</code></pre>
+<p><strong>Usage</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>repoindex<span class="w"> </span>publish<span class="w"> </span>--bump-version<span class="w"> </span>patch<span class="w">     </span><span class="c1"># 1.0.0 → 1.0.1</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>repoindex<span class="w"> </span>publish<span class="w"> </span>--bump-version<span class="w"> </span>minor<span class="w">     </span><span class="c1"># 1.0.0 → 1.1.0</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>repoindex<span class="w"> </span>publish<span class="w"> </span>--bump-version<span class="w"> </span>major<span class="w">     </span><span class="c1"># 1.0.0 → 2.0.0</span>
+</code></pre></div></p>
 <p><strong>Supports</strong>:
 - Semantic versioning (major.minor.patch)
 - PEP 440 for Python
 - Standard semver for Node.js, Rust, Go
 - Custom formats for C++</p>
 <h3 id="2-version-setting">2. Version Setting</h3>
-<p><strong>Usage</strong>:</p>
-<pre><code class="language-bash">repoindex publish --set-version 2.0.0
-</code></pre>
+<p><strong>Usage</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>repoindex<span class="w"> </span>publish<span class="w"> </span>--set-version<span class="w"> </span><span class="m">2</span>.0.0
+</code></pre></div></p>
 <p>Sets an explicit version across all project files.</p>
 <h3 id="3-version-only-mode">3. Version-Only Mode</h3>
-<p><strong>Usage</strong>:</p>
-<pre><code class="language-bash">repoindex publish --bump-version patch --version-only
-</code></pre>
+<p><strong>Usage</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>repoindex<span class="w"> </span>publish<span class="w"> </span>--bump-version<span class="w"> </span>patch<span class="w"> </span>--version-only
+</code></pre></div></p>
 <p>Updates version without publishing. Useful for:
 - Preparing releases
 - Version synchronization across files
 - Pre-release version updates</p>
 <h3 id="4-combined-with-publishing">4. Combined with Publishing</h3>
-<p><strong>Usage</strong>:</p>
-<pre><code class="language-bash"># Bump version and publish in one command
-repoindex publish --bump-version patch
-
-# Set version and publish
-repoindex publish --set-version 1.0.0
-
-# Dry-run to preview
-repoindex publish --bump-version minor --dry-run
-</code></pre>
+<p><strong>Usage</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Bump version and publish in one command</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>repoindex<span class="w"> </span>publish<span class="w"> </span>--bump-version<span class="w"> </span>patch
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="c1"># Set version and publish</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>repoindex<span class="w"> </span>publish<span class="w"> </span>--set-version<span class="w"> </span><span class="m">1</span>.0.0
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="c1"># Dry-run to preview</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>repoindex<span class="w"> </span>publish<span class="w"> </span>--bump-version<span class="w"> </span>minor<span class="w"> </span>--dry-run
+</code></pre></div></p>
 <h2 id="supported-package-types">Supported Package Types</h2>
 <h3 id="python-pep-440">Python (PEP 440)</h3>
 <p><strong>Files Updated</strong>:
@@ -1142,48 +1444,48 @@ repoindex publish --bump-version minor --dry-run
 - <code>setup.py</code> - version parameter
 - <code>*/__init__.py</code> - <strong>version</strong> variable</p>
 <p><strong>Detection</strong>: pyproject.toml, setup.py, setup.cfg</p>
-<p><strong>Example</strong>:</p>
-<pre><code class="language-bash"># Current: 0.7.0
-repoindex publish --bump-version patch
-# New: 0.7.1 in pyproject.toml and __init__.py
-</code></pre>
+<p><strong>Example</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># Current: 0.7.0</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>repoindex<span class="w"> </span>publish<span class="w"> </span>--bump-version<span class="w"> </span>patch
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="c1"># New: 0.7.1 in pyproject.toml and __init__.py</span>
+</code></pre></div></p>
 <h3 id="nodejs-semver">Node.js (semver)</h3>
 <p><strong>Files Updated</strong>:
 - <code>package.json</code> - version field</p>
 <p><strong>Detection</strong>: package.json</p>
-<p><strong>Example</strong>:</p>
-<pre><code class="language-bash"># package.json: &quot;version&quot;: &quot;1.0.0&quot;
-repoindex publish --bump-version minor
-# package.json: &quot;version&quot;: &quot;1.1.0&quot;
-</code></pre>
+<p><strong>Example</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># package.json: &quot;version&quot;: &quot;1.0.0&quot;</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>repoindex<span class="w"> </span>publish<span class="w"> </span>--bump-version<span class="w"> </span>minor
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="c1"># package.json: &quot;version&quot;: &quot;1.1.0&quot;</span>
+</code></pre></div></p>
 <h3 id="rust-semver">Rust (semver)</h3>
 <p><strong>Files Updated</strong>:
 - <code>Cargo.toml</code> - [package] version</p>
 <p><strong>Detection</strong>: Cargo.toml</p>
-<p><strong>Example</strong>:</p>
-<pre><code class="language-bash"># Cargo.toml: version = &quot;0.5.0&quot;
-repoindex publish --bump-version patch
-# Cargo.toml: version = &quot;0.5.1&quot;
-</code></pre>
+<p><strong>Example</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># Cargo.toml: version = &quot;0.5.0&quot;</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>repoindex<span class="w"> </span>publish<span class="w"> </span>--bump-version<span class="w"> </span>patch
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="c1"># Cargo.toml: version = &quot;0.5.1&quot;</span>
+</code></pre></div></p>
 <h3 id="c-varies">C++ (varies)</h3>
 <p><strong>Files Updated</strong>:
 - <code>conanfile.py</code> - version variable
 - <code>CMakeLists.txt</code> - project(... VERSION x.y.z)</p>
 <p><strong>Detection</strong>: conanfile.py, conanfile.txt, vcpkg.json, CMakeLists.txt</p>
-<p><strong>Example</strong>:</p>
-<pre><code class="language-bash"># conanfile.py: version = &quot;1.2.0&quot;
-repoindex publish --bump-version major
-# conanfile.py: version = &quot;2.0.0&quot;
-</code></pre>
+<p><strong>Example</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># conanfile.py: version = &quot;1.2.0&quot;</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>repoindex<span class="w"> </span>publish<span class="w"> </span>--bump-version<span class="w"> </span>major
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="c1"># conanfile.py: version = &quot;2.0.0&quot;</span>
+</code></pre></div></p>
 <h3 id="go-semver-via-git-tags">Go (semver via git tags)</h3>
 <p><strong>Files Updated</strong>:
 - Git tags (no file changes)</p>
 <p><strong>Detection</strong>: go.mod</p>
-<p><strong>Example</strong>:</p>
-<pre><code class="language-bash"># Latest tag: v1.0.0
-repoindex publish --bump-version minor
-# New tag: v1.1.0
-</code></pre>
+<p><strong>Example</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># Latest tag: v1.0.0</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>repoindex<span class="w"> </span>publish<span class="w"> </span>--bump-version<span class="w"> </span>minor
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="c1"># New tag: v1.1.0</span>
+</code></pre></div></p>
 <h3 id="ruby-semver">Ruby (semver)</h3>
 <p><strong>Files Updated</strong>:
 - <code>*.gemspec</code> - version field
@@ -1201,40 +1503,40 @@ repoindex publish --bump-version minor
    - CppVersionManager
    - GoVersionManager</p>
 <h3 id="version-bumping-algorithm">Version Bumping Algorithm</h3>
-<pre><code class="language-python">class VersionBumper:
-    def bump_major(version: str) -&gt; str:
-        # 1.2.3 → 2.0.0
-        major + 1, minor = 0, patch = 0
-
-    def bump_minor(version: str) -&gt; str:
-        # 1.2.3 → 1.3.0
-        minor + 1, patch = 0
-
-    def bump_patch(version: str) -&gt; str:
-        # 1.2.3 → 1.2.4
-        patch + 1
-</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">VersionBumper</span><span class="p">:</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">bump_major</span><span class="p">(</span><span class="n">version</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>        <span class="c1"># 1.2.3 → 2.0.0</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>        <span class="n">major</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">minor</span> <span class="o">=</span> <span class="mi">0</span><span class="p">,</span> <span class="n">patch</span> <span class="o">=</span> <span class="mi">0</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">bump_minor</span><span class="p">(</span><span class="n">version</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>        <span class="c1"># 1.2.3 → 1.3.0</span>
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>        <span class="n">minor</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">patch</span> <span class="o">=</span> <span class="mi">0</span>
+<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>
+<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">bump_patch</span><span class="p">(</span><span class="n">version</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>        <span class="c1"># 1.2.3 → 1.2.4</span>
+<a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a>        <span class="n">patch</span> <span class="o">+</span> <span class="mi">1</span>
+</code></pre></div>
 <p>Uses <code>packaging.version.Version</code> for robust parsing with fallback to string manipulation.</p>
 <h3 id="file-detection-updates">File Detection &amp; Updates</h3>
 <p>Each language manager implements:
 - <code>get_version(repo_path)</code> - Read current version from project files
 - <code>set_version(repo_path, new_version)</code> - Write new version to all relevant files</p>
-<p><strong>Python Example</strong>:</p>
-<pre><code class="language-python">class PythonVersionManager:
-    @staticmethod
-    def get_version(repo_path):
-        # Try pyproject.toml
-        # Try setup.py
-        # Try __init__.py
-        return version
-
-    @staticmethod
-    def set_version(repo_path, new_version):
-        # Update pyproject.toml
-        # Update setup.py
-        # Update __init__.py
-        return success
-</code></pre>
+<p><strong>Python Example</strong>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">PythonVersionManager</span><span class="p">:</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>    <span class="nd">@staticmethod</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">get_version</span><span class="p">(</span><span class="n">repo_path</span><span class="p">):</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>        <span class="c1"># Try pyproject.toml</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>        <span class="c1"># Try setup.py</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>        <span class="c1"># Try __init__.py</span>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>        <span class="k">return</span> <span class="n">version</span>
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>    <span class="nd">@staticmethod</span>
+<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a>    <span class="k">def</span><span class="w"> </span><span class="nf">set_version</span><span class="p">(</span><span class="n">repo_path</span><span class="p">,</span> <span class="n">new_version</span><span class="p">):</span>
+<a id="__codelineno-10-11" name="__codelineno-10-11" href="#__codelineno-10-11"></a>        <span class="c1"># Update pyproject.toml</span>
+<a id="__codelineno-10-12" name="__codelineno-10-12" href="#__codelineno-10-12"></a>        <span class="c1"># Update setup.py</span>
+<a id="__codelineno-10-13" name="__codelineno-10-13" href="#__codelineno-10-13"></a>        <span class="c1"># Update __init__.py</span>
+<a id="__codelineno-10-14" name="__codelineno-10-14" href="#__codelineno-10-14"></a>        <span class="k">return</span> <span class="n">success</span>
+</code></pre></div></p>
 <h2 id="integration-with-publish-workflow">Integration with Publish Workflow</h2>
 <h3 id="workflow-order">Workflow Order</h3>
 <ol>
@@ -1249,72 +1551,72 @@ repoindex publish --bump-version minor
 <li>Upload to registry</li>
 </ol>
 <h3 id="dry-run-support">Dry-Run Support</h3>
-<p>All operations support <code>--dry-run</code>:</p>
-<pre><code class="language-bash">$ repoindex publish --bump-version patch --dry-run
-
-Processing: repoindex
-✓ Detected types: python
-Current version: 0.7.0
-Would bump patch: 0.7.0 → 0.7.1
-Publishing Python package to PyPI...
-Would run: python -m twine upload dist/*
-✓ Dry run: would upload to PyPI
-</code></pre>
+<p>All operations support <code>--dry-run</code>:
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>$<span class="w"> </span>repoindex<span class="w"> </span>publish<span class="w"> </span>--bump-version<span class="w"> </span>patch<span class="w"> </span>--dry-run
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>Processing:<span class="w"> </span>repoindex
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>✓<span class="w"> </span>Detected<span class="w"> </span>types:<span class="w"> </span>python
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>Current<span class="w"> </span>version:<span class="w"> </span><span class="m">0</span>.7.0
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>Would<span class="w"> </span>bump<span class="w"> </span>patch:<span class="w"> </span><span class="m">0</span>.7.0<span class="w"> </span>→<span class="w"> </span><span class="m">0</span>.7.1
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>Publishing<span class="w"> </span>Python<span class="w"> </span>package<span class="w"> </span>to<span class="w"> </span>PyPI...
+<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a>Would<span class="w"> </span>run:<span class="w"> </span>python<span class="w"> </span>-m<span class="w"> </span>twine<span class="w"> </span>upload<span class="w"> </span>dist/*
+<a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a>✓<span class="w"> </span>Dry<span class="w"> </span>run:<span class="w"> </span>would<span class="w"> </span>upload<span class="w"> </span>to<span class="w"> </span>PyPI
+</code></pre></div></p>
 <h2 id="usage-examples">Usage Examples</h2>
 <h3 id="scenario-1-patch-release">Scenario 1: Patch Release</h3>
-<pre><code class="language-bash"># Make bug fixes
-git commit -m &quot;fix: resolve timeout issue&quot;
-
-# Bump patch version and publish
-repoindex publish --bump-version patch
-
-# Output:
-# Current version: 1.0.0
-# ✓ Bumped patch: 1.0.0 → 1.0.1
-# ✓ Published to PyPI
-</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c1"># Make bug fixes</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;fix: resolve timeout issue&quot;</span>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="c1"># Bump patch version and publish</span>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>repoindex<span class="w"> </span>publish<span class="w"> </span>--bump-version<span class="w"> </span>patch
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>
+<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="c1"># Output:</span>
+<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a><span class="c1"># Current version: 1.0.0</span>
+<a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a><span class="c1"># ✓ Bumped patch: 1.0.0 → 1.0.1</span>
+<a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a><span class="c1"># ✓ Published to PyPI</span>
+</code></pre></div>
 <h3 id="scenario-2-minor-release-with-new-features">Scenario 2: Minor Release with New Features</h3>
-<pre><code class="language-bash"># Add features
-git commit -m &quot;feat: add new export format&quot;
-
-# Bump minor version
-repoindex publish --bump-version minor
-
-# Output:
-# Current version: 1.0.1
-# ✓ Bumped minor: 1.0.1 → 1.1.0
-# ✓ Published to PyPI
-</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="c1"># Add features</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;feat: add new export format&quot;</span>
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="c1"># Bump minor version</span>
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>repoindex<span class="w"> </span>publish<span class="w"> </span>--bump-version<span class="w"> </span>minor
+<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>
+<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a><span class="c1"># Output:</span>
+<a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a><span class="c1"># Current version: 1.0.1</span>
+<a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a><span class="c1"># ✓ Bumped minor: 1.0.1 → 1.1.0</span>
+<a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a><span class="c1"># ✓ Published to PyPI</span>
+</code></pre></div>
 <h3 id="scenario-3-major-breaking-changes">Scenario 3: Major Breaking Changes</h3>
-<pre><code class="language-bash"># Make breaking changes
-git commit -m &quot;feat!: redesign API&quot;
-
-# Bump major version
-repoindex publish --bump-version major
-
-# Output:
-# Current version: 1.1.0
-# ✓ Bumped major: 1.1.0 → 2.0.0
-# ✓ Published to PyPI
-</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="c1"># Make breaking changes</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;feat!: redesign API&quot;</span>
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="c1"># Bump major version</span>
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>repoindex<span class="w"> </span>publish<span class="w"> </span>--bump-version<span class="w"> </span>major
+<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>
+<a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a><span class="c1"># Output:</span>
+<a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a><span class="c1"># Current version: 1.1.0</span>
+<a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a><span class="c1"># ✓ Bumped major: 1.1.0 → 2.0.0</span>
+<a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a><span class="c1"># ✓ Published to PyPI</span>
+</code></pre></div>
 <h3 id="scenario-4-pre-release-version-sync">Scenario 4: Pre-Release Version Sync</h3>
-<pre><code class="language-bash"># Update version across all files without publishing
-repoindex publish --set-version 2.0.0-beta.1 --version-only
-
-# Output:
-# Current version: 1.1.0
-# ✓ Version set to: 2.0.0-beta.1
-# Summary: ✓ Version updated
-
-# Later, publish when ready
-repoindex publish
-</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="c1"># Update version across all files without publishing</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>repoindex<span class="w"> </span>publish<span class="w"> </span>--set-version<span class="w"> </span><span class="m">2</span>.0.0-beta.1<span class="w"> </span>--version-only
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>
+<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="c1"># Output:</span>
+<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="c1"># Current version: 1.1.0</span>
+<a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a><span class="c1"># ✓ Version set to: 2.0.0-beta.1</span>
+<a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a><span class="c1"># Summary: ✓ Version updated</span>
+<a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a>
+<a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a><span class="c1"># Later, publish when ready</span>
+<a id="__codelineno-15-10" name="__codelineno-15-10" href="#__codelineno-15-10"></a>repoindex<span class="w"> </span>publish
+</code></pre></div>
 <h3 id="scenario-5-bulk-version-updates">Scenario 5: Bulk Version Updates</h3>
-<pre><code class="language-bash"># Update all Python packages to 1.0.0
-repoindex publish /by-language/Python --set-version 1.0.0 --version-only --dry-run
-
-# Shows what would be updated for each repo
-</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="c1"># Update all Python packages to 1.0.0</span>
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>repoindex<span class="w"> </span>publish<span class="w"> </span>/by-language/Python<span class="w"> </span>--set-version<span class="w"> </span><span class="m">1</span>.0.0<span class="w"> </span>--version-only<span class="w"> </span>--dry-run
+<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>
+<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="c1"># Shows what would be updated for each repo</span>
+</code></pre></div>
 <h2 id="cli-options-summary">CLI Options Summary</h2>
 <table>
 <thead>
@@ -1359,14 +1661,14 @@ repoindex publish /by-language/Python --set-version 1.0.0 --version-only --dry-r
 </table>
 <h2 id="configuration">Configuration</h2>
 <p>No configuration required - version management works automatically based on detected project type. Optional configuration for registry preferences:</p>
-<pre><code class="language-json">{
-  &quot;publish&quot;: {
-    &quot;python&quot;: [&quot;pypi&quot;],
-    &quot;node&quot;: [&quot;npm&quot;],
-    &quot;rust&quot;: [&quot;crates.io&quot;]
-  }
-}
-</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="p">{</span>
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="w">  </span><span class="nt">&quot;publish&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="w">    </span><span class="nt">&quot;python&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;pypi&quot;</span><span class="p">],</span>
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="w">    </span><span class="nt">&quot;node&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;npm&quot;</span><span class="p">],</span>
+<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a><span class="w">    </span><span class="nt">&quot;rust&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;crates.io&quot;</span><span class="p">]</span>
+<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a><span class="w">  </span><span class="p">}</span>
+<a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a><span class="p">}</span>
+</code></pre></div>
 <h2 id="error-handling">Error Handling</h2>
 <ul>
 <li><strong>No version found</strong>: Starts from 0.0.0</li>
@@ -1375,18 +1677,18 @@ repoindex publish /by-language/Python --set-version 1.0.0 --version-only --dry-r
 <li><strong>Multiple project types</strong>: Uses first detected type for versioning</li>
 </ul>
 <h2 id="testing">Testing</h2>
-<pre><code class="language-bash"># Test version detection
-repoindex publish --dry-run
-# Shows: Current version: X.Y.Z
-
-# Test bumping without publishing
-repoindex publish --bump-version patch --version-only --dry-run
-# Shows: Would bump patch: X.Y.Z → X.Y.Z+1
-
-# Test setting version
-repoindex publish --set-version 2.0.0 --version-only --dry-run
-# Shows: Would set version to: 2.0.0
-</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="c1"># Test version detection</span>
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>repoindex<span class="w"> </span>publish<span class="w"> </span>--dry-run
+<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="c1"># Shows: Current version: X.Y.Z</span>
+<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>
+<a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a><span class="c1"># Test bumping without publishing</span>
+<a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a>repoindex<span class="w"> </span>publish<span class="w"> </span>--bump-version<span class="w"> </span>patch<span class="w"> </span>--version-only<span class="w"> </span>--dry-run
+<a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a><span class="c1"># Shows: Would bump patch: X.Y.Z → X.Y.Z+1</span>
+<a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a>
+<a id="__codelineno-18-9" name="__codelineno-18-9" href="#__codelineno-18-9"></a><span class="c1"># Test setting version</span>
+<a id="__codelineno-18-10" name="__codelineno-18-10" href="#__codelineno-18-10"></a>repoindex<span class="w"> </span>publish<span class="w"> </span>--set-version<span class="w"> </span><span class="m">2</span>.0.0<span class="w"> </span>--version-only<span class="w"> </span>--dry-run
+<a id="__codelineno-18-11" name="__codelineno-18-11" href="#__codelineno-18-11"></a><span class="c1"># Shows: Would set version to: 2.0.0</span>
+</code></pre></div>
 <h2 id="files-createdmodified">Files Created/Modified</h2>
 <h3 id="new-files-1">New Files (1)</h3>
 <ul>
@@ -1408,9 +1710,9 @@ repoindex publish --set-version 2.0.0 --version-only --dry-run
 <li><strong>Pre-release support</strong> - Handle alpha, beta, rc versions</li>
 </ol>
 <h3 id="example-future-usage">Example Future Usage</h3>
-<pre><code class="language-bash"># Bump version, update changelog, create git tag, commit, and publish
-repoindex publish --bump-version minor --changelog --tag --commit
-</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="c1"># Bump version, update changelog, create git tag, commit, and publish</span>
+<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>repoindex<span class="w"> </span>publish<span class="w"> </span>--bump-version<span class="w"> </span>minor<span class="w"> </span>--changelog<span class="w"> </span>--tag<span class="w"> </span>--commit
+</code></pre></div>
 <h2 id="benefits">Benefits</h2>
 <ol>
 <li><strong>Consistency</strong>: All project files stay in sync</li>
@@ -1425,28 +1727,26 @@ repoindex publish --bump-version minor --changelog --tag --commit
 <ol>
 <li>
 <p><strong>Always use --dry-run first</strong>:
-   <code>bash
-   repoindex publish --bump-version patch --dry-run
-   # Review output, then run without --dry-run</code></p>
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>repoindex<span class="w"> </span>publish<span class="w"> </span>--bump-version<span class="w"> </span>patch<span class="w"> </span>--dry-run
+<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a><span class="c1"># Review output, then run without --dry-run</span>
+</code></pre></div></p>
 </li>
 <li>
 <p><strong>Version-only for preparation</strong>:
-   ```bash
-   # Prepare release
-   repoindex publish --bump-version minor --version-only
-   git add .
-   git commit -m "chore: bump version to $(cat VERSION)"</p>
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="c1"># Prepare release</span>
+<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>repoindex<span class="w"> </span>publish<span class="w"> </span>--bump-version<span class="w"> </span>minor<span class="w"> </span>--version-only
+<a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a>git<span class="w"> </span>add<span class="w"> </span>.
+<a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a>git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;chore: bump version to </span><span class="k">$(</span>cat<span class="w"> </span>VERSION<span class="k">)</span><span class="s2">&quot;</span>
+<a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a>
+<a id="__codelineno-21-6" name="__codelineno-21-6" href="#__codelineno-21-6"></a><span class="c1"># Publish later</span>
+<a id="__codelineno-21-7" name="__codelineno-21-7" href="#__codelineno-21-7"></a>repoindex<span class="w"> </span>publish
+</code></pre></div></p>
 </li>
-</ol>
-<p># Publish later
-   repoindex publish
-   ```</p>
-<ol>
 <li>
 <p><strong>Combine with VFS for bulk operations</strong>:
-   <code>bash
-   # Update all Python packages
-   repoindex publish /by-language/Python --set-version 1.0.0 --version-only</code></p>
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="c1"># Update all Python packages</span>
+<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a>repoindex<span class="w"> </span>publish<span class="w"> </span>/by-language/Python<span class="w"> </span>--set-version<span class="w"> </span><span class="m">1</span>.0.0<span class="w"> </span>--version-only
+</code></pre></div></p>
 </li>
 <li>
 <p><strong>Follow semver guidelines</strong>:</p>

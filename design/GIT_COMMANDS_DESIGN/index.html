@@ -6,9 +6,15 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
+        <meta name="description" content="Collection-aware metadata index for git repositories">
       
       
       
+      
+        <link rel="prev" href="../CLI_DESIGN_DECISIONS/">
+      
+      
+        <link rel="next" href="../VERSION_MANAGEMENT_IMPLEMENTATION/">
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
@@ -252,33 +258,14 @@
   
   
   
-    <li class="md-tabs__item">
-      <a href="../../usage/" class="md-tabs__link">
-        
-  
-  
-    
-  
-  Usage
-
-      </a>
-    </li>
-  
-
-      
-        
-  
-  
-  
-  
     
     
       <li class="md-tabs__item">
-        <a href="../../catalog-query/" class="md-tabs__link">
+        <a href="../../usage/" class="md-tabs__link">
           
   
   
-  Commands
+  Core
 
         </a>
       </li>
@@ -294,11 +281,11 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../integrations/overview/" class="md-tabs__link">
+        <a href="../../events/overview/" class="md-tabs__link">
           
   
   
-  Integrations
+  Events
 
         </a>
       </li>
@@ -314,11 +301,11 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../tutorials/" class="md-tabs__link">
+        <a href="../../shell-vfs/" class="md-tabs__link">
           
   
   
-  Tutorials
+  Interactive
 
         </a>
       </li>
@@ -330,38 +317,21 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../../api/integrations/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../../architecture-vision/" class="md-tabs__link">
           
   
   
-  API Reference
+  Reference
 
         </a>
       </li>
     
-  
-
-      
-        
-  
-  
-  
-  
-    <li class="md-tabs__item">
-      <a href="../../architecture-vision/" class="md-tabs__link">
-        
-  
-  
-    
-  
-  Architecture
-
-      </a>
-    </li>
   
 
       
@@ -397,25 +367,6 @@
     
   
   Contributing
-
-      </a>
-    </li>
-  
-
-      
-        
-  
-  
-  
-  
-    <li class="md-tabs__item">
-      <a href="../../future-plans/" class="md-tabs__link">
-        
-  
-  
-    
-  
-  Future Plans
 
       </a>
     </li>
@@ -519,28 +470,6 @@
   
   
   
-    <li class="md-nav__item">
-      <a href="../../usage/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Usage
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
     
     
     
@@ -555,15 +484,15 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
         
           
-          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
             
   
   
   <span class="md-ellipsis">
-    Commands
+    Core
     
   </span>
   
@@ -571,12 +500,35 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
-            Commands
+            Core
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Usage Guide
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
             
               
                 
@@ -590,99 +542,7 @@
   
   
   <span class="md-ellipsis">
-    Organization & Discovery
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../audit-command/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Repository Audit
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../export-command/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Portfolio Export
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../docs-command/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Documentation
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../list-command/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    List
+    Query Language
     
   </span>
   
@@ -743,15 +603,15 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
         
           
-          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
             
   
   
   <span class="md-ellipsis">
-    Integrations
+    Events
     
   </span>
   
@@ -759,10 +619,10 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
             <span class="md-nav__icon md-icon"></span>
-            Integrations
+            Events
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
             
@@ -773,7 +633,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../integrations/overview/" class="md-nav__link">
+      <a href="../../events/overview/" class="md-nav__link">
         
   
   
@@ -796,35 +656,12 @@
   
   
     <li class="md-nav__item">
-      <a href="../../integrations/clustering/" class="md-nav__link">
+      <a href="../../events/event-types/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
-    Repository Clustering
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../integrations/workflow/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Workflow Orchestration
+    Event Types Reference
     
   </span>
   
@@ -862,15 +699,15 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
         
           
-          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
             
   
   
   <span class="md-ellipsis">
-    Tutorials
+    Interactive
     
   </span>
   
@@ -878,118 +715,93 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Interactive
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../shell-vfs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Shell & VFS
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    Reference
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_6">
             <span class="md-nav__icon md-icon"></span>
-            Tutorials
+            Reference
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
             
               
                 
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../tutorials/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Jupyter Notebooks
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    
-    
-    
-    
-      
-      
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
-        
-          
-          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
-            
-  
-  
-  <span class="md-ellipsis">
-    API Reference
-    
-  </span>
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_7">
-            <span class="md-nav__icon md-icon"></span>
-            API Reference
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../api/integrations/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Integration API
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
-      
-      
   
   
   
@@ -1006,6 +818,548 @@
   
 
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../CLI_DESIGN_DECISIONS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Design Decisions
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Git Commands Design
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    Git Commands Design
+    
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#vision" class="md-nav__link">
+    <span class="md-ellipsis">
+      Vision
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#key-design-principles" class="md-nav__link">
+    <span class="md-ellipsis">
+      Key Design Principles
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#use-cases" class="md-nav__link">
+    <span class="md-ellipsis">
+      Use Cases
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Use Cases">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#in-shell" class="md-nav__link">
+    <span class="md-ellipsis">
+      In Shell
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#in-cli" class="md-nav__link">
+    <span class="md-ellipsis">
+      In CLI
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#command-categories" class="md-nav__link">
+    <span class="md-ellipsis">
+      Command Categories
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Command Categories">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#read-only-commands-safe-no-confirmation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Read-Only Commands (Safe, No Confirmation)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#state-changing-commands-require-confirmation" class="md-nav__link">
+    <span class="md-ellipsis">
+      State-Changing Commands (Require Confirmation)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#write-commands-require-explicit-confirmation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Write Commands (Require Explicit Confirmation)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#implementation-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      Implementation Structure
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Implementation Structure">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#examples" class="md-nav__link">
+    <span class="md-ellipsis">
+      Examples:
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#output-formats" class="md-nav__link">
+    <span class="md-ellipsis">
+      Output Formats
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Output Formats">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#single-repository" class="md-nav__link">
+    <span class="md-ellipsis">
+      Single Repository
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#multiple-repositories" class="md-nav__link">
+    <span class="md-ellipsis">
+      Multiple Repositories
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#jsonl-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      JSONL Mode
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#command-specific-designs" class="md-nav__link">
+    <span class="md-ellipsis">
+      Command-Specific Designs
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Command-Specific Designs">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#git-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      git status
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#git-log" class="md-nav__link">
+    <span class="md-ellipsis">
+      git log
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#git-pull" class="md-nav__link">
+    <span class="md-ellipsis">
+      git pull
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#git-diff" class="md-nav__link">
+    <span class="md-ellipsis">
+      git diff
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#shell-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      Shell Integration
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#safety-features" class="md-nav__link">
+    <span class="md-ellipsis">
+      Safety Features
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Safety Features">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#confirmation-prompts" class="md-nav__link">
+    <span class="md-ellipsis">
+      Confirmation Prompts
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#dry-run-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      Dry Run Mode
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#implementation-plan" class="md-nav__link">
+    <span class="md-ellipsis">
+      Implementation Plan
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Implementation Plan">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#phase-1-read-only-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      Phase 1: Read-Only Commands
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-2-fetch-operations" class="md-nav__link">
+    <span class="md-ellipsis">
+      Phase 2: Fetch Operations
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-3-write-operations" class="md-nav__link">
+    <span class="md-ellipsis">
+      Phase 3: Write Operations
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#phase-4-advanced-operations" class="md-nav__link">
+    <span class="md-ellipsis">
+      Phase 4: Advanced Operations
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#file-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      File Structure
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#key-implementation-details" class="md-nav__link">
+    <span class="md-ellipsis">
+      Key Implementation Details
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Key Implementation Details">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#multi-repo-execution" class="md-nav__link">
+    <span class="md-ellipsis">
+      Multi-Repo Execution
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#vfs-path-resolution" class="md-nav__link">
+    <span class="md-ellipsis">
+      VFS Path Resolution
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#benefits" class="md-nav__link">
+    <span class="md-ellipsis">
+      Benefits
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#example-workflows" class="md-nav__link">
+    <span class="md-ellipsis">
+      Example Workflows
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Example Workflows">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#daily-status-check" class="md-nav__link">
+    <span class="md-ellipsis">
+      Daily Status Check
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#pull-all-work-repos" class="md-nav__link">
+    <span class="md-ellipsis">
+      Pull All Work Repos
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#view-recent-activity" class="md-nav__link">
+    <span class="md-ellipsis">
+      View Recent Activity
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#bulk-operations" class="md-nav__link">
+    <span class="md-ellipsis">
+      Bulk Operations
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#questions-to-consider" class="md-nav__link">
+    <span class="md-ellipsis">
+      Questions to Consider
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#next-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      Next Steps
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../VERSION_MANAGEMENT_IMPLEMENTATION/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Version Management
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -1054,28 +1408,6 @@
   
 
     
-      
-      
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../future-plans/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Future Plans
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-    
   </ul>
 </nav>
                   </div>
@@ -1108,39 +1440,39 @@
 </ol>
 <h2 id="use-cases">Use Cases</h2>
 <h3 id="in-shell">In Shell</h3>
-<pre><code class="language-bash"># Navigate to VFS location
-repoindex:/&gt; cd /by-tag/work/active
-
-# Run git status on ALL repos with that tag
-repoindex:/by-tag/work/active&gt; git status
-
-# See recent commits across all active work repos
-repoindex:/by-tag/work/active&gt; git log --oneline -5
-
-# Pull updates for all active work repos
-repoindex:/by-tag/work/active&gt; git pull
-
-# Navigate to specific repo
-repoindex:/&gt; cd /repos/myproject
-
-# Git commands work on single repo
-repoindex:/repos/myproject&gt; git log --graph --all
-repoindex:/repos/myproject&gt; git diff
-repoindex:/repos/myproject&gt; git commit -m &quot;Update&quot;
-</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># Navigate to VFS location</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>repoindex:/&gt;<span class="w"> </span><span class="nb">cd</span><span class="w"> </span>/by-tag/work/active
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="c1"># Run git status on ALL repos with that tag</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>repoindex:/by-tag/work/active&gt;<span class="w"> </span>git<span class="w"> </span>status
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="c1"># See recent commits across all active work repos</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>repoindex:/by-tag/work/active&gt;<span class="w"> </span>git<span class="w"> </span>log<span class="w"> </span>--oneline<span class="w"> </span>-5
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="c1"># Pull updates for all active work repos</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>repoindex:/by-tag/work/active&gt;<span class="w"> </span>git<span class="w"> </span>pull
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="c1"># Navigate to specific repo</span>
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>repoindex:/&gt;<span class="w"> </span><span class="nb">cd</span><span class="w"> </span>/repos/myproject
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>
+<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="c1"># Git commands work on single repo</span>
+<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a>repoindex:/repos/myproject&gt;<span class="w"> </span>git<span class="w"> </span>log<span class="w"> </span>--graph<span class="w"> </span>--all
+<a id="__codelineno-0-18" name="__codelineno-0-18" href="#__codelineno-0-18"></a>repoindex:/repos/myproject&gt;<span class="w"> </span>git<span class="w"> </span>diff
+<a id="__codelineno-0-19" name="__codelineno-0-19" href="#__codelineno-0-19"></a>repoindex:/repos/myproject&gt;<span class="w"> </span>git<span class="w"> </span>commit<span class="w"> </span>-m<span class="w"> </span><span class="s2">&quot;Update&quot;</span>
+</code></pre></div>
 <h3 id="in-cli">In CLI</h3>
-<pre><code class="language-bash"># Status for specific VFS path
-repoindex git status /by-tag/work/active
-
-# Log for specific repo
-repoindex git log /repos/myproject --oneline -5
-
-# Pull all repos in directory
-repoindex git pull /by-tag/needs-update
-
-# Diff across multiple repos
-repoindex git diff --name-status /by-language/Python
-</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># Status for specific VFS path</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>repoindex<span class="w"> </span>git<span class="w"> </span>status<span class="w"> </span>/by-tag/work/active
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># Log for specific repo</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>repoindex<span class="w"> </span>git<span class="w"> </span>log<span class="w"> </span>/repos/myproject<span class="w"> </span>--oneline<span class="w"> </span>-5
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="c1"># Pull all repos in directory</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>repoindex<span class="w"> </span>git<span class="w"> </span>pull<span class="w"> </span>/by-tag/needs-update
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="c1"># Diff across multiple repos</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>repoindex<span class="w"> </span>git<span class="w"> </span>diff<span class="w"> </span>--name-status<span class="w"> </span>/by-language/Python
+</code></pre></div>
 <h2 id="command-categories">Command Categories</h2>
 <h3 id="read-only-commands-safe-no-confirmation">Read-Only Commands (Safe, No Confirmation)</h3>
 <ul>
@@ -1172,148 +1504,148 @@ repoindex git diff --name-status /by-language/Python
 <li><code>git rebase</code> - Rebase branches</li>
 </ul>
 <h2 id="implementation-structure">Implementation Structure</h2>
-<pre><code>repoindex git &lt;command&gt; [VFS_PATH] [options]
-</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>repoindex git &lt;command&gt; [VFS_PATH] [options]
+</code></pre></div>
 <h3 id="examples">Examples:</h3>
-<pre><code class="language-bash"># CLI mode - path is explicit
-repoindex git status /by-tag/work/active
-repoindex git log /repos/myproject --oneline -10
-repoindex git pull /by-tag/needs-update --confirm
-
-# Shell mode - path is from cwd
-repoindex:/by-tag/work/active&gt; git status
-repoindex:/repos/myproject&gt; git log --oneline -10
-repoindex:/by-tag/needs-update&gt; git pull
-</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># CLI mode - path is explicit</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>repoindex<span class="w"> </span>git<span class="w"> </span>status<span class="w"> </span>/by-tag/work/active
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>repoindex<span class="w"> </span>git<span class="w"> </span>log<span class="w"> </span>/repos/myproject<span class="w"> </span>--oneline<span class="w"> </span>-10
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>repoindex<span class="w"> </span>git<span class="w"> </span>pull<span class="w"> </span>/by-tag/needs-update<span class="w"> </span>--confirm
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="c1"># Shell mode - path is from cwd</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>repoindex:/by-tag/work/active&gt;<span class="w"> </span>git<span class="w"> </span>status
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>repoindex:/repos/myproject&gt;<span class="w"> </span>git<span class="w"> </span>log<span class="w"> </span>--oneline<span class="w"> </span>-10
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>repoindex:/by-tag/needs-update&gt;<span class="w"> </span>git<span class="w"> </span>pull
+</code></pre></div>
 <h2 id="output-formats">Output Formats</h2>
 <h3 id="single-repository">Single Repository</h3>
-<pre><code class="language-bash">repoindex git status /repos/myproject
-
-Repository: myproject (/home/user/repos/myproject)
-On branch: main
-Your branch is up to date with 'origin/main'.
-
-Changes not staged for commit:
-  modified:   README.md
-  modified:   src/main.py
-</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>repoindex<span class="w"> </span>git<span class="w"> </span>status<span class="w"> </span>/repos/myproject
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>Repository:<span class="w"> </span>myproject<span class="w"> </span><span class="o">(</span>/home/user/repos/myproject<span class="o">)</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>On<span class="w"> </span>branch:<span class="w"> </span>main
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>Your<span class="w"> </span>branch<span class="w"> </span>is<span class="w"> </span>up<span class="w"> </span>to<span class="w"> </span>date<span class="w"> </span>with<span class="w"> </span><span class="s1">&#39;origin/main&#39;</span>.
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>Changes<span class="w"> </span>not<span class="w"> </span>staged<span class="w"> </span><span class="k">for</span><span class="w"> </span>commit:
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">  </span>modified:<span class="w">   </span>README.md
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="w">  </span>modified:<span class="w">   </span>src/main.py
+</code></pre></div>
 <h3 id="multiple-repositories">Multiple Repositories</h3>
-<pre><code class="language-bash">repoindex git status /by-tag/work/active
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Repository: myproject
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-On branch: main
-Modified: 2 files
-Untracked: 0 files
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Repository: another-project
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-On branch: develop
-Clean working tree
-
-Summary: 2 repositories, 1 with changes
-</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>repoindex<span class="w"> </span>git<span class="w"> </span>status<span class="w"> </span>/by-tag/work/active
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>Repository:<span class="w"> </span>myproject
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>On<span class="w"> </span>branch:<span class="w"> </span>main
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>Modified:<span class="w"> </span><span class="m">2</span><span class="w"> </span>files
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a>Untracked:<span class="w"> </span><span class="m">0</span><span class="w"> </span>files
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>Repository:<span class="w"> </span>another-project
+<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>On<span class="w"> </span>branch:<span class="w"> </span>develop
+<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>Clean<span class="w"> </span>working<span class="w"> </span>tree
+<a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a>
+<a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a>Summary:<span class="w"> </span><span class="m">2</span><span class="w"> </span>repositories,<span class="w"> </span><span class="m">1</span><span class="w"> </span>with<span class="w"> </span>changes
+</code></pre></div>
 <h3 id="jsonl-mode">JSONL Mode</h3>
-<pre><code class="language-bash">repoindex git status /by-tag/work/active --json
-
-{&quot;repo&quot;: &quot;myproject&quot;, &quot;path&quot;: &quot;/home/user/repos/myproject&quot;, &quot;branch&quot;: &quot;main&quot;, &quot;clean&quot;: false, &quot;modified&quot;: 2}
-{&quot;repo&quot;: &quot;another-project&quot;, &quot;path&quot;: &quot;/home/user/repos/another&quot;, &quot;branch&quot;: &quot;develop&quot;, &quot;clean&quot;: true, &quot;modified&quot;: 0}
-</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>repoindex<span class="w"> </span>git<span class="w"> </span>status<span class="w"> </span>/by-tag/work/active<span class="w"> </span>--json
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="o">{</span><span class="s2">&quot;repo&quot;</span>:<span class="w"> </span><span class="s2">&quot;myproject&quot;</span>,<span class="w"> </span><span class="s2">&quot;path&quot;</span>:<span class="w"> </span><span class="s2">&quot;/home/user/repos/myproject&quot;</span>,<span class="w"> </span><span class="s2">&quot;branch&quot;</span>:<span class="w"> </span><span class="s2">&quot;main&quot;</span>,<span class="w"> </span><span class="s2">&quot;clean&quot;</span>:<span class="w"> </span>false,<span class="w"> </span><span class="s2">&quot;modified&quot;</span>:<span class="w"> </span><span class="m">2</span><span class="o">}</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="o">{</span><span class="s2">&quot;repo&quot;</span>:<span class="w"> </span><span class="s2">&quot;another-project&quot;</span>,<span class="w"> </span><span class="s2">&quot;path&quot;</span>:<span class="w"> </span><span class="s2">&quot;/home/user/repos/another&quot;</span>,<span class="w"> </span><span class="s2">&quot;branch&quot;</span>:<span class="w"> </span><span class="s2">&quot;develop&quot;</span>,<span class="w"> </span><span class="s2">&quot;clean&quot;</span>:<span class="w"> </span>true,<span class="w"> </span><span class="s2">&quot;modified&quot;</span>:<span class="w"> </span><span class="m">0</span><span class="o">}</span>
+</code></pre></div>
 <h2 id="command-specific-designs">Command-Specific Designs</h2>
 <h3 id="git-status"><code>git status</code></h3>
-<pre><code class="language-bash">Usage: repoindex git status [VFS_PATH] [OPTIONS]
-
-Show working tree status for repositories.
-
-Options:
-  --short, -s          Show short format
-  --branch, -b         Show branch info
-  --json               Output as JSONL
-  --dirty-only         Show only repos with changes
-</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>Usage:<span class="w"> </span>repoindex<span class="w"> </span>git<span class="w"> </span>status<span class="w"> </span><span class="o">[</span>VFS_PATH<span class="o">]</span><span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>Show<span class="w"> </span>working<span class="w"> </span>tree<span class="w"> </span>status<span class="w"> </span><span class="k">for</span><span class="w"> </span>repositories.
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>Options:
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="w">  </span>--short,<span class="w"> </span>-s<span class="w">          </span>Show<span class="w"> </span>short<span class="w"> </span>format
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a><span class="w">  </span>--branch,<span class="w"> </span>-b<span class="w">         </span>Show<span class="w"> </span>branch<span class="w"> </span>info
+<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a><span class="w">  </span>--json<span class="w">               </span>Output<span class="w"> </span>as<span class="w"> </span>JSONL
+<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a><span class="w">  </span>--dirty-only<span class="w">         </span>Show<span class="w"> </span>only<span class="w"> </span>repos<span class="w"> </span>with<span class="w"> </span>changes
+</code></pre></div>
 <h3 id="git-log"><code>git log</code></h3>
-<pre><code class="language-bash">Usage: repoindex git log [VFS_PATH] [OPTIONS]
-
-Show commit history.
-
-Options:
-  --oneline            Show one line per commit
-  --graph              Show commit graph
-  --all                Show all branches
-  -n, --max-count N    Limit to N commits
-  --since DATE         Show commits since date
-  --author AUTHOR      Filter by author
-  --json               Output as JSONL
-</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>Usage:<span class="w"> </span>repoindex<span class="w"> </span>git<span class="w"> </span>log<span class="w"> </span><span class="o">[</span>VFS_PATH<span class="o">]</span><span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>Show<span class="w"> </span>commit<span class="w"> </span>history.
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>Options:
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">  </span>--oneline<span class="w">            </span>Show<span class="w"> </span>one<span class="w"> </span>line<span class="w"> </span>per<span class="w"> </span>commit
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="w">  </span>--graph<span class="w">              </span>Show<span class="w"> </span>commit<span class="w"> </span>graph
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="w">  </span>--all<span class="w">                </span>Show<span class="w"> </span>all<span class="w"> </span>branches
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="w">  </span>-n,<span class="w"> </span>--max-count<span class="w"> </span>N<span class="w">    </span>Limit<span class="w"> </span>to<span class="w"> </span>N<span class="w"> </span>commits
+<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="w">  </span>--since<span class="w"> </span>DATE<span class="w">         </span>Show<span class="w"> </span>commits<span class="w"> </span>since<span class="w"> </span>date
+<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a><span class="w">  </span>--author<span class="w"> </span>AUTHOR<span class="w">      </span>Filter<span class="w"> </span>by<span class="w"> </span>author
+<a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a><span class="w">  </span>--json<span class="w">               </span>Output<span class="w"> </span>as<span class="w"> </span>JSONL
+</code></pre></div>
 <h3 id="git-pull"><code>git pull</code></h3>
-<pre><code class="language-bash">Usage: repoindex git pull [VFS_PATH] [OPTIONS]
-
-Pull changes from remote.
-
-Options:
-  --dry-run            Show what would be pulled
-  --confirm            Require confirmation for each repo
-  --no-confirm         Don't require confirmation (use with caution!)
-  --parallel           Pull repos in parallel
-  --json               Output as JSONL
-</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>Usage:<span class="w"> </span>repoindex<span class="w"> </span>git<span class="w"> </span>pull<span class="w"> </span><span class="o">[</span>VFS_PATH<span class="o">]</span><span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>Pull<span class="w"> </span>changes<span class="w"> </span>from<span class="w"> </span>remote.
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>Options:
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="w">  </span>--dry-run<span class="w">            </span>Show<span class="w"> </span>what<span class="w"> </span>would<span class="w"> </span>be<span class="w"> </span>pulled
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="w">  </span>--confirm<span class="w">            </span>Require<span class="w"> </span>confirmation<span class="w"> </span><span class="k">for</span><span class="w"> </span>each<span class="w"> </span>repo
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a><span class="w">  </span>--no-confirm<span class="w">         </span>Don<span class="err">&#39;</span>t<span class="w"> </span>require<span class="w"> </span>confirmation<span class="w"> </span><span class="o">(</span>use<span class="w"> </span>with<span class="w"> </span>caution!<span class="o">)</span>
+<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a><span class="w">  </span>--parallel<span class="w">           </span>Pull<span class="w"> </span>repos<span class="w"> </span><span class="k">in</span><span class="w"> </span>parallel
+<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="w">  </span>--json<span class="w">               </span>Output<span class="w"> </span>as<span class="w"> </span>JSONL
+</code></pre></div>
 <h3 id="git-diff"><code>git diff</code></h3>
-<pre><code class="language-bash">Usage: repoindex git diff [VFS_PATH] [OPTIONS]
-
-Show changes.
-
-Options:
-  --name-only          Show only names
-  --name-status        Show names with status
-  --stat               Show stats
-  --cached, --staged   Show staged changes
-  --json               Output as JSONL
-</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>Usage:<span class="w"> </span>repoindex<span class="w"> </span>git<span class="w"> </span>diff<span class="w"> </span><span class="o">[</span>VFS_PATH<span class="o">]</span><span class="w"> </span><span class="o">[</span>OPTIONS<span class="o">]</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>Show<span class="w"> </span>changes.
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>Options:
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="w">  </span>--name-only<span class="w">          </span>Show<span class="w"> </span>only<span class="w"> </span>names
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="w">  </span>--name-status<span class="w">        </span>Show<span class="w"> </span>names<span class="w"> </span>with<span class="w"> </span>status
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="w">  </span>--stat<span class="w">               </span>Show<span class="w"> </span>stats
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a><span class="w">  </span>--cached,<span class="w"> </span>--staged<span class="w">   </span>Show<span class="w"> </span>staged<span class="w"> </span>changes
+<a id="__codelineno-10-10" name="__codelineno-10-10" href="#__codelineno-10-10"></a><span class="w">  </span>--json<span class="w">               </span>Output<span class="w"> </span>as<span class="w"> </span>JSONL
+</code></pre></div>
 <h2 id="shell-integration">Shell Integration</h2>
 <p>In the shell, git commands should:</p>
 <ol>
 <li>
 <p><strong>Use current VFS directory as default path</strong>
-   <code>bash
-   repoindex:/by-tag/work/active&gt; git status
-   # Equivalent to: repoindex git status /by-tag/work/active</code></p>
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>repoindex:/by-tag/work/active&gt;<span class="w"> </span>git<span class="w"> </span>status
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="c1"># Equivalent to: repoindex git status /by-tag/work/active</span>
+</code></pre></div></p>
 </li>
 <li>
 <p><strong>Support relative VFS paths</strong>
-   <code>bash
-   repoindex:/by-tag&gt; git status work/active
-   # Equivalent to: repoindex git status /by-tag/work/active</code></p>
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a>repoindex:/by-tag&gt;<span class="w"> </span>git<span class="w"> </span>status<span class="w"> </span>work/active
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="c1"># Equivalent to: repoindex git status /by-tag/work/active</span>
+</code></pre></div></p>
 </li>
 <li>
 <p><strong>Work on single repos</strong>
-   <code>bash
-   repoindex:/repos/myproject&gt; git log --oneline -10
-   # Shows log for just myproject</code></p>
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>repoindex:/repos/myproject&gt;<span class="w"> </span>git<span class="w"> </span>log<span class="w"> </span>--oneline<span class="w"> </span>-10
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="c1"># Shows log for just myproject</span>
+</code></pre></div></p>
 </li>
 </ol>
 <h2 id="safety-features">Safety Features</h2>
 <h3 id="confirmation-prompts">Confirmation Prompts</h3>
-<pre><code class="language-bash">repoindex git pull /by-tag/work/active
-
-Found 5 repositories. Pull changes? [y/N]: y
-
-Pulling: myproject... ✓ (already up to date)
-Pulling: another-project... ✓ (fast-forward, 3 commits)
-Pulling: third-project... ✗ (merge conflict, skipped)
-
-Summary: 2/5 successful, 1 failed
-</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a>repoindex<span class="w"> </span>git<span class="w"> </span>pull<span class="w"> </span>/by-tag/work/active
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>Found<span class="w"> </span><span class="m">5</span><span class="w"> </span>repositories.<span class="w"> </span>Pull<span class="w"> </span>changes?<span class="w"> </span><span class="o">[</span>y/N<span class="o">]</span>:<span class="w"> </span>y
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>Pulling:<span class="w"> </span>myproject...<span class="w"> </span>✓<span class="w"> </span><span class="o">(</span>already<span class="w"> </span>up<span class="w"> </span>to<span class="w"> </span>date<span class="o">)</span>
+<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>Pulling:<span class="w"> </span>another-project...<span class="w"> </span>✓<span class="w"> </span><span class="o">(</span>fast-forward,<span class="w"> </span><span class="m">3</span><span class="w"> </span>commits<span class="o">)</span>
+<a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a>Pulling:<span class="w"> </span>third-project...<span class="w"> </span>✗<span class="w"> </span><span class="o">(</span>merge<span class="w"> </span>conflict,<span class="w"> </span>skipped<span class="o">)</span>
+<a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a>
+<a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a>Summary:<span class="w"> </span><span class="m">2</span>/5<span class="w"> </span>successful,<span class="w"> </span><span class="m">1</span><span class="w"> </span>failed
+</code></pre></div>
 <h3 id="dry-run-mode">Dry Run Mode</h3>
-<pre><code class="language-bash">repoindex git push /by-tag/ready-to-publish --dry-run
-
-Would push to remote:
-  myproject (main): 2 commits
-  another-project (develop): 1 commit
-
-Use --confirm to actually push.
-</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a>repoindex<span class="w"> </span>git<span class="w"> </span>push<span class="w"> </span>/by-tag/ready-to-publish<span class="w"> </span>--dry-run
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>Would<span class="w"> </span>push<span class="w"> </span>to<span class="w"> </span>remote:
+<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="w">  </span>myproject<span class="w"> </span><span class="o">(</span>main<span class="o">)</span>:<span class="w"> </span><span class="m">2</span><span class="w"> </span>commits
+<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="w">  </span>another-project<span class="w"> </span><span class="o">(</span>develop<span class="o">)</span>:<span class="w"> </span><span class="m">1</span><span class="w"> </span>commit
+<a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a>
+<a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a>Use<span class="w"> </span>--confirm<span class="w"> </span>to<span class="w"> </span>actually<span class="w"> </span>push.
+</code></pre></div>
 <h2 id="implementation-plan">Implementation Plan</h2>
 <h3 id="phase-1-read-only-commands">Phase 1: Read-Only Commands</h3>
 <ol>
@@ -1344,53 +1676,53 @@ Use --confirm to actually push.
 <li>Implement <code>git reset</code></li>
 </ol>
 <h2 id="file-structure">File Structure</h2>
-<pre><code>repoindex/commands/git.py          # Main git command group
-repoindex/git_ops/
-    __init__.py
-    status.py                   # Git status operations
-    log.py                      # Git log operations
-    diff.py                     # Git diff operations
-    pull.py                     # Git pull operations
-    commit.py                   # Git commit operations
-    utils.py                    # Common git utilities
-</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a>repoindex/commands/git.py          # Main git command group
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>repoindex/git_ops/
+<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>    __init__.py
+<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>    status.py                   # Git status operations
+<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a>    log.py                      # Git log operations
+<a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a>    diff.py                     # Git diff operations
+<a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a>    pull.py                     # Git pull operations
+<a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a>    commit.py                   # Git commit operations
+<a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a>    utils.py                    # Common git utilities
+</code></pre></div>
 <h2 id="key-implementation-details">Key Implementation Details</h2>
 <h3 id="multi-repo-execution">Multi-Repo Execution</h3>
-<pre><code class="language-python">def execute_git_on_repos(repos: List[str], git_command: str,
-                        parallel: bool = False,
-                        confirm: bool = True) -&gt; Generator[Dict, None, None]:
-    &quot;&quot;&quot;Execute git command on multiple repositories.&quot;&quot;&quot;
-
-    if confirm and len(repos) &gt; 1:
-        if not click.confirm(f&quot;Execute on {len(repos)} repositories?&quot;):
-            return
-
-    if parallel:
-        # Use threading/multiprocessing
-        with ThreadPoolExecutor() as executor:
-            futures = {executor.submit(run_git, repo, git_command): repo
-                      for repo in repos}
-            for future in as_completed(futures):
-                yield future.result()
-    else:
-        # Sequential execution
-        for repo in repos:
-            yield run_git(repo, git_command)
-</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">execute_git_on_repos</span><span class="p">(</span><span class="n">repos</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">git_command</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>                        <span class="n">parallel</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>                        <span class="n">confirm</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Generator</span><span class="p">[</span><span class="n">Dict</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span><span class="p">]:</span>
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Execute git command on multiple repositories.&quot;&quot;&quot;</span>
+<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>
+<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>    <span class="k">if</span> <span class="n">confirm</span> <span class="ow">and</span> <span class="nb">len</span><span class="p">(</span><span class="n">repos</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+<a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a>        <span class="k">if</span> <span class="ow">not</span> <span class="n">click</span><span class="o">.</span><span class="n">confirm</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Execute on </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">repos</span><span class="p">)</span><span class="si">}</span><span class="s2"> repositories?&quot;</span><span class="p">):</span>
+<a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a>            <span class="k">return</span>
+<a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a>
+<a id="__codelineno-17-10" name="__codelineno-17-10" href="#__codelineno-17-10"></a>    <span class="k">if</span> <span class="n">parallel</span><span class="p">:</span>
+<a id="__codelineno-17-11" name="__codelineno-17-11" href="#__codelineno-17-11"></a>        <span class="c1"># Use threading/multiprocessing</span>
+<a id="__codelineno-17-12" name="__codelineno-17-12" href="#__codelineno-17-12"></a>        <span class="k">with</span> <span class="n">ThreadPoolExecutor</span><span class="p">()</span> <span class="k">as</span> <span class="n">executor</span><span class="p">:</span>
+<a id="__codelineno-17-13" name="__codelineno-17-13" href="#__codelineno-17-13"></a>            <span class="n">futures</span> <span class="o">=</span> <span class="p">{</span><span class="n">executor</span><span class="o">.</span><span class="n">submit</span><span class="p">(</span><span class="n">run_git</span><span class="p">,</span> <span class="n">repo</span><span class="p">,</span> <span class="n">git_command</span><span class="p">):</span> <span class="n">repo</span>
+<a id="__codelineno-17-14" name="__codelineno-17-14" href="#__codelineno-17-14"></a>                      <span class="k">for</span> <span class="n">repo</span> <span class="ow">in</span> <span class="n">repos</span><span class="p">}</span>
+<a id="__codelineno-17-15" name="__codelineno-17-15" href="#__codelineno-17-15"></a>            <span class="k">for</span> <span class="n">future</span> <span class="ow">in</span> <span class="n">as_completed</span><span class="p">(</span><span class="n">futures</span><span class="p">):</span>
+<a id="__codelineno-17-16" name="__codelineno-17-16" href="#__codelineno-17-16"></a>                <span class="k">yield</span> <span class="n">future</span><span class="o">.</span><span class="n">result</span><span class="p">()</span>
+<a id="__codelineno-17-17" name="__codelineno-17-17" href="#__codelineno-17-17"></a>    <span class="k">else</span><span class="p">:</span>
+<a id="__codelineno-17-18" name="__codelineno-17-18" href="#__codelineno-17-18"></a>        <span class="c1"># Sequential execution</span>
+<a id="__codelineno-17-19" name="__codelineno-17-19" href="#__codelineno-17-19"></a>        <span class="k">for</span> <span class="n">repo</span> <span class="ow">in</span> <span class="n">repos</span><span class="p">:</span>
+<a id="__codelineno-17-20" name="__codelineno-17-20" href="#__codelineno-17-20"></a>            <span class="k">yield</span> <span class="n">run_git</span><span class="p">(</span><span class="n">repo</span><span class="p">,</span> <span class="n">git_command</span><span class="p">)</span>
+</code></pre></div>
 <h3 id="vfs-path-resolution">VFS Path Resolution</h3>
-<pre><code class="language-python">def get_repos_from_vfs_path(vfs_path: str) -&gt; List[str]:
-    &quot;&quot;&quot;Get all repository paths from a VFS path.&quot;&quot;&quot;
-    vfs = build_vfs_structure(load_config())
-    node = resolve_vfs_path(vfs, vfs_path)
-
-    if node['type'] == 'repository':
-        return [node['path']]
-    elif node['type'] == 'symlink':
-        return [node['path']]
-    elif node['type'] == 'directory':
-        # Collect all repos in this directory recursively
-        return collect_repos_from_node(node)
-</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">get_repos_from_vfs_path</span><span class="p">(</span><span class="n">vfs_path</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;Get all repository paths from a VFS path.&quot;&quot;&quot;</span>
+<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>    <span class="n">vfs</span> <span class="o">=</span> <span class="n">build_vfs_structure</span><span class="p">(</span><span class="n">load_config</span><span class="p">())</span>
+<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>    <span class="n">node</span> <span class="o">=</span> <span class="n">resolve_vfs_path</span><span class="p">(</span><span class="n">vfs</span><span class="p">,</span> <span class="n">vfs_path</span><span class="p">)</span>
+<a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a>
+<a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a>    <span class="k">if</span> <span class="n">node</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;repository&#39;</span><span class="p">:</span>
+<a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a>        <span class="k">return</span> <span class="p">[</span><span class="n">node</span><span class="p">[</span><span class="s1">&#39;path&#39;</span><span class="p">]]</span>
+<a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a>    <span class="k">elif</span> <span class="n">node</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;symlink&#39;</span><span class="p">:</span>
+<a id="__codelineno-18-9" name="__codelineno-18-9" href="#__codelineno-18-9"></a>        <span class="k">return</span> <span class="p">[</span><span class="n">node</span><span class="p">[</span><span class="s1">&#39;path&#39;</span><span class="p">]]</span>
+<a id="__codelineno-18-10" name="__codelineno-18-10" href="#__codelineno-18-10"></a>    <span class="k">elif</span> <span class="n">node</span><span class="p">[</span><span class="s1">&#39;type&#39;</span><span class="p">]</span> <span class="o">==</span> <span class="s1">&#39;directory&#39;</span><span class="p">:</span>
+<a id="__codelineno-18-11" name="__codelineno-18-11" href="#__codelineno-18-11"></a>        <span class="c1"># Collect all repos in this directory recursively</span>
+<a id="__codelineno-18-12" name="__codelineno-18-12" href="#__codelineno-18-12"></a>        <span class="k">return</span> <span class="n">collect_repos_from_node</span><span class="p">(</span><span class="n">node</span><span class="p">)</span>
+</code></pre></div>
 <h2 id="benefits">Benefits</h2>
 <ol>
 <li><strong>Familiar Commands</strong>: Users already know git</li>
@@ -1402,29 +1734,29 @@ repoindex/git_ops/
 </ol>
 <h2 id="example-workflows">Example Workflows</h2>
 <h3 id="daily-status-check">Daily Status Check</h3>
-<pre><code class="language-bash"># In shell
-repoindex:/&gt; cd /by-tag/work/active
-repoindex:/by-tag/work/active&gt; git status --dirty-only
-
-# Shows only repos with uncommitted changes
-</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="c1"># In shell</span>
+<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>repoindex:/&gt;<span class="w"> </span><span class="nb">cd</span><span class="w"> </span>/by-tag/work/active
+<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>repoindex:/by-tag/work/active&gt;<span class="w"> </span>git<span class="w"> </span>status<span class="w"> </span>--dirty-only
+<a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a>
+<a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a><span class="c1"># Shows only repos with uncommitted changes</span>
+</code></pre></div>
 <h3 id="pull-all-work-repos">Pull All Work Repos</h3>
-<pre><code class="language-bash"># In CLI
-repoindex git pull /by-tag/work --confirm
-
-# Pulls updates for all work-tagged repos with confirmation
-</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a><span class="c1"># In CLI</span>
+<a id="__codelineno-20-2" name="__codelineno-20-2" href="#__codelineno-20-2"></a>repoindex<span class="w"> </span>git<span class="w"> </span>pull<span class="w"> </span>/by-tag/work<span class="w"> </span>--confirm
+<a id="__codelineno-20-3" name="__codelineno-20-3" href="#__codelineno-20-3"></a>
+<a id="__codelineno-20-4" name="__codelineno-20-4" href="#__codelineno-20-4"></a><span class="c1"># Pulls updates for all work-tagged repos with confirmation</span>
+</code></pre></div>
 <h3 id="view-recent-activity">View Recent Activity</h3>
-<pre><code class="language-bash"># In shell
-repoindex:/by-tag/client/acme&gt; git log --since=&quot;1 week ago&quot; --oneline
-
-# Shows commits from last week across all client repos
-</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="c1"># In shell</span>
+<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>repoindex:/by-tag/client/acme&gt;<span class="w"> </span>git<span class="w"> </span>log<span class="w"> </span>--since<span class="o">=</span><span class="s2">&quot;1 week ago&quot;</span><span class="w"> </span>--oneline
+<a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a>
+<a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a><span class="c1"># Shows commits from last week across all client repos</span>
+</code></pre></div>
 <h3 id="bulk-operations">Bulk Operations</h3>
-<pre><code class="language-bash"># Push all ready repos
-repoindex git push /by-tag/ready-to-publish --dry-run  # Check first
-repoindex git push /by-tag/ready-to-publish --confirm  # Then push
-</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="c1"># Push all ready repos</span>
+<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a>repoindex<span class="w"> </span>git<span class="w"> </span>push<span class="w"> </span>/by-tag/ready-to-publish<span class="w"> </span>--dry-run<span class="w">  </span><span class="c1"># Check first</span>
+<a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a>repoindex<span class="w"> </span>git<span class="w"> </span>push<span class="w"> </span>/by-tag/ready-to-publish<span class="w"> </span>--confirm<span class="w">  </span><span class="c1"># Then push</span>
+</code></pre></div>
 <h2 id="questions-to-consider">Questions to Consider</h2>
 <ol>
 <li>Should we allow glob patterns in VFS paths? <code>/by-tag/work/*</code></li>

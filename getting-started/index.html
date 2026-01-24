@@ -6,6 +6,8 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
+        <meta name="description" content="Collection-aware metadata index for git repositories">
+      
       
       
       
@@ -72,7 +74,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#getting-started-with-repoindex" class="md-skip">
+        <a href="#getting-started" class="md-skip">
           Skip to content
         </a>
       
@@ -258,33 +260,14 @@
   
   
   
-    <li class="md-tabs__item">
-      <a href="../usage/" class="md-tabs__link">
-        
-  
-  
-    
-  
-  Usage
-
-      </a>
-    </li>
-  
-
-      
-        
-  
-  
-  
-  
     
     
       <li class="md-tabs__item">
-        <a href="../catalog-query/" class="md-tabs__link">
+        <a href="../usage/" class="md-tabs__link">
           
   
   
-  Commands
+  Core
 
         </a>
       </li>
@@ -300,11 +283,11 @@
     
     
       <li class="md-tabs__item">
-        <a href="../integrations/overview/" class="md-tabs__link">
+        <a href="../events/overview/" class="md-tabs__link">
           
   
   
-  Integrations
+  Events
 
         </a>
       </li>
@@ -320,11 +303,11 @@
     
     
       <li class="md-tabs__item">
-        <a href="../tutorials/" class="md-tabs__link">
+        <a href="../shell-vfs/" class="md-tabs__link">
           
   
   
-  Tutorials
+  Interactive
 
         </a>
       </li>
@@ -340,34 +323,15 @@
     
     
       <li class="md-tabs__item">
-        <a href="../api/integrations/" class="md-tabs__link">
+        <a href="../architecture-vision/" class="md-tabs__link">
           
   
   
-  API Reference
+  Reference
 
         </a>
       </li>
     
-  
-
-      
-        
-  
-  
-  
-  
-    <li class="md-tabs__item">
-      <a href="../architecture-vision/" class="md-tabs__link">
-        
-  
-  
-    
-  
-  Architecture
-
-      </a>
-    </li>
   
 
       
@@ -403,25 +367,6 @@
     
   
   Contributing
-
-      </a>
-    </li>
-  
-
-      
-        
-  
-  
-  
-  
-    <li class="md-tabs__item">
-      <a href="../future-plans/" class="md-tabs__link">
-        
-  
-  
-    
-  
-  Future Plans
 
       </a>
     </li>
@@ -569,39 +514,6 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Installation">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#install-from-pypi-recommended" class="md-nav__link">
-    <span class="md-ellipsis">
-      Install from PyPI (Recommended)
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#install-from-source" class="md-nav__link">
-    <span class="md-ellipsis">
-      Install from Source
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#verify-installation" class="md-nav__link">
-    <span class="md-ellipsis">
-      Verify Installation
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
 </li>
       
         <li class="md-nav__item">
@@ -615,18 +527,18 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#1-generate-configuration" class="md-nav__link">
+  <a href="#1-initialize-configuration" class="md-nav__link">
     <span class="md-ellipsis">
-      1. Generate Configuration
+      1. Initialize Configuration
     </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#2-configure-repository-directories" class="md-nav__link">
+  <a href="#2-refresh-database" class="md-nav__link">
     <span class="md-ellipsis">
-      2. Configure Repository Directories
+      2. Refresh Database
     </span>
   </a>
   
@@ -657,18 +569,27 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#list-your-repositories" class="md-nav__link">
+  <a href="#check-status" class="md-nav__link">
     <span class="md-ellipsis">
-      List Your Repositories
+      Check Status
     </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#check-repository-status" class="md-nav__link">
+  <a href="#query-repositories" class="md-nav__link">
     <span class="md-ellipsis">
-      Check Repository Status
+      Query Repositories
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#view-events" class="md-nav__link">
+    <span class="md-ellipsis">
+      View Events
     </span>
   </a>
   
@@ -684,42 +605,9 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#analyze-repository-clusters" class="md-nav__link">
+  <a href="#interactive-shell" class="md-nav__link">
     <span class="md-ellipsis">
-      Analyze Repository Clusters
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#run-a-workflow" class="md-nav__link">
-    <span class="md-ellipsis">
-      Run a Workflow
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#interactive-learning" class="md-nav__link">
-    <span class="md-ellipsis">
-      Interactive Learning
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Interactive Learning">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#jupyter-notebooks" class="md-nav__link">
-    <span class="md-ellipsis">
-      Jupyter Notebooks
+      Interactive Shell
     </span>
   </a>
   
@@ -741,27 +629,18 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#morning-repository-review" class="md-nav__link">
+  <a href="#morning-check" class="md-nav__link">
     <span class="md-ellipsis">
-      Morning Repository Review
+      Morning Check
     </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#export-portfolio" class="md-nav__link">
+  <a href="#release-tracking" class="md-nav__link">
     <span class="md-ellipsis">
-      Export Portfolio
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#social-media-automation" class="md-nav__link">
-    <span class="md-ellipsis">
-      Social Media Automation
+      Release Tracking
     </span>
   </a>
   
@@ -769,6 +648,24 @@
         
       </ul>
     </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#output-formats" class="md-nav__link">
+    <span class="md-ellipsis">
+      Output Formats
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration-file" class="md-nav__link">
+    <span class="md-ellipsis">
+      Configuration File
+    </span>
+  </a>
   
 </li>
       
@@ -782,9 +679,9 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#command-output-formats" class="md-nav__link">
+  <a href="#claude-code-integration" class="md-nav__link">
     <span class="md-ellipsis">
-      Command Output Formats
+      Claude Code Integration
     </span>
   </a>
   
@@ -809,13 +706,13 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#troubleshooting-quick-fixes" class="md-nav__link">
+  <a href="#troubleshooting" class="md-nav__link">
     <span class="md-ellipsis">
-      Troubleshooting Quick Fixes
+      Troubleshooting
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Troubleshooting Quick Fixes">
+    <nav class="md-nav" aria-label="Troubleshooting">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -837,9 +734,9 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#permission-denied-errors" class="md-nav__link">
+  <a href="#permission-errors" class="md-nav__link">
     <span class="md-ellipsis">
-      Permission denied errors
+      Permission errors
     </span>
   </a>
   
@@ -864,28 +761,6 @@
   
   
   
-    <li class="md-nav__item">
-      <a href="../usage/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Usage
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
     
     
     
@@ -900,15 +775,15 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
         
           
-          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
             
   
   
   <span class="md-ellipsis">
-    Commands
+    Core
     
   </span>
   
@@ -916,12 +791,35 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
-            Commands
+            Core
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Usage Guide
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
             
               
                 
@@ -935,99 +833,7 @@
   
   
   <span class="md-ellipsis">
-    Organization & Discovery
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../audit-command/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Repository Audit
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../export-command/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Portfolio Export
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../docs-command/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Documentation
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../list-command/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    List
+    Query Language
     
   </span>
   
@@ -1088,15 +894,15 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
         
           
-          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
             
   
   
   <span class="md-ellipsis">
-    Integrations
+    Events
     
   </span>
   
@@ -1104,10 +910,10 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
             <span class="md-nav__icon md-icon"></span>
-            Integrations
+            Events
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
             
@@ -1118,7 +924,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../integrations/overview/" class="md-nav__link">
+      <a href="../events/overview/" class="md-nav__link">
         
   
   
@@ -1141,12 +947,12 @@
   
   
     <li class="md-nav__item">
-      <a href="../integrations/clustering/" class="md-nav__link">
+      <a href="../events/event-types/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
-    Repository Clustering
+    Event Types Reference
     
   </span>
   
@@ -1157,6 +963,56 @@
 
               
             
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Interactive
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Interactive
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
               
                 
   
@@ -1164,12 +1020,12 @@
   
   
     <li class="md-nav__item">
-      <a href="../integrations/workflow/" class="md-nav__link">
+      <a href="../shell-vfs/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
-    Workflow Orchestration
+    Shell & VFS
     
   </span>
   
@@ -1215,7 +1071,7 @@
   
   
   <span class="md-ellipsis">
-    Tutorials
+    Reference
     
   </span>
   
@@ -1226,115 +1082,12 @@
         <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_6">
             <span class="md-nav__icon md-icon"></span>
-            Tutorials
+            Reference
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
             
               
                 
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../tutorials/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Jupyter Notebooks
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    
-    
-    
-    
-      
-      
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
-        
-          
-          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
-            
-  
-  
-  <span class="md-ellipsis">
-    API Reference
-    
-  </span>
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_7">
-            <span class="md-nav__icon md-icon"></span>
-            API Reference
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../api/integrations/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Integration API
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
-      
-      
   
   
   
@@ -1351,6 +1104,83 @@
   
 
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/CLI_DESIGN_DECISIONS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Design Decisions
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/GIT_COMMANDS_DESIGN/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Git Commands Design
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/VERSION_MANAGEMENT_IMPLEMENTATION/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Version Management
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -1399,28 +1229,6 @@
   
 
     
-      
-      
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../future-plans/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Future Plans
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-    
   </ul>
 </nav>
                   </div>
@@ -1440,350 +1248,198 @@
   
 
 
-<h1 id="getting-started-with-repoindex">Getting Started with repoindex</h1>
-<p>Welcome to repoindex! This guide will help you get up and running with the repository orchestration platform in just a few minutes.</p>
+<h1 id="getting-started">Getting Started</h1>
+<p>Get up and running with repoindex in minutes.</p>
 <h2 id="prerequisites">Prerequisites</h2>
 <ul>
 <li>Python 3.8 or higher</li>
 <li>Git installed and configured</li>
-<li>Optional: GitHub personal access token for enhanced features</li>
+<li>Optional: GitHub token for enhanced metadata</li>
 </ul>
 <h2 id="installation">Installation</h2>
-<h3 id="install-from-pypi-recommended">Install from PyPI (Recommended)</h3>
-<pre><code class="language-bash">pip install repoindex
-</code></pre>
-<h3 id="install-from-source">Install from Source</h3>
-<pre><code class="language-bash">git clone https://github.com/queelius/repoindex.git
-cd repoindex
-pip install -e .
-</code></pre>
-<h3 id="verify-installation">Verify Installation</h3>
-<pre><code class="language-bash">repoindex --version
-repoindex --help
-</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span>repoindex
+</code></pre></div>
+<p>Verify installation:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>repoindex<span class="w"> </span>--version
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>repoindex<span class="w"> </span>--help
+</code></pre></div>
 <h2 id="quick-setup">Quick Setup</h2>
-<h3 id="1-generate-configuration">1. Generate Configuration</h3>
-<p>Create your initial configuration file with sensible defaults:</p>
-<pre><code class="language-bash">repoindex config generate
-</code></pre>
-<p>This creates <code>~/.repoindex/config.json</code> with example settings. The configuration includes:
-- Repository directories to scan
-- GitHub API settings
-- Social media templates
-- Export preferences</p>
-<h3 id="2-configure-repository-directories">2. Configure Repository Directories</h3>
-<p>Edit <code>~/.repoindex/config.json</code> to specify where your repositories are located:</p>
-<pre><code class="language-json">{
-  &quot;general&quot;: {
-    &quot;repository_directories&quot;: [
-      &quot;~/projects&quot;,
-      &quot;~/work&quot;,
-      &quot;~/github/**&quot;
-    ]
-  }
-}
-</code></pre>
-<p>The <code>**</code> pattern recursively searches subdirectories.</p>
+<h3 id="1-initialize-configuration">1. Initialize Configuration</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Create default configuration</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>repoindex<span class="w"> </span>config<span class="w"> </span>init
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1"># Verify configuration</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>repoindex<span class="w"> </span>config<span class="w"> </span>show
+</code></pre></div>
+<p>Configuration is stored at <code>~/.repoindex/config.yaml</code>.</p>
+<h3 id="2-refresh-database">2. Refresh Database</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Populate the database with your repositories</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>repoindex<span class="w"> </span>refresh
+</code></pre></div>
 <h3 id="3-set-up-github-token-optional">3. Set Up GitHub Token (Optional)</h3>
-<p>For enhanced GitHub features, add your personal access token:</p>
-<pre><code class="language-bash">export REPOINDEX_GITHUB_TOKEN=&quot;your-token-here&quot;
-</code></pre>
-<p>Or add it to your configuration:</p>
-<pre><code class="language-json">{
-  &quot;github&quot;: {
-    &quot;token&quot;: &quot;your-token-here&quot;
-  }
-}
-</code></pre>
+<p>For GitHub-specific metadata (stars, topics, etc.):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="nb">export</span><span class="w"> </span><span class="nv">GITHUB_TOKEN</span><span class="o">=</span><span class="s2">&quot;ghp_your_token_here&quot;</span>
+</code></pre></div>
+<p>Or add to config:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="nt">github</span><span class="p">:</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">  </span><span class="nt">token</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ghp_your_token_here</span>
+</code></pre></div>
+<p>Then refresh with GitHub metadata:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>repoindex<span class="w"> </span>refresh<span class="w"> </span>--github
+</code></pre></div>
 <h2 id="your-first-commands">Your First Commands</h2>
-<h3 id="list-your-repositories">List Your Repositories</h3>
-<pre><code class="language-bash"># List all repositories (JSONL output)
-repoindex list
-
-# Pretty-print as a table
-repoindex list --pretty
-
-# Show only Python projects
-repoindex list --pretty | grep Python
-</code></pre>
-<h3 id="check-repository-status">Check Repository Status</h3>
-<pre><code class="language-bash"># Status of current directory
-repoindex status
-
-# Status of all repositories
-repoindex status -r --pretty
-
-# Find repos with uncommitted changes (using jq)
-repoindex status -r | jq 'select(.status.uncommitted_changes == true)'
-</code></pre>
+<h3 id="check-status">Check Status</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># Dashboard overview</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>repoindex<span class="w"> </span>status
+</code></pre></div>
+<h3 id="query-repositories">Query Repositories</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># Find repos with uncommitted changes (pretty table by default)</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>repoindex<span class="w"> </span>query<span class="w"> </span>--dirty
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="c1"># Find Python repos</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>repoindex<span class="w"> </span>query<span class="w"> </span>--language<span class="w"> </span>python
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="c1"># Find repos by tag</span>
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>repoindex<span class="w"> </span>query<span class="w"> </span>--tag<span class="w"> </span><span class="s2">&quot;work/*&quot;</span>
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a>
+<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="c1"># JSONL output for piping</span>
+<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a>repoindex<span class="w"> </span>query<span class="w"> </span>--json<span class="w"> </span>--dirty<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">&#39;.name&#39;</span>
+</code></pre></div>
+<h3 id="view-events">View Events</h3>
+<p>See what's happening across your collection:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1"># Events in the last 7 days (pretty table by default)</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>repoindex<span class="w"> </span>events<span class="w"> </span>--since<span class="w"> </span>7d
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="c1"># Only git tags (releases)</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>repoindex<span class="w"> </span>events<span class="w"> </span>--type<span class="w"> </span>git_tag<span class="w"> </span>--since<span class="w"> </span>30d
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="c1"># Summary statistics</span>
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>repoindex<span class="w"> </span>events<span class="w"> </span>--stats
+</code></pre></div>
 <h3 id="organize-with-tags">Organize with Tags</h3>
-<pre><code class="language-bash"># Add tags to repositories
-repoindex catalog tag myproject &quot;important&quot; &quot;python&quot; &quot;ml&quot;
-
-# Query by tags
-repoindex query &quot;tag:important&quot;
-
-# List all tags
-repoindex catalog tags --pretty
-</code></pre>
-<h3 id="analyze-repository-clusters">Analyze Repository Clusters</h3>
-<p>Clustering helps you organize and understand relationships between your repositories.</p>
-<pre><code class="language-bash"># Find similar repositories using K-means
-repoindex cluster analyze --algorithm kmeans --n-clusters 5 -r
-
-# Use DBSCAN for density-based clustering
-repoindex cluster analyze --algorithm dbscan --eps 0.3 -r
-
-# Pretty-print cluster analysis
-repoindex cluster analyze --pretty
-
-# Find duplicate code across repositories
-repoindex cluster find-duplicates --min-similarity 0.7 -r --pretty
-
-# Get consolidation suggestions for similar repos
-repoindex cluster suggest-consolidation --confidence 0.8 -r --pretty
-
-# Export cluster results for visualization
-repoindex cluster export --format html --output clusters.html
-</code></pre>
-<p><strong>Understanding Clustering Algorithms:</strong></p>
-<ul>
-<li><strong>K-means</strong>: Fast, works well when you know the number of clusters. Good for evenly distributed groups.</li>
-<li><strong>DBSCAN</strong>: Finds clusters of arbitrary shapes, no need to specify cluster count. Good for finding outliers.</li>
-<li><strong>Hierarchical</strong>: Creates a tree of clusters, great for understanding nested relationships.</li>
-<li><strong>Network</strong>: Uses repository connections and dependencies for clustering.</li>
-</ul>
-<h3 id="run-a-workflow">Run a Workflow</h3>
-<p>Workflows automate complex multi-step operations with conditional logic and parallel execution.</p>
-<pre><code class="language-bash"># Run example morning routine workflow
-repoindex workflow run examples/workflows/morning-routine.yaml
-
-# Run release pipeline with variables
-repoindex workflow run examples/workflows/release-pipeline.yaml \
-  --var version=1.2.0 \
-  --var branch=main
-
-# Dry run to preview without executing
-repoindex workflow run my-workflow.yaml --dry-run
-
-# Validate workflow syntax
-repoindex workflow validate my-workflow.yaml
-</code></pre>
-<p><strong>Create Your First Workflow:</strong></p>
-<pre><code class="language-bash">cat &gt; my-workflow.yaml &lt;&lt; 'EOF'
-name: Daily Repository Health Check
-description: Check all repositories for issues and generate report
-
-variables:
-  notification_email: dev@example.com
-  max_age_days: 30
-
-tasks:
-  - id: check_status
-    type: repoindex
-    name: Check all repository statuses
-    command: status
-    args: [&quot;--recursive&quot;, &quot;--format&quot;, &quot;json&quot;]
-    parse_output: true
-    output_var: repo_statuses
-
-  - id: find_stale
-    type: repoindex
-    name: Find stale repositories
-    command: query
-    args:
-      - &quot;days_since_commit &gt; ${max_age_days}&quot;
-    parse_output: true
-    output_var: stale_repos
-    depends_on: [check_status]
-
-  - id: analyze_duplicates
-    type: repoindex
-    name: Find duplicate code
-    command: cluster find-duplicates
-    args: [&quot;--recursive&quot;, &quot;--min-similarity&quot;, &quot;0.8&quot;]
-    parse_output: true
-    output_var: duplicates
-    depends_on: [check_status]
-
-  - id: generate_report
-    type: python
-    name: Generate health report
-    code: |
-      report = []
-      report.append(&quot;# Repository Health Report&quot;)
-      report.append(f&quot;Generated: {datetime.now().strftime('%Y-%m-%d')}&quot;)
-      report.append(&quot;&quot;)
-
-      if context.get('stale_repos'):
-          report.append(f&quot;## Stale Repositories ({len(context['stale_repos'])})&quot;)
-          for repo in context['stale_repos']:
-              report.append(f&quot;- {repo['name']}: {repo['days_since_commit']} days old&quot;)
-          report.append(&quot;&quot;)
-
-      if context.get('duplicates'):
-          report.append(f&quot;## Duplicate Code Found ({len(context['duplicates'])})&quot;)
-          for dup in context['duplicates']:
-              report.append(f&quot;- {dup['repo1']} ↔ {dup['repo2']}: {dup['similarity']:.0%} similar&quot;)
-          report.append(&quot;&quot;)
-
-      with open('health-report.md', 'w') as f:
-          f.write('\n'.join(report))
-
-      context['report_path'] = 'health-report.md'
-    depends_on: [find_stale, analyze_duplicates]
-
-  - id: send_notification
-    type: shell
-    name: Email the report
-    command: |
-      cat ${report_path} | mail -s &quot;Daily Repository Report&quot; ${notification_email}
-    condition: stale_repos or duplicates
-    ignore_errors: true
-    depends_on: [generate_report]
-
-on_failure: continue
-timeout: 600
-EOF
-
-# Run your workflow
-repoindex workflow run my-workflow.yaml
-</code></pre>
-<p><strong>Workflow Features:</strong>
-- <strong>Parallel Execution</strong>: Independent tasks run concurrently
-- <strong>Conditional Steps</strong>: Use <code>condition</code> to control execution
-- <strong>Variable Templating</strong>: Access variables with <code>${var_name}</code>
-- <strong>Error Handling</strong>: Configure retries and fallback actions
-- <strong>Output Capture</strong>: Save step outputs to variables for later use</p>
-<h2 id="interactive-learning">Interactive Learning</h2>
-<h3 id="jupyter-notebooks">Jupyter Notebooks</h3>
-<p>Explore repoindex features interactively with our tutorial notebooks:</p>
-<pre><code class="language-bash"># Clone the repository to access notebooks
-git clone https://github.com/queelius/repoindex.git
-cd repoindex/notebooks
-
-# Start Jupyter
-jupyter notebook
-
-# Open notebooks in order:
-# 1. 01_getting_started.ipynb
-# 2. 02_clustering_analysis.ipynb
-# 3. 03_workflow_orchestration.ipynb
-# 4. 04_advanced_integrations.ipynb
-# 5. 05_data_visualization.ipynb
-</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1"># Add tags</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>repoindex<span class="w"> </span>tag<span class="w"> </span>add<span class="w"> </span>myproject<span class="w"> </span>work/active
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>repoindex<span class="w"> </span>tag<span class="w"> </span>add<span class="w"> </span>myproject<span class="w"> </span>topic:ml
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="c1"># List repos by tag</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>repoindex<span class="w"> </span>tag<span class="w"> </span>list<span class="w"> </span>-t<span class="w"> </span><span class="s2">&quot;work/*&quot;</span>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a>
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a><span class="c1"># Show tag hierarchy</span>
+<a id="__codelineno-10-9" name="__codelineno-10-9" href="#__codelineno-10-9"></a>repoindex<span class="w"> </span>tag<span class="w"> </span>tree
+</code></pre></div>
+<h3 id="interactive-shell">Interactive Shell</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a>repoindex<span class="w"> </span>shell
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="c1"># Navigate like a filesystem</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a>&gt;<span class="w"> </span><span class="nb">cd</span><span class="w"> </span>/by-tag/work/active
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>&gt;<span class="w"> </span>ls
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>&gt;<span class="w"> </span>events<span class="w"> </span>--since<span class="w"> </span>1d
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a>&gt;<span class="w"> </span><span class="nb">exit</span>
+</code></pre></div>
 <h2 id="common-workflows">Common Workflows</h2>
-<h3 id="morning-repository-review">Morning Repository Review</h3>
-<pre><code class="language-bash"># Update all repositories
-repoindex update -r
-
-# Check status
-repoindex status -r --pretty
-
-# Audit for issues
-repoindex audit -r --check license,readme,security
-</code></pre>
-<h3 id="export-portfolio">Export Portfolio</h3>
-<pre><code class="language-bash"># Export to Markdown
-repoindex export markdown --output portfolio.md
-
-# Export to interactive HTML
-repoindex export html --output portfolio.html --group-by language
-
-# Export for Hugo site
-repoindex export hugo --output-dir my-site/content
-</code></pre>
-<h3 id="social-media-automation">Social Media Automation</h3>
-<pre><code class="language-bash"># Sample repositories for promotion
-repoindex social sample --size 3
-
-# Preview posts (dry run)
-repoindex social post --dry-run
-
-# Post to configured platforms
-repoindex social post
-</code></pre>
+<h3 id="morning-check">Morning Check</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c1"># What happened overnight?</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>repoindex<span class="w"> </span>events<span class="w"> </span>--since<span class="w"> </span>12h
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="c1"># Repos with uncommitted work</span>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>repoindex<span class="w"> </span>query<span class="w"> </span>--dirty
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>
+<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="c1"># Dashboard overview</span>
+<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a>repoindex<span class="w"> </span>status
+</code></pre></div>
+<h3 id="release-tracking">Release Tracking</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="c1"># Recent releases across all repos</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>repoindex<span class="w"> </span>events<span class="w"> </span>--type<span class="w"> </span>git_tag<span class="w"> </span>--since<span class="w"> </span>30d
+</code></pre></div>
+<h2 id="output-formats">Output Formats</h2>
+<p>Commands output pretty tables by default for human readability:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="c1"># Pretty tables (default)</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>repoindex<span class="w"> </span>query<span class="w"> </span>--language<span class="w"> </span>python
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>repoindex<span class="w"> </span>events<span class="w"> </span>--since<span class="w"> </span>7d
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="c1"># JSONL for piping/scripting</span>
+<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>repoindex<span class="w"> </span>query<span class="w"> </span>--json<span class="w"> </span>--language<span class="w"> </span>python<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">&#39;.name&#39;</span>
+<a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a>repoindex<span class="w"> </span>events<span class="w"> </span>--json<span class="w"> </span>--since<span class="w"> </span>7d<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">&#39;.type&#39;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>sort<span class="w"> </span><span class="p">|</span><span class="w"> </span>uniq<span class="w"> </span>-c
+<a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a>
+<a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a><span class="c1"># Brief output (just repo names)</span>
+<a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a>repoindex<span class="w"> </span>query<span class="w"> </span>--brief<span class="w"> </span>--dirty
+</code></pre></div>
+<h2 id="configuration-file">Configuration File</h2>
+<p>Configuration lives at <code>~/.repoindex/config.yaml</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="nt">repository_directories</span><span class="p">:</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">~/projects</span>
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">~/work/**</span>
+<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a>
+<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a><span class="nt">github</span><span class="p">:</span>
+<a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a><span class="w">  </span><span class="nt">token</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ghp_...</span>
+<a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a>
+<a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a><span class="nt">repository_tags</span><span class="p">:</span>
+<a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a><span class="w">  </span><span class="nt">/path/to/repo</span><span class="p">:</span>
+<a id="__codelineno-15-10" name="__codelineno-15-10" href="#__codelineno-15-10"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">topic:ml</span>
+<a id="__codelineno-15-11" name="__codelineno-15-11" href="#__codelineno-15-11"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">work/active</span>
+</code></pre></div>
 <h2 id="environment-variables">Environment Variables</h2>
-<p>repoindex respects the following environment variables:</p>
 <table>
 <thead>
 <tr>
 <th>Variable</th>
 <th>Description</th>
-<th>Example</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td><code>REPOINDEX_CONFIG</code></td>
 <td>Path to config file</td>
-<td><code>~/.config/repoindex/config.json</code></td>
+</tr>
+<tr>
+<td><code>GITHUB_TOKEN</code></td>
+<td>GitHub API token</td>
 </tr>
 <tr>
 <td><code>REPOINDEX_GITHUB_TOKEN</code></td>
-<td>GitHub API token</td>
-<td><code>ghp_xxxxxxxxxxxx</code></td>
+<td>GitHub API token (alternative)</td>
 </tr>
 <tr>
 <td><code>REPOINDEX_LOG_LEVEL</code></td>
-<td>Logging level</td>
-<td><code>DEBUG</code>, <code>INFO</code>, <code>WARNING</code></td>
-</tr>
-<tr>
-<td><code>REPOINDEX_NO_COLOR</code></td>
-<td>Disable colored output</td>
-<td><code>1</code> or <code>true</code></td>
+<td>Logging level (DEBUG, INFO, WARNING)</td>
 </tr>
 </tbody>
 </table>
-<h2 id="command-output-formats">Command Output Formats</h2>
-<p>repoindex follows Unix philosophy - all commands output JSONL by default:</p>
-<pre><code class="language-bash"># JSONL output (default) - great for piping
-repoindex list | jq '.name'
-
-# Pretty table output - great for humans
-repoindex list --pretty
-
-# Export specific format
-repoindex export json --output repos.json
-repoindex export csv --output repos.csv
-</code></pre>
+<h2 id="claude-code-integration">Claude Code Integration</h2>
+<p>Install the repoindex skill for Claude Code:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="c1"># Install globally (all projects)</span>
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>repoindex<span class="w"> </span>claude<span class="w"> </span>install<span class="w"> </span>--global
+</code></pre></div>
+<p>Then use <code>/repoindex</code> in Claude Code conversations for collection awareness.</p>
 <h2 id="next-steps">Next Steps</h2>
-<p>Now that you're up and running:</p>
-<ol>
-<li><strong>Explore Commands</strong>: Run <code>repoindex --help</code> to see all available commands</li>
-<li><strong>Read the Usage Guide</strong>: Dive deeper into <a href="../usage/">command reference</a></li>
-<li><strong>Try Clustering</strong>: Group similar repositories with <a href="../integrations/clustering/">clustering integration</a></li>
-<li><strong>Automate Workflows</strong>: Create complex automations with <a href="../integrations/workflow/">workflow orchestration</a></li>
-<li><strong>Query Your Repos</strong>: Master the <a href="../query-cookbook/">query language</a></li>
-</ol>
+<ul>
+<li><strong><a href="../usage/">Usage Guide</a></strong> - Full command reference</li>
+<li><strong><a href="../events/overview/">Events</a></strong> - Event system documentation</li>
+<li><strong><a href="../catalog-query/">Query Language</a></strong> - Query syntax</li>
+<li><strong><a href="../shell-vfs/">Shell &amp; VFS</a></strong> - Interactive shell</li>
+</ul>
 <h2 id="getting-help">Getting Help</h2>
 <ul>
-<li><strong>Documentation</strong>: You're reading it!</li>
 <li><strong>Command Help</strong>: <code>repoindex &lt;command&gt; --help</code></li>
-<li><strong>GitHub Issues</strong>: <a href="https://github.com/queelius/repoindex/issues">Report bugs or request features</a></li>
-<li><strong>Discussions</strong>: <a href="https://github.com/queelius/repoindex/discussions">Ask questions and share ideas</a></li>
+<li><strong>GitHub Issues</strong>: <a href="https://github.com/queelius/repoindex/issues">Report bugs</a></li>
 </ul>
-<h2 id="troubleshooting-quick-fixes">Troubleshooting Quick Fixes</h2>
+<h2 id="troubleshooting">Troubleshooting</h2>
 <h3 id="no-repositories-found">No repositories found</h3>
 <ul>
-<li>Check your <code>repository_directories</code> configuration</li>
-<li>Ensure directories contain <code>.git</code> folders</li>
-<li>Use <code>repoindex config show</code> to verify settings</li>
+<li>Check <code>repository_directories</code> in config with <code>repoindex config show</code></li>
+<li>Verify directories contain <code>.git</code> folders</li>
+<li>Run <code>repoindex refresh --full</code> to rebuild database</li>
 </ul>
 <h3 id="github-api-rate-limit">GitHub API rate limit</h3>
 <ul>
-<li>Add a GitHub token to increase limits</li>
-<li>Use <code>--no-github-check</code> to skip API calls</li>
-<li>Configure rate limiting in config</li>
+<li>Add a GitHub token (increases limits from 60 to 5000/hour)</li>
+<li>Skip GitHub metadata: <code>repoindex refresh</code> (local only by default)</li>
 </ul>
-<h3 id="permission-denied-errors">Permission denied errors</h3>
+<h3 id="permission-errors">Permission errors</h3>
 <ul>
 <li>Check file permissions in repository directories</li>
 <li>Ensure git credentials are configured</li>
-<li>Run with appropriate user permissions</li>
 </ul>
-<p>For more detailed troubleshooting, see the <a href="guides/troubleshooting.md">Troubleshooting Guide</a>.</p>
 
 
 

@@ -6,9 +6,15 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
+        <meta name="description" content="Collection-aware metadata index for git repositories">
       
       
       
+      
+        <link rel="prev" href="../../architecture-vision/">
+      
+      
+        <link rel="next" href="../GIT_COMMANDS_DESIGN/">
       
       
       <link rel="icon" href="../../assets/images/favicon.png">
@@ -16,7 +22,7 @@
     
     
       
-        <title>CLI Design Decisions - repoindex</title>
+        <title>Design Decisions - repoindex</title>
       
     
     
@@ -102,7 +108,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              CLI Design Decisions
+              Design Decisions
             
           </span>
         </div>
@@ -252,33 +258,14 @@
   
   
   
-    <li class="md-tabs__item">
-      <a href="../../usage/" class="md-tabs__link">
-        
-  
-  
-    
-  
-  Usage
-
-      </a>
-    </li>
-  
-
-      
-        
-  
-  
-  
-  
     
     
       <li class="md-tabs__item">
-        <a href="../../catalog-query/" class="md-tabs__link">
+        <a href="../../usage/" class="md-tabs__link">
           
   
   
-  Commands
+  Core
 
         </a>
       </li>
@@ -294,11 +281,11 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../integrations/overview/" class="md-tabs__link">
+        <a href="../../events/overview/" class="md-tabs__link">
           
   
   
-  Integrations
+  Events
 
         </a>
       </li>
@@ -314,11 +301,11 @@
     
     
       <li class="md-tabs__item">
-        <a href="../../tutorials/" class="md-tabs__link">
+        <a href="../../shell-vfs/" class="md-tabs__link">
           
   
   
-  Tutorials
+  Interactive
 
         </a>
       </li>
@@ -330,38 +317,21 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../../api/integrations/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../../architecture-vision/" class="md-tabs__link">
           
   
   
-  API Reference
+  Reference
 
         </a>
       </li>
     
-  
-
-      
-        
-  
-  
-  
-  
-    <li class="md-tabs__item">
-      <a href="../../architecture-vision/" class="md-tabs__link">
-        
-  
-  
-    
-  
-  Architecture
-
-      </a>
-    </li>
   
 
       
@@ -397,25 +367,6 @@
     
   
   Contributing
-
-      </a>
-    </li>
-  
-
-      
-        
-  
-  
-  
-  
-    <li class="md-tabs__item">
-      <a href="../../future-plans/" class="md-tabs__link">
-        
-  
-  
-    
-  
-  Future Plans
 
       </a>
     </li>
@@ -519,28 +470,6 @@
   
   
   
-    <li class="md-nav__item">
-      <a href="../../usage/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Usage
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
     
     
     
@@ -555,15 +484,15 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
         
           
-          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
             
   
   
   <span class="md-ellipsis">
-    Commands
+    Core
     
   </span>
   
@@ -571,12 +500,35 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
-            Commands
+            Core
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Usage Guide
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
             
               
                 
@@ -590,99 +542,7 @@
   
   
   <span class="md-ellipsis">
-    Organization & Discovery
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../audit-command/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Repository Audit
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../export-command/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Portfolio Export
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../docs-command/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Documentation
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../list-command/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    List
+    Query Language
     
   </span>
   
@@ -743,15 +603,15 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
         
           
-          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
             
   
   
   <span class="md-ellipsis">
-    Integrations
+    Events
     
   </span>
   
@@ -759,10 +619,10 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
             <span class="md-nav__icon md-icon"></span>
-            Integrations
+            Events
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
             
@@ -773,7 +633,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../integrations/overview/" class="md-nav__link">
+      <a href="../../events/overview/" class="md-nav__link">
         
   
   
@@ -796,35 +656,12 @@
   
   
     <li class="md-nav__item">
-      <a href="../../integrations/clustering/" class="md-nav__link">
+      <a href="../../events/event-types/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
-    Repository Clustering
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../integrations/workflow/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Workflow Orchestration
+    Event Types Reference
     
   </span>
   
@@ -862,15 +699,15 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
         
           
-          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
             
   
   
   <span class="md-ellipsis">
-    Tutorials
+    Interactive
     
   </span>
   
@@ -878,118 +715,93 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Interactive
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../shell-vfs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Shell & VFS
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    Reference
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_6">
             <span class="md-nav__icon md-icon"></span>
-            Tutorials
+            Reference
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
             
               
                 
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../tutorials/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Jupyter Notebooks
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    
-    
-    
-    
-      
-      
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
-        
-          
-          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
-            
-  
-  
-  <span class="md-ellipsis">
-    API Reference
-    
-  </span>
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_7">
-            <span class="md-nav__icon md-icon"></span>
-            API Reference
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../api/integrations/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Integration API
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
-      
-      
   
   
   
@@ -1006,6 +818,344 @@
   
 
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    Design Decisions
+    
+  </span>
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    Design Decisions
+    
+  </span>
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#question-5-which-commands-stay-top-level" class="md-nav__link">
+    <span class="md-ellipsis">
+      Question 5: Which Commands Stay Top-Level?
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Question 5: Which Commands Stay Top-Level?">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#analysis-of-command-usage-patterns" class="md-nav__link">
+    <span class="md-ellipsis">
+      Analysis of Command Usage Patterns
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Analysis of Command Usage Patterns">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#current-commands-analysis" class="md-nav__link">
+    <span class="md-ellipsis">
+      Current Commands Analysis
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#can-fs-replace-these-operations" class="md-nav__link">
+    <span class="md-ellipsis">
+      Can fs Replace These Operations?
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Can fs Replace These Operations?">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#operations-fs-can-replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      Operations fs CAN replace:
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#operations-fs-cannot-replace" class="md-nav__link">
+    <span class="md-ellipsis">
+      Operations fs CANNOT replace:
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#recommendation-hybrid-approach" class="md-nav__link">
+    <span class="md-ellipsis">
+      Recommendation: Hybrid Approach
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#final-top-level-recommendation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Final Top-Level Recommendation
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#question-6-export-command-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      Question 6: Export Command Structure
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Question 6: Export Command Structure">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#pattern-analysis-from-popular-tools" class="md-nav__link">
+    <span class="md-ellipsis">
+      Pattern Analysis from Popular Tools
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#current-export-implementation" class="md-nav__link">
+    <span class="md-ellipsis">
+      Current Export Implementation
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#option-1-keep-flat-with-format-flag-current" class="md-nav__link">
+    <span class="md-ellipsis">
+      Option 1: Keep Flat with --format Flag (Current)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#option-2-grouped-by-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      Option 2: Grouped by Format
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#option-3-hybrid-grouped-smart-defaults" class="md-nav__link">
+    <span class="md-ellipsis">
+      Option 3: Hybrid (Grouped + Smart Defaults)
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#recommendation-option-1-flat-with-format" class="md-nav__link">
+    <span class="md-ellipsis">
+      Recommendation: Option 1 (Flat with --format)
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#final-proposed-structure" class="md-nav__link">
+    <span class="md-ellipsis">
+      Final Proposed Structure
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#summary-of-decisions" class="md-nav__link">
+    <span class="md-ellipsis">
+      Summary of Decisions
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#key-insights" class="md-nav__link">
+    <span class="md-ellipsis">
+      Key Insights
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Key Insights">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#list-stays-top-level-because" class="md-nav__link">
+    <span class="md-ellipsis">
+      list stays top-level because:
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fs-group-provides" class="md-nav__link">
+    <span class="md-ellipsis">
+      fs group provides:
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#relationship-between-commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      Relationship between commands:
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../GIT_COMMANDS_DESIGN/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Git Commands Design
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../VERSION_MANAGEMENT_IMPLEMENTATION/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Version Management
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -1054,28 +1204,6 @@
   
 
     
-      
-      
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../../future-plans/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Future Plans
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-    
   </ul>
 </nav>
                   </div>
@@ -1096,6 +1224,12 @@
 
 
 <h1 id="cli-design-decisions">CLI Design Decisions</h1>
+<blockquote>
+<p><strong>Note (v0.10.0):</strong> This document describes early design decisions. Some commands have since been consolidated:
+- <code>list</code> command was merged into <code>query</code> (use <code>repoindex query</code> or <code>repoindex query --json</code>)
+- <code>top</code> command was replaced by <code>events</code>
+- Several commands (<code>docs</code>, <code>audit</code>, <code>service</code>, <code>social</code>, <code>network</code>, <code>ai</code>) were removed to keep the tool focused</p>
+</blockquote>
 <h2 id="question-5-which-commands-stay-top-level">Question 5: Which Commands Stay Top-Level?</h2>
 <h3 id="analysis-of-command-usage-patterns">Analysis of Command Usage Patterns</h3>
 <p>Let's examine each current top-level command and determine if it:
@@ -1219,60 +1353,60 @@
 </table>
 <h3 id="can-fs-replace-these-operations">Can <code>fs</code> Replace These Operations?</h3>
 <h4 id="operations-fs-can-replace">Operations <code>fs</code> CAN replace:</h4>
-<pre><code class="language-bash"># Instead of: repoindex list
-repoindex fs ls /repos                    # List all repos
-repoindex fs ls /by-language/Python       # List Python repos
-repoindex fs ls /by-tag/alex/beta         # List tagged repos
-
-# Instead of: repoindex query &quot;language == 'Python'&quot;
-repoindex fs find --language Python       # Find by language
-repoindex fs find --tag alex/beta         # Find by tag
-repoindex fs ls /by-language/Python       # Browse by language
-
-# Instead of: repoindex catalog show -t &quot;alex/beta&quot;
-repoindex fs ls /by-tag/alex/beta         # List repos with tag
-</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># Instead of: repoindex list</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>repoindex<span class="w"> </span>fs<span class="w"> </span>ls<span class="w"> </span>/repos<span class="w">                    </span><span class="c1"># List all repos</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>repoindex<span class="w"> </span>fs<span class="w"> </span>ls<span class="w"> </span>/by-language/Python<span class="w">       </span><span class="c1"># List Python repos</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>repoindex<span class="w"> </span>fs<span class="w"> </span>ls<span class="w"> </span>/by-tag/alex/beta<span class="w">         </span><span class="c1"># List tagged repos</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="c1"># Instead of: repoindex query &quot;language == &#39;Python&#39;&quot;</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>repoindex<span class="w"> </span>fs<span class="w"> </span>find<span class="w"> </span>--language<span class="w"> </span>Python<span class="w">       </span><span class="c1"># Find by language</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>repoindex<span class="w"> </span>fs<span class="w"> </span>find<span class="w"> </span>--tag<span class="w"> </span>alex/beta<span class="w">         </span><span class="c1"># Find by tag</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>repoindex<span class="w"> </span>fs<span class="w"> </span>ls<span class="w"> </span>/by-language/Python<span class="w">       </span><span class="c1"># Browse by language</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="c1"># Instead of: repoindex catalog show -t &quot;alex/beta&quot;</span>
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>repoindex<span class="w"> </span>fs<span class="w"> </span>ls<span class="w"> </span>/by-tag/alex/beta<span class="w">         </span><span class="c1"># List repos with tag</span>
+</code></pre></div>
 <h4 id="operations-fs-cannot-replace">Operations <code>fs</code> CANNOT replace:</h4>
-<pre><code class="language-bash">repoindex get owner/repo                  # Clone operation
-repoindex update                          # Git pull operation
-repoindex status --dirty                  # Git status check
-repoindex top --hours 24                  # Activity monitoring
-repoindex export --format hugo            # Content generation
-</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>repoindex<span class="w"> </span>get<span class="w"> </span>owner/repo<span class="w">                  </span><span class="c1"># Clone operation</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>repoindex<span class="w"> </span>update<span class="w">                          </span><span class="c1"># Git pull operation</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>repoindex<span class="w"> </span>status<span class="w"> </span>--dirty<span class="w">                  </span><span class="c1"># Git status check</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>repoindex<span class="w"> </span>top<span class="w"> </span>--hours<span class="w"> </span><span class="m">24</span><span class="w">                  </span><span class="c1"># Activity monitoring</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>repoindex<span class="w"> </span><span class="nb">export</span><span class="w"> </span>--format<span class="w"> </span>hugo<span class="w">            </span><span class="c1"># Content generation</span>
+</code></pre></div>
 <h3 id="recommendation-hybrid-approach">Recommendation: Hybrid Approach</h3>
-<p><strong>Top-Level Commands (frequently used, can't be replaced by <code>fs</code>):</strong></p>
-<pre><code>repoindex
-├── get          # Clone repos - unique operation
-├── update       # Update repos - unique operation
-├── status       # Git status - unique operation
-├── query        # Powerful query - too important to nest
-├── top          # Activity monitor - unique operation
-├── shell        # Mode switch - special
-└── metadata     # System management - special
-</code></pre>
-<p><strong>Commands that COULD use <code>fs</code> but should stay top-level for convenience:</strong></p>
-<pre><code class="language-bash"># Keep these as convenient shortcuts:
-repoindex list              # Shortcut for: repoindex fs ls /repos
-repoindex list --language Python  # Shortcut for: repoindex fs ls /by-language/Python
-</code></pre>
-<p><strong>Commands to Group:</strong></p>
-<pre><code>repoindex
-├── tag          # Already grouped - keep as-is
-├── docs         # Already grouped - keep as-is
-├── analysis     # New group
-│   ├── audit
-│   ├── network
-│   └── ai
-├── social       # Convert from social-cmd
-├── export       # Stay top-level OR group? (see Q6)
-├── service      # Convert to group
-├── config       # Convert to group
-└── fs           # New group
-    ├── ls       # List VFS path
-    ├── tree     # Show tree
-    ├── find     # Find by criteria
-    └── info     # Show detailed info
-</code></pre>
+<p><strong>Top-Level Commands (frequently used, can't be replaced by <code>fs</code>):</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>repoindex
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>├── get          # Clone repos - unique operation
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>├── update       # Update repos - unique operation
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>├── status       # Git status - unique operation
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>├── query        # Powerful query - too important to nest
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>├── top          # Activity monitor - unique operation
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>├── shell        # Mode switch - special
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>└── metadata     # System management - special
+</code></pre></div></p>
+<p><strong>Commands that COULD use <code>fs</code> but should stay top-level for convenience:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Keep these as convenient shortcuts:</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>repoindex<span class="w"> </span>list<span class="w">              </span><span class="c1"># Shortcut for: repoindex fs ls /repos</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>repoindex<span class="w"> </span>list<span class="w"> </span>--language<span class="w"> </span>Python<span class="w">  </span><span class="c1"># Shortcut for: repoindex fs ls /by-language/Python</span>
+</code></pre></div></p>
+<p><strong>Commands to Group:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>repoindex
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>├── tag          # Already grouped - keep as-is
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>├── docs         # Already grouped - keep as-is
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>├── analysis     # New group
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>│   ├── audit
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>│   ├── network
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>│   └── ai
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a>├── social       # Convert from social-cmd
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>├── export       # Stay top-level OR group? (see Q6)
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>├── service      # Convert to group
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>├── config       # Convert to group
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>└── fs           # New group
+<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>    ├── ls       # List VFS path
+<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>    ├── tree     # Show tree
+<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a>    ├── find     # Find by criteria
+<a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a>    └── info     # Show detailed info
+</code></pre></div></p>
 <h3 id="final-top-level-recommendation">Final Top-Level Recommendation</h3>
 <p><strong>Essential Top-Level (8 commands):</strong>
 1. <code>get</code> - Clone operation
@@ -1297,27 +1431,27 @@ repoindex list --language Python  # Shortcut for: repoindex fs ls /by-language/P
 <hr />
 <h2 id="question-6-export-command-structure">Question 6: Export Command Structure</h2>
 <h3 id="pattern-analysis-from-popular-tools">Pattern Analysis from Popular Tools</h3>
-<p><strong>Git Pattern</strong> (flat with flags):</p>
-<pre><code class="language-bash">git log --oneline --graph --all
-git diff --stat --color
-</code></pre>
-<p><strong>Docker Pattern</strong> (grouped):</p>
-<pre><code class="language-bash">docker image ls
-docker image build
-docker image push
-docker container run
-docker container ls
-</code></pre>
-<p><strong>Pip Pattern</strong> (flat):</p>
-<pre><code class="language-bash">pip install --upgrade package
-pip list --format json
-</code></pre>
+<p><strong>Git Pattern</strong> (flat with flags):
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>git<span class="w"> </span>log<span class="w"> </span>--oneline<span class="w"> </span>--graph<span class="w"> </span>--all
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>git<span class="w"> </span>diff<span class="w"> </span>--stat<span class="w"> </span>--color
+</code></pre></div></p>
+<p><strong>Docker Pattern</strong> (grouped):
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>docker<span class="w"> </span>image<span class="w"> </span>ls
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>docker<span class="w"> </span>image<span class="w"> </span>build
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>docker<span class="w"> </span>image<span class="w"> </span>push
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>docker<span class="w"> </span>container<span class="w"> </span>run
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>docker<span class="w"> </span>container<span class="w"> </span>ls
+</code></pre></div></p>
+<p><strong>Pip Pattern</strong> (flat):
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>pip<span class="w"> </span>install<span class="w"> </span>--upgrade<span class="w"> </span>package
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>pip<span class="w"> </span>list<span class="w"> </span>--format<span class="w"> </span>json
+</code></pre></div></p>
 <h3 id="current-export-implementation">Current Export Implementation</h3>
-<pre><code class="language-bash">repoindex export --format markdown --output-dir ./docs
-repoindex export --format hugo --output-dir ./site
-repoindex export --format html --output-dir ./public
-repoindex export --format pdf --output-file report.pdf
-</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>repoindex<span class="w"> </span><span class="nb">export</span><span class="w"> </span>--format<span class="w"> </span>markdown<span class="w"> </span>--output-dir<span class="w"> </span>./docs
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>repoindex<span class="w"> </span><span class="nb">export</span><span class="w"> </span>--format<span class="w"> </span>hugo<span class="w"> </span>--output-dir<span class="w"> </span>./site
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>repoindex<span class="w"> </span><span class="nb">export</span><span class="w"> </span>--format<span class="w"> </span>html<span class="w"> </span>--output-dir<span class="w"> </span>./public
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>repoindex<span class="w"> </span><span class="nb">export</span><span class="w"> </span>--format<span class="w"> </span>pdf<span class="w"> </span>--output-file<span class="w"> </span>report.pdf
+</code></pre></div>
 <h3 id="option-1-keep-flat-with-format-flag-current">Option 1: Keep Flat with --format Flag (Current)</h3>
 <p><strong>Pros:</strong>
 - ✅ Simple, Pythonic
@@ -1329,11 +1463,11 @@ repoindex export --format pdf --output-file report.pdf
 - ❌ Format-specific options get mixed
 - ❌ Help text becomes long
 - ❌ Hard to have format-specific validation</p>
-<p><strong>Example:</strong></p>
-<pre><code class="language-bash">repoindex export --format markdown --output-dir ./docs
-repoindex export --format hugo --output-dir ./site --theme minimal
-repoindex export --format pdf --template custom.jinja2
-</code></pre>
+<p><strong>Example:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>repoindex<span class="w"> </span><span class="nb">export</span><span class="w"> </span>--format<span class="w"> </span>markdown<span class="w"> </span>--output-dir<span class="w"> </span>./docs
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>repoindex<span class="w"> </span><span class="nb">export</span><span class="w"> </span>--format<span class="w"> </span>hugo<span class="w"> </span>--output-dir<span class="w"> </span>./site<span class="w"> </span>--theme<span class="w"> </span>minimal
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>repoindex<span class="w"> </span><span class="nb">export</span><span class="w"> </span>--format<span class="w"> </span>pdf<span class="w"> </span>--template<span class="w"> </span>custom.jinja2
+</code></pre></div></p>
 <h3 id="option-2-grouped-by-format">Option 2: Grouped by Format</h3>
 <p><strong>Pros:</strong>
 - ✅ Format-specific options are clear
@@ -1344,12 +1478,12 @@ repoindex export --format pdf --template custom.jinja2
 - ❌ More typing
 - ❌ More commands to document
 - ❌ Feels heavy for simple use case</p>
-<p><strong>Example:</strong></p>
-<pre><code class="language-bash">repoindex export markdown --output-dir ./docs
-repoindex export hugo --output-dir ./site --theme minimal
-repoindex export pdf --template custom.jinja2
-repoindex export html --output-dir ./public --style dark
-</code></pre>
+<p><strong>Example:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a>repoindex<span class="w"> </span><span class="nb">export</span><span class="w"> </span>markdown<span class="w"> </span>--output-dir<span class="w"> </span>./docs
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>repoindex<span class="w"> </span><span class="nb">export</span><span class="w"> </span>hugo<span class="w"> </span>--output-dir<span class="w"> </span>./site<span class="w"> </span>--theme<span class="w"> </span>minimal
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>repoindex<span class="w"> </span><span class="nb">export</span><span class="w"> </span>pdf<span class="w"> </span>--template<span class="w"> </span>custom.jinja2
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>repoindex<span class="w"> </span><span class="nb">export</span><span class="w"> </span>html<span class="w"> </span>--output-dir<span class="w"> </span>./public<span class="w"> </span>--style<span class="w"> </span>dark
+</code></pre></div></p>
 <h3 id="option-3-hybrid-grouped-smart-defaults">Option 3: Hybrid (Grouped + Smart Defaults)</h3>
 <p><strong>Pros:</strong>
 - ✅ Both patterns work
@@ -1359,18 +1493,18 @@ repoindex export html --output-dir ./public --style dark
 <p><strong>Cons:</strong>
 - ❌ Two ways to do same thing
 - ❌ More code to maintain</p>
-<p><strong>Example:</strong></p>
-<pre><code class="language-bash"># Simple case - use default format detector
-repoindex export ./output              # Auto-detects format from dir structure
-
-# Explicit format (short)
-repoindex export --format hugo ./site  # Flag-based
-
-# Explicit format (grouped)
-repoindex export hugo ./site           # Subcommand-based
-
-# Both work!
-</code></pre>
+<p><strong>Example:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="c1"># Simple case - use default format detector</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>repoindex<span class="w"> </span><span class="nb">export</span><span class="w"> </span>./output<span class="w">              </span><span class="c1"># Auto-detects format from dir structure</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="c1"># Explicit format (short)</span>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>repoindex<span class="w"> </span><span class="nb">export</span><span class="w"> </span>--format<span class="w"> </span>hugo<span class="w"> </span>./site<span class="w">  </span><span class="c1"># Flag-based</span>
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="c1"># Explicit format (grouped)</span>
+<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a>repoindex<span class="w"> </span><span class="nb">export</span><span class="w"> </span>hugo<span class="w"> </span>./site<span class="w">           </span><span class="c1"># Subcommand-based</span>
+<a id="__codelineno-11-9" name="__codelineno-11-9" href="#__codelineno-11-9"></a>
+<a id="__codelineno-11-10" name="__codelineno-11-10" href="#__codelineno-11-10"></a><span class="c1"># Both work!</span>
+</code></pre></div></p>
 <h3 id="recommendation-option-1-flat-with-format">Recommendation: Option 1 (Flat with --format)</h3>
 <p><strong>Why:</strong>
 1. <strong>Pythonic</strong> - Similar to pip, argparse patterns
@@ -1378,19 +1512,19 @@ repoindex export hugo ./site           # Subcommand-based
 3. <strong>Least Surprising</strong> - Users expect <code>--format</code> for multi-format tools
 4. <strong>Elegant</strong> - No artificial grouping needed
 5. <strong>Current Implementation</strong> - Already works this way</p>
-<p><strong>Evidence from Python ecosystem:</strong></p>
-<pre><code class="language-bash"># Black (formatter)
-black --diff --color file.py
-
-# Pytest
-pytest --verbose --color=yes
-
-# Sphinx
-sphinx-build -b html source build
-
-# Mypy
-mypy --strict --show-error-codes
-</code></pre>
+<p><strong>Evidence from Python ecosystem:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c1"># Black (formatter)</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>black<span class="w"> </span>--diff<span class="w"> </span>--color<span class="w"> </span>file.py
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="c1"># Pytest</span>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>pytest<span class="w"> </span>--verbose<span class="w"> </span>--color<span class="o">=</span>yes
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>
+<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="c1"># Sphinx</span>
+<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a>sphinx-build<span class="w"> </span>-b<span class="w"> </span>html<span class="w"> </span><span class="nb">source</span><span class="w"> </span>build
+<a id="__codelineno-12-9" name="__codelineno-12-9" href="#__codelineno-12-9"></a>
+<a id="__codelineno-12-10" name="__codelineno-12-10" href="#__codelineno-12-10"></a><span class="c1"># Mypy</span>
+<a id="__codelineno-12-11" name="__codelineno-12-11" href="#__codelineno-12-11"></a>mypy<span class="w"> </span>--strict<span class="w"> </span>--show-error-codes
+</code></pre></div></p>
 <p><strong>Comparison to alternatives:</strong></p>
 <table>
 <thead>
@@ -1427,65 +1561,65 @@ mypy --strict --show-error-codes
 - Users can easily discover all formats via <code>--help</code></p>
 <hr />
 <h2 id="final-proposed-structure">Final Proposed Structure</h2>
-<pre><code>repoindex
-│
-├── Core Operations (Top-Level)
-│   ├── get          Clone repositories
-│   ├── update       Update repositories
-│   ├── status       Show git status
-│   ├── query        Query with expression language
-│   ├── list         List repositories (shortcut for fs ls /repos)
-│   ├── top          Show recent activity
-│   ├── shell        Launch interactive shell
-│   └── metadata     Manage metadata store
-│
-├── Command Groups
-│   ├── tag          Tag management (existing group)
-│   │   ├── add
-│   │   ├── remove
-│   │   ├── move
-│   │   ├── list
-│   │   └── tree
-│   │
-│   ├── docs         Documentation (existing group)
-│   │   ├── build
-│   │   ├── deploy
-│   │   └── detect
-│   │
-│   ├── analysis     Analysis operations (new group)
-│   │   ├── audit    Health checks
-│   │   ├── network  Network analysis
-│   │   └── ai       AI conversations
-│   │
-│   ├── social       Social media (convert from social-cmd)
-│   │   ├── post     Create post
-│   │   ├── schedule Schedule posts
-│   │   └── list     List posts
-│   │
-│   ├── fs           Virtual filesystem (new group)
-│   │   ├── ls       List path contents
-│   │   ├── tree     Show tree view
-│   │   ├── find     Find by criteria
-│   │   └── info     Show path info
-│   │
-│   ├── service      Background service (new group)
-│   │   ├── start    Start service
-│   │   ├── stop     Stop service
-│   │   ├── status   Service status
-│   │   └── logs     View logs
-│   │
-│   └── config       Configuration (new group)
-│       ├── show     Show configuration
-│       ├── set      Set value
-│       ├── edit     Edit config file
-│       └── init     Initialize config
-│
-├── Single Commands (Stay as-is)
-│   └── export       Export data (--format flag, not grouped)
-│
-└── Deprecated (Backward compat)
-    └── catalog      Use 'tag' or 'fs' instead
-</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>repoindex
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>│
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>├── Core Operations (Top-Level)
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>│   ├── get          Clone repositories
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>│   ├── update       Update repositories
+<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a>│   ├── status       Show git status
+<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a>│   ├── query        Query with expression language
+<a id="__codelineno-13-8" name="__codelineno-13-8" href="#__codelineno-13-8"></a>│   ├── list         List repositories (shortcut for fs ls /repos)
+<a id="__codelineno-13-9" name="__codelineno-13-9" href="#__codelineno-13-9"></a>│   ├── top          Show recent activity
+<a id="__codelineno-13-10" name="__codelineno-13-10" href="#__codelineno-13-10"></a>│   ├── shell        Launch interactive shell
+<a id="__codelineno-13-11" name="__codelineno-13-11" href="#__codelineno-13-11"></a>│   └── metadata     Manage metadata store
+<a id="__codelineno-13-12" name="__codelineno-13-12" href="#__codelineno-13-12"></a>│
+<a id="__codelineno-13-13" name="__codelineno-13-13" href="#__codelineno-13-13"></a>├── Command Groups
+<a id="__codelineno-13-14" name="__codelineno-13-14" href="#__codelineno-13-14"></a>│   ├── tag          Tag management (existing group)
+<a id="__codelineno-13-15" name="__codelineno-13-15" href="#__codelineno-13-15"></a>│   │   ├── add
+<a id="__codelineno-13-16" name="__codelineno-13-16" href="#__codelineno-13-16"></a>│   │   ├── remove
+<a id="__codelineno-13-17" name="__codelineno-13-17" href="#__codelineno-13-17"></a>│   │   ├── move
+<a id="__codelineno-13-18" name="__codelineno-13-18" href="#__codelineno-13-18"></a>│   │   ├── list
+<a id="__codelineno-13-19" name="__codelineno-13-19" href="#__codelineno-13-19"></a>│   │   └── tree
+<a id="__codelineno-13-20" name="__codelineno-13-20" href="#__codelineno-13-20"></a>│   │
+<a id="__codelineno-13-21" name="__codelineno-13-21" href="#__codelineno-13-21"></a>│   ├── docs         Documentation (existing group)
+<a id="__codelineno-13-22" name="__codelineno-13-22" href="#__codelineno-13-22"></a>│   │   ├── build
+<a id="__codelineno-13-23" name="__codelineno-13-23" href="#__codelineno-13-23"></a>│   │   ├── deploy
+<a id="__codelineno-13-24" name="__codelineno-13-24" href="#__codelineno-13-24"></a>│   │   └── detect
+<a id="__codelineno-13-25" name="__codelineno-13-25" href="#__codelineno-13-25"></a>│   │
+<a id="__codelineno-13-26" name="__codelineno-13-26" href="#__codelineno-13-26"></a>│   ├── analysis     Analysis operations (new group)
+<a id="__codelineno-13-27" name="__codelineno-13-27" href="#__codelineno-13-27"></a>│   │   ├── audit    Health checks
+<a id="__codelineno-13-28" name="__codelineno-13-28" href="#__codelineno-13-28"></a>│   │   ├── network  Network analysis
+<a id="__codelineno-13-29" name="__codelineno-13-29" href="#__codelineno-13-29"></a>│   │   └── ai       AI conversations
+<a id="__codelineno-13-30" name="__codelineno-13-30" href="#__codelineno-13-30"></a>│   │
+<a id="__codelineno-13-31" name="__codelineno-13-31" href="#__codelineno-13-31"></a>│   ├── social       Social media (convert from social-cmd)
+<a id="__codelineno-13-32" name="__codelineno-13-32" href="#__codelineno-13-32"></a>│   │   ├── post     Create post
+<a id="__codelineno-13-33" name="__codelineno-13-33" href="#__codelineno-13-33"></a>│   │   ├── schedule Schedule posts
+<a id="__codelineno-13-34" name="__codelineno-13-34" href="#__codelineno-13-34"></a>│   │   └── list     List posts
+<a id="__codelineno-13-35" name="__codelineno-13-35" href="#__codelineno-13-35"></a>│   │
+<a id="__codelineno-13-36" name="__codelineno-13-36" href="#__codelineno-13-36"></a>│   ├── fs           Virtual filesystem (new group)
+<a id="__codelineno-13-37" name="__codelineno-13-37" href="#__codelineno-13-37"></a>│   │   ├── ls       List path contents
+<a id="__codelineno-13-38" name="__codelineno-13-38" href="#__codelineno-13-38"></a>│   │   ├── tree     Show tree view
+<a id="__codelineno-13-39" name="__codelineno-13-39" href="#__codelineno-13-39"></a>│   │   ├── find     Find by criteria
+<a id="__codelineno-13-40" name="__codelineno-13-40" href="#__codelineno-13-40"></a>│   │   └── info     Show path info
+<a id="__codelineno-13-41" name="__codelineno-13-41" href="#__codelineno-13-41"></a>│   │
+<a id="__codelineno-13-42" name="__codelineno-13-42" href="#__codelineno-13-42"></a>│   ├── service      Background service (new group)
+<a id="__codelineno-13-43" name="__codelineno-13-43" href="#__codelineno-13-43"></a>│   │   ├── start    Start service
+<a id="__codelineno-13-44" name="__codelineno-13-44" href="#__codelineno-13-44"></a>│   │   ├── stop     Stop service
+<a id="__codelineno-13-45" name="__codelineno-13-45" href="#__codelineno-13-45"></a>│   │   ├── status   Service status
+<a id="__codelineno-13-46" name="__codelineno-13-46" href="#__codelineno-13-46"></a>│   │   └── logs     View logs
+<a id="__codelineno-13-47" name="__codelineno-13-47" href="#__codelineno-13-47"></a>│   │
+<a id="__codelineno-13-48" name="__codelineno-13-48" href="#__codelineno-13-48"></a>│   └── config       Configuration (new group)
+<a id="__codelineno-13-49" name="__codelineno-13-49" href="#__codelineno-13-49"></a>│       ├── show     Show configuration
+<a id="__codelineno-13-50" name="__codelineno-13-50" href="#__codelineno-13-50"></a>│       ├── set      Set value
+<a id="__codelineno-13-51" name="__codelineno-13-51" href="#__codelineno-13-51"></a>│       ├── edit     Edit config file
+<a id="__codelineno-13-52" name="__codelineno-13-52" href="#__codelineno-13-52"></a>│       └── init     Initialize config
+<a id="__codelineno-13-53" name="__codelineno-13-53" href="#__codelineno-13-53"></a>│
+<a id="__codelineno-13-54" name="__codelineno-13-54" href="#__codelineno-13-54"></a>├── Single Commands (Stay as-is)
+<a id="__codelineno-13-55" name="__codelineno-13-55" href="#__codelineno-13-55"></a>│   └── export       Export data (--format flag, not grouped)
+<a id="__codelineno-13-56" name="__codelineno-13-56" href="#__codelineno-13-56"></a>│
+<a id="__codelineno-13-57" name="__codelineno-13-57" href="#__codelineno-13-57"></a>└── Deprecated (Backward compat)
+<a id="__codelineno-13-58" name="__codelineno-13-58" href="#__codelineno-13-58"></a>    └── catalog      Use &#39;tag&#39; or &#39;fs&#39; instead
+</code></pre></div>
 <h2 id="summary-of-decisions">Summary of Decisions</h2>
 <ol>
 <li>✅ <strong>Use hybrid structure</strong> - Common at top-level, rest grouped</li>
@@ -1511,22 +1645,22 @@ mypy --strict --show-error-codes
 <li><strong>Tree visualization</strong> of tag hierarchies</li>
 </ul>
 <h3 id="relationship-between-commands">Relationship between commands:</h3>
-<pre><code class="language-bash"># These are equivalent:
-repoindex list                           # Traditional listing
-repoindex fs ls /repos                   # VFS-based listing
-
-# These are equivalent:
-repoindex list --language Python         # Filter-based
-repoindex fs ls /by-language/Python      # Path-based
-
-# These are equivalent:
-repoindex query &quot;stars &gt; 10&quot;             # Query language
-repoindex fs find --min-stars 10         # Criteria-based
-
-# These complement each other:
-repoindex tag list -t alex/beta          # Tag-centric view
-repoindex fs ls /by-tag/alex/beta        # Path-centric view
-</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="c1"># These are equivalent:</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>repoindex<span class="w"> </span>list<span class="w">                           </span><span class="c1"># Traditional listing</span>
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>repoindex<span class="w"> </span>fs<span class="w"> </span>ls<span class="w"> </span>/repos<span class="w">                   </span><span class="c1"># VFS-based listing</span>
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a><span class="c1"># These are equivalent:</span>
+<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a>repoindex<span class="w"> </span>list<span class="w"> </span>--language<span class="w"> </span>Python<span class="w">         </span><span class="c1"># Filter-based</span>
+<a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a>repoindex<span class="w"> </span>fs<span class="w"> </span>ls<span class="w"> </span>/by-language/Python<span class="w">      </span><span class="c1"># Path-based</span>
+<a id="__codelineno-14-8" name="__codelineno-14-8" href="#__codelineno-14-8"></a>
+<a id="__codelineno-14-9" name="__codelineno-14-9" href="#__codelineno-14-9"></a><span class="c1"># These are equivalent:</span>
+<a id="__codelineno-14-10" name="__codelineno-14-10" href="#__codelineno-14-10"></a>repoindex<span class="w"> </span>query<span class="w"> </span><span class="s2">&quot;stars &gt; 10&quot;</span><span class="w">             </span><span class="c1"># Query language</span>
+<a id="__codelineno-14-11" name="__codelineno-14-11" href="#__codelineno-14-11"></a>repoindex<span class="w"> </span>fs<span class="w"> </span>find<span class="w"> </span>--min-stars<span class="w"> </span><span class="m">10</span><span class="w">         </span><span class="c1"># Criteria-based</span>
+<a id="__codelineno-14-12" name="__codelineno-14-12" href="#__codelineno-14-12"></a>
+<a id="__codelineno-14-13" name="__codelineno-14-13" href="#__codelineno-14-13"></a><span class="c1"># These complement each other:</span>
+<a id="__codelineno-14-14" name="__codelineno-14-14" href="#__codelineno-14-14"></a>repoindex<span class="w"> </span>tag<span class="w"> </span>list<span class="w"> </span>-t<span class="w"> </span>alex/beta<span class="w">          </span><span class="c1"># Tag-centric view</span>
+<a id="__codelineno-14-15" name="__codelineno-14-15" href="#__codelineno-14-15"></a>repoindex<span class="w"> </span>fs<span class="w"> </span>ls<span class="w"> </span>/by-tag/alex/beta<span class="w">        </span><span class="c1"># Path-centric view</span>
+</code></pre></div>
 
 
 

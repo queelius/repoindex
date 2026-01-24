@@ -6,13 +6,15 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
+        <meta name="description" content="Collection-aware metadata index for git repositories">
+      
       
       
       
         <link rel="prev" href="../usage/">
       
       
-        <link rel="next" href="../audit-command/">
+        <link rel="next" href="../query-cookbook/">
       
       
       <link rel="icon" href="../assets/images/favicon.png">
@@ -20,7 +22,7 @@
     
     
       
-        <title>Organization & Discovery - repoindex</title>
+        <title>Query Language - repoindex</title>
       
     
     
@@ -72,7 +74,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#repository-organization-with-catalog-and-query" class="md-skip">
+        <a href="#tags-and-query-language" class="md-skip">
           Skip to content
         </a>
       
@@ -106,7 +108,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Organization & Discovery
+              Query Language
             
           </span>
         </div>
@@ -255,36 +257,17 @@
   
   
   
-  
-    <li class="md-tabs__item">
-      <a href="../usage/" class="md-tabs__link">
-        
-  
-  
-    
-  
-  Usage
-
-      </a>
-    </li>
-  
-
-      
-        
-  
-  
-  
     
   
   
     
     
       <li class="md-tabs__item md-tabs__item--active">
-        <a href="./" class="md-tabs__link">
+        <a href="../usage/" class="md-tabs__link">
           
   
   
-  Commands
+  Core
 
         </a>
       </li>
@@ -300,11 +283,11 @@
     
     
       <li class="md-tabs__item">
-        <a href="../integrations/overview/" class="md-tabs__link">
+        <a href="../events/overview/" class="md-tabs__link">
           
   
   
-  Integrations
+  Events
 
         </a>
       </li>
@@ -320,11 +303,11 @@
     
     
       <li class="md-tabs__item">
-        <a href="../tutorials/" class="md-tabs__link">
+        <a href="../shell-vfs/" class="md-tabs__link">
           
   
   
-  Tutorials
+  Interactive
 
         </a>
       </li>
@@ -340,34 +323,15 @@
     
     
       <li class="md-tabs__item">
-        <a href="../api/integrations/" class="md-tabs__link">
+        <a href="../architecture-vision/" class="md-tabs__link">
           
   
   
-  API Reference
+  Reference
 
         </a>
       </li>
     
-  
-
-      
-        
-  
-  
-  
-  
-    <li class="md-tabs__item">
-      <a href="../architecture-vision/" class="md-tabs__link">
-        
-  
-  
-    
-  
-  Architecture
-
-      </a>
-    </li>
   
 
       
@@ -403,25 +367,6 @@
     
   
   Contributing
-
-      </a>
-    </li>
-  
-
-      
-        
-  
-  
-  
-  
-    <li class="md-tabs__item">
-      <a href="../future-plans/" class="md-tabs__link">
-        
-  
-  
-    
-  
-  Future Plans
 
       </a>
     </li>
@@ -523,28 +468,6 @@
       
   
   
-  
-  
-    <li class="md-nav__item">
-      <a href="../usage/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Usage
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
-  
-  
     
   
   
@@ -566,15 +489,15 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
         
           
-          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
             
   
   
   <span class="md-ellipsis">
-    Commands
+    Core
     
   </span>
   
@@ -582,12 +505,35 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_4">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
-            Commands
+            Core
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Usage Guide
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
             
               
                 
@@ -610,7 +556,7 @@
   
   
   <span class="md-ellipsis">
-    Organization & Discovery
+    Query Language
     
   </span>
   
@@ -623,7 +569,7 @@
   
   
   <span class="md-ellipsis">
-    Organization & Discovery
+    Query Language
     
   </span>
   
@@ -646,13 +592,13 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#catalog-system" class="md-nav__link">
+  <a href="#tag-system" class="md-nav__link">
     <span class="md-ellipsis">
-      Catalog System
+      Tag System
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Catalog System">
+    <nav class="md-nav" aria-label="Tag System">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -665,9 +611,9 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#viewing-tagged-repositories" class="md-nav__link">
+  <a href="#viewing-tags" class="md-nav__link">
     <span class="md-ellipsis">
-      Viewing Tagged Repositories
+      Viewing Tags
     </span>
   </a>
   
@@ -677,6 +623,24 @@
   <a href="#removing-tags" class="md-nav__link">
     <span class="md-ellipsis">
       Removing Tags
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#moving-between-tags" class="md-nav__link">
+    <span class="md-ellipsis">
+      Moving Between Tags
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#tag-formats" class="md-nav__link">
+    <span class="md-ellipsis">
+      Tag Formats
     </span>
   </a>
   
@@ -707,6 +671,15 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
+  <a href="#citation-metadata-fields" class="md-nav__link">
+    <span class="md-ellipsis">
+      Citation Metadata Fields
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#basic-syntax" class="md-nav__link">
     <span class="md-ellipsis">
       Basic Syntax
@@ -733,15 +706,24 @@
   
 </li>
         
+          <li class="md-nav__item">
+  <a href="#tag-queries" class="md-nav__link">
+    <span class="md-ellipsis">
+      Tag Queries
+    </span>
+  </a>
+  
+</li>
+        
       </ul>
     </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#combining-catalog-and-query" class="md-nav__link">
+  <a href="#combining-tags-and-queries" class="md-nav__link">
     <span class="md-ellipsis">
-      Combining Catalog and Query
+      Combining Tags and Queries
     </span>
   </a>
   
@@ -832,44 +814,11 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#integration-with-other-commands" class="md-nav__link">
+  <a href="#integration-with-events" class="md-nav__link">
     <span class="md-ellipsis">
-      Integration with Other Commands
+      Integration with Events
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Integration with Other Commands">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#audit-filtered-repos" class="md-nav__link">
-    <span class="md-ellipsis">
-      Audit Filtered Repos
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#export-filtered-repos" class="md-nav__link">
-    <span class="md-ellipsis">
-      Export Filtered Repos
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#bulk-operations" class="md-nav__link">
-    <span class="md-ellipsis">
-      Bulk Operations
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
@@ -882,102 +831,19 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#shell-vfs-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      Shell VFS Integration
+    </span>
+  </a>
+  
+</li>
+      
     </ul>
   
 </nav>
       
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../audit-command/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Repository Audit
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../export-command/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Portfolio Export
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../docs-command/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Documentation
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../list-command/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    List
-    
-  </span>
-  
-
-      </a>
     </li>
   
 
@@ -1033,15 +899,15 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
         
           
-          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
             
   
   
   <span class="md-ellipsis">
-    Integrations
+    Events
     
   </span>
   
@@ -1049,10 +915,10 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
             <span class="md-nav__icon md-icon"></span>
-            Integrations
+            Events
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
             
@@ -1063,7 +929,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../integrations/overview/" class="md-nav__link">
+      <a href="../events/overview/" class="md-nav__link">
         
   
   
@@ -1086,12 +952,12 @@
   
   
     <li class="md-nav__item">
-      <a href="../integrations/clustering/" class="md-nav__link">
+      <a href="../events/event-types/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
-    Repository Clustering
+    Event Types Reference
     
   </span>
   
@@ -1102,6 +968,56 @@
 
               
             
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Interactive
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Interactive
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
               
                 
   
@@ -1109,12 +1025,12 @@
   
   
     <li class="md-nav__item">
-      <a href="../integrations/workflow/" class="md-nav__link">
+      <a href="../shell-vfs/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
-    Workflow Orchestration
+    Shell & VFS
     
   </span>
   
@@ -1160,7 +1076,7 @@
   
   
   <span class="md-ellipsis">
-    Tutorials
+    Reference
     
   </span>
   
@@ -1171,115 +1087,12 @@
         <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_6">
             <span class="md-nav__icon md-icon"></span>
-            Tutorials
+            Reference
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
             
               
                 
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../tutorials/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Jupyter Notebooks
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    
-    
-    
-    
-      
-      
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
-        
-          
-          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
-            
-  
-  
-  <span class="md-ellipsis">
-    API Reference
-    
-  </span>
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_7">
-            <span class="md-nav__icon md-icon"></span>
-            API Reference
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../api/integrations/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Integration API
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
-      
-      
   
   
   
@@ -1296,6 +1109,83 @@
   
 
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/CLI_DESIGN_DECISIONS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Design Decisions
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/GIT_COMMANDS_DESIGN/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Git Commands Design
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../design/VERSION_MANAGEMENT_IMPLEMENTATION/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Version Management
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -1344,28 +1234,6 @@
   
 
     
-      
-      
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../future-plans/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Future Plans
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-    
   </ul>
 </nav>
                   </div>
@@ -1385,38 +1253,65 @@
   
 
 
-<h1 id="repository-organization-with-catalog-and-query">Repository Organization with Catalog and Query</h1>
+<h1 id="tags-and-query-language">Tags and Query Language</h1>
 <p>repoindex provides powerful tools for organizing and finding repositories through its tagging system and query language.</p>
-<h2 id="catalog-system">Catalog System</h2>
-<p>The catalog system allows you to organize repositories with tags, both explicit (user-defined) and implicit (auto-generated).</p>
+<h2 id="tag-system">Tag System</h2>
+<p>The tag system allows you to organize repositories with hierarchical tags, both explicit (user-defined) and implicit (auto-generated).</p>
 <h3 id="adding-tags">Adding Tags</h3>
-<pre><code class="language-bash"># Tag a single repository
-repoindex catalog add myproject python ml research
-
-# Tag multiple repos
-repoindex catalog add project1 client-work urgent
-repoindex catalog add project2 client-work completed
-</code></pre>
-<h3 id="viewing-tagged-repositories">Viewing Tagged Repositories</h3>
-<pre><code class="language-bash"># Show all tagged repos
-repoindex catalog show --pretty
-
-# Filter by specific tags
-repoindex catalog show -t python --pretty
-
-# Require multiple tags (AND operation)
-repoindex catalog show -t python -t ml --all-tags --pretty
-
-# JSONL output for processing
-repoindex catalog show -t client-work | jq -r '.name'
-</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># Add tags to a repository</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>repoindex<span class="w"> </span>tag<span class="w"> </span>add<span class="w"> </span>myproject<span class="w"> </span>python<span class="w"> </span>ml<span class="w"> </span>research
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="c1"># Add hierarchical tags</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>repoindex<span class="w"> </span>tag<span class="w"> </span>add<span class="w"> </span>myproject<span class="w"> </span>work/active
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>repoindex<span class="w"> </span>tag<span class="w"> </span>add<span class="w"> </span>myproject<span class="w"> </span>topic:ml/research
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="c1"># Add to multiple repos</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>repoindex<span class="w"> </span>tag<span class="w"> </span>add<span class="w"> </span>project1<span class="w"> </span>client-work<span class="w"> </span>urgent
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>repoindex<span class="w"> </span>tag<span class="w"> </span>add<span class="w"> </span>project2<span class="w"> </span>client-work<span class="w"> </span>completed
+</code></pre></div>
+<h3 id="viewing-tags">Viewing Tags</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># List all tags</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>repoindex<span class="w"> </span>tag<span class="w"> </span>list
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># List repositories with a specific tag</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>repoindex<span class="w"> </span>tag<span class="w"> </span>list<span class="w"> </span>-t<span class="w"> </span>python
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="c1"># List repositories matching tag pattern</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>repoindex<span class="w"> </span>tag<span class="w"> </span>list<span class="w"> </span>-t<span class="w"> </span><span class="s2">&quot;work/*&quot;</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="c1"># Show tags for a specific repository</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>repoindex<span class="w"> </span>tag<span class="w"> </span>list<span class="w"> </span>-r<span class="w"> </span>myproject
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="c1"># Show tag hierarchy as tree</span>
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>repoindex<span class="w"> </span>tag<span class="w"> </span>tree
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>
+<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a><span class="c1"># Show subtree</span>
+<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>repoindex<span class="w"> </span>tag<span class="w"> </span>tree<span class="w"> </span>-t<span class="w"> </span>work
+</code></pre></div>
 <h3 id="removing-tags">Removing Tags</h3>
-<pre><code class="language-bash"># Remove specific tags
-repoindex catalog remove myproject urgent
-
-# Remove all tags from a repo
-repoindex catalog clear myproject
-</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Remove specific tags</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>repoindex<span class="w"> </span>tag<span class="w"> </span>remove<span class="w"> </span>myproject<span class="w"> </span>urgent
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1"># Remove hierarchical tag</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>repoindex<span class="w"> </span>tag<span class="w"> </span>remove<span class="w"> </span>myproject<span class="w"> </span>work/active
+</code></pre></div>
+<h3 id="moving-between-tags">Moving Between Tags</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Move from one tag to another (removes old, adds new)</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>repoindex<span class="w"> </span>tag<span class="w"> </span>move<span class="w"> </span>myproject<span class="w"> </span>work/active<span class="w"> </span>work/completed
+</code></pre></div>
+<h3 id="tag-formats">Tag Formats</h3>
+<p><strong>Simple tags:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>repoindex<span class="w"> </span>tag<span class="w"> </span>add<span class="w"> </span>myproject<span class="w"> </span>python<span class="w"> </span>ml<span class="w"> </span>research
+</code></pre></div></p>
+<p><strong>Hierarchical tags:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>repoindex<span class="w"> </span>tag<span class="w"> </span>add<span class="w"> </span>myproject<span class="w"> </span>work/active
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>repoindex<span class="w"> </span>tag<span class="w"> </span>add<span class="w"> </span>myproject<span class="w"> </span>client/acme/backend
+</code></pre></div></p>
+<p><strong>Key:value tags:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>repoindex<span class="w"> </span>tag<span class="w"> </span>add<span class="w"> </span>myproject<span class="w"> </span>topic:ml
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>repoindex<span class="w"> </span>tag<span class="w"> </span>add<span class="w"> </span>myproject<span class="w"> </span>status:maintained
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>repoindex<span class="w"> </span>tag<span class="w"> </span>add<span class="w"> </span>myproject<span class="w"> </span>topic:scientific/engineering/ai
+</code></pre></div></p>
 <h3 id="implicit-tags">Implicit Tags</h3>
 <p>The system automatically generates implicit tags from repository metadata:</p>
 <table>
@@ -1482,173 +1377,231 @@ repoindex catalog clear myproject
 </table>
 <h2 id="query-language">Query Language</h2>
 <p>The query command provides fuzzy matching and complex boolean expressions.</p>
+<h3 id="citation-metadata-fields">Citation Metadata Fields</h3>
+<p>Repositories with CITATION.cff or .zenodo.json files have these queryable fields:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>citation_doi</code></td>
+<td>DOI identifier (e.g., "10.5281/zenodo.1234567")</td>
+</tr>
+<tr>
+<td><code>citation_title</code></td>
+<td>Software title from citation file</td>
+</tr>
+<tr>
+<td><code>citation_authors</code></td>
+<td>JSON array of author objects</td>
+</tr>
+<tr>
+<td><code>citation_version</code></td>
+<td>Version from citation file</td>
+</tr>
+<tr>
+<td><code>citation_repository</code></td>
+<td>Repository URL from citation file</td>
+</tr>
+<tr>
+<td><code>citation_license</code></td>
+<td>License from citation file</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Query examples:</strong>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># Repos with DOI</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>repoindex<span class="w"> </span>query<span class="w"> </span>--has-doi
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>repoindex<span class="w"> </span>query<span class="w"> </span><span class="s2">&quot;citation_doi != &#39;&#39;&quot;</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="c1"># SQL queries for citation data</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>repoindex<span class="w"> </span>sql<span class="w"> </span><span class="s2">&quot;SELECT name, citation_doi, citation_title FROM repos WHERE citation_doi IS NOT NULL&quot;</span>
+</code></pre></div></p>
 <h3 id="basic-syntax">Basic Syntax</h3>
-<pre><code class="language-bash"># Simple equality
-repoindex query &quot;language == 'Python'&quot;
-
-# Fuzzy matching with ~=
-repoindex query &quot;language ~= 'pyton'&quot;  # Matches Python
-
-# Comparisons
-repoindex query &quot;stars &gt; 10&quot;
-repoindex query &quot;forks &gt;= 5&quot;
-repoindex query &quot;created_at &lt; '2023-01-01'&quot;
-
-# Contains operator
-repoindex query &quot;'machine-learning' in topics&quot;
-repoindex query &quot;topics contains 'ml'&quot;
-
-# Not equal
-repoindex query &quot;license.key != 'proprietary'&quot;
-</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># Simple equality</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>repoindex<span class="w"> </span>query<span class="w"> </span><span class="s2">&quot;language == &#39;Python&#39;&quot;</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="c1"># Fuzzy matching with ~=</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a>repoindex<span class="w"> </span>query<span class="w"> </span><span class="s2">&quot;language ~= &#39;pyton&#39;&quot;</span><span class="w">  </span><span class="c1"># Matches Python</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a><span class="c1"># Comparisons</span>
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a>repoindex<span class="w"> </span>query<span class="w"> </span><span class="s2">&quot;stars &gt; 10&quot;</span>
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a>repoindex<span class="w"> </span>query<span class="w"> </span><span class="s2">&quot;forks &gt;= 5&quot;</span>
+<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a>repoindex<span class="w"> </span>query<span class="w"> </span><span class="s2">&quot;created_at &lt; &#39;2023-01-01&#39;&quot;</span>
+<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a>
+<a id="__codelineno-8-12" name="__codelineno-8-12" href="#__codelineno-8-12"></a><span class="c1"># Contains operator</span>
+<a id="__codelineno-8-13" name="__codelineno-8-13" href="#__codelineno-8-13"></a>repoindex<span class="w"> </span>query<span class="w"> </span><span class="s2">&quot;&#39;machine-learning&#39; in topics&quot;</span>
+<a id="__codelineno-8-14" name="__codelineno-8-14" href="#__codelineno-8-14"></a>repoindex<span class="w"> </span>query<span class="w"> </span><span class="s2">&quot;topics contains &#39;ml&#39;&quot;</span>
+<a id="__codelineno-8-15" name="__codelineno-8-15" href="#__codelineno-8-15"></a>
+<a id="__codelineno-8-16" name="__codelineno-8-16" href="#__codelineno-8-16"></a><span class="c1"># Not equal</span>
+<a id="__codelineno-8-17" name="__codelineno-8-17" href="#__codelineno-8-17"></a>repoindex<span class="w"> </span>query<span class="w"> </span><span class="s2">&quot;license.key != &#39;proprietary&#39;&quot;</span>
+</code></pre></div>
 <h3 id="complex-expressions">Complex Expressions</h3>
-<pre><code class="language-bash"># AND operations
-repoindex query &quot;stars &gt; 10 and language == 'Python'&quot;
-
-# OR operations
-repoindex query &quot;language == 'Python' or language == 'JavaScript'&quot;
-
-# Parentheses for grouping
-repoindex query &quot;(stars &gt; 5 or forks &gt; 2) and language ~= 'python'&quot;
-
-# Nested field access
-repoindex query &quot;license.name contains 'MIT'&quot;
-repoindex query &quot;remote.owner == 'myorg'&quot;
-</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1"># AND operations</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>repoindex<span class="w"> </span>query<span class="w"> </span><span class="s2">&quot;stars &gt; 10 and language == &#39;Python&#39;&quot;</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="c1"># OR operations</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>repoindex<span class="w"> </span>query<span class="w"> </span><span class="s2">&quot;language == &#39;Python&#39; or language == &#39;JavaScript&#39;&quot;</span>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a><span class="c1"># Parentheses for grouping</span>
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>repoindex<span class="w"> </span>query<span class="w"> </span><span class="s2">&quot;(stars &gt; 5 or forks &gt; 2) and language ~= &#39;python&#39;&quot;</span>
+<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>
+<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a><span class="c1"># Nested field access</span>
+<a id="__codelineno-9-11" name="__codelineno-9-11" href="#__codelineno-9-11"></a>repoindex<span class="w"> </span>query<span class="w"> </span><span class="s2">&quot;license.name contains &#39;MIT&#39;&quot;</span>
+<a id="__codelineno-9-12" name="__codelineno-9-12" href="#__codelineno-9-12"></a>repoindex<span class="w"> </span>query<span class="w"> </span><span class="s2">&quot;remote.owner == &#39;myorg&#39;&quot;</span>
+</code></pre></div>
 <h3 id="fuzzy-matching">Fuzzy Matching</h3>
 <p>The <code>~=</code> operator uses fuzzy string matching:</p>
-<pre><code class="language-bash"># Typos are forgiven
-repoindex query &quot;name ~= 'djago'&quot;  # Matches django
-
-# Partial matches
-repoindex query &quot;description ~= 'web framework'&quot;
-
-# Case insensitive
-repoindex query &quot;language ~= 'PYTHON'&quot;
-</code></pre>
-<h2 id="combining-catalog-and-query">Combining Catalog and Query</h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1"># Typos are forgiven</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>repoindex<span class="w"> </span>query<span class="w"> </span><span class="s2">&quot;name ~= &#39;djago&#39;&quot;</span><span class="w">  </span><span class="c1"># Matches django</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="c1"># Partial matches</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>repoindex<span class="w"> </span>query<span class="w"> </span><span class="s2">&quot;description ~= &#39;web framework&#39;&quot;</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="c1"># Case insensitive</span>
+<a id="__codelineno-10-8" name="__codelineno-10-8" href="#__codelineno-10-8"></a>repoindex<span class="w"> </span>query<span class="w"> </span><span class="s2">&quot;language ~= &#39;PYTHON&#39;&quot;</span>
+</code></pre></div>
+<h3 id="tag-queries">Tag Queries</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="c1"># Check if tag exists</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a>repoindex<span class="w"> </span>query<span class="w"> </span><span class="s2">&quot;&#39;python&#39; in tags&quot;</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="c1"># Check for hierarchical tag</span>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a>repoindex<span class="w"> </span>query<span class="w"> </span><span class="s2">&quot;&#39;work/active&#39; in tags&quot;</span>
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a>
+<a id="__codelineno-11-7" name="__codelineno-11-7" href="#__codelineno-11-7"></a><span class="c1"># Combine with other conditions</span>
+<a id="__codelineno-11-8" name="__codelineno-11-8" href="#__codelineno-11-8"></a>repoindex<span class="w"> </span>query<span class="w"> </span><span class="s2">&quot;&#39;ml&#39; in tags and stars &gt; 5&quot;</span>
+</code></pre></div>
+<h2 id="combining-tags-and-queries">Combining Tags and Queries</h2>
 <p>Use both systems together for powerful filtering:</p>
-<pre><code class="language-bash"># Tag-based pre-filtering with query refinement
-repoindex list -t &quot;lang:python&quot; | jq -r '.path' | \
-  xargs -I {} repoindex query &quot;stars &gt; 5&quot; --path {}
-
-# Find untagged repos
-repoindex query &quot;true&quot; | jq -r '.name' &gt; all-repos.txt
-repoindex catalog show | jq -r '.name' &gt; tagged-repos.txt
-comm -23 &lt;(sort all-repos.txt) &lt;(sort tagged-repos.txt)
-</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c1"># Tag-based filtering with query refinement</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a>repoindex<span class="w"> </span>query<span class="w"> </span>--json<span class="w"> </span>--tag<span class="w"> </span><span class="s2">&quot;lang:python&quot;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">&#39;select(.stars &gt; 5)&#39;</span>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="c1"># Query with tag conditions</span>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a>repoindex<span class="w"> </span>query<span class="w"> </span><span class="s2">&quot;&#39;work&#39; in tags and language == &#39;Python&#39;&quot;</span>
+<a id="__codelineno-12-6" name="__codelineno-12-6" href="#__codelineno-12-6"></a>
+<a id="__codelineno-12-7" name="__codelineno-12-7" href="#__codelineno-12-7"></a><span class="c1"># Find repos with specific tag and status</span>
+<a id="__codelineno-12-8" name="__codelineno-12-8" href="#__codelineno-12-8"></a>repoindex<span class="w"> </span>query<span class="w"> </span><span class="s2">&quot;&#39;client:acme&#39; in tags and not archived&quot;</span>
+</code></pre></div>
 <h2 id="common-patterns">Common Patterns</h2>
 <h3 id="project-organization">Project Organization</h3>
-<pre><code class="language-bash"># Tag by project status
-repoindex catalog add project1 active in-development
-repoindex catalog add project2 completed archived
-repoindex catalog add project3 active needs-review
-
-# Find active projects needing review
-repoindex catalog show -t active -t needs-review --all-tags
-</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="c1"># Tag by project status</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>repoindex<span class="w"> </span>tag<span class="w"> </span>add<span class="w"> </span>project1<span class="w"> </span>status/active<span class="w"> </span><span class="k">in</span>-development
+<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>repoindex<span class="w"> </span>tag<span class="w"> </span>add<span class="w"> </span>project2<span class="w"> </span>status/completed<span class="w"> </span>archived
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a>repoindex<span class="w"> </span>tag<span class="w"> </span>add<span class="w"> </span>project3<span class="w"> </span>status/active<span class="w"> </span>needs-review
+<a id="__codelineno-13-5" name="__codelineno-13-5" href="#__codelineno-13-5"></a>
+<a id="__codelineno-13-6" name="__codelineno-13-6" href="#__codelineno-13-6"></a><span class="c1"># Find active projects needing review</span>
+<a id="__codelineno-13-7" name="__codelineno-13-7" href="#__codelineno-13-7"></a>repoindex<span class="w"> </span>query<span class="w"> </span><span class="s2">&quot;&#39;status/active&#39; in tags and &#39;needs-review&#39; in tags&quot;</span>
+</code></pre></div>
 <h3 id="client-work">Client Work</h3>
-<pre><code class="language-bash"># Tag by client
-repoindex catalog add webapp client:acme web
-repoindex catalog add api client:acme backend
-repoindex catalog add report client:bigco analysis
-
-# All work for a client
-repoindex catalog show -t &quot;client:acme&quot;
-</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="c1"># Tag by client</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a>repoindex<span class="w"> </span>tag<span class="w"> </span>add<span class="w"> </span>webapp<span class="w"> </span>client/acme<span class="w"> </span>web
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a>repoindex<span class="w"> </span>tag<span class="w"> </span>add<span class="w"> </span>api<span class="w"> </span>client/acme<span class="w"> </span>backend
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a>repoindex<span class="w"> </span>tag<span class="w"> </span>add<span class="w"> </span>report<span class="w"> </span>client/bigco<span class="w"> </span>analysis
+<a id="__codelineno-14-5" name="__codelineno-14-5" href="#__codelineno-14-5"></a>
+<a id="__codelineno-14-6" name="__codelineno-14-6" href="#__codelineno-14-6"></a><span class="c1"># All work for a client</span>
+<a id="__codelineno-14-7" name="__codelineno-14-7" href="#__codelineno-14-7"></a>repoindex<span class="w"> </span>tag<span class="w"> </span>list<span class="w"> </span>-t<span class="w"> </span><span class="s2">&quot;client/acme&quot;</span>
+</code></pre></div>
 <h3 id="technology-stacks">Technology Stacks</h3>
-<pre><code class="language-bash"># Tag by stack
-repoindex catalog add frontend react typescript webpack
-repoindex catalog add backend python django postgresql
-repoindex catalog add mobile flutter dart
-
-# Find all TypeScript projects
-repoindex catalog show -t typescript
-# Or use implicit tags
-repoindex list -t &quot;lang:typescript&quot;
-</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="c1"># Tag by stack</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a>repoindex<span class="w"> </span>tag<span class="w"> </span>add<span class="w"> </span>frontend<span class="w"> </span>react<span class="w"> </span>typescript<span class="w"> </span>webpack
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a>repoindex<span class="w"> </span>tag<span class="w"> </span>add<span class="w"> </span>backend<span class="w"> </span>python<span class="w"> </span>django<span class="w"> </span>postgresql
+<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a>repoindex<span class="w"> </span>tag<span class="w"> </span>add<span class="w"> </span>mobile<span class="w"> </span>flutter<span class="w"> </span>dart
+<a id="__codelineno-15-5" name="__codelineno-15-5" href="#__codelineno-15-5"></a>
+<a id="__codelineno-15-6" name="__codelineno-15-6" href="#__codelineno-15-6"></a><span class="c1"># Find all TypeScript projects (using implicit tag)</span>
+<a id="__codelineno-15-7" name="__codelineno-15-7" href="#__codelineno-15-7"></a>repoindex<span class="w"> </span>query<span class="w"> </span>--json<span class="w"> </span>--tag<span class="w"> </span><span class="s2">&quot;lang:typescript&quot;</span>
+<a id="__codelineno-15-8" name="__codelineno-15-8" href="#__codelineno-15-8"></a>
+<a id="__codelineno-15-9" name="__codelineno-15-9" href="#__codelineno-15-9"></a><span class="c1"># Or explicit tag</span>
+<a id="__codelineno-15-10" name="__codelineno-15-10" href="#__codelineno-15-10"></a>repoindex<span class="w"> </span>tag<span class="w"> </span>list<span class="w"> </span>-t<span class="w"> </span>typescript
+</code></pre></div>
 <h3 id="maintenance-status">Maintenance Status</h3>
-<pre><code class="language-bash"># Tag by maintenance needs
-repoindex catalog add oldproject needs:update needs:tests
-repoindex catalog add newproject well-maintained has:ci
-
-# Find projects needing attention
-repoindex catalog show -t &quot;needs:update&quot;
-</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="c1"># Tag by maintenance needs</span>
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a>repoindex<span class="w"> </span>tag<span class="w"> </span>add<span class="w"> </span>oldproject<span class="w"> </span>needs/update<span class="w"> </span>needs/tests
+<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>repoindex<span class="w"> </span>tag<span class="w"> </span>add<span class="w"> </span>newproject<span class="w"> </span>well-maintained<span class="w"> </span>has-ci
+<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a>
+<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="c1"># Find projects needing attention</span>
+<a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a>repoindex<span class="w"> </span>tag<span class="w"> </span>list<span class="w"> </span>-t<span class="w"> </span><span class="s2">&quot;needs/*&quot;</span>
+</code></pre></div>
 <h2 id="query-examples">Query Examples</h2>
 <h3 id="finding-repositories">Finding Repositories</h3>
-<pre><code class="language-bash"># Popular Python projects
-repoindex query &quot;language == 'Python' and stars &gt; 10&quot;
-
-# Recently updated
-repoindex query &quot;updated_at &gt; '2024-01-01'&quot;
-
-# Projects without licenses
-repoindex query &quot;not has_license&quot;
-
-# Large projects
-repoindex query &quot;file_count &gt; 1000 or total_size &gt; 10000000&quot;
-
-# ML projects
-repoindex query &quot;'machine-learning' in topics or 'ml' in topics or name contains 'learn'&quot;
-</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="c1"># Popular Python projects</span>
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>repoindex<span class="w"> </span>query<span class="w"> </span><span class="s2">&quot;language == &#39;Python&#39; and stars &gt; 10&quot;</span>
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="c1"># Recently updated</span>
+<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a>repoindex<span class="w"> </span>query<span class="w"> </span><span class="s2">&quot;updated_at &gt; &#39;2024-01-01&#39;&quot;</span>
+<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a>
+<a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a><span class="c1"># Projects without licenses</span>
+<a id="__codelineno-17-8" name="__codelineno-17-8" href="#__codelineno-17-8"></a>repoindex<span class="w"> </span>query<span class="w"> </span><span class="s2">&quot;not has_license&quot;</span>
+<a id="__codelineno-17-9" name="__codelineno-17-9" href="#__codelineno-17-9"></a>
+<a id="__codelineno-17-10" name="__codelineno-17-10" href="#__codelineno-17-10"></a><span class="c1"># Large projects</span>
+<a id="__codelineno-17-11" name="__codelineno-17-11" href="#__codelineno-17-11"></a>repoindex<span class="w"> </span>query<span class="w"> </span><span class="s2">&quot;file_count &gt; 1000 or total_size &gt; 10000000&quot;</span>
+<a id="__codelineno-17-12" name="__codelineno-17-12" href="#__codelineno-17-12"></a>
+<a id="__codelineno-17-13" name="__codelineno-17-13" href="#__codelineno-17-13"></a><span class="c1"># ML projects</span>
+<a id="__codelineno-17-14" name="__codelineno-17-14" href="#__codelineno-17-14"></a>repoindex<span class="w"> </span>query<span class="w"> </span><span class="s2">&quot;&#39;machine-learning&#39; in topics or &#39;ml&#39; in topics or name contains &#39;learn&#39;&quot;</span>
+</code></pre></div>
 <h3 id="complex-queries">Complex Queries</h3>
-<pre><code class="language-bash"># Active web projects
-repoindex query &quot;(language == 'JavaScript' or language == 'TypeScript') and updated_at &gt; '2023-06-01' and ('web' in topics or description contains 'web')&quot;
-
-# Python packages on PyPI
-repoindex query &quot;language == 'Python' and has_package == true and package.registry == 'pypi'&quot;
-
-# Documentation sites
-repoindex query &quot;has_docs == true and (has_pages == true or homepage contains 'github.io')&quot;
-</code></pre>
-<h2 id="integration-with-other-commands">Integration with Other Commands</h2>
-<h3 id="audit-filtered-repos">Audit Filtered Repos</h3>
-<pre><code class="language-bash"># Audit all client work
-repoindex audit all -t &quot;client:*&quot; --pretty
-
-# Audit Python projects without docs
-repoindex audit docs -q &quot;language == 'Python' and not has_docs&quot;
-</code></pre>
-<h3 id="export-filtered-repos">Export Filtered Repos</h3>
-<pre><code class="language-bash"># Export active projects to Hugo
-repoindex export generate -t active -f hugo -o ./site/content/active
-
-# Export popular repos to PDF
-repoindex export generate -q &quot;stars &gt; 5 or forks &gt; 2&quot; -f pdf
-</code></pre>
-<h3 id="bulk-operations">Bulk Operations</h3>
-<pre><code class="language-bash"># Update all work repos
-repoindex update -t &quot;dir:work&quot;
-
-# Build docs for all documented Python projects
-repoindex docs build -q &quot;language == 'Python' and has_docs == true&quot;
-</code></pre>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="c1"># Active web projects</span>
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a>repoindex<span class="w"> </span>query<span class="w"> </span><span class="s2">&quot;(language == &#39;JavaScript&#39; or language == &#39;TypeScript&#39;) and updated_at &gt; &#39;2023-06-01&#39; and (&#39;web&#39; in topics or description contains &#39;web&#39;)&quot;</span>
+<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a>
+<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="c1"># Python packages on PyPI</span>
+<a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a>repoindex<span class="w"> </span>query<span class="w"> </span><span class="s2">&quot;language == &#39;Python&#39; and has_package == true and package.registry == &#39;pypi&#39;&quot;</span>
+<a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a>
+<a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a><span class="c1"># Documentation sites</span>
+<a id="__codelineno-18-8" name="__codelineno-18-8" href="#__codelineno-18-8"></a>repoindex<span class="w"> </span>query<span class="w"> </span><span class="s2">&quot;has_docs == true and (has_pages == true or homepage contains &#39;github.io&#39;)&quot;</span>
+</code></pre></div>
+<h2 id="integration-with-events">Integration with Events</h2>
+<p>Combine tags with event monitoring:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a><span class="c1"># Events for tagged repos</span>
+<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>repoindex<span class="w"> </span>events<span class="w"> </span>--since<span class="w"> </span>7d<span class="w"> </span>-t<span class="w"> </span><span class="s2">&quot;work/active&quot;</span><span class="w"> </span>--pretty
+<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>
+<a id="__codelineno-19-4" name="__codelineno-19-4" href="#__codelineno-19-4"></a><span class="c1"># Find repos with recent releases</span>
+<a id="__codelineno-19-5" name="__codelineno-19-5" href="#__codelineno-19-5"></a>repoindex<span class="w"> </span>events<span class="w"> </span>--type<span class="w"> </span>git_tag<span class="w"> </span>--since<span class="w"> </span>30d<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span>-r<span class="w"> </span><span class="s1">&#39;.repo&#39;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>sort<span class="w"> </span>-u
+</code></pre></div>
 <h2 id="best-practices">Best Practices</h2>
 <ol>
 <li>
-<p><strong>Use Namespaces</strong>: Prefix related tags (e.g., <code>client:*</code>, <code>project:*</code>, <code>status:*</code>)</p>
+<p><strong>Use Namespaces</strong>: Prefix related tags (e.g., <code>client/*</code>, <code>project/*</code>, <code>status/*</code>)</p>
+</li>
+<li>
+<p><strong>Hierarchical Organization</strong>: Use paths for related concepts
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-20-1" name="__codelineno-20-1" href="#__codelineno-20-1"></a>repoindex<span class="w"> </span>tag<span class="w"> </span>add<span class="w"> </span>myproject<span class="w"> </span>work/client/acme/backend
+</code></pre></div></p>
 </li>
 <li>
 <p><strong>Combine Systems</strong>: Use tags for stable categorization, queries for dynamic filtering</p>
 </li>
 <li>
-<p><strong>Document Tags</strong>: Keep a README of your tagging conventions</p>
-</li>
-<li>
 <p><strong>Regular Cleanup</strong>: Remove obsolete tags periodically
-   <code>bash
-   repoindex catalog show -t obsolete | jq -r '.name' | \
-     xargs -I {} repoindex catalog remove {} obsolete</code></p>
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="c1"># Find and remove obsolete tags</span>
+<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>repoindex<span class="w"> </span>tag<span class="w"> </span>list<span class="w"> </span>-t<span class="w"> </span>obsolete<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span>-r<span class="w"> </span><span class="s1">&#39;.name&#39;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span><span class="se">\</span>
+<a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a><span class="w">  </span>xargs<span class="w"> </span>-I<span class="w"> </span><span class="o">{}</span><span class="w"> </span>repoindex<span class="w"> </span>tag<span class="w"> </span>remove<span class="w"> </span><span class="o">{}</span><span class="w"> </span>obsolete
+</code></pre></div></p>
 </li>
 <li>
-<p><strong>Export Tag Documentation</strong>:
-   <code>bash
-   # Generate tag documentation
-   repoindex catalog show | jq -r '.tags[]' | sort | uniq -c | \
-     sort -rn &gt; tag-usage.txt</code></p>
+<p><strong>Document Conventions</strong>: Keep a README of your tagging conventions</p>
 </li>
 </ol>
+<h2 id="shell-vfs-integration">Shell VFS Integration</h2>
+<p>The interactive shell provides a filesystem view of your tags:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a>repoindex<span class="w"> </span>shell
+<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a>
+<a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a><span class="c1"># Navigate tag hierarchy</span>
+<a id="__codelineno-22-4" name="__codelineno-22-4" href="#__codelineno-22-4"></a>&gt;<span class="w"> </span><span class="nb">cd</span><span class="w"> </span>/by-tag/work/active
+<a id="__codelineno-22-5" name="__codelineno-22-5" href="#__codelineno-22-5"></a>&gt;<span class="w"> </span>ls
+<a id="__codelineno-22-6" name="__codelineno-22-6" href="#__codelineno-22-6"></a>
+<a id="__codelineno-22-7" name="__codelineno-22-7" href="#__codelineno-22-7"></a><span class="c1"># Add tags via filesystem operations</span>
+<a id="__codelineno-22-8" name="__codelineno-22-8" href="#__codelineno-22-8"></a>&gt;<span class="w"> </span>cp<span class="w"> </span>/repos/myproject<span class="w"> </span>/by-tag/work/active
+<a id="__codelineno-22-9" name="__codelineno-22-9" href="#__codelineno-22-9"></a>
+<a id="__codelineno-22-10" name="__codelineno-22-10" href="#__codelineno-22-10"></a><span class="c1"># Move between tags</span>
+<a id="__codelineno-22-11" name="__codelineno-22-11" href="#__codelineno-22-11"></a>&gt;<span class="w"> </span>mv<span class="w"> </span>/by-tag/work/active/myproject<span class="w"> </span>/by-tag/work/completed
+<a id="__codelineno-22-12" name="__codelineno-22-12" href="#__codelineno-22-12"></a>
+<a id="__codelineno-22-13" name="__codelineno-22-13" href="#__codelineno-22-13"></a><span class="c1"># Remove tags</span>
+<a id="__codelineno-22-14" name="__codelineno-22-14" href="#__codelineno-22-14"></a>&gt;<span class="w"> </span>rm<span class="w"> </span>/by-tag/work/active/myproject
+</code></pre></div>
+<p>See <a href="../shell-vfs/">Shell &amp; VFS</a> for details.</p>
 
 
 

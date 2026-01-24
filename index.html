@@ -6,6 +6,8 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
+        <meta name="description" content="Collection-aware metadata index for git repositories">
+      
       
       
       
@@ -70,7 +72,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#repoindex-documentation" class="md-skip">
+        <a href="#repoindex" class="md-skip">
           Skip to content
         </a>
       
@@ -256,33 +258,14 @@
   
   
   
-    <li class="md-tabs__item">
-      <a href="usage/" class="md-tabs__link">
-        
-  
-  
-    
-  
-  Usage
-
-      </a>
-    </li>
-  
-
-      
-        
-  
-  
-  
-  
     
     
       <li class="md-tabs__item">
-        <a href="catalog-query/" class="md-tabs__link">
+        <a href="usage/" class="md-tabs__link">
           
   
   
-  Commands
+  Core
 
         </a>
       </li>
@@ -298,11 +281,11 @@
     
     
       <li class="md-tabs__item">
-        <a href="integrations/overview/" class="md-tabs__link">
+        <a href="events/overview/" class="md-tabs__link">
           
   
   
-  Integrations
+  Events
 
         </a>
       </li>
@@ -318,11 +301,11 @@
     
     
       <li class="md-tabs__item">
-        <a href="tutorials/" class="md-tabs__link">
+        <a href="shell-vfs/" class="md-tabs__link">
           
   
   
-  Tutorials
+  Interactive
 
         </a>
       </li>
@@ -338,34 +321,15 @@
     
     
       <li class="md-tabs__item">
-        <a href="api/integrations/" class="md-tabs__link">
+        <a href="architecture-vision/" class="md-tabs__link">
           
   
   
-  API Reference
+  Reference
 
         </a>
       </li>
     
-  
-
-      
-        
-  
-  
-  
-  
-    <li class="md-tabs__item">
-      <a href="architecture-vision/" class="md-tabs__link">
-        
-  
-  
-    
-  
-  Architecture
-
-      </a>
-    </li>
   
 
       
@@ -401,25 +365,6 @@
     
   
   Contributing
-
-      </a>
-    </li>
-  
-
-      
-        
-  
-  
-  
-  
-    <li class="md-tabs__item">
-      <a href="future-plans/" class="md-tabs__link">
-        
-  
-  
-    
-  
-  Future Plans
 
       </a>
     </li>
@@ -530,27 +475,18 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#what-is-repoindex" class="md-nav__link">
+  <a href="#philosophy" class="md-nav__link">
     <span class="md-ellipsis">
-      What is repoindex?
+      Philosophy
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#whats-new-in-version-080" class="md-nav__link">
+  <a href="#quick-start" class="md-nav__link">
     <span class="md-ellipsis">
-      🚀 What's New in Version 0.8.0
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#core-philosophy" class="md-nav__link">
-    <span class="md-ellipsis">
-      🎯 Core Philosophy
+      Quick Start
     </span>
   </a>
   
@@ -559,134 +495,44 @@
         <li class="md-nav__item">
   <a href="#key-features" class="md-nav__link">
     <span class="md-ellipsis">
-      ✨ Key Features
+      Key Features
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="✨ Key Features">
+    <nav class="md-nav" aria-label="Key Features">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#advanced-repository-analysis" class="md-nav__link">
+  <a href="#query-system" class="md-nav__link">
     <span class="md-ellipsis">
-      🧠 Advanced Repository Analysis
+      Query System
     </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#workflow-orchestration" class="md-nav__link">
+  <a href="#event-system" class="md-nav__link">
     <span class="md-ellipsis">
-      🔄 Workflow Orchestration
+      Event System
     </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#repository-discovery-organization" class="md-nav__link">
+  <a href="#tag-system" class="md-nav__link">
     <span class="md-ellipsis">
-      🔍 Repository Discovery &amp; Organization
+      Tag System
     </span>
   </a>
   
 </li>
         
           <li class="md-nav__item">
-  <a href="#repository-auditing" class="md-nav__link">
+  <a href="#interactive-shell" class="md-nav__link">
     <span class="md-ellipsis">
-      🛡️ Repository Auditing
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#portfolio-export" class="md-nav__link">
-    <span class="md-ellipsis">
-      📄 Portfolio Export
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#documentation-management" class="md-nav__link">
-    <span class="md-ellipsis">
-      📚 Documentation Management
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#repository-management" class="md-nav__link">
-    <span class="md-ellipsis">
-      🚀 Repository Management
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#pypi-integration" class="md-nav__link">
-    <span class="md-ellipsis">
-      📦 PyPI Integration
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#social-media-automation" class="md-nav__link">
-    <span class="md-ellipsis">
-      📱 Social Media Automation
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#github-pages-detection" class="md-nav__link">
-    <span class="md-ellipsis">
-      🌐 GitHub Pages Detection
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#license-management" class="md-nav__link">
-    <span class="md-ellipsis">
-      📄 License Management
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#configuration-management" class="md-nav__link">
-    <span class="md-ellipsis">
-      ⚙️ Configuration Management
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#performance-quality" class="md-nav__link">
-    <span class="md-ellipsis">
-      ⚡ Performance &amp; Quality
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#unix-philosophy-jsonl-output" class="md-nav__link">
-    <span class="md-ellipsis">
-      🔧 Unix Philosophy &amp; JSONL Output
+      Interactive Shell
     </span>
   </a>
   
@@ -698,240 +544,54 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#quick-start" class="md-nav__link">
+  <a href="#output-formats" class="md-nav__link">
     <span class="md-ellipsis">
-      🚀 Quick Start
+      Output Formats
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#use-cases" class="md-nav__link">
+  <a href="#refresh-database" class="md-nav__link">
     <span class="md-ellipsis">
-      Use Cases
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Use Cases">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#open-source-maintainers" class="md-nav__link">
-    <span class="md-ellipsis">
-      Open Source Maintainers
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#development-teams" class="md-nav__link">
-    <span class="md-ellipsis">
-      Development Teams
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#individual-developers" class="md-nav__link">
-    <span class="md-ellipsis">
-      Individual Developers
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#getting-started" class="md-nav__link">
-    <span class="md-ellipsis">
-      Getting Started
+      Refresh Database
     </span>
   </a>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#documentation-sections" class="md-nav__link">
+  <a href="#configuration" class="md-nav__link">
     <span class="md-ellipsis">
-      Documentation Sections
+      Configuration
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Documentation Sections">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#core-documentation" class="md-nav__link">
-    <span class="md-ellipsis">
-      📖 Core Documentation
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#integrations" class="md-nav__link">
-    <span class="md-ellipsis">
-      🔌 Integrations
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#tutorials-guides" class="md-nav__link">
-    <span class="md-ellipsis">
-      📚 Tutorials &amp; Guides
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#commands-api" class="md-nav__link">
-    <span class="md-ellipsis">
-      🔧 Commands &amp; API
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#development" class="md-nav__link">
-    <span class="md-ellipsis">
-      🚀 Development
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#recent-updates" class="md-nav__link">
+  <a href="#documentation" class="md-nav__link">
     <span class="md-ellipsis">
-      Recent Updates
+      Documentation
     </span>
   </a>
-  
-    <nav class="md-nav" aria-label="Recent Updates">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#version-060" class="md-nav__link">
-    <span class="md-ellipsis">
-      Version 0.6.0 🎉
-    </span>
-  </a>
-  
-    <nav class="md-nav" aria-label="Version 0.6.0 🎉">
-      <ul class="md-nav__list">
-        
-          <li class="md-nav__item">
-  <a href="#complete-architecture-redesign" class="md-nav__link">
-    <span class="md-ellipsis">
-      🏗️ Complete Architecture Redesign
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#comprehensive-testing-framework" class="md-nav__link">
-    <span class="md-ellipsis">
-      🧪 Comprehensive Testing Framework
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#performance-reliability-enhancements" class="md-nav__link">
-    <span class="md-ellipsis">
-      ⚡ Performance &amp; Reliability Enhancements
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#advanced-social-media-framework" class="md-nav__link">
-    <span class="md-ellipsis">
-      📱 Advanced Social Media Framework
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#enhanced-configuration-system" class="md-nav__link">
-    <span class="md-ellipsis">
-      ⚙️ Enhanced Configuration System
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#robust-license-management" class="md-nav__link">
-    <span class="md-ellipsis">
-      📄 Robust License Management
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#enhanced-github-pages-detection" class="md-nav__link">
-    <span class="md-ellipsis">
-      🌐 Enhanced GitHub Pages Detection
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#improved-pypi-integration" class="md-nav__link">
-    <span class="md-ellipsis">
-      📦 Improved PyPI Integration
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#version-05x-legacy" class="md-nav__link">
-    <span class="md-ellipsis">
-      Version 0.5.x (Legacy)
-    </span>
-  </a>
-  
-</li>
-        
-      </ul>
-    </nav>
   
 </li>
       
         <li class="md-nav__item">
-  <a href="#community-and-support" class="md-nav__link">
+  <a href="#for-claude-code-users" class="md-nav__link">
     <span class="md-ellipsis">
-      Community and Support
+      For Claude Code Users
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#links" class="md-nav__link">
+    <span class="md-ellipsis">
+      Links
     </span>
   </a>
   
@@ -982,28 +642,6 @@
   
   
   
-    <li class="md-nav__item">
-      <a href="usage/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Usage
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
     
     
     
@@ -1018,15 +656,15 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
         
           
-          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
             
   
   
   <span class="md-ellipsis">
-    Commands
+    Core
     
   </span>
   
@@ -1034,12 +672,35 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_4">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
-            Commands
+            Core
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="usage/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Usage Guide
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
             
               
                 
@@ -1053,99 +714,7 @@
   
   
   <span class="md-ellipsis">
-    Organization & Discovery
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="audit-command/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Repository Audit
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="export-command/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Portfolio Export
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="docs-command/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Documentation
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="list-command/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    List
+    Query Language
     
   </span>
   
@@ -1206,15 +775,15 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
         
           
-          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
             
   
   
   <span class="md-ellipsis">
-    Integrations
+    Events
     
   </span>
   
@@ -1222,10 +791,10 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
             <span class="md-nav__icon md-icon"></span>
-            Integrations
+            Events
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
             
@@ -1236,7 +805,7 @@
   
   
     <li class="md-nav__item">
-      <a href="integrations/overview/" class="md-nav__link">
+      <a href="events/overview/" class="md-nav__link">
         
   
   
@@ -1259,12 +828,12 @@
   
   
     <li class="md-nav__item">
-      <a href="integrations/clustering/" class="md-nav__link">
+      <a href="events/event-types/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
-    Repository Clustering
+    Event Types Reference
     
   </span>
   
@@ -1275,6 +844,56 @@
 
               
             
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    Interactive
+    
+  </span>
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            Interactive
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
               
                 
   
@@ -1282,12 +901,12 @@
   
   
     <li class="md-nav__item">
-      <a href="integrations/workflow/" class="md-nav__link">
+      <a href="shell-vfs/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
-    Workflow Orchestration
+    Shell & VFS
     
   </span>
   
@@ -1333,7 +952,7 @@
   
   
   <span class="md-ellipsis">
-    Tutorials
+    Reference
     
   </span>
   
@@ -1344,115 +963,12 @@
         <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_6">
             <span class="md-nav__icon md-icon"></span>
-            Tutorials
+            Reference
           </label>
           <ul class="md-nav__list" data-md-scrollfix>
             
               
                 
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="tutorials/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Jupyter Notebooks
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
-      
-      
-  
-  
-  
-  
-    
-    
-    
-    
-      
-      
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
-        
-          
-          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
-            
-  
-  
-  <span class="md-ellipsis">
-    API Reference
-    
-  </span>
-  
-
-            <span class="md-nav__icon md-icon"></span>
-          </label>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_7">
-            <span class="md-nav__icon md-icon"></span>
-            API Reference
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="api/integrations/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Integration API
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-          </ul>
-        </nav>
-      
-    </li>
-  
-
-    
-      
-      
   
   
   
@@ -1469,6 +985,83 @@
   
 
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="design/CLI_DESIGN_DECISIONS/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Design Decisions
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="design/GIT_COMMANDS_DESIGN/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Git Commands Design
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="design/VERSION_MANAGEMENT_IMPLEMENTATION/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    Version Management
+    
+  </span>
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
     </li>
   
 
@@ -1517,28 +1110,6 @@
   
 
     
-      
-      
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="future-plans/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    Future Plans
-    
-  </span>
-  
-
-      </a>
-    </li>
-  
-
-    
   </ul>
 </nav>
                   </div>
@@ -1558,353 +1129,193 @@
   
 
 
-<h1 id="repoindex-documentation">repoindex Documentation</h1>
-<p>Welcome to the documentation for <strong>repoindex</strong> - a comprehensive repository orchestration platform that helps developers manage, analyze, and automate their projects across multiple platforms with advanced clustering, workflow orchestration, and intelligent integrations.</p>
-<h2 id="what-is-repoindex">What is repoindex?</h2>
-<p><code>repoindex</code> is a powerful repository orchestration platform that treats your local git repositories as the source of truth, with remote platforms (GitHub, GitLab, PyPI, etc.) serving as enrichment and distribution services. It provides advanced repository analysis, intelligent clustering, workflow automation, and comprehensive export capabilities for managing projects at scale.</p>
-<h2 id="whats-new-in-version-080">🚀 What's New in Version 0.8.0</h2>
-<ul>
-<li><strong>🧠 Repository Clustering</strong>: Advanced machine learning algorithms for grouping similar projects</li>
-<li>Multiple clustering algorithms: K-means, DBSCAN, Hierarchical, Network-based</li>
-<li>Code duplication detection at function and class level</li>
-<li>Intelligent consolidation advisor with confidence scoring</li>
-<li>Support for Python, JavaScript, Java, and Go code analysis</li>
-<li><strong>🔄 Workflow Orchestration</strong>: YAML-based workflow automation with DAG execution</li>
-<li>Parallel and sequential step execution with dependency resolution</li>
-<li>Multiple action types: shell, python, http, git, repoindex</li>
-<li>Conditional execution and retry mechanisms</li>
-<li>Built-in actions library and extensible custom actions</li>
-<li><strong>📊 Data Visualization</strong>: Interactive charts and graphs for repository analytics</li>
-<li><strong>🎓 Tutorial Notebooks</strong>: 5 comprehensive Jupyter notebooks for hands-on learning</li>
-<li><strong>🔌 Plugin Architecture</strong>: Extensible integration system for custom features</li>
-</ul>
-<h2 id="core-philosophy">🎯 Core Philosophy</h2>
-<ul>
-<li><strong>Local-First</strong>: Your local git repositories are the ground truth</li>
-<li><strong>JSONL by Default</strong>: All commands output newline-delimited JSON for Unix pipeline composition</li>
-<li><strong>Tag-Based Organization</strong>: Powerful tagging system with implicit tags from metadata</li>
-<li><strong>Query Language</strong>: Fuzzy search with simple boolean expressions</li>
-<li><strong>Multi-Platform</strong>: Works with GitHub, GitLab, Bitbucket, and more (coming soon)</li>
-</ul>
-<h2 id="key-features">✨ Key Features</h2>
-<h3 id="advanced-repository-analysis">🧠 <strong>Advanced Repository Analysis</strong></h3>
-<ul>
-<li><strong>Intelligent Clustering</strong>: Automatically group similar repositories using machine learning</li>
-<li>K-means clustering with automatic optimal cluster detection</li>
-<li>DBSCAN for density-based clustering of arbitrary shapes</li>
-<li>Hierarchical clustering with dendrogram visualization</li>
-<li>Network-based clustering using repository relationships</li>
-<li>Ensemble methods combining multiple algorithms</li>
-<li><strong>Code Duplication Detection</strong>: Find duplicate code blocks across repositories</li>
-<li>Function and class-level code extraction</li>
-<li>Cross-repository similarity scoring</li>
-<li>Multi-language support: Python, JavaScript, Java, Go</li>
-<li>Actionable recommendations with confidence levels</li>
-<li><strong>Consolidation Advisor</strong>: Get intelligent suggestions for merging similar repositories</li>
-<li>Confidence scoring (0.0 to 1.0) for consolidation recommendations</li>
-<li>Effort estimation: low, medium, high complexity</li>
-<li>Detailed rationale and expected benefits</li>
-<li>Consideration of shared dependencies and code patterns</li>
-<li><strong>Technology Stack Analysis</strong>: Deep insights into languages, frameworks, and dependencies</li>
-</ul>
-<h3 id="workflow-orchestration">🔄 <strong>Workflow Orchestration</strong></h3>
-<ul>
-<li><strong>YAML Workflows</strong>: Define complex multi-step workflows in human-readable YAML</li>
-<li>Clear workflow definitions with variables and templating</li>
-<li>Support for workflow composition and reuse</li>
-<li>Schedule workflows with cron expressions</li>
-<li>Version control friendly format</li>
-<li><strong>DAG Execution</strong>: Directed Acyclic Graph execution with dependency management</li>
-<li>Automatic dependency resolution and topological sorting</li>
-<li>Parallel execution of independent steps</li>
-<li>Sequential execution for dependent operations</li>
-<li>Dynamic step generation based on runtime conditions</li>
-<li><strong>Multiple Action Types</strong>: Rich variety of built-in and custom actions</li>
-<li><strong>shell</strong>: Execute shell commands with timeout and retry</li>
-<li><strong>python</strong>: Run Python code with context access</li>
-<li><strong>http</strong>: Make HTTP requests with authentication</li>
-<li><strong>git</strong>: Git operations (clone, pull, push, commit)</li>
-<li><strong>repoindex</strong>: Integrate all repoindex commands seamlessly</li>
-<li><strong>custom</strong>: Extensible custom action support</li>
-<li><strong>Conditional Logic</strong>: Support for if/else conditions and dynamic branching</li>
-<li>Jinja2-style template expressions</li>
-<li>Access to step outputs and workflow context</li>
-<li>Complex boolean expressions</li>
-<li>Skip steps based on previous results</li>
-<li><strong>Error Handling</strong>: Robust retry and recovery mechanisms</li>
-<li>Configurable retry with exponential backoff</li>
-<li>Continue on error or stop on failure options</li>
-<li>Error recovery steps and fallback actions</li>
-<li>Comprehensive error reporting</li>
-</ul>
-<h3 id="repository-discovery-organization">🔍 <strong>Repository Discovery &amp; Organization</strong></h3>
-<ul>
-<li><strong>Tag-Based Catalogs</strong>: Organize repos with explicit tags and auto-generated implicit tags</li>
-<li><strong>Powerful Query Language</strong>: Find repos with fuzzy matching: <code>repoindex query "language ~= 'pyton'"</code></li>
-<li><strong>Metadata Store</strong>: Local database of all repository information for fast queries</li>
-<li><strong>Implicit Tags</strong>: Automatic tags like <code>repo:name</code>, <code>lang:python</code>, <code>has:docs</code>, <code>dir:parent</code></li>
-</ul>
-<h3 id="repository-auditing">🛡️ <strong>Repository Auditing</strong></h3>
-<ul>
-<li><strong>Comprehensive Health Checks</strong>: Audit repos for licenses, READMEs, security issues, and more</li>
-<li><strong>Auto-Fix Capabilities</strong>: Automatically fix common issues with <code>--fix</code> flag</li>
-<li><strong>Security Scanning</strong>: Detect hardcoded secrets and security vulnerabilities</li>
-<li><strong>Dependency Auditing</strong>: Check for missing or outdated dependency management</li>
-<li><strong>Documentation Health</strong>: Verify documentation setup and configuration</li>
-</ul>
-<h3 id="portfolio-export">📄 <strong>Portfolio Export</strong></h3>
-<ul>
-<li><strong>Multiple Formats</strong>: Export to Markdown, Hugo, HTML, JSON, CSV, LaTeX, and PDF</li>
-<li><strong>Interactive HTML</strong>: Generated HTML includes live search, filtering, and sorting</li>
-<li><strong>Hugo Integration</strong>: Create complete Hugo site structure with taxonomies</li>
-<li><strong>Grouping &amp; Organization</strong>: Group exports by language, directory, or custom tags</li>
-<li><strong>Template Support</strong>: Customizable export templates for all formats</li>
-</ul>
-<h3 id="documentation-management">📚 <strong>Documentation Management</strong></h3>
-<ul>
-<li><strong>Multi-Tool Support</strong>: Works with MkDocs, Sphinx, Jekyll, Hugo, and more</li>
-<li><strong>Status Checking</strong>: See documentation health across all repos</li>
-<li><strong>Build &amp; Serve</strong>: Build and preview documentation locally</li>
-<li><strong>Deploy to GitHub Pages</strong>: One-command deployment to GitHub Pages</li>
-<li><strong>Bulk Operations</strong>: Manage docs across multiple repos simultaneously</li>
-</ul>
-<h3 id="repository-management">🚀 <strong>Repository Management</strong></h3>
-<ul>
-<li>Clone all your GitHub repositories with a single command</li>
-<li>Update multiple repositories simultaneously with smart conflict resolution</li>
-<li>Track status across all your projects with detailed reporting and progress bars</li>
-<li>Flexible repository discovery with configurable ignore patterns</li>
-</ul>
-<h3 id="pypi-integration">📦 <strong>PyPI Integration</strong></h3>
-<ul>
-<li>Automatically detect Python packages from <code>pyproject.toml</code>, <code>setup.py</code>, and <code>setup.cfg</code></li>
-<li>Track PyPI publishing status and version information with real-time checking</li>
-<li>Identify outdated packages that need updates</li>
-<li>Performance optimized with optional checking for faster operations</li>
-</ul>
-<h3 id="social-media-automation">📱 <strong>Social Media Automation</strong></h3>
-<ul>
-<li>Template-driven content generation for Twitter, LinkedIn, and Mastodon</li>
-<li>Smart sampling of repositories with configurable filters</li>
-<li>Dry-run support to preview posts before publishing</li>
-<li>Rate limiting and posting frequency controls</li>
-</ul>
-<h3 id="github-pages-detection">🌐 <strong>GitHub Pages Detection</strong></h3>
-<ul>
-<li>Multi-method detection for Jekyll, MkDocs, Sphinx, and custom configurations</li>
-<li>Automatically build GitHub Pages URLs from repository metadata</li>
-<li>Track which repositories have active documentation sites</li>
-</ul>
-<h3 id="license-management">📄 <strong>License Management</strong></h3>
-<ul>
-<li>GitHub API integration for license template fetching</li>
-<li>Bulk license addition across multiple repositories</li>
-<li>Template customization with automatic placeholder replacement</li>
-<li>Support for all major open source licenses</li>
-</ul>
-<h3 id="configuration-management">⚙️ <strong>Configuration Management</strong></h3>
-<ul>
-<li>Support for both JSON and TOML configuration formats</li>
-<li>Environment variable overrides for all settings</li>
-<li>Intelligent merging of defaults, file settings, and overrides</li>
-<li>Built-in configuration template generation</li>
-</ul>
-<h3 id="performance-quality">⚡ <strong>Performance &amp; Quality</strong></h3>
-<ul>
-<li>Fast operations with real-time progress indicators</li>
-<li>Configurable filtering and performance options</li>
-<li>Clean console output with detailed statistics</li>
-<li>Comprehensive error handling and logging</li>
-</ul>
-<h3 id="unix-philosophy-jsonl-output">🔧 <strong>Unix Philosophy &amp; JSONL Output</strong></h3>
-<ul>
-<li>All commands output newline-delimited JSON (JSONL) by default</li>
-<li>Stream-friendly format for processing millions of repos</li>
-<li>Compose with standard Unix tools (jq, grep, awk)</li>
-<li>Human-readable tables available with <code>--pretty</code> flag</li>
-</ul>
-<h2 id="quick-start">🚀 Quick Start</h2>
-<pre><code class="language-bash"># Install repoindex
-pip install repoindex
-
-# Generate configuration with examples
-repoindex config generate
-
-# Clone all your repositories
-repoindex get
-
-# Check status of all repositories (outputs JSONL)
-repoindex status -r
-
-# Pretty-print status as a table
-repoindex status -r --pretty
-
-# Analyze repository clusters using K-means
-repoindex cluster analyze --algorithm kmeans --n-clusters 5
-
-# Find duplicate code across repositories
-repoindex cluster find-duplicates --min-similarity 0.7 -r
-
-# Get consolidation suggestions
-repoindex cluster suggest-consolidation --confidence 0.8 --pretty
-
-# Run a workflow
-repoindex workflow run examples/workflows/morning-routine.yaml
-
-# Run workflow with variables
-repoindex workflow run release-pipeline.yaml --var version=1.0.0
-
-# Filter repos with jq
-repoindex status | jq 'select(.status.uncommitted_changes == true)'
-
-# Sample repositories for social media (dry run)
-repoindex social sample --size 3
-repoindex social post --dry-run
-</code></pre>
-<h2 id="use-cases">Use Cases</h2>
-<h3 id="open-source-maintainers"><strong>Open Source Maintainers</strong></h3>
-<ul>
-<li>Track all your projects in one place</li>
-<li>Automate social media promotion of releases</li>
-<li>Monitor PyPI package status across projects</li>
-<li>Keep licenses up to date</li>
-</ul>
-<h3 id="development-teams"><strong>Development Teams</strong></h3>
-<ul>
-<li>Synchronize repository updates across team members</li>
-<li>Track project health and activity</li>
-<li>Maintain consistent licensing and documentation</li>
-</ul>
-<h3 id="individual-developers"><strong>Individual Developers</strong></h3>
-<ul>
-<li>Organize and monitor personal projects</li>
-<li>Automate promotion of your work</li>
-<li>Track your open source contributions</li>
-</ul>
-<h2 id="getting-started">Getting Started</h2>
+<h1 id="repoindex">repoindex</h1>
+<p><strong>A filesystem git catalog for your repository collection.</strong></p>
+<p>repoindex provides a unified view across all your local git repositories, enabling queries, organization, and integration with LLM tools like Claude Code.</p>
+<h2 id="philosophy">Philosophy</h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Claude Code (deep work on ONE repo)
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>         |
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>         | &quot;What else do I have?&quot;
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>         | &quot;Which repos need X?&quot;
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>         v
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>      repoindex (collection awareness)
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>         |
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>         +-- status      -&gt; what exists
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>         +-- tags        -&gt; organization
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>         +-- query       -&gt; discovery
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>         +-- events      -&gt; what happened
+</code></pre></div>
+<p><strong>Core Principles:</strong></p>
 <ol>
-<li><strong><a href="getting-started/">Installation</a></strong> - Quick start guide for new users</li>
-<li><strong><a href="tutorials/notebooks/">Tutorial Notebooks</a></strong> - Interactive Jupyter notebooks for learning</li>
-<li><strong><a href="usage/">Basic Usage</a></strong> - Learn the core commands</li>
-<li><strong><a href="usage/#configuration-management">Configuration</a></strong> - Set up your preferences</li>
-<li><strong><a href="usage/#pypi-integration">Advanced Features</a></strong> - Explore PyPI and social media features</li>
+<li><strong>Collection, not content</strong> - Know <em>about</em> repos, not <em>inside</em> them</li>
+<li><strong>Metadata, not manipulation</strong> - Track state, don't edit files</li>
+<li><strong>Index, not IDE</strong> - We're the catalog, not the workbench</li>
+<li><strong>Unix philosophy</strong> - Pretty tables by default, JSONL for pipes</li>
+<li><strong>Read-only events</strong> - Observe and report, don't act</li>
 </ol>
-<h2 id="documentation-sections">Documentation Sections</h2>
-<h3 id="core-documentation">📖 Core Documentation</h3>
+<h2 id="quick-start">Quick Start</h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># Install</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>pip<span class="w"> </span>install<span class="w"> </span>repoindex
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># Initialize configuration</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>repoindex<span class="w"> </span>config<span class="w"> </span>init
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="c1"># Refresh database (required before queries)</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>repoindex<span class="w"> </span>refresh
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="c1"># Dashboard overview</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>repoindex<span class="w"> </span>status
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="c1"># Query with convenience flags</span>
+<a id="__codelineno-1-14" name="__codelineno-1-14" href="#__codelineno-1-14"></a>repoindex<span class="w"> </span>query<span class="w"> </span>--dirty<span class="w">                    </span><span class="c1"># Uncommitted changes</span>
+<a id="__codelineno-1-15" name="__codelineno-1-15" href="#__codelineno-1-15"></a>repoindex<span class="w"> </span>query<span class="w"> </span>--language<span class="w"> </span>python<span class="w">          </span><span class="c1"># Python repos</span>
+<a id="__codelineno-1-16" name="__codelineno-1-16" href="#__codelineno-1-16"></a>repoindex<span class="w"> </span>query<span class="w"> </span>--recent<span class="w"> </span>7d<span class="w">                </span><span class="c1"># Recent commits</span>
+<a id="__codelineno-1-17" name="__codelineno-1-17" href="#__codelineno-1-17"></a>repoindex<span class="w"> </span>query<span class="w"> </span>--tag<span class="w"> </span><span class="s2">&quot;work/*&quot;</span><span class="w">             </span><span class="c1"># By tag</span>
+<a id="__codelineno-1-18" name="__codelineno-1-18" href="#__codelineno-1-18"></a>
+<a id="__codelineno-1-19" name="__codelineno-1-19" href="#__codelineno-1-19"></a><span class="c1"># Tag repositories for organization</span>
+<a id="__codelineno-1-20" name="__codelineno-1-20" href="#__codelineno-1-20"></a>repoindex<span class="w"> </span>tag<span class="w"> </span>add<span class="w"> </span>myproject<span class="w"> </span>work/active
+<a id="__codelineno-1-21" name="__codelineno-1-21" href="#__codelineno-1-21"></a>repoindex<span class="w"> </span>tag<span class="w"> </span>add<span class="w"> </span>myproject<span class="w"> </span>topic:ml
+<a id="__codelineno-1-22" name="__codelineno-1-22" href="#__codelineno-1-22"></a>
+<a id="__codelineno-1-23" name="__codelineno-1-23" href="#__codelineno-1-23"></a><span class="c1"># See what happened</span>
+<a id="__codelineno-1-24" name="__codelineno-1-24" href="#__codelineno-1-24"></a>repoindex<span class="w"> </span>events<span class="w"> </span>--since<span class="w"> </span>7d
+</code></pre></div>
+<h2 id="key-features">Key Features</h2>
+<h3 id="query-system">Query System</h3>
+<p>Find repositories with convenience flags or the query DSL:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Convenience flags (pretty table by default)</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>repoindex<span class="w"> </span>query<span class="w"> </span>--dirty<span class="w">                    </span><span class="c1"># Uncommitted changes</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>repoindex<span class="w"> </span>query<span class="w"> </span>--language<span class="w"> </span>python<span class="w">          </span><span class="c1"># Python repos</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>repoindex<span class="w"> </span>query<span class="w"> </span>--starred<span class="w">                  </span><span class="c1"># Has GitHub stars (requires --github during refresh)</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>repoindex<span class="w"> </span>query<span class="w"> </span>--has-citation<span class="w">             </span><span class="c1"># Has citation files</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>repoindex<span class="w"> </span>query<span class="w"> </span>--has-doi<span class="w">                  </span><span class="c1"># Has DOI in citation</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="c1"># Query DSL</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>repoindex<span class="w"> </span>query<span class="w"> </span><span class="s2">&quot;language == &#39;Python&#39; and github_stars &gt; 10&quot;</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>repoindex<span class="w"> </span>query<span class="w"> </span><span class="s2">&quot;language ~= &#39;pyton&#39;&quot;</span><span class="w">      </span><span class="c1"># Fuzzy matching (typo-tolerant)</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>repoindex<span class="w"> </span>query<span class="w"> </span><span class="s2">&quot;tagged(&#39;work/*&#39;)&quot;</span><span class="w">         </span><span class="c1"># Query by tag</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="c1"># JSONL output for piping</span>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a>repoindex<span class="w"> </span>query<span class="w"> </span>--json<span class="w"> </span>--language<span class="w"> </span>python<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">&#39;.name&#39;</span>
+</code></pre></div>
+<p>See <a href="catalog-query/">Query Language</a> for syntax details.</p>
+<h3 id="event-system">Event System</h3>
+<p>Track what's happening across your entire collection:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># Events from database (pretty table by default)</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>repoindex<span class="w"> </span>events<span class="w"> </span>--since<span class="w"> </span>7d
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="c1"># Filter by type</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>repoindex<span class="w"> </span>events<span class="w"> </span>--type<span class="w"> </span>git_tag<span class="w"> </span>--since<span class="w"> </span>30d
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>repoindex<span class="w"> </span>events<span class="w"> </span>--type<span class="w"> </span>commit<span class="w"> </span>--since<span class="w"> </span>7d
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="c1"># Filter by repository</span>
+<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>repoindex<span class="w"> </span>events<span class="w"> </span>--repo<span class="w"> </span>myproject
+<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>
+<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a><span class="c1"># Summary statistics</span>
+<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a>repoindex<span class="w"> </span>events<span class="w"> </span>--stats
+<a id="__codelineno-3-13" name="__codelineno-3-13" href="#__codelineno-3-13"></a>
+<a id="__codelineno-3-14" name="__codelineno-3-14" href="#__codelineno-3-14"></a><span class="c1"># JSONL for piping</span>
+<a id="__codelineno-3-15" name="__codelineno-3-15" href="#__codelineno-3-15"></a>repoindex<span class="w"> </span>events<span class="w"> </span>--json<span class="w"> </span>--since<span class="w"> </span>7d<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">&#39;.type&#39;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>sort<span class="w"> </span><span class="p">|</span><span class="w"> </span>uniq<span class="w"> </span>-c
+</code></pre></div>
+<p><strong>Event categories:</strong>
+- <strong>Local git</strong>: tags, commits, branches, merges</p>
+<p>See <a href="events/overview/">Events Overview</a> for full documentation.</p>
+<h3 id="tag-system">Tag System</h3>
+<p>Organize repos with hierarchical tags:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># Add tags</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>repoindex<span class="w"> </span>tag<span class="w"> </span>add<span class="w"> </span>myproject<span class="w"> </span>work/active
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>repoindex<span class="w"> </span>tag<span class="w"> </span>add<span class="w"> </span>myproject<span class="w"> </span>topic:ml/research
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="c1"># List by tag</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>repoindex<span class="w"> </span>tag<span class="w"> </span>list<span class="w"> </span>-t<span class="w"> </span><span class="s2">&quot;work/*&quot;</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="c1"># Show tag hierarchy</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>repoindex<span class="w"> </span>tag<span class="w"> </span>tree
+</code></pre></div>
+<p>Tags support:
+- Hierarchical paths: <code>work/active</code>, <code>topic/ml/research</code>
+- Key:value format: <code>lang:python</code>, <code>status:maintained</code>
+- Implicit tags: Auto-generated from metadata (<code>repo:name</code>, <code>dir:parent</code>)</p>
+<h3 id="interactive-shell">Interactive Shell</h3>
+<p>VFS-based shell for navigating your collection:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>repoindex<span class="w"> </span>shell
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="c1"># Navigate like a filesystem</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>&gt;<span class="w"> </span><span class="nb">cd</span><span class="w"> </span>/by-tag/work/active
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>&gt;<span class="w"> </span>ls
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>myproject<span class="w">  </span>otherproject
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="c1"># Run events from shell</span>
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>&gt;<span class="w"> </span>events<span class="w"> </span>--since<span class="w"> </span>1d
+</code></pre></div>
+<p>See <a href="shell-vfs/">Shell &amp; VFS</a> for details.</p>
+<h2 id="output-formats">Output Formats</h2>
+<p>Commands output pretty tables by default. Use <code>--json</code> for JSONL:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># Pretty tables (default)</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>repoindex<span class="w"> </span>query<span class="w"> </span>--language<span class="w"> </span>python
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>repoindex<span class="w"> </span>events<span class="w"> </span>--since<span class="w"> </span>7d
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="c1"># JSONL for piping/scripting</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>repoindex<span class="w"> </span>query<span class="w"> </span>--json<span class="w"> </span>--language<span class="w"> </span>python<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">&#39;.name&#39;</span>
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>repoindex<span class="w"> </span>events<span class="w"> </span>--json<span class="w"> </span>--since<span class="w"> </span>7d<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">&#39;.type&#39;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>sort<span class="w"> </span><span class="p">|</span><span class="w"> </span>uniq<span class="w"> </span>-c
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="c1"># Brief output (just repo names)</span>
+<a id="__codelineno-6-10" name="__codelineno-6-10" href="#__codelineno-6-10"></a>repoindex<span class="w"> </span>query<span class="w"> </span>--brief<span class="w"> </span>--dirty
+</code></pre></div>
+<h2 id="refresh-database">Refresh Database</h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>repoindex<span class="w"> </span>refresh<span class="w">                  </span><span class="c1"># Smart refresh (changed repos only)</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>repoindex<span class="w"> </span>refresh<span class="w"> </span>--full<span class="w">           </span><span class="c1"># Force full refresh</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>repoindex<span class="w"> </span>refresh<span class="w"> </span>--github<span class="w">         </span><span class="c1"># Include GitHub metadata</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>repoindex<span class="w"> </span>refresh<span class="w"> </span>--pypi<span class="w">           </span><span class="c1"># Include PyPI package status</span>
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>repoindex<span class="w"> </span>refresh<span class="w"> </span>--cran<span class="w">           </span><span class="c1"># Include CRAN package status</span>
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>repoindex<span class="w"> </span>refresh<span class="w"> </span>--external<span class="w">       </span><span class="c1"># Include all external metadata</span>
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>repoindex<span class="w"> </span>refresh<span class="w"> </span>--since<span class="w"> </span>30d<span class="w">      </span><span class="c1"># Events from last 30 days</span>
+</code></pre></div>
+<h2 id="configuration">Configuration</h2>
+<p>Configuration lives in <code>~/.repoindex/config.yaml</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nt">repository_directories</span><span class="p">:</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">~/projects</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">~/work/**</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="nt">github</span><span class="p">:</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="w">  </span><span class="nt">token</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">ghp_...</span>
+<a id="__codelineno-8-7" name="__codelineno-8-7" href="#__codelineno-8-7"></a>
+<a id="__codelineno-8-8" name="__codelineno-8-8" href="#__codelineno-8-8"></a><span class="nt">repository_tags</span><span class="p">:</span>
+<a id="__codelineno-8-9" name="__codelineno-8-9" href="#__codelineno-8-9"></a><span class="w">  </span><span class="nt">/path/to/repo</span><span class="p">:</span>
+<a id="__codelineno-8-10" name="__codelineno-8-10" href="#__codelineno-8-10"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">topic:ml</span>
+<a id="__codelineno-8-11" name="__codelineno-8-11" href="#__codelineno-8-11"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">work/active</span>
+</code></pre></div>
+<p>Or use environment variables:
+- <code>REPOINDEX_GITHUB_TOKEN</code>
+- <code>REPOINDEX_CONFIG</code></p>
+<h2 id="documentation">Documentation</h2>
 <ul>
-<li><strong><a href="getting-started/">Getting Started</a></strong> - Quick installation and first steps</li>
-<li><strong><a href="usage/">Usage Guide</a></strong> - Comprehensive command reference and examples</li>
-<li><strong><a href="query-cookbook/">Query Cookbook</a></strong> - Advanced query examples and patterns</li>
-<li><strong><a href="architecture-vision/">Architecture &amp; Vision</a></strong> - System design and philosophy</li>
+<li><strong><a href="getting-started/">Getting Started</a></strong> - Installation and first steps</li>
+<li><strong><a href="usage/">Usage Guide</a></strong> - Core commands and configuration</li>
+<li><strong><a href="events/overview/">Events</a></strong> - Event system documentation</li>
+<li><strong><a href="catalog-query/">Query Language</a></strong> - Query syntax and examples</li>
+<li><strong><a href="shell-vfs/">Shell &amp; VFS</a></strong> - Interactive shell</li>
+<li><strong><a href="changelog/">Changelog</a></strong> - Release history</li>
 </ul>
-<h3 id="integrations">🔌 Integrations</h3>
+<h2 id="for-claude-code-users">For Claude Code Users</h2>
+<p>repoindex complements Claude Code by providing collection awareness. While Claude Code works deeply within a single repository, repoindex answers questions like:</p>
 <ul>
-<li><strong><a href="integrations/overview/">Integration Overview</a></strong> - Plugin architecture and available integrations</li>
-<li><strong><a href="integrations/clustering/">Repository Clustering</a></strong> - Machine learning-based clustering</li>
-<li><strong><a href="integrations/workflow/">Workflow Orchestration</a></strong> - YAML-based automation</li>
-<li><strong><a href="integrations/network-analysis.md">Network Analysis</a></strong> - Repository relationship analysis</li>
+<li>"Which of my repos have uncommitted changes?"</li>
+<li>"What got released this week?"</li>
+<li>"Which repos use Python?"</li>
+<li>"What needs attention?"</li>
 </ul>
-<h3 id="tutorials-guides">📚 Tutorials &amp; Guides</h3>
+<p>Install the skill for easy access:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>repoindex<span class="w"> </span>claude<span class="w"> </span>install<span class="w"> </span>--global
+</code></pre></div>
+<p>Then use <code>/repoindex</code> in Claude Code conversations.</p>
+<h2 id="links">Links</h2>
 <ul>
-<li><strong><a href="tutorials/notebooks/">Tutorial Notebooks</a></strong> - Interactive Jupyter notebooks</li>
-<li><strong><a href="guides/best-practices.md">Best Practices</a></strong> - Repository management best practices</li>
-<li><strong><a href="guides/migration.md">Migration Guide</a></strong> - Upgrading from older versions</li>
-<li><strong><a href="guides/troubleshooting.md">Troubleshooting</a></strong> - Common issues and solutions</li>
-</ul>
-<h3 id="commands-api">🔧 Commands &amp; API</h3>
-<ul>
-<li><strong><a href="catalog-query/">Catalog &amp; Query</a></strong> - Organization and discovery</li>
-<li><strong><a href="audit-command/">Repository Audit</a></strong> - Health checks and auto-fixes</li>
-<li><strong><a href="export-command/">Portfolio Export</a></strong> - Export to multiple formats</li>
-<li><strong><a href="docs-command/">Documentation</a></strong> - Documentation management</li>
-<li><strong><a href="api/index.md">API Reference</a></strong> - Complete API documentation</li>
-</ul>
-<h3 id="development">🚀 Development</h3>
-<ul>
-<li><strong><a href="contributing/">Contributing</a></strong> - How to contribute to the project</li>
-<li><strong><a href="future-plans/">Future Plans</a></strong> - Roadmap and upcoming features</li>
-<li><strong><a href="changelog/">Changelog</a></strong> - Version history and release notes</li>
-</ul>
-<h2 id="recent-updates">Recent Updates</h2>
-<h3 id="version-060">Version 0.6.0 🎉</h3>
-<p><strong>Major Architecture &amp; Quality Overhaul</strong> - This release represents a complete transformation of <code>repoindex</code> into a robust, enterprise-ready tool.</p>
-<h4 id="complete-architecture-redesign">🏗️ <strong>Complete Architecture Redesign</strong></h4>
-<ul>
-<li>✅ <strong>Modular Command Structure</strong>: Separated all commands into dedicated modules (<code>repoindex/commands/</code>)</li>
-<li>✅ <strong>Clean Separation of Concerns</strong>: Utilities, configuration, and API integrations properly separated</li>
-<li>✅ <strong>Extensible Design</strong>: Easy to add new commands and features without breaking existing functionality</li>
-<li>✅ <strong>Import Optimization</strong>: Eliminated circular dependencies and improved startup time</li>
-</ul>
-<h4 id="comprehensive-testing-framework">🧪 <strong>Comprehensive Testing Framework</strong></h4>
-<ul>
-<li>✅ <strong>138 Tests</strong>: Complete test coverage for all functionality</li>
-<li>✅ <strong>86% Code Coverage</strong>: Robust testing of edge cases and error conditions</li>
-<li>✅ <strong>Unit &amp; Integration Tests</strong>: Both isolated component testing and end-to-end workflows</li>
-<li>✅ <strong>Mock Testing</strong>: Reliable testing of external API interactions</li>
-<li>✅ <strong>Error Condition Testing</strong>: Comprehensive failure scenario coverage</li>
-</ul>
-<h4 id="performance-reliability-enhancements">⚡ <strong>Performance &amp; Reliability Enhancements</strong></h4>
-<ul>
-<li>✅ <strong>Optional API Checks</strong>: <code>--no-pypi-check</code> and <code>--no-pages-check</code> for faster operations</li>
-<li>✅ <strong>Robust Error Handling</strong>: Graceful handling of network failures and edge cases</li>
-<li>✅ <strong>Progress Indicators</strong>: Real-time progress bars for long-running operations</li>
-<li>✅ <strong>Concurrent Operations</strong>: Configurable parallel processing for better performance</li>
-<li>✅ <strong>JSONL Streaming</strong>: Stream-friendly output for processing large repository sets</li>
-<li>✅ <strong>Unix Pipeline Integration</strong>: Compose with jq, grep, and other standard tools</li>
-</ul>
-<h4 id="advanced-social-media-framework">📱 <strong>Advanced Social Media Framework</strong></h4>
-<ul>
-<li>✅ <strong>Template-Driven Content</strong>: Customizable post templates for different content types</li>
-<li>✅ <strong>Multi-Platform Support</strong>: Twitter, LinkedIn, and Mastodon integration</li>
-<li>✅ <strong>Smart Sampling</strong>: Configurable repository filtering and random selection</li>
-<li>✅ <strong>Dry-Run Support</strong>: Preview posts before publishing</li>
-<li>✅ <strong>Rate Limiting</strong>: Built-in posting frequency controls and daily limits</li>
-</ul>
-<h4 id="enhanced-configuration-system">⚙️ <strong>Enhanced Configuration System</strong></h4>
-<ul>
-<li>✅ <strong>Multiple Formats</strong>: Support for both JSON and TOML configuration files</li>
-<li>✅ <strong>Environment Overrides</strong>: All settings controllable via environment variables</li>
-<li>✅ <strong>Intelligent Merging</strong>: Proper precedence of defaults, files, and overrides</li>
-<li>✅ <strong>Example Generation</strong>: <code>repoindex config generate</code> creates comprehensive examples</li>
-</ul>
-<h4 id="robust-license-management">📄 <strong>Robust License Management</strong></h4>
-<ul>
-<li>✅ <strong>GitHub API Integration</strong>: Direct fetching of license templates from GitHub</li>
-<li>✅ <strong>Template Customization</strong>: Automatic placeholder replacement for author details</li>
-<li>✅ <strong>Bulk Operations</strong>: Add licenses to multiple repositories efficiently</li>
-<li>✅ <strong>All Major Licenses</strong>: Support for MIT, Apache, GPL, and many others</li>
-</ul>
-<h4 id="enhanced-github-pages-detection">🌐 <strong>Enhanced GitHub Pages Detection</strong></h4>
-<ul>
-<li>✅ <strong>Multi-Method Detection</strong>: Scans for Jekyll, MkDocs, Sphinx, and custom configurations</li>
-<li>✅ <strong>URL Construction</strong>: Automatically builds Pages URLs from repository metadata</li>
-<li>✅ <strong>Documentation Tracking</strong>: Monitor which projects have active documentation</li>
-</ul>
-<h4 id="improved-pypi-integration">📦 <strong>Improved PyPI Integration</strong></h4>
-<ul>
-<li>✅ <strong>Smart Package Detection</strong>: Enhanced scanning of <code>pyproject.toml</code>, <code>setup.py</code>, <code>setup.cfg</code></li>
-<li>✅ <strong>Version Comparison</strong>: Track local vs published version differences</li>
-<li>✅ <strong>Performance Options</strong>: Optional PyPI checking for faster status operations</li>
-<li>✅ <strong>Error Resilience</strong>: Graceful handling of PyPI API issues</li>
-</ul>
-<h3 id="version-05x-legacy">Version 0.5.x (Legacy)</h3>
-<ul>
-<li>✅ <strong>PyPI Integration</strong>: Automatic detection and tracking of Python packages</li>
-<li>✅ <strong>Social Media Framework</strong>: Generate and post content about your projects</li>
-<li>✅ <strong>Configuration System</strong>: Flexible configuration with example generation</li>
-<li>✅ <strong>Performance Improvements</strong>: Progress bars and faster operations</li>
-<li>✅ <strong>Enhanced Status</strong>: Clean status reporting with PyPI and GitHub Pages info</li>
-</ul>
-<h2 id="community-and-support">Community and Support</h2>
-<ul>
-<li><strong>GitHub Repository</strong>: <a href="https://github.com/queelius/repoindex">github.com/queelius/repoindex</a></li>
-<li><strong>Issues and Bug Reports</strong>: <a href="https://github.com/queelius/repoindex/issues">GitHub Issues</a></li>
-<li><strong>Feature Requests</strong>: <a href="https://github.com/queelius/repoindex/discussions">GitHub Discussions</a></li>
+<li><strong>GitHub</strong>: <a href="https://github.com/queelius/repoindex">github.com/queelius/repoindex</a></li>
+<li><strong>Issues</strong>: <a href="https://github.com/queelius/repoindex/issues">GitHub Issues</a></li>
+<li><strong>PyPI</strong>: <a href="https://pypi.org/project/repoindex/">pypi.org/project/repoindex</a></li>
 </ul>
 <h2 id="license">License</h2>
-<p>This project is licensed under the MIT License. See the <a href="https://github.com/queelius/repoindex/blob/main/LICENSE">LICENSE</a> file for details.</p>
-<hr />
-<p>Ready to streamline your GitHub workflow? <a href="usage/#installation-and-setup">Get started with the installation guide</a>!</p>
+<p>MIT License - see <a href="https://github.com/queelius/repoindex/blob/main/LICENSE">LICENSE</a></p>
 
 
 
