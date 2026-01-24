@@ -14,7 +14,6 @@ from typing import Optional, List, Tuple
 from pathlib import Path
 from datetime import datetime
 import logging
-import re
 
 logger = logging.getLogger(__name__)
 
@@ -157,9 +156,9 @@ class GitClient:
                     branch=result.branch,
                     clean=False,
                     uncommitted_changes=True,
-                    untracked_files=sum(1 for l in lines if l.startswith('??')),
-                    staged_files=sum(1 for l in lines if l[0] in 'MADRC'),
-                    modified_files=sum(1 for l in lines if l[1] in 'MADRC')
+                    untracked_files=sum(1 for line in lines if line.startswith('??')),
+                    staged_files=sum(1 for line in lines if line[0] in 'MADRC'),
+                    modified_files=sum(1 for line in lines if line[1] in 'MADRC')
                 )
             else:
                 result = GitStatus(branch=result.branch, clean=True)

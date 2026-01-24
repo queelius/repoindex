@@ -6,10 +6,10 @@ import json
 import sys
 import click
 from functools import wraps
-from typing import Any, Dict, Generator
+from typing import Any, Generator
 from .progress import get_progress
 from .exit_codes import (
-    SUCCESS, GENERAL_ERROR, USAGE_ERROR, INTERRUPTED,
+    SUCCESS, INTERRUPTED,
     get_exit_code_for_exception, CommandError
 )
 from .format_utils import format_output, get_format_from_env

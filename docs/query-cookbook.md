@@ -6,14 +6,14 @@ This cookbook shows common search and analysis patterns using `repoindex` with `
 
 ### Find repositories by language
 ```bash
-repoindex list | jq 'select(.github.language == "Python")'
-repoindex list | jq 'select(.github.language | test("Java"; "i"))'  # Case-insensitive
+repoindex query --json | jq 'select(.language == "Python")'
+repoindex query --json | jq 'select(.language | test("Java"; "i"))'  # Case-insensitive
 ```
 
 ### Find popular repositories
 ```bash
-repoindex list | jq 'select(.github.stars > 10)'
-repoindex status | jq 'select(.github.on_github and .github.stars > 5)'
+repoindex query --json | jq 'select(.github_stars > 10)'
+repoindex query --json | jq 'select(.github_stars != null and .github_stars > 5)'
 ```
 
 ### Find repositories with issues
@@ -26,23 +26,23 @@ repoindex status | jq 'select(.status | contains("modified") or contains("untrac
 ### Multi-criteria search
 ```bash
 # Python repos with PyPI packages
-repoindex status | jq 'select(
-  .github.language == "Python" and 
-  .pypi_info != null and 
-  .github.stars > 0
+repoindex query --json | jq 'select(
+  .language == "Python" and
+  .pypi_published == true and
+  .github_stars > 0
 )'
 ```
 
 ### Repository health assessment
 ```bash
-repoindex status | jq '{
+repoindex query --json | jq '{
   name: .name,
   health_score: (
-    (.github.on_github | if . then 2 else 0 end) +
-    ((.license.name != null) | if . then 1 else 0 end) +
-    ((.pypi_info != null) | if . then 2 else 0 end) +
-    ((.pages_url != null) | if . then 1 else 0 end) +
-    ((.github.stars > 0) | if . then 1 else 0 end)
+    ((.github_stars != null) | if . then 2 else 0 end) +
+    ((.license != null and .license != "") | if . then 1 else 0 end) +
+    ((.pypi_published == true) | if . then 2 else 0 end) +
+    ((.has_readme == true) | if . then 1 else 0 end) +
+    ((.github_stars > 0) | if . then 1 else 0 end)
   )
 } | select(.health_score >= 4)'
 ```
@@ -51,19 +51,19 @@ repoindex status | jq '{
 
 ### Language distribution
 ```bash
-repoindex list | jq -s 'group_by(.github.language) | 
-  map({language: .[0].github.language, count: length}) | 
+repoindex query --json | jq -s 'group_by(.language) |
+  map({language: .[0].language, count: length}) |
   sort_by(.count) | reverse'
 ```
 
 ### Deployment statistics
 ```bash
-repoindex status | jq -s '{
+repoindex query --json | jq -s '{
   total: length,
-  on_github: map(select(.github.on_github)) | length,
-  with_pypi: map(select(.pypi_info != null)) | length,
-  with_pages: map(select(.pages_url != null)) | length,
-  with_license: map(select(.license.name != null)) | length
+  with_github: map(select(.github_stars != null)) | length,
+  with_pypi: map(select(.pypi_published == true)) | length,
+  with_license: map(select(.license != null and .license != "")) | length,
+  with_readme: map(select(.has_readme == true)) | length
 }'
 ```
 
@@ -72,20 +72,20 @@ repoindex status | jq -s '{
 ### CSV export
 ```bash
 echo "name,stars,language,has_pypi" > repos.csv
-repoindex list | jq -r '[.name, .github.stars, .github.language, (.pypi_info != null)] | @csv' >> repos.csv
+repoindex query --json | jq -r '[.name, .github_stars, .language, .pypi_published] | @csv' >> repos.csv
 ```
 
 ### Markdown report
 ```bash
-repoindex list | jq -r '"## " + .name + " (" + (.github.language // "Unknown") + ")\n" +
-  "⭐ " + (.github.stars | tostring) + " stars\n" +
-  (.github.description // "No description") + "\n"'
+repoindex query --json | jq -r '"## " + .name + " (" + (.language // "Unknown") + ")\n" +
+  "Stars: " + ((.github_stars // 0) | tostring) + "\n" +
+  (.description // "No description") + "\n"'
 ```
 
 ### HTML table
 ```bash
 echo "<table><tr><th>Name</th><th>Stars</th><th>Language</th></tr>"
-repoindex list | jq -r '"<tr><td>" + .name + "</td><td>" + (.github.stars | tostring) + "</td><td>" + (.github.language // "") + "</td></tr>"'
+repoindex query --json | jq -r '"<tr><td>" + .name + "</td><td>" + ((.github_stars // 0) | tostring) + "</td><td>" + (.language // "") + "</td></tr>"'
 echo "</table>"
 ```
 
@@ -94,15 +94,15 @@ echo "</table>"
 ### Streaming for large datasets
 ```bash
 # Process results as they come in (don't wait for all repos)
-repoindex status --recursive | jq 'select(.github.stars > 100)' | head -10
+repoindex query --json | jq 'select(.github_stars > 100)' | head -10
 ```
 
 ### Combine commands efficiently
 ```bash
 # Use process substitution for complex joins
 join -t$'\t' \
-  <(repoindex list | jq -r '[.name, .github.stars] | @tsv' | sort) \
-  <(repoindex status | jq -r '[.name, (.pypi_info != null)] | @tsv' | sort)
+  <(repoindex query --json | jq -r '[.name, .github_stars] | @tsv' | sort) \
+  <(repoindex query --json | jq -r '[.name, .pypi_published] | @tsv' | sort)
 ```
 
 ## Common Patterns
@@ -110,37 +110,37 @@ join -t$'\t' \
 ### Find "todo" repositories
 ```bash
 # Repos that need attention
-repoindex status | jq 'select(
-  (.status | contains("modified")) or
-  (.license.name == null) or
-  (.github.on_github == false) or
-  (.github.description == null or .github.description == "")
+repoindex query --json | jq 'select(
+  (.clean == false) or
+  (.license == null or .license == "") or
+  (.github_stars == null) or
+  (.description == null or .description == "")
 )' | jq '{name: .name, issues: [
-  (if .status | contains("modified") then "uncommitted changes" else empty end),
-  (if .license.name == null then "no license" else empty end),
-  (if .github.on_github == false then "not on github" else empty end),
-  (if .github.description == null or .github.description == "" then "no description" else empty end)
+  (if .clean == false then "uncommitted changes" else empty end),
+  (if .license == null or .license == "" then "no license" else empty end),
+  (if .github_stars == null then "not on github" else empty end),
+  (if .description == null or .description == "" then "no description" else empty end)
 ]}'
 ```
 
 ### Portfolio analysis
 ```bash
 # Your coding portfolio stats
-repoindex list | jq -s '{
+repoindex query --json | jq -s '{
   total_repos: length,
-  languages: [group_by(.github.language) | .[] | {lang: .[0].github.language, count: length}],
-  total_stars: map(.github.stars) | add,
-  original_projects: map(select(.github.is_fork == false)) | length
+  languages: [group_by(.language) | .[] | {lang: .[0].language, count: length}],
+  total_stars: map(.github_stars // 0) | add,
+  original_projects: map(select(.github_is_fork != true)) | length
 }'
 ```
 
 ### Maintenance dashboard
 ```bash
-# Repos needing updates
-repoindex status | jq 'select(.status | contains("behind"))' | jq '{
+# Repos with uncommitted changes
+repoindex query --json | jq 'select(.clean == false)' | jq '{
   name: .name,
-  status: .status,
-  action: "git pull needed"
+  branch: .branch,
+  action: "git commit needed"
 }'
 ```
 
@@ -149,12 +149,12 @@ repoindex status | jq 'select(.status | contains("behind"))' | jq '{
 ### Custom scoring function
 ```bash
 repoindex_score() {
-  repoindex status | jq --arg weight_stars "$1" --arg weight_pypi "$2" '{
+  repoindex query --json | jq --arg weight_stars "$1" --arg weight_pypi "$2" '{
     name: .name,
     score: (
-      (.github.stars * ($weight_stars | tonumber)) +
-      ((.pypi_info != null) | if . then ($weight_pypi | tonumber) else 0 end) +
-      ((.license.name != null) | if . then 5 else 0 end)
+      ((.github_stars // 0) * ($weight_stars | tonumber)) +
+      ((.pypi_published == true) | if . then ($weight_pypi | tonumber) else 0 end) +
+      ((.license != null and .license != "") | if . then 5 else 0 end)
     )
   } | select(.score > 10)'
 }
@@ -164,6 +164,6 @@ repoindex_score() {
 
 ### Real-time monitoring
 ```bash
-# Watch for changes (requires `watch` command)
-watch -n 30 'repoindex status | jq "select(.status | contains(\"modified\"))" | jq -r ".name + \": \" + .status"'
+# Watch for dirty repos (requires `watch` command)
+watch -n 30 'repoindex query --json | jq "select(.clean == false)" | jq -r ".name + \": uncommitted changes\""'
 ```

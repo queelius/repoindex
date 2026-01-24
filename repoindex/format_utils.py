@@ -7,7 +7,6 @@ Provides functions to format data as CSV, TSV, YAML, JSON, and JSONL.
 import json
 import csv
 import io
-import sys
 from typing import Dict, List, Any, Iterator, Optional
 import yaml
 
@@ -75,7 +74,7 @@ def format_csv(data: Iterator[Dict[str, Any]], fields: Optional[List[str]] = Non
     # Determine fields
     if fields is None:
         # Get all unique fields from all items (in case they vary)
-        all_fields = set()
+        all_fields: set[str] = set()
         for item in data_list:
             if isinstance(item, dict):
                 all_fields.update(flatten_dict(item).keys())
@@ -114,7 +113,7 @@ def format_tsv(data: Iterator[Dict[str, Any]], fields: Optional[List[str]] = Non
     # Determine fields
     if fields is None:
         # Get all unique fields from all items
-        all_fields = set()
+        all_fields: set[str] = set()
         for item in data_list:
             if isinstance(item, dict):
                 all_fields.update(flatten_dict(item).keys())
@@ -152,7 +151,7 @@ def flatten_dict(d: Dict[str, Any], parent_key: str = '', sep: str = '.') -> Dic
     Example:
         {'a': {'b': 1, 'c': 2}} -> {'a.b': 1, 'a.c': 2}
     """
-    items = []
+    items: list[tuple[str, Any]] = []
     for k, v in d.items():
         new_key = f"{parent_key}{sep}{k}" if parent_key else k
         

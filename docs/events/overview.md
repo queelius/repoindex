@@ -1,37 +1,38 @@
 # Event System
 
-repoindex provides a powerful event scanning system that detects changes across your repository collection. The system is **read-only** and **stateless** - it observes and reports, leaving action to external tools.
+repoindex provides an event scanning system that detects changes across your repository collection. Events are stored in the database and populated by `repoindex refresh`.
 
 ## Philosophy
 
 The event system follows Unix principles:
 
-- **Observe, don't act**: repoindex detects events but doesn't modify anything
-- **Stream-friendly**: Default JSONL output pipes to `jq`, `grep`, or custom handlers
+- **Database-first**: Events are populated by `refresh`, then queried
+- **Stream-friendly**: Use `--json` for JSONL output that pipes to `jq`
 - **Composable**: Use with cron, GitHub Actions, or any automation tool
-- **Fast by default**: Local events require no API calls; remote events are opt-in
+- **Fast queries**: Events are indexed in SQLite for quick retrieval
 
 ## Quick Start
 
 ```bash
-# See what happened in your repos this week
-repoindex events --since 7d --pretty
+# First, populate events into the database
+repoindex refresh --since 7d
+
+# Query recent events (default: last 7 days, pretty table)
+repoindex events
 
 # Stream events as JSONL for processing
-repoindex events --since 1d | jq '.type'
+repoindex events --json | jq '.type'
 
-# Include GitHub releases and PRs
-repoindex events --github --since 7d --pretty
+# Filter by type
+repoindex events --type git_tag
 
-# Watch for new events continuously
-repoindex events --watch --github
+# Summary statistics
+repoindex events --stats
 ```
 
-## Event Categories
+## Event Types
 
-### Local Events (Default, Fast)
-
-These scan git history directly - no API calls needed:
+Events are populated during `repoindex refresh` by scanning git history:
 
 | Event Type | Description |
 |------------|-------------|
@@ -39,46 +40,18 @@ These scan git history directly - no API calls needed:
 | `commit` | Git commits |
 | `branch` | Branch creation/deletion |
 | `merge` | Merge commits |
-| `version_bump` | Changes to version files (pyproject.toml, package.json, etc.) |
-| `deps_update` | Dependency file changes |
-| `license_change` | LICENSE file modifications |
-| `ci_config_change` | CI/CD config changes (.github/workflows, .gitlab-ci.yml) |
-| `docs_change` | Documentation changes (docs/, *.md) |
-| `readme_change` | README file changes |
 
-### GitHub Events (--github)
+## Command Options
 
-Requires GitHub API access via `gh` CLI:
-
-| Event Type | Description |
-|------------|-------------|
-| `github_release` | GitHub releases |
-| `pr` | Pull requests |
-| `issue` | Issues |
-| `workflow_run` | GitHub Actions runs |
-| `security_alert` | Dependabot security alerts |
-| `repo_rename` | Repository renamed |
-| `repo_transfer` | Repository transferred to new owner |
-| `repo_visibility` | Public/private visibility changed |
-| `repo_archive` | Repository archived/unarchived |
-| `deployment` | Deployments (gh-pages, production, etc.) |
-| `fork` | Repository forked by another user |
-| `star` | Repository starred by a user |
-
-### Registry Events (opt-in)
-
-Detect package publishes across ecosystems:
-
-| Flag | Event Type | Registry |
-|------|------------|----------|
-| `--pypi` | `pypi_publish` | PyPI (Python) |
-| `--cran` | `cran_publish` | CRAN (R) |
-| `--npm` | `npm_publish` | npm (JavaScript) |
-| `--cargo` | `cargo_publish` | crates.io (Rust) |
-| `--docker` | `docker_publish` | Docker Hub |
-| `--gem` | `gem_publish` | RubyGems (Ruby) |
-| `--nuget` | `nuget_publish` | NuGet (.NET) |
-| `--maven` | `maven_publish` | Maven Central (Java) |
+| Option | Description |
+|--------|-------------|
+| `--type`, `-t` | Filter by event type (can be repeated) |
+| `--repo`, `-r` | Filter by repository name |
+| `--since`, `-s` | Events after this time (e.g., 1h, 7d, 2024-01-01) |
+| `--until`, `-u` | Events before this time |
+| `--limit`, `-n` | Maximum events to return (default: 100, 0 for unlimited) |
+| `--json` | Output as JSONL (default: pretty table) |
+| `--stats` | Show summary statistics only |
 
 ## Usage Examples
 
@@ -88,11 +61,8 @@ Detect package publishes across ecosystems:
 # Only git tags
 repoindex events --type git_tag --since 30d
 
-# Only security alerts
-repoindex events --type security_alert --github
-
-# Multiple types
-repoindex events --type git_tag --type github_release --github
+# Only commits
+repoindex events --type commit --since 7d
 ```
 
 ### Filter by Repository
@@ -118,17 +88,14 @@ repoindex events --since 2024-01-15T10:30:00
 ### Output Formats
 
 ```bash
-# JSONL (default) - one JSON object per line
+# Pretty table (default)
 repoindex events --since 1d
 
-# Pretty table with colors
-repoindex events --since 1d --pretty
-
-# Relative timestamps ("2h ago")
-repoindex events --since 1d --pretty --relative-time
+# JSONL - one JSON object per line (for piping)
+repoindex events --json --since 1d
 
 # Statistics summary
-repoindex events --since 7d --stats --pretty
+repoindex events --stats
 ```
 
 ### Controlling Limits
@@ -144,63 +111,41 @@ repoindex events --since 30d --limit 500
 repoindex events --since 365d --limit 0
 ```
 
-## Configuration
+## Workflow
 
-Set default event types in `~/.repoindex/config.json`:
+Events follow a two-step workflow:
 
-```json
-{
-  "events": {
-    "default_types": [
-      "git_tag", "commit", "branch", "merge",
-      "version_bump", "deps_update",
-      "license_change", "ci_config_change", "docs_change", "readme_change"
-    ]
-  }
-}
-```
+1. **Refresh** - Scan repositories and populate events into database:
+   ```bash
+   repoindex refresh --since 30d
+   ```
 
-By default, only local (fast) events are enabled. Add remote events explicitly.
+2. **Query** - Retrieve events from database:
+   ```bash
+   repoindex events --since 7d
+   ```
 
 ## Composing with Other Tools
 
 ### Filter with jq
 
 ```bash
-# Get repos with security alerts
-repoindex events --github --type security_alert --since 7d | jq -r '.repo_name' | sort -u
-
 # Count events by type
-repoindex events --since 7d | jq -r '.type' | sort | uniq -c | sort -rn
+repoindex events --json --since 7d | jq -r '.type' | sort | uniq -c | sort -rn
+
+# Get unique repos with events
+repoindex events --json --since 7d | jq -r '.repo_name' | sort -u
 ```
 
 ### Trigger Actions
 
 ```bash
-# Post to Slack on new releases
-repoindex events --type git_tag --since 1h | while read event; do
+# Process events in a script
+repoindex events --json --type git_tag --since 1h | while read event; do
   repo=$(echo "$event" | jq -r '.repo_name')
   tag=$(echo "$event" | jq -r '.data.tag')
-  curl -X POST "$SLACK_WEBHOOK" -d "{\"text\": \"New release: $repo $tag\"}"
+  echo "New tag: $repo $tag"
 done
 ```
 
-### Watch Mode
-
-```bash
-# Continuous monitoring with custom interval
-repoindex events --watch --github --interval 300
-```
-
-## Shell Integration
-
-The interactive shell also supports events:
-
-```bash
-repoindex shell
-> events --since 1d --pretty
-> events --github --type github_release
-> events --stats
-```
-
-See [Shell & VFS](../shell-vfs.md) for more shell commands.
+See [Event Types Reference](event-types.md) for details on each event type.

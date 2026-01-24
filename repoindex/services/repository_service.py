@@ -13,7 +13,7 @@ import re
 
 from ..domain import Repository, GitStatus, GitHubMetadata, PackageMetadata
 from ..domain.repository import LicenseInfo
-from ..infra import GitClient, GitHubClient, FileStore
+from ..infra import GitClient, GitHubClient
 
 logger = logging.getLogger(__name__)
 
@@ -388,11 +388,10 @@ class RepositoryService:
 
             return PackageMetadata(
                 name=pypi_info.get('package_name', ''),
-                version=pypi_info.get('local_version', ''),
+                version=pypi_info.get('local_version') or pypi_info.get('pypi_info', {}).get('version'),
                 registry='pypi',
                 published=pypi_info.get('is_published', False),
-                registry_url=pypi_info.get('pypi_info', {}).get('url', ''),
-                registry_version=pypi_info.get('pypi_info', {}).get('version', ''),
+                url=pypi_info.get('pypi_info', {}).get('url'),
             )
         except Exception as e:
             logger.debug(f"Failed to fetch PyPI metadata for {path}: {e}")
@@ -413,11 +412,10 @@ class RepositoryService:
 
             return PackageMetadata(
                 name=r_info.get('package_name', ''),
-                version=r_info.get('local_version', ''),
+                version=r_info.get('local_version') or registry_info.get('version'),
                 registry=registry,
                 published=r_info.get('is_published', False),
-                registry_url=registry_info.get('url', ''),
-                registry_version=registry_info.get('version', ''),
+                url=registry_info.get('url'),
             )
         except Exception as e:
             logger.debug(f"Failed to fetch CRAN/R metadata for {path}: {e}")
@@ -454,11 +452,11 @@ class RepositoryService:
             match = re.search(r"language\s*[=~]+\s*['\"]?(\w+)['\"]?", query, re.I)
             if match:
                 lang = match.group(1).lower()
-                return repo.language and repo.language.lower() == lang
+                return bool(repo.language and repo.language.lower() == lang)
 
         if query_lower.startswith('lang:'):
             lang = query[5:].strip().lower()
-            return repo.language and repo.language.lower() == lang
+            return bool(repo.language and repo.language.lower() == lang)
 
         if query_lower.startswith('tag:'):
             tag_pattern = query[4:].strip()
@@ -466,7 +464,7 @@ class RepositoryService:
 
         if query_lower.startswith('owner:'):
             owner = query[6:].strip().lower()
-            return repo.owner and repo.owner.lower() == owner
+            return bool(repo.owner and repo.owner.lower() == owner)
 
         if query_lower.startswith('name:'):
             name = query[5:].strip().lower()

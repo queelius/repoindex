@@ -41,14 +41,11 @@ nav:
     - Event Types Reference: events/event-types.md
   - Interactive:
     - Shell & VFS: shell-vfs.md
-    - TUI Dashboard: tui.md
-  - Commands:
-    - Repository Audit: audit-command.md
-    - Documentation: docs-command.md
-    - List: list-command.md
   - Reference:
     - Architecture: architecture-vision.md
     - Design Decisions: design/CLI_DESIGN_DECISIONS.md
+    - Git Commands Design: design/GIT_COMMANDS_DESIGN.md
+    - Version Management: design/VERSION_MANAGEMENT_IMPLEMENTATION.md
   - Changelog: changelog.md
   - Contributing: contributing.md
 

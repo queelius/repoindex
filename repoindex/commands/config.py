@@ -1,10 +1,9 @@
 import click
 import json
-import os
 import sys
 from pathlib import Path
 
-from repoindex.config import load_config, save_config, get_config_path
+from repoindex.config import load_config, get_config_path
 
 
 def detect_default_repo_dir() -> str:
@@ -49,7 +48,7 @@ def config_cmd():
 
 
 # Register repos subgroup
-from .config_repos import config_repos
+from .config_repos import config_repos  # noqa: E402
 config_cmd.add_command(config_repos)
 
 

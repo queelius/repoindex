@@ -8,7 +8,6 @@ that can be shared across modules without circular dependencies.
 from typing import Dict, Any, List
 from pathlib import Path
 
-from .config import load_config
 from .utils import find_git_repos_from_config
 from .metadata import get_metadata_store
 from .commands.catalog import get_repository_tags
@@ -87,7 +86,7 @@ def build_vfs_structure(config: Dict[str, Any]) -> Dict[str, Any]:
     metadata_store = get_metadata_store()
 
     # Build VFS structure
-    vfs = {
+    vfs: Dict[str, Any] = {
         "/": {
             "type": "directory",
             "children": {
@@ -100,11 +99,11 @@ def build_vfs_structure(config: Dict[str, Any]) -> Dict[str, Any]:
         }
     }
 
-    repos_node = vfs["/"]["children"]["repos"]["children"]
-    by_lang_node = vfs["/"]["children"]["by-language"]["children"]
-    by_tag_node = vfs["/"]["children"]["by-tag"]["children"]
-    by_status_node = vfs["/"]["children"]["by-status"]["children"]
-    config_node = vfs["/"]["children"]["config"]["children"]
+    repos_node: Dict[str, Any] = vfs["/"]["children"]["repos"]["children"]
+    by_lang_node: Dict[str, Any] = vfs["/"]["children"]["by-language"]["children"]
+    by_tag_node: Dict[str, Any] = vfs["/"]["children"]["by-tag"]["children"]
+    by_status_node: Dict[str, Any] = vfs["/"]["children"]["by-status"]["children"]
+    config_node: Dict[str, Any] = vfs["/"]["children"]["config"]["children"]
 
     # Populate /config with configuration structure
     _build_config_vfs(config_node, config)

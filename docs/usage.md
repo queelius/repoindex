@@ -17,20 +17,41 @@ repoindex --help
 
 ## Core Commands
 
-### Repository Status
+### Dashboard Status
 
 ```bash
-# Status of all repositories (JSONL output)
-repoindex status -r
+# Dashboard overview of your collection
+repoindex status
+```
 
-# Human-readable table
-repoindex status -r --pretty
+### Query Repositories
 
-# Status for specific directory
-repoindex status --dir ~/projects -r
+```bash
+# Query with convenience flags (pretty table by default)
+repoindex query --dirty                    # Uncommitted changes
+repoindex query --clean                    # Clean repos
+repoindex query --language python          # Python repos
+repoindex query --recent 7d                # Recent activity
+repoindex query --tag "work/*"             # Filter by tag
 
-# Filter by query
-repoindex status -q "language == 'Python'"
+# GitHub flags (requires --github during refresh)
+repoindex query --starred                  # Has GitHub stars
+repoindex query --public                   # Public repos
+repoindex query --private                  # Private repos
+repoindex query --fork                     # Forked repos
+repoindex query --no-fork                  # Non-forked repos
+repoindex query --archived                 # Archived repos
+
+# Citation flags
+repoindex query --has-citation             # Has citation files
+repoindex query --has-doi                  # Has DOI in citation
+
+# Query DSL
+repoindex query "language == 'Python' and github_stars > 10"
+
+# Output options
+repoindex query --json --language python   # JSONL output
+repoindex query --brief --dirty            # Just repo names
 ```
 
 ### Events
@@ -38,52 +59,28 @@ repoindex status -q "language == 'Python'"
 Track what's happening across your repositories:
 
 ```bash
-# Events in the last 7 days (default)
-repoindex events --pretty
+# Events from database (pretty table by default)
+repoindex events --since 7d
 
 # Events since specific time
-repoindex events --since 24h --pretty
-repoindex events --since 7d
+repoindex events --since 24h
 repoindex events --since 2024-01-15
 
 # Filter by event type
 repoindex events --type git_tag --since 30d
-repoindex events --type commit --since 1d
+repoindex events --type commit --since 7d
 
-# Include GitHub events (requires API)
-repoindex events --github --since 7d
+# Filter by repository
+repoindex events --repo myproject
 
-# Include package registry events
-repoindex events --pypi --npm --cargo --since 30d
+# Summary statistics
+repoindex events --stats
 
-# Watch mode for continuous monitoring
-repoindex events --watch --interval 300
-
-# Unlimited results (default limit is 100)
-repoindex events --since 30d --limit 0
+# JSONL output for piping
+repoindex events --json --since 7d | jq '.type' | sort | uniq -c
 ```
 
 See [Events Overview](events/overview.md) for full documentation.
-
-### Query Language
-
-Find repositories with fuzzy matching:
-
-```bash
-# Fuzzy language match (typo-tolerant)
-repoindex query "language ~= 'pyton'"
-
-# Multiple conditions
-repoindex query "language == 'Python' and stars > 10"
-
-# Check tags
-repoindex query "'ml' in tags"
-
-# Complex queries
-repoindex query "has_docs and not archived and stars > 10"
-```
-
-See [Query Language](catalog-query.md) for syntax details.
 
 ### Tag Management
 
@@ -126,41 +123,202 @@ repoindex shell
 
 See [Shell & VFS](shell-vfs.md) for details.
 
+## Database Management
+
+### Refresh
+
+```bash
+# Smart refresh (changed repos only)
+repoindex refresh
+
+# Force full refresh
+repoindex refresh --full
+
+# Include external metadata
+repoindex refresh --github         # GitHub metadata
+repoindex refresh --pypi           # PyPI package status
+repoindex refresh --cran           # CRAN package status
+repoindex refresh --external       # All external sources
+
+# Refresh specific directory
+repoindex refresh -d ~/projects
+
+# Events scan range
+repoindex refresh --since 30d
+
+# Preview mode
+repoindex refresh --dry-run
+```
+
+### SQL Access
+
+```bash
+# Direct SQL queries
+repoindex sql "SELECT name, language, github_stars FROM repos ORDER BY github_stars DESC LIMIT 10"
+
+# Database info
+repoindex sql --info
+repoindex sql --schema
+repoindex sql --stats        # Row counts per table
+repoindex sql --path         # Database file path
+
+# Interactive SQL shell
+repoindex sql -i
+
+# Output formats
+repoindex sql "SELECT * FROM repos" --format json
+repoindex sql "SELECT * FROM repos" --format csv
+repoindex sql "SELECT * FROM repos" --format table
+
+# Query from file
+repoindex sql -f query.sql
+
+# Database maintenance
+repoindex sql --integrity    # Check database integrity
+repoindex sql --vacuum       # Compact and optimize
+repoindex sql --reset        # Delete and recreate database
+```
+
+## Additional Commands
+
+### Export (ECHO format)
+
+Export repository index in durable, self-describing format:
+
+```bash
+# Basic export
+repoindex export ~/backup
+
+# Include README snapshots
+repoindex export ~/backup --include-readmes
+
+# Include event history
+repoindex export ~/backup --include-events
+
+# Include git summaries
+repoindex export ~/backup --include-git-summary 10
+
+# Full export with archives
+repoindex export ~/backup --include-readmes --include-events --archive-repos
+
+# Preview
+repoindex export ~/backup --dry-run --pretty
+```
+
+### Copy (backup/redundancy)
+
+Copy repositories with filtering:
+
+```bash
+# Copy all repos
+repoindex copy ~/backup
+
+# Copy with filters
+repoindex copy ~/backup --language python
+repoindex copy ~/backup --dirty
+repoindex copy ~/backup --tag "work/*"
+
+# Options
+repoindex copy ~/backup --exclude-git          # Skip .git
+repoindex copy ~/backup --preserve-structure   # Keep dir hierarchy
+repoindex copy ~/backup --collision rename     # Handle conflicts
+repoindex copy ~/backup --dry-run --pretty     # Preview
+```
+
+### Link Trees
+
+Create symlink trees organized by metadata:
+
+```bash
+# Create by tag
+repoindex link tree ~/links/by-tag --by tag
+
+# Create by language
+repoindex link tree ~/links/by-lang --by language
+
+# Other organization options
+repoindex link tree ~/links/by-year --by modified-year
+repoindex link tree ~/links/by-owner --by owner
+
+# With query filters
+repoindex link tree ~/links/python --by tag --language python
+
+# Preview
+repoindex link tree ~/links/test --by tag --dry-run --pretty
+
+# Check status
+repoindex link status ~/links/by-tag
+
+# Refresh (remove broken links)
+repoindex link refresh ~/links/by-tag --prune
+```
+
+### Views (Curated Collections)
+
+Views are ordered repository collections with optional metadata overlays:
+
+```bash
+# List all views
+repoindex view list
+repoindex view list --templates
+
+# Show view definition
+repoindex view show portfolio
+
+# Evaluate view (resolve to repositories)
+repoindex view eval portfolio
+repoindex view eval portfolio --full    # Include overlay details
+
+# Create views
+repoindex view create portfolio --repos repoindex ctk btk
+repoindex view create python-libs --query "language == 'Python'"
+repoindex view create ml-research --tags "research/ml" "research/nlp"
+repoindex view create active --extends portfolio
+
+# Add overlays/annotations
+repoindex view overlay portfolio repoindex -d "Repository management toolkit"
+repoindex view overlay teaching project --highlight -n "Start here"
+
+# Delete view
+repoindex view delete old-portfolio --force
+
+# Find views containing a repo
+repoindex view repos myproject
+```
+
+Views support composition (union, intersect, subtract) for building complex collections.
+
 ## Configuration
 
 ### Configuration File
 
-Configuration lives at `~/.repoindex/config.json`:
+Configuration lives at `~/.repoindex/config.yaml`:
 
-```json
-{
-  "general": {
-    "repository_directories": [
-      "~/projects",
-      "~/work/**"
-    ]
-  },
-  "events": {
-    "default_types": ["git_tag", "commit", "version_bump"]
-  },
-  "github": {
-    "token": "ghp_..."
-  }
-}
+```yaml
+repository_directories:
+  - ~/projects
+  - ~/work/**
+
+github:
+  token: ghp_...
+
+repository_tags:
+  /path/to/repo:
+    - topic:ml
+    - work/active
 ```
 
 ### Configuration Commands
 
 ```bash
+# Initialize configuration
+repoindex config init
+
 # Show current configuration
 repoindex config show
 
-# Add repository directory
-repoindex config repos add ~/projects
-repoindex config repos add ~/work/**
-
-# Set GitHub token
-export REPOINDEX_GITHUB_TOKEN="ghp_your_token"
+# List repository directories
+repoindex config repos
 ```
 
 ### Environment Variables
@@ -168,73 +326,38 @@ export REPOINDEX_GITHUB_TOKEN="ghp_your_token"
 | Variable | Description |
 |----------|-------------|
 | `REPOINDEX_CONFIG` | Path to config file |
-| `REPOINDEX_GITHUB_TOKEN` | GitHub API token |
+| `GITHUB_TOKEN` | GitHub API token |
+| `REPOINDEX_GITHUB_TOKEN` | GitHub API token (alternative) |
 | `REPOINDEX_LOG_LEVEL` | Logging level (DEBUG, INFO, WARNING) |
-
-## Repository Operations
-
-### Clone Repositories
-
-```bash
-# Clone all your GitHub repositories
-repoindex get
-
-# Clone to a specific directory
-repoindex get --dir ~/projects
-```
-
-### Update Repositories
-
-```bash
-# Update all repositories in current directory
-repoindex update
-
-# Update recursively
-repoindex update -r
-
-# Update specific directory
-repoindex update --dir ~/projects -r
-```
-
-### List Repositories
-
-```bash
-# List all tracked repositories
-repoindex list
-
-# List with metadata
-repoindex list --pretty
-
-# Filter by tag
-repoindex list -t "lang:python"
-```
 
 ## Output Formats
 
-All commands output JSONL (newline-delimited JSON) by default:
+Commands output pretty tables by default:
 
 ```bash
-# Stream to jq
-repoindex events --since 7d | jq '.type' | sort | uniq -c
+# Pretty tables (default)
+repoindex query --language python
+repoindex events --since 7d
 
-# Filter specific repos
-repoindex status -r | jq 'select(.name | contains("api"))'
+# JSONL for piping/scripting
+repoindex query --json --language python | jq '.name'
+repoindex events --json --since 7d | jq '.type' | sort | uniq -c
 
-# Human-readable tables
-repoindex events --since 7d --pretty
+# Brief output (just repo names)
+repoindex query --brief --dirty
 ```
 
 ### Pipeline Examples
 
 ```bash
-# Find Python repos with uncommitted changes
-repoindex status -r | jq 'select(.status.uncommitted_changes == true and .language == "Python")'
+# Get Python repos with uncommitted changes
+repoindex query --json --language python --dirty | jq '.name'
 
 # Count events by type
-repoindex events --since 30d | jq '.type' | sort | uniq -c
+repoindex events --json --since 30d | jq '.type' | sort | uniq -c
 
 # Get repo names needing attention
-repoindex status -r | jq -r 'select(.status.clean == false) | .name'
+repoindex query --brief --dirty
 ```
 
 ## Common Workflows
@@ -243,113 +366,81 @@ repoindex status -r | jq -r 'select(.status.clean == false) | .name'
 
 ```bash
 # What happened overnight?
-repoindex events --since 12h --pretty
-
-# Any security alerts?
-repoindex events --github --type security_alert --since 7d
+repoindex events --since 12h
 
 # Repos with uncommitted work
-repoindex status -r | jq 'select(.status.uncommitted_changes == true) | .name'
+repoindex query --dirty
+
+# Dashboard overview
+repoindex status
 ```
 
 ### Release Tracking
 
 ```bash
 # Recent releases across all repos
-repoindex events --type git_tag --since 30d --pretty
+repoindex events --type git_tag --since 30d
 
-# Include GitHub releases
-repoindex events --github --type github_release --since 30d
+# Repos with recent tags
+repoindex query --recent 7d
 ```
 
-### Package Monitoring
+## Claude Code Integration
+
+Install the skill for Claude Code:
 
 ```bash
-# Python packages published
-repoindex events --pypi --since 30d --pretty
+# Install globally (all projects)
+repoindex claude install --global
 
-# All registry events
-repoindex events --pypi --npm --cargo --since 30d
-```
+# Install locally (current project)
+repoindex claude install
 
-## Advanced Features
+# Show installation status
+repoindex claude show
 
-### Metadata Store
-
-Refresh repository metadata:
-
-```bash
-# Refresh all metadata
-repoindex metadata refresh
-
-# Refresh with GitHub data
-repoindex metadata refresh --github
-
-# View metadata for a repo
-repoindex metadata show myproject
-```
-
-### Repository Audit
-
-Check repository health:
-
-```bash
-# Full audit
-repoindex audit
-
-# Auto-fix common issues
-repoindex audit --fix
-
-# Security checks
-repoindex audit security
-```
-
-### MCP Server
-
-For LLM integration:
-
-```bash
-# Start MCP server
-repoindex mcp serve
-
-# Or use CLI directly with Claude Code
-# (documented in MCP Overview)
+# Uninstall
+repoindex claude uninstall --global
 ```
 
 ## Performance Tips
 
-### Fast Status Checks
+### Fast Queries
 
 ```bash
-# Skip time-consuming checks
-repoindex status --no-pypi-check --no-pages-check
+# Local-only queries (no external API)
+repoindex query --dirty
+repoindex query --language python
 
-# Local-only events (no API calls)
-repoindex events --since 7d  # Default is local-only
+# Use brief mode for scripts
+repoindex query --brief --dirty
 ```
 
-### Event Limits
+### Refresh Optimization
 
 ```bash
-# Increase limit for more results
-repoindex events --since 30d --limit 500
+# Smart refresh only updates changed repos
+repoindex refresh
 
-# Unlimited results
-repoindex events --since 90d --limit 0
+# Full refresh when needed
+repoindex refresh --full
+
+# Limit event scan range
+repoindex refresh --since 7d
 ```
 
 ## Troubleshooting
 
 ### No Repositories Found
 
-- Check `repository_directories` in config
-- Verify directories contain `.git` folders
 - Run `repoindex config show` to check settings
+- Verify directories contain `.git` folders
+- Run `repoindex refresh --full` to rebuild database
 
 ### GitHub API Rate Limit
 
 - Add a GitHub token (increases limits from 60 to 5000/hour)
-- Skip GitHub events: `repoindex events` (local only by default)
+- Skip GitHub metadata: `repoindex refresh` (local only by default)
 
 ### Permission Errors
 
@@ -362,7 +453,7 @@ repoindex events --since 90d --limit 0
 # Install development dependencies
 pip install -e ".[test]"
 
-# Run all tests (625+ tests)
+# Run all tests (810+ tests)
 pytest
 
 # Run with coverage report
@@ -377,4 +468,4 @@ pytest tests/test_events.py -v
 - **[Events Overview](events/overview.md)** - Event system details
 - **[Query Language](catalog-query.md)** - Query syntax
 - **[Shell & VFS](shell-vfs.md)** - Interactive shell
-- **[Event Types Reference](events/event-types.md)** - All 28 event types
+- **[Event Types Reference](events/event-types.md)** - All event types

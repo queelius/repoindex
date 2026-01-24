@@ -9,7 +9,6 @@ import json
 import os
 import sys
 from datetime import datetime
-from pathlib import Path
 from typing import Optional
 
 import click
@@ -23,7 +22,6 @@ from ..database import (
     cleanup_missing_repos,
     needs_refresh,
     get_repo_count,
-    get_repo_by_path,
     record_scan_error,
     clear_scan_error_for_path,
     get_scan_error_count,
@@ -362,11 +360,12 @@ def _parse_since(since_str: str) -> datetime:
 
 def _format_bytes(size: int) -> str:
     """Format byte size as human readable string."""
+    sz: float = float(size)
     for unit in ['B', 'KB', 'MB', 'GB']:
-        if size < 1024:
-            return f"{size:.1f} {unit}"
-        size /= 1024
-    return f"{size:.1f} TB"
+        if sz < 1024:
+            return f"{sz:.1f} {unit}"
+        sz /= 1024
+    return f"{sz:.1f} TB"
 
 
 def _print_summary_pretty(stats: dict):
@@ -558,7 +557,7 @@ def sql_handler(
         size_after = os.path.getsize(db_path)
         saved = size_before - size_after
 
-        click.echo(f"Database optimized.", err=False)
+        click.echo("Database optimized.", err=False)
         click.echo(f"  Size before: {_format_bytes(size_before)}", err=False)
         click.echo(f"  Size after:  {_format_bytes(size_after)}", err=False)
         if saved > 0:

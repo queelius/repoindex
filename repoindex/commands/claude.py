@@ -6,10 +6,8 @@ enabling Claude to query and manage your repository collection.
 """
 
 import click
-import json
 import sys
 from pathlib import Path
-from typing import Optional
 
 def get_version() -> str:
     """Get repoindex version from package metadata."""
@@ -49,14 +47,24 @@ repoindex events --since 7d
 ## Query Convenience Flags
 
 ```bash
+# Local flags (no external API required)
 repoindex query --dirty              # Repos with uncommitted changes
 repoindex query --clean              # Clean repos
 repoindex query --language python    # Filter by language (py, js, ts, rust, go, cpp)
 repoindex query --recent 7d          # Recent activity
-repoindex query --starred            # Repos with stars
 repoindex query --tag "work/*"       # Filter by tag (wildcards supported)
 repoindex query --no-license         # Repos without license
 repoindex query --no-readme          # Repos without README
+repoindex query --has-citation       # Repos with citation files (CITATION.cff, .zenodo.json)
+repoindex query --has-doi            # Repos with DOI in citation metadata
+repoindex query --has-remote         # Repos with remote URL
+
+# GitHub flags (requires --github during refresh)
+repoindex query --starred            # Repos with GitHub stars
+repoindex query --public             # Public repos only
+repoindex query --private            # Private repos only
+repoindex query --fork               # Forked repos only
+repoindex query --no-fork            # Non-forked repos only
 repoindex query --archived           # Archived repos only
 
 # Combine flags
@@ -109,9 +117,48 @@ repoindex events --json                     # JSONL for piping
 ```bash
 repoindex refresh              # Smart refresh (changed repos only)
 repoindex refresh --full       # Force full refresh
-repoindex refresh --github     # Include GitHub metadata
+repoindex refresh --github     # Include GitHub metadata (stars, topics)
+repoindex refresh --pypi       # Include PyPI package status
+repoindex refresh --cran       # Include CRAN package status
+repoindex refresh --external   # Include all external sources
 repoindex refresh --since 30d  # Events from last 30 days
 repoindex sql --reset && repoindex refresh --full  # Full rebuild
+```
+
+## Tag Management
+
+```bash
+repoindex tag add myproject topic:ml work/active   # Add tags
+repoindex tag remove myproject work/active         # Remove tags
+repoindex tag list                                 # List all tags
+repoindex tag list -t "topic:*"                   # Filter tags
+repoindex tag tree                                 # Hierarchical view
+```
+
+## Link Trees (symlinks organized by metadata)
+
+```bash
+repoindex link tree ~/links/by-tag --by tag        # Organize by tags
+repoindex link tree ~/links/by-lang --by language  # Organize by language
+repoindex link tree ~/links/by-year --by modified-year
+repoindex link status ~/links/by-tag               # Check tree health
+repoindex link refresh ~/links/by-tag --prune      # Remove broken links
+```
+
+## Copy (backup/redundancy)
+
+```bash
+repoindex copy ~/backup --language python          # Copy Python repos
+repoindex copy ~/backup --dirty --dry-run          # Preview dirty repos
+repoindex copy ~/backup --exclude-git              # Skip .git directories
+```
+
+## Export (ECHO format)
+
+```bash
+repoindex export ~/backup --include-readmes        # Export with READMEs
+repoindex export ~/backup --include-events         # Include event history
+repoindex export ~/backup --dry-run --pretty       # Preview
 ```
 
 ## Output Formats
@@ -238,20 +285,20 @@ def show():
 
     # Global status
     if global_path.exists():
-        console.print(f"Global: [green]installed[/green]")
+        console.print("Global: [green]installed[/green]")
         console.print(f"  Path: {global_path}")
     else:
-        console.print(f"Global: [dim]not installed[/dim]")
+        console.print("Global: [dim]not installed[/dim]")
         console.print(f"  Path: [dim]{global_path}[/dim]")
 
     console.print()
 
     # Local status
     if local_path.exists():
-        console.print(f"Local:  [green]installed[/green]")
+        console.print("Local:  [green]installed[/green]")
         console.print(f"  Path: {local_path}")
     else:
-        console.print(f"Local:  [dim]not installed[/dim]")
+        console.print("Local:  [dim]not installed[/dim]")
         console.print(f"  Path: [dim]{local_path}[/dim]")
 
     console.print()

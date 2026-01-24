@@ -65,7 +65,7 @@ def record_scan_error(
         (path, error_type, error_message)
     )
 
-    return db.lastrowid
+    return db.lastrowid or 0
 
 
 def get_scan_errors(

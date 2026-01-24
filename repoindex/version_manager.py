@@ -79,7 +79,7 @@ class PythonVersionManager:
                     return data['project']['version']
                 if 'tool' in data and 'poetry' in data['tool'] and 'version' in data['tool']['poetry']:
                     return data['tool']['poetry']['version']
-            except:
+            except Exception:
                 pass
 
         # Try setup.py
@@ -120,7 +120,7 @@ class PythonVersionManager:
                     with open(pyproject, 'w') as f:
                         toml.dump(data, f)
                     updated = True
-            except:
+            except Exception:
                 pass
 
         # Update setup.py
@@ -162,7 +162,7 @@ class NodeVersionManager:
             try:
                 data = json.loads(package_json.read_text())
                 return data.get('version')
-            except:
+            except (json.JSONDecodeError, OSError):
                 pass
         return None
 
@@ -178,7 +178,7 @@ class NodeVersionManager:
                     json.dump(data, f, indent=2)
                     f.write('\n')  # Add trailing newline
                 return True
-            except:
+            except (json.JSONDecodeError, OSError):
                 pass
         return False
 
@@ -194,7 +194,7 @@ class RustVersionManager:
             try:
                 data = toml.load(cargo_toml)
                 return data.get('package', {}).get('version')
-            except:
+            except Exception:
                 pass
         return None
 
@@ -210,7 +210,7 @@ class RustVersionManager:
                     with open(cargo_toml, 'w') as f:
                         toml.dump(data, f)
                     return True
-            except:
+            except Exception:
                 pass
         return False
 

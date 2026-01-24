@@ -8,7 +8,7 @@ import click
 import json
 import sys
 from datetime import datetime, timedelta
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 
 from ..config import load_config
 from ..database import Database
@@ -212,7 +212,7 @@ def _show_pretty(config: dict, event_types: tuple, repo: Optional[str],
                 repo_name = row['repo_name'] or ""
 
                 # Format details based on event type
-                data = {}
+                data: Dict[str, Any] = {}
                 # Use 'metadata' column (schema) or 'message' (events table)
                 raw_metadata = row['metadata'] if 'metadata' in row.keys() else None
                 if not raw_metadata:
@@ -252,8 +252,6 @@ def _show_stats(config: dict, event_types: tuple, repo: Optional[str],
                 since_dt: datetime, until_dt: Optional[datetime]):
     """Show summary statistics for events."""
     from rich.console import Console
-    from rich.table import Table
-    from rich import box
 
     console = Console()
 
@@ -279,8 +277,9 @@ def _show_stats(config: dict, event_types: tuple, repo: Optional[str],
     try:
         with Database(config=config, read_only=True) as db:
             # Total events
-            db.execute(f"SELECT COUNT(*) as count FROM events e LEFT JOIN repos r ON e.repo_id = r.id WHERE {where_clause}", params)
-            total = db.fetchone()['count']
+            db.execute(f"SELECT COUNT(*) as count FROM events e LEFT JOIN repos r ON e.repo_id = r.id WHERE {where_clause}", tuple(params))
+            row = db.fetchone()
+            total = row['count'] if row else 0
 
             # By type
             db.execute(f"""
@@ -290,7 +289,7 @@ def _show_stats(config: dict, event_types: tuple, repo: Optional[str],
                 WHERE {where_clause}
                 GROUP BY type
                 ORDER BY count DESC
-            """, params)
+            """, tuple(params))
             by_type = db.fetchall()
 
             # Active repos
@@ -299,8 +298,9 @@ def _show_stats(config: dict, event_types: tuple, repo: Optional[str],
                 FROM events e
                 LEFT JOIN repos r ON e.repo_id = r.id
                 WHERE {where_clause}
-            """, params)
-            active_repos = db.fetchone()['count']
+            """, tuple(params))
+            row = db.fetchone()
+            active_repos = row['count'] if row else 0
 
             # Display
             console.print()

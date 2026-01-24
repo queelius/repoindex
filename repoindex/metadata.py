@@ -11,11 +11,10 @@ from pathlib import Path
 from typing import Dict, Any, Optional, List, Iterator
 from datetime import datetime, timezone
 import logging
-import mimetypes
 from collections import defaultdict
 
 from .config import get_config_path
-from .utils import get_remote_url, parse_repo_url, run_command
+from .utils import get_remote_url, parse_repo_url
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +42,7 @@ def detect_languages(repo_path: str, config: Optional[Dict[str, Any]] = None) ->
         'JavaScript': {'files': 5, 'bytes': 8000}
     }
     """
-    languages = defaultdict(lambda: {'files': 0, 'bytes': 0})
+    languages: Dict[str, Dict[str, int]] = defaultdict(lambda: {'files': 0, 'bytes': 0})
     
     # Get config settings
     if config is None:
@@ -197,7 +196,7 @@ def detect_languages(repo_path: str, config: Optional[Dict[str, Any]] = None) ->
                                 language = 'Perl'
                             elif 'bash' in shebang or 'sh' in shebang:
                                 language = 'Shell'
-                except:
+                except Exception:
                     pass
             
             if language:
@@ -323,7 +322,7 @@ class MetadataStore:
         logger.debug(f"Refreshing metadata for {repo_path}")
         
         # Get basic repository info
-        metadata = {
+        metadata: Dict[str, Any] = {
             'path': repo_path,
             'name': os.path.basename(repo_path)
         }
@@ -385,20 +384,6 @@ class MetadataStore:
         except Exception as e:
             logger.warning(f"Failed to get language info for {repo_path}: {e}")
         
-        # Get documentation info
-        try:
-            # Import here to avoid circular dependency
-            from .commands.docs import detect_docs_tool
-            docs_info = detect_docs_tool(repo_path)
-            if docs_info:
-                metadata['has_docs'] = True
-                metadata['docs_tool'] = docs_info['tool']
-                metadata['docs_config'] = docs_info.get('config')
-            else:
-                metadata['has_docs'] = False
-        except Exception as e:
-            logger.warning(f"Failed to detect docs for {repo_path}: {e}")
-        
         # Get README content
         try:
             readme_files = ['README.md', 'README.rst', 'README.txt', 'README', 'readme.md', 'Readme.md']
@@ -437,10 +422,10 @@ class MetadataStore:
                 if '.git' in root:
                     continue
                 file_count += len(files)
-                for f in files:
+                for filename in files:
                     try:
-                        total_size += os.path.getsize(os.path.join(root, f))
-                    except:
+                        total_size += os.path.getsize(os.path.join(root, filename))
+                    except OSError:
                         pass
             
             metadata['file_count'] = file_count
@@ -624,8 +609,8 @@ class MetadataStore:
         total_repos = len(self._metadata)
         
         # Calculate various stats
-        providers = {}
-        languages = {}
+        providers: Dict[str, int] = {}
+        languages: Dict[str, int] = {}
         total_stars = 0
         total_forks = 0
         

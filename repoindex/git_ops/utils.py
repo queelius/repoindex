@@ -3,7 +3,6 @@ Common utilities for git operations.
 """
 
 from typing import List, Dict, Any, Optional, Tuple
-from pathlib import Path
 import subprocess
 
 from ..config import load_config
@@ -46,7 +45,7 @@ def run_git(repo_path: str, command: List[str], capture_output: bool = True) -> 
         return f"Error: {str(e)}", -1
 
 
-def get_repos_from_vfs_path(vfs_path: str = None) -> List[str]:
+def get_repos_from_vfs_path(vfs_path: Optional[str] = None) -> List[str]:
     """Get all repository paths from a VFS path.
 
     Args:

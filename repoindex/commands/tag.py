@@ -8,17 +8,204 @@ import click
 import json
 import os
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from collections import defaultdict
 
 from ..config import load_config, save_config
 from ..utils import find_git_repos_from_config, is_git_repo
 from ..commands.catalog import get_repository_tags, is_protected_tag
+from ..database.connection import Database, get_db_path
+from ..database.repository import get_all_repos
 from rich.console import Console
 from rich.table import Table
 from rich.tree import Tree
 
 console = Console()
+
+
+def get_implicit_tags_from_row(repo_dict: Dict[str, Any]) -> List[str]:
+    """
+    Generate implicit tags from a database row.
+
+    This produces the same tags as TagService.get_implicit_tags() but works
+    directly from database rows without needing full domain object conversion.
+
+    Args:
+        repo_dict: Database row as dictionary
+
+    Returns:
+        List of implicit tag strings
+    """
+    tags = []
+
+    # repo:name
+    if repo_dict.get('name'):
+        tags.append(f"repo:{repo_dict['name']}")
+
+    # dir:parent (from path)
+    if repo_dict.get('path'):
+        parent = Path(repo_dict['path']).parent.name
+        tags.append(f"dir:{parent}")
+
+    # lang:language
+    if repo_dict.get('language'):
+        tags.append(f"lang:{repo_dict['language'].lower()}")
+
+    # owner:owner
+    if repo_dict.get('owner'):
+        tags.append(f"owner:{repo_dict['owner']}")
+
+    # license:key
+    if repo_dict.get('license_key'):
+        tags.append(f"license:{repo_dict['license_key']}")
+
+    # status:clean or status:dirty
+    if repo_dict.get('is_clean') is not None:
+        status = "clean" if repo_dict['is_clean'] else "dirty"
+        tags.append(f"status:{status}")
+
+    # GitHub-specific implicit tags (all have github_ prefix in database)
+    if repo_dict.get('github_owner'):
+        # visibility:public/private
+        if repo_dict.get('github_is_private'):
+            tags.append("visibility:private")
+        else:
+            tags.append("visibility:public")
+
+        # source:fork
+        if repo_dict.get('github_is_fork'):
+            tags.append("source:fork")
+
+        # archived:true
+        if repo_dict.get('github_is_archived'):
+            tags.append("archived:true")
+
+        # Stars buckets
+        stars = repo_dict.get('github_stars', 0) or 0
+        if stars >= 1000:
+            tags.append("stars:1000+")
+        elif stars >= 100:
+            tags.append("stars:100+")
+        elif stars >= 10:
+            tags.append("stars:10+")
+
+        # GitHub topics as topic:{topic} (provider tags)
+        if repo_dict.get('github_topics'):
+            try:
+                topics = json.loads(repo_dict['github_topics'])
+                for topic in topics:
+                    tags.append(f"topic:{topic}")
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+    # Package registry tags
+    # Note: these would come from publications table, not repos table
+    # For now, we skip these as they require a join
+
+    return tags
+
+
+def get_all_tags_from_database(
+    config: Dict[str, Any],
+    tag_filter: Optional[str] = None
+) -> Dict[str, List[str]]:
+    """
+    Get all tags (explicit + implicit) from the database.
+
+    Args:
+        config: Configuration dictionary
+        tag_filter: Optional filter pattern (supports wildcards)
+
+    Returns:
+        Dict mapping tag strings to list of repo paths
+    """
+    from ..tags import filter_tags
+
+    tag_repos = defaultdict(list)
+
+    # Get explicit tags from config
+    explicit_repo_tags = config.get("repository_tags", {})
+
+    # Check if database exists
+    db_path = get_db_path(config)
+    if not db_path.exists():
+        # Fall back to explicit tags only
+        for repo_path, tags in explicit_repo_tags.items():
+            for tag in tags:
+                if tag_filter:
+                    matching = filter_tags([tag], tag_filter)
+                    if matching:
+                        tag_repos[tag].append(repo_path)
+                else:
+                    tag_repos[tag].append(repo_path)
+        return dict(tag_repos)
+
+    # Query database for repos
+    with Database(config=config, read_only=True) as db:
+        for repo_dict in get_all_repos(db):
+            repo_path = repo_dict['path']
+
+            # Explicit tags from config
+            explicit_tags = explicit_repo_tags.get(repo_path, [])
+            for tag in explicit_tags:
+                if tag_filter:
+                    matching = filter_tags([tag], tag_filter)
+                    if matching:
+                        tag_repos[tag].append(repo_path)
+                else:
+                    tag_repos[tag].append(repo_path)
+
+            # Implicit tags from database row
+            implicit_tags = get_implicit_tags_from_row(repo_dict)
+            for tag in implicit_tags:
+                if tag_filter:
+                    matching = filter_tags([tag], tag_filter)
+                    if matching:
+                        tag_repos[tag].append(repo_path)
+                else:
+                    tag_repos[tag].append(repo_path)
+
+    return dict(tag_repos)
+
+
+def get_repo_tags_from_database(config: Dict[str, Any]) -> Dict[str, List[str]]:
+    """
+    Get all tags (explicit + implicit) organized by repository.
+
+    This returns the same format as config['repository_tags'] but includes
+    implicit tags from the database.
+
+    Args:
+        config: Configuration dictionary
+
+    Returns:
+        Dict mapping repo paths to list of tag strings
+    """
+    repo_tags = defaultdict(list)
+
+    # Get explicit tags from config
+    explicit_repo_tags = config.get("repository_tags", {})
+
+    # Check if database exists
+    db_path = get_db_path(config)
+    if not db_path.exists():
+        # Fall back to explicit tags only
+        return dict(explicit_repo_tags)
+
+    # Query database for repos
+    with Database(config=config, read_only=True) as db:
+        for repo_dict in get_all_repos(db):
+            repo_path = repo_dict['path']
+
+            # Explicit tags from config
+            explicit_tags = explicit_repo_tags.get(repo_path, [])
+            repo_tags[repo_path].extend(explicit_tags)
+
+            # Implicit tags from database row
+            implicit_tags = get_implicit_tags_from_row(repo_dict)
+            repo_tags[repo_path].extend(implicit_tags)
+
+    return dict(repo_tags)
 
 
 @click.group(name='tag')
@@ -242,21 +429,8 @@ def tag_list(tag_filter, json_output, repository):
                 else:
                     console.print(f"  • {tag}")
     else:
-        # List all tags and their repos
-        from ..tags import filter_tags
-
-        repo_tags = config.get("repository_tags", {})
-
-        # Build tag -> repos mapping
-        tag_repos = defaultdict(list)
-        for repo_path, tags in repo_tags.items():
-            for tag in tags:
-                if tag_filter:
-                    matching = filter_tags([tag], tag_filter)
-                    if matching:
-                        tag_repos[tag].append(repo_path)
-                else:
-                    tag_repos[tag].append(repo_path)
+        # List all tags and their repos (explicit + implicit from database)
+        tag_repos = get_all_tags_from_database(config, tag_filter)
 
         if json_output:
             for tag, repos in sorted(tag_repos.items()):
@@ -293,7 +467,8 @@ def tag_tree(tag_prefix):
         repoindex tag tree -t topic        # Show topic:* hierarchy
     """
     config = load_config()
-    repo_tags = config.get("repository_tags", {})
+    # Get all tags (explicit + implicit) from database
+    repo_tags = get_repo_tags_from_database(config)
 
     # Build hierarchical structure
     tree_data = build_tag_tree(repo_tags, tag_prefix)
@@ -348,7 +523,7 @@ def resolve_repository_path(repository: str, config: Dict[str, Any]) -> str:
     return None
 
 
-def build_tag_tree(repo_tags: Dict[str, List[str]], prefix: str = None) -> Dict:
+def build_tag_tree(repo_tags: Dict[str, List[str]], prefix: Optional[str] = None) -> Dict[str, Any]:
     """Build a hierarchical tree structure from tags.
 
     Args:

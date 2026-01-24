@@ -42,7 +42,7 @@ Total: 30 event types across multiple categories.
 repoindex is read-only: it observes and reports, external tools consume the stream.
 """
 
-from typing import Dict, Any, List, Optional, Generator, Callable
+from typing import Dict, Any, List, Optional, Generator
 from datetime import datetime, timedelta
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -50,7 +50,6 @@ import re
 import json
 import logging
 import hashlib
-import os
 import time
 
 from .utils import run_command, get_remote_url, parse_repo_url
@@ -451,7 +450,7 @@ def scan_branches(
                 continue
 
             commit_hash = parts[0].strip()
-            ref_info = parts[1].strip()
+            _ref_info = parts[1].strip()  # noqa: F841 - parsed but unused
             action_msg = parts[2].strip()
 
             # Extract branch name from action message
@@ -722,7 +721,7 @@ def scan_github_prs(
     owner, name = info
 
     # Use gh CLI to get PRs
-    state_filter = '' if state == 'all' else f'&state={state}'
+    # Note: state_filter is computed but we use state=all in the hardcoded URL
     cmd = f'gh api "repos/{owner}/{name}/pulls?state=all&sort=updated&direction=desc&per_page=100"'
 
     output, returncode = run_command(cmd, cwd=repo_path, capture_output=True, check=False, log_stderr=False)
@@ -844,7 +843,7 @@ def scan_github_issues(
             if until and issue_date > until:
                 continue
 
-            labels = [l.get('name', '') for l in issue.get('labels', [])]
+            labels = [label.get('name', '') for label in issue.get('labels', [])]
 
             yield Event(
                 type='issue',
@@ -1859,12 +1858,11 @@ def scan_github_repo_events(
 
     # Event type mapping from GitHub API to our event types
     # See: https://docs.github.com/en/rest/using-the-rest-api/github-event-types
-    repo_event_types = {
-        'RepositoryRenamedEvent': 'repo_rename',      # Not in standard events API
-        'MemberEvent': None,                          # Collaborator changes (skip for now)
-        'PublicEvent': 'repo_visibility',             # Repo made public
-        'PrivateEvent': 'repo_visibility',            # Repo made private (rare in API)
-    }
+    # Note: This mapping documents the event types but isn't currently used in code
+    # 'RepositoryRenamedEvent': 'repo_rename'  # Not in standard events API
+    # 'MemberEvent': None                      # Collaborator changes (skip for now)
+    # 'PublicEvent': 'repo_visibility'         # Repo made public
+    # 'PrivateEvent': 'repo_visibility'        # Repo made private (rare in API)
 
     count = 0
     for event in events:
@@ -1885,7 +1883,7 @@ def scan_github_repo_events(
             if until and event_date > until:
                 continue
 
-            payload = event.get('payload', {})
+            _payload = event.get('payload', {})  # noqa: F841 - available for future use
             actor = event.get('actor', {}).get('login', '')
 
             # Handle different event types
@@ -1971,10 +1969,8 @@ def scan_github_repo_events(
                         )
 
             # Check visibility
-            is_private = repo_data.get('private', False)
-            visibility = 'private' if is_private else 'public'
-            # We can't easily detect visibility *changes* without historical data,
-            # but we note current visibility for completeness
+            # Note: is_private is available but we can't detect *changes* without historical data
+            _is_private = repo_data.get('private', False)  # noqa: F841
 
     except (json.JSONDecodeError, KeyError, TypeError, ValueError) as e:
         logger.debug(f"Error checking repo info: {e}")
@@ -3150,8 +3146,8 @@ def _scan_repo_events(
     Internal function used by scan_events_parallel for concurrent scanning.
     Returns a list (not generator) for thread-safety.
     """
-    events = []
-    repo_name = Path(repo_path).name
+    events: List[Event] = []
+    _repo_name = Path(repo_path).name  # noqa: F841 - computed for debugging
 
     # Local git events (fast, no caching needed)
     if 'git_tag' in types:
@@ -3190,9 +3186,8 @@ def _scan_repo_events(
 
     for event_type in remote_types_to_scan:
         cache_key = _cache_key(repo_path, event_type, since, until) if use_cache else None
-        cached_events = None
 
-        if use_cache:
+        if use_cache and cache_key:
             cached_data = _cache_get(cache_key, cache_ttl)
             if cached_data is not None:
                 # Reconstruct Event objects from cached dicts

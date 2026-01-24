@@ -1,8 +1,8 @@
 # repoindex
 
-**Collection-aware metadata index for git repositories.**
+**A filesystem git catalog for your repository collection.**
 
-repoindex provides a unified view across all your repositories, enabling queries, organization, and integration with LLM tools like Claude Code.
+repoindex provides a unified view across all your local git repositories, enabling queries, organization, and integration with LLM tools like Claude Code.
 
 ## Philosophy
 
@@ -25,7 +25,7 @@ Claude Code (deep work on ONE repo)
 1. **Collection, not content** - Know *about* repos, not *inside* them
 2. **Metadata, not manipulation** - Track state, don't edit files
 3. **Index, not IDE** - We're the catalog, not the workbench
-4. **Unix philosophy** - JSONL output, compose with pipes
+4. **Unix philosophy** - Pretty tables by default, JSONL for pipes
 5. **Read-only events** - Observe and report, don't act
 
 ## Quick Start
@@ -34,71 +34,80 @@ Claude Code (deep work on ONE repo)
 # Install
 pip install repoindex
 
-# Configure repository directories
-repoindex config repos add ~/projects
-repoindex config repos add ~/work/**
+# Initialize configuration
+repoindex config init
 
-# See what's happening across your repos
-repoindex events --since 7d --pretty
+# Refresh database (required before queries)
+repoindex refresh
 
-# Query with fuzzy matching
-repoindex query "language ~= 'python' and stars > 10"
+# Dashboard overview
+repoindex status
+
+# Query with convenience flags
+repoindex query --dirty                    # Uncommitted changes
+repoindex query --language python          # Python repos
+repoindex query --recent 7d                # Recent commits
+repoindex query --tag "work/*"             # By tag
 
 # Tag repositories for organization
 repoindex tag add myproject work/active
 repoindex tag add myproject topic:ml
 
-# Interactive shell with VFS
-repoindex shell
+# See what happened
+repoindex events --since 7d
 ```
 
 ## Key Features
 
-### Event System (30 event types)
+### Query System
+
+Find repositories with convenience flags or the query DSL:
+
+```bash
+# Convenience flags (pretty table by default)
+repoindex query --dirty                    # Uncommitted changes
+repoindex query --language python          # Python repos
+repoindex query --starred                  # Has GitHub stars (requires --github during refresh)
+repoindex query --has-citation             # Has citation files
+repoindex query --has-doi                  # Has DOI in citation
+
+# Query DSL
+repoindex query "language == 'Python' and github_stars > 10"
+repoindex query "language ~= 'pyton'"      # Fuzzy matching (typo-tolerant)
+repoindex query "tagged('work/*')"         # Query by tag
+
+# JSONL output for piping
+repoindex query --json --language python | jq '.name'
+```
+
+See [Query Language](catalog-query.md) for syntax details.
+
+### Event System
 
 Track what's happening across your entire collection:
 
 ```bash
-# Local events (fast, no API)
-repoindex events --since 7d --pretty
+# Events from database (pretty table by default)
+repoindex events --since 7d
 
-# Include GitHub events
-repoindex events --github --since 7d
+# Filter by type
+repoindex events --type git_tag --since 30d
+repoindex events --type commit --since 7d
 
-# Include package publishes
-repoindex events --pypi --npm --cargo --since 30d
+# Filter by repository
+repoindex events --repo myproject
 
-# Watch for new events
-repoindex events --watch --github
+# Summary statistics
+repoindex events --stats
+
+# JSONL for piping
+repoindex events --json --since 7d | jq '.type' | sort | uniq -c
 ```
 
 **Event categories:**
 - **Local git**: tags, commits, branches, merges
-- **Local metadata**: version bumps, dependency updates, license changes, CI config changes
-- **GitHub**: releases, PRs, issues, workflows, security alerts, repo renames/transfers, deployments, forks, stars
-- **Registries**: PyPI, CRAN, npm, Cargo, Docker, RubyGems, NuGet, Maven
 
 See [Events Overview](events/overview.md) for full documentation.
-
-### Query Language
-
-Find repositories with fuzzy matching:
-
-```bash
-# Fuzzy language match (typo-tolerant)
-repoindex query "language ~= 'pyton'"
-
-# Multiple conditions
-repoindex query "language == 'Python' and stars > 100"
-
-# Check tags
-repoindex query "'ml' in tags"
-
-# Complex queries
-repoindex query "has_docs and not archived and stars > 10"
-```
-
-See [Query Language](catalog-query.md) for syntax details.
 
 ### Tag System
 
@@ -133,64 +142,57 @@ repoindex shell
 > ls
 myproject  otherproject
 
-# Tag via filesystem operations
-> cp /repos/newproject /by-tag/work/active
-
 # Run events from shell
-> events --github --since 1d
+> events --since 1d
 ```
 
 See [Shell & VFS](shell-vfs.md) for details.
 
-### Repository Audit
-
-Check repository health:
-
-```bash
-# Full audit
-repoindex audit
-
-# Auto-fix common issues
-repoindex audit --fix
-
-# Security checks
-repoindex audit security
-```
-
 ## Output Formats
 
-All commands output JSONL by default for Unix pipeline composition:
+Commands output pretty tables by default. Use `--json` for JSONL:
 
 ```bash
-# Stream to jq
-repoindex events --since 7d | jq '.type' | sort | uniq -c
+# Pretty tables (default)
+repoindex query --language python
+repoindex events --since 7d
 
-# Filter with grep
-repoindex status | grep '"clean": false'
+# JSONL for piping/scripting
+repoindex query --json --language python | jq '.name'
+repoindex events --json --since 7d | jq '.type' | sort | uniq -c
 
-# Human-readable tables
-repoindex events --since 7d --pretty
+# Brief output (just repo names)
+repoindex query --brief --dirty
+```
+
+## Refresh Database
+
+```bash
+repoindex refresh                  # Smart refresh (changed repos only)
+repoindex refresh --full           # Force full refresh
+repoindex refresh --github         # Include GitHub metadata
+repoindex refresh --pypi           # Include PyPI package status
+repoindex refresh --cran           # Include CRAN package status
+repoindex refresh --external       # Include all external metadata
+repoindex refresh --since 30d      # Events from last 30 days
 ```
 
 ## Configuration
 
-Configuration lives in `~/.repoindex/config.json`:
+Configuration lives in `~/.repoindex/config.yaml`:
 
-```json
-{
-  "general": {
-    "repository_directories": [
-      "~/projects",
-      "~/work/**"
-    ]
-  },
-  "events": {
-    "default_types": ["git_tag", "commit", "version_bump"]
-  },
-  "github": {
-    "token": "ghp_..."
-  }
-}
+```yaml
+repository_directories:
+  - ~/projects
+  - ~/work/**
+
+github:
+  token: ghp_...
+
+repository_tags:
+  /path/to/repo:
+    - topic:ml
+    - work/active
 ```
 
 Or use environment variables:
@@ -210,12 +212,18 @@ Or use environment variables:
 
 repoindex complements Claude Code by providing collection awareness. While Claude Code works deeply within a single repository, repoindex answers questions like:
 
-- "Which of my repos have security alerts?"
+- "Which of my repos have uncommitted changes?"
 - "What got released this week?"
-- "Which repos use Python 3.12?"
+- "Which repos use Python?"
 - "What needs attention?"
 
-Add repoindex commands to your workflow via CLAUDE.md or use the [MCP server](mcp/overview.md) for structured access.
+Install the skill for easy access:
+
+```bash
+repoindex claude install --global
+```
+
+Then use `/repoindex` in Claude Code conversations.
 
 ## Links
 

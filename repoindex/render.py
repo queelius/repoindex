@@ -8,13 +8,13 @@ Core functions return data, this module makes it human-readable.
 from rich.table import Table
 from rich.console import Console
 from rich import box
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from pathlib import Path
 
 console = Console()
 
 
-def render_table(headers: List[str], rows: List[List[str]], title: str = None) -> None:
+def render_table(headers: List[str], rows: List[List[str]], title: Optional[str] = None) -> None:
     """
     Render a generic table with the given headers and rows.
     
@@ -103,10 +103,10 @@ def render_status_table(repos: List[Dict[str, Any]]) -> None:
             if pkg.get('outdated'):
                 package_display += " ⚠️"
         
-        # Pages display
-        pages_display = ""
+        # Pages display (computed for future use)
+        _pages_display = ""  # noqa: F841 - reserved for future table column
         if 'github' in repo and repo['github'].get('pages_url'):
-            pages_display = "📄"
+            _pages_display = "📄"
         
         # Path display with deduplication info
         path_display = repo.get('path', 'N/A')
@@ -178,7 +178,7 @@ def print_status_summary(repos: List[Dict[str, Any]]) -> None:
     with_packages = sum(1 for r in repos if 'package' in r)
     pages_enabled = sum(1 for r in repos if r.get('github', {}).get('pages_url'))
     
-    console.print(f"\n[bold]Summary:[/bold]")
+    console.print("\n[bold]Summary:[/bold]")
     console.print(f"  Total repositories: {total}")
     
     if uncommitted:
@@ -298,7 +298,7 @@ def render_list_table(repos: List[Dict[str, Any]]) -> None:
         if 'all_paths' in repo:
             # Dedup details mode - show all paths
             paths = repo['all_paths']
-            primary_path = repo.get('primary_path', paths[0])
+            _primary_path = repo.get('primary_path', paths[0])  # noqa: F841 - for debugging
             
             if len(paths) > 1:
                 # Multiple paths - show the first path (which is usually the real one)
@@ -365,7 +365,7 @@ def render_list_table(repos: List[Dict[str, Any]]) -> None:
     dup_count = sum(1 for r in repos if r.get('is_true_duplicate'))
     dedup_count = sum(1 for r in repos if r.get('duplicate_count', 1) > 1)
     
-    console.print(f"\n[bold]Summary:[/bold]")
+    console.print("\n[bold]Summary:[/bold]")
     console.print(f"  Total repositories: {total}")
     console.print(f"  With license: {with_license} ({with_license*100//total if total else 0}%)")
     console.print(f"  With package: {with_package} ({with_package*100//total if total else 0}%)")
@@ -518,7 +518,7 @@ def print_update_summary(updates: List[Dict[str, Any]]) -> None:
     errors = sum(1 for u in updates if u.get('error'))
     up_to_date = total - pulled - errors
     
-    console.print(f"\n[bold]Summary:[/bold]")
+    console.print("\n[bold]Summary:[/bold]")
     console.print(f"  Total repositories: {total}")
     console.print(f"  Up to date: {up_to_date}")
     
@@ -632,7 +632,7 @@ def print_get_summary(results: List[Dict[str, Any]]) -> None:
     errors = sum(1 for r in results if r.get('error') and r.get('type') != 'user_error')
     user_errors = sum(1 for r in results if r.get('type') == 'user_error')
     
-    console.print(f"\n[bold]Summary:[/bold]")
+    console.print("\n[bold]Summary:[/bold]")
     if total > 0:
         console.print(f"  Total repositories: {total}")
         if cloned:
@@ -691,7 +691,7 @@ def render_catalog_list_table(catalog_stats: List[Dict[str, Any]]) -> None:
     total_dirs = sum(s['directories'] for s in catalog_stats)
     total_repos = sum(s['repositories'] for s in catalog_stats)
     
-    console.print(f"\n[bold]Summary:[/bold]")
+    console.print("\n[bold]Summary:[/bold]")
     console.print(f"  Total catalogs: {total_catalogs}")
     console.print(f"  Total directories: {total_dirs}")
     console.print(f"  Total repositories: {total_repos}")
@@ -749,7 +749,7 @@ def render_catalog_table(repos: List[Dict[str, Any]], catalog_type: str, catalog
     console.print(table)
     
     # Print summary
-    console.print(f"\n[bold]Summary:[/bold]")
+    console.print("\n[bold]Summary:[/bold]")
     console.print(f"  Total repositories: {len(repos)}")
     
     # Count by metadata if available
@@ -840,13 +840,13 @@ def render_docs_table(docs_statuses: List[Dict[str, Any]]) -> None:
     pages_enabled = sum(1 for r in docs_statuses if r.get('pages_url'))
     
     # Count by tool
-    tool_counts = {}
+    tool_counts: Dict[str, int] = {}
     for repo in docs_statuses:
         tool = repo.get('docs_tool')
         if tool:
             tool_counts[tool] = tool_counts.get(tool, 0) + 1
     
-    summary = f"\n[bold]Summary:[/bold]"
+    summary = "\n[bold]Summary:[/bold]"
     summary += f"\n  Total repositories: {total}"
     summary += f"\n  [bold green]With docs:[/bold green] {has_docs}"
     summary += f"\n  [bold magenta]Pages enabled:[/bold magenta] {pages_enabled}"

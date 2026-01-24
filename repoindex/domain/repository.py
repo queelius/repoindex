@@ -6,7 +6,7 @@ It's designed to be immutable and serializable for JSONL output.
 """
 
 from dataclasses import dataclass, field
-from typing import Optional, Dict, Any, FrozenSet, List
+from typing import Optional, Dict, Any, FrozenSet
 from pathlib import Path
 
 

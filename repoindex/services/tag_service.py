@@ -8,7 +8,7 @@ Provides tag management operations:
 - Persist tags to config
 """
 
-from typing import Generator, List, Set, Dict, Any, Optional, Iterable
+from typing import Generator, List, Set, Dict, Optional, Iterable
 from pathlib import Path
 import logging
 

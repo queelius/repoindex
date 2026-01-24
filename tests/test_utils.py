@@ -350,66 +350,6 @@ class TestGetGitRemoteUrl:
 
 
 # ============================================================================
-# Tests for check_github_repo_status
-# ============================================================================
-
-from repoindex.utils import check_github_repo_status
-
-
-class TestCheckGithubRepoStatus:
-    """Tests for check_github_repo_status function."""
-
-    @patch('repoindex.utils.run_command')
-    def test_public_repo(self, mock_run):
-        """Returns correct status for public repo."""
-        mock_run.return_value = ('{"name": "repo", "visibility": "public", "isFork": false}', 0)
-        result = check_github_repo_status("owner", "repo")
-        assert result['exists'] is True
-        assert result['visibility'] == "Public"
-        assert result['is_fork'] is False
-
-    @patch('repoindex.utils.run_command')
-    def test_private_repo(self, mock_run):
-        """Returns correct status for private repo."""
-        mock_run.return_value = ('{"name": "repo", "visibility": "private", "isFork": false}', 0)
-        result = check_github_repo_status("owner", "repo")
-        assert result['exists'] is True
-        assert result['visibility'] == "Private"
-
-    @patch('repoindex.utils.run_command')
-    def test_fork_repo(self, mock_run):
-        """Returns correct status for forked repo."""
-        mock_run.return_value = ('{"name": "repo", "visibility": "public", "isFork": true}', 0)
-        result = check_github_repo_status("owner", "repo")
-        assert result['is_fork'] is True
-
-    @patch('repoindex.utils.run_command')
-    def test_nonexistent_repo(self, mock_run):
-        """Returns not exists for missing repo."""
-        mock_run.return_value = ("", 1)
-        result = check_github_repo_status("owner", "nonexistent")
-        assert result['exists'] is False
-        assert result['visibility'] == "N/A"
-
-    def test_empty_owner(self):
-        """Returns not exists for empty owner."""
-        result = check_github_repo_status("", "repo")
-        assert result['exists'] is False
-
-    def test_empty_repo(self):
-        """Returns not exists for empty repo."""
-        result = check_github_repo_status("owner", "")
-        assert result['exists'] is False
-
-    @patch('repoindex.utils.run_command')
-    def test_invalid_json_response(self, mock_run):
-        """Handles invalid JSON response."""
-        mock_run.return_value = ("not valid json", 0)
-        result = check_github_repo_status("owner", "repo")
-        assert result['exists'] is False
-
-
-# ============================================================================
 # Tests for get_license_info
 # ============================================================================
 
@@ -593,63 +533,6 @@ class TestDetectGithubPagesLocally:
         with patch('repoindex.utils.run_command', return_value=("origin/main", 0)):
             result = detect_github_pages_locally("/repo")
         assert result is None
-
-
-# ============================================================================
-# Tests for get_gh_pages_url
-# ============================================================================
-
-from repoindex.utils import get_gh_pages_url
-
-
-class TestGetGhPagesUrl:
-    """Tests for get_gh_pages_url function."""
-
-    @patch('repoindex.utils.run_command')
-    def test_gh_api_success(self, mock_run, fs):
-        """Returns URL from GitHub API when available."""
-        fs.create_dir("/repo/.git")
-        mock_run.side_effect = [
-            ("https://github.com/user/repo.git", 0),  # get remote url
-            ('{"html_url": "https://user.github.io/repo"}', 0)  # gh api pages
-        ]
-        result = get_gh_pages_url("/repo")
-        assert result == "https://user.github.io/repo"
-
-    @patch('repoindex.utils.run_command')
-    def test_gh_pages_branch_fallback(self, mock_run, fs):
-        """Falls back to gh-pages branch detection."""
-        fs.create_dir("/repo/.git")
-        mock_run.side_effect = [
-            ("https://github.com/user/repo.git", 0),  # get remote url
-            ("", 1),  # gh api pages fails
-            ("origin/gh-pages\norigin/main", 0)  # git branch -r
-        ]
-        result = get_gh_pages_url("/repo")
-        assert result == "https://user.github.io/repo/"
-
-    @patch('repoindex.utils.run_command')
-    def test_no_pages_returns_none(self, mock_run, fs):
-        """Returns None when no Pages found."""
-        fs.create_dir("/repo/.git")
-        mock_run.side_effect = [
-            ("https://github.com/user/repo.git", 0),  # get remote url
-            ("", 1),  # gh api pages fails
-            ("origin/main", 0)  # git branch -r (no gh-pages)
-        ]
-        result = get_gh_pages_url("/repo")
-        assert result is None
-
-    @patch('repoindex.utils.run_command')
-    def test_ssh_url_parsing(self, mock_run, fs):
-        """Parses SSH remote URL correctly."""
-        fs.create_dir("/repo/.git")
-        mock_run.side_effect = [
-            ("git@github.com:user/repo.git", 0),  # SSH format
-            ('{"html_url": "https://user.github.io/repo"}', 0)
-        ]
-        result = get_gh_pages_url("/repo")
-        assert result == "https://user.github.io/repo"
 
 
 # ============================================================================

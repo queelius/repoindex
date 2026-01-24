@@ -6,7 +6,6 @@ This module provides functionality to detect R packages in repositories
 and check their status on CRAN, similar to the PyPI integration for Python.
 """
 
-import os
 import re
 import requests
 from pathlib import Path
@@ -24,15 +23,15 @@ def find_r_package_files(repo_path: str) -> List[str]:
     - R/ directory (contains R source files)
     """
     package_files = []
-    repo_path = Path(repo_path)
+    repo_path_obj = Path(repo_path)
 
     # Check for DESCRIPTION file (primary indicator)
-    description_path = repo_path / 'DESCRIPTION'
+    description_path = repo_path_obj / 'DESCRIPTION'
     if description_path.exists():
         package_files.append(str(description_path))
 
     # Check for NAMESPACE file
-    namespace_path = repo_path / 'NAMESPACE'
+    namespace_path = repo_path_obj / 'NAMESPACE'
     if namespace_path.exists():
         package_files.append(str(namespace_path))
 
@@ -247,9 +246,10 @@ def detect_r_package(repo_path: str) -> Dict:
     result['license'] = info.get('license')
 
     # Check registries if we have a package name
-    if result['package_name']:
+    package_name = result['package_name']
+    if package_name and isinstance(package_name, str):
         # Check CRAN first
-        cran_info = check_cran_package(result['package_name'])
+        cran_info = check_cran_package(package_name)
         if cran_info:
             result['cran_info'] = cran_info
             if cran_info.get('exists'):
@@ -258,7 +258,7 @@ def detect_r_package(repo_path: str) -> Dict:
 
         # Check Bioconductor if not on CRAN
         if not result['is_published']:
-            bioc_info = check_bioconductor_package(result['package_name'])
+            bioc_info = check_bioconductor_package(package_name)
             if bioc_info:
                 result['bioconductor_info'] = bioc_info
                 if bioc_info.get('exists'):

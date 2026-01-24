@@ -7,11 +7,12 @@ Shows a quick overview of your repository collection from the database.
 import json
 import sys
 from datetime import datetime, timedelta
+from typing import Any, Dict, List, Tuple
 
 import click
 
 from ..config import load_config
-from ..database import Database, get_database_info, get_scan_errors, get_scan_error_count
+from ..database import Database, get_database_info, get_scan_error_count
 
 
 @click.command(name='status')
@@ -63,9 +64,6 @@ def _json_dashboard(config: dict, db_info: dict):
 def _pretty_dashboard(config: dict, db_info: dict):
     """Display a pretty dashboard."""
     from rich.console import Console
-    from rich.table import Table
-    from rich.panel import Panel
-    from rich import box
 
     console = Console()
     data = _gather_dashboard_data(config, db_info)
@@ -144,9 +142,12 @@ def _pretty_dashboard(config: dict, db_info: dict):
             console.print("[dim]Run 'repoindex query' to search your repositories.[/dim]")
 
 
-def _gather_dashboard_data(config: dict, db_info: dict) -> dict:
+def _gather_dashboard_data(config: dict, db_info: dict) -> Dict[str, Any]:
     """Gather all dashboard data from the database."""
-    data = {
+    warnings: List[str] = []
+    suggestions: List[str] = []
+    languages: List[Tuple[str, int]] = []
+    data: Dict[str, Any] = {
         'database': {
             'repos': db_info.get('repos', 0),
             'events': db_info.get('events', 0),
@@ -160,9 +161,9 @@ def _gather_dashboard_data(config: dict, db_info: dict) -> dict:
             'scan_errors': 0,
             'stale_repos': 0,  # Not scanned in 7+ days
         },
-        'warnings': [],  # List of warning messages
-        'suggestions': [],  # Actionable suggestions
-        'languages': [],
+        'warnings': warnings,
+        'suggestions': suggestions,
+        'languages': languages,
         'recent_activity': {
             'since': '7 days',
             'commits': 0,
@@ -318,11 +319,12 @@ def _print_repos_table(rows):
 
 def _format_size(bytes_size: int) -> str:
     """Format bytes as human readable."""
+    size: float = float(bytes_size)
     for unit in ['B', 'KB', 'MB', 'GB']:
-        if bytes_size < 1024:
-            return f"{bytes_size:.0f} {unit}"
-        bytes_size /= 1024
-    return f"{bytes_size:.0f} TB"
+        if size < 1024:
+            return f"{size:.0f} {unit}"
+        size /= 1024
+    return f"{size:.0f} TB"
 
 
 def _format_time_ago(timestamp: str) -> str:

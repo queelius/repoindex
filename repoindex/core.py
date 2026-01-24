@@ -7,17 +7,15 @@ No printing, no direct file system access (unless reading is the core function).
 """
 
 import json
-import random
 import os
-import time
-from datetime import datetime, timedelta
+from datetime import datetime
 from pathlib import Path
-from typing import List, Dict, Optional, Generator
+from typing import List, Dict, Generator, Optional, Any
 
-from repoindex.config import logger, stats, load_config
+from repoindex.config import logger, load_config
 
 from .pypi import detect_pypi_package, is_package_outdated
-from .utils import find_git_repos, find_git_repos_from_config, get_remote_url, get_license_info, get_gh_pages_url, get_git_status, run_command, parse_repo_url, get_git_remote_url
+from .utils import find_git_repos, find_git_repos_from_config, get_remote_url, get_license_info, get_git_status, run_command, parse_repo_url, get_git_remote_url
 
 
 def list_repos(source, directory, recursive, dedup, dedup_details):
@@ -121,9 +119,9 @@ def get_repositories_from_path(base_dir: str, recursive: bool = False) -> Genera
                 yield os.path.abspath(repo_dir)
 
 
-def get_repository_status(base_dir: str = None, recursive: bool = False, skip_pages_check: bool = False,
-                         deduplicate: bool = True, tag_filters: list = None, all_tags: bool = False,
-                         use_github_api: bool = False) -> Generator[Dict, None, None]:
+def get_repository_status(base_dir: Optional[str] = None, recursive: bool = False, skip_pages_check: bool = False,
+                         deduplicate: bool = True, tag_filters: Optional[List[Any]] = None, all_tags: bool = False,
+                         use_github_api: bool = False) -> Generator[Dict[str, Any], None, None]:
     """
     Generator that yields repository status objects.
 
@@ -221,7 +219,7 @@ def _get_repository_status_for_path(repo_path: str, skip_pages_check: bool = Fal
                 has_upstream = True
                 # Check for unpushed commits
                 result, _ = run_command(
-                    f"git log @{{upstream}}..HEAD --oneline",
+                    "git log @{upstream}..HEAD --oneline",
                     cwd=repo_path,
                     capture_output=True,
                     check=False
@@ -229,7 +227,7 @@ def _get_repository_status_for_path(repo_path: str, skip_pages_check: bool = Fal
                 has_unpushed = bool(result and result.strip())
 
         # Build status object
-        repo_status = {
+        repo_status: Dict[str, Any] = {
             "path": repo_path,
             "name": repo_name,
             "status": {
@@ -334,7 +332,7 @@ def _get_repository_status_for_path(repo_path: str, skip_pages_check: bool = Fal
                 repo_status["github"] = github_info
 
         # Add tags (both explicit and implicit)
-        from .commands.catalog import get_implicit_tags, get_repository_tags
+        from .commands.catalog import get_repository_tags
 
         # Get all tags for this repository
         all_tags = get_repository_tags(repo_path, repo_info=repo_status)
@@ -657,7 +655,7 @@ def get_license_template(license_key):
     return None
 
 
-def get_license_info(repo_path):
+def get_github_license_info(repo_path):
     """
     Get license info from GitHub API for a repository.
     
@@ -843,7 +841,6 @@ def create_social_media_posts(repo_paths, sample_size=3):
     Returns:
         List of post dictionaries with platform-specific content
     """
-    import random
     from .metadata import get_metadata_store
     from .social import generate_social_content
     

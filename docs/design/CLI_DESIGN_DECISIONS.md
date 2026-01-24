@@ -1,5 +1,10 @@
 # CLI Design Decisions
 
+> **Note (v0.10.0):** This document describes early design decisions. Some commands have since been consolidated:
+> - `list` command was merged into `query` (use `repoindex query` or `repoindex query --json`)
+> - `top` command was replaced by `events`
+> - Several commands (`docs`, `audit`, `service`, `social`, `network`, `ai`) were removed to keep the tool focused
+
 ## Question 5: Which Commands Stay Top-Level?
 
 ### Analysis of Command Usage Patterns

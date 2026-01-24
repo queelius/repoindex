@@ -19,7 +19,7 @@ Views are read-only projections - they don't modify source repo data.
 from dataclasses import dataclass, field
 from typing import (
     Dict, Any, List, Optional, FrozenSet, Tuple,
-    Union, Sequence as TypingSequence, Iterator
+    Union, Iterator
 )
 from enum import Enum
 import json
@@ -61,7 +61,7 @@ class Overlay:
     extra: Dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> Dict[str, Any]:
-        result = {}
+        result: Dict[str, Any] = {}
         if self.description is not None:
             result['description'] = self.description
         if self.tags:
@@ -155,7 +155,7 @@ class ViewEntry:
     annotation: Annotation = field(default_factory=Annotation)
 
     def to_dict(self) -> Dict[str, Any]:
-        result = {'repo': self.repo_ref}
+        result: Dict[str, Any] = {'repo': self.repo_ref}
         overlay_dict = self.overlay.to_dict()
         if overlay_dict:
             result['overlay'] = overlay_dict

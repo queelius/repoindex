@@ -32,6 +32,7 @@ BOOLEAN_FIELDS = {
     # Local boolean fields
     'is_clean', 'clean', 'has_readme', 'has_license', 'has_ci',
     'has_upstream', 'uncommitted_changes', 'uncommitted',
+    'has_citation',  # Citation detection (CITATION.cff, .zenodo.json, etc.)
     # GitHub boolean fields (short aliases)
     'is_fork', 'is_archived', 'archived', 'is_private', 'private', 'has_pages',
     # GitHub boolean fields (explicit prefix)
@@ -80,6 +81,8 @@ def _build_query_from_flags(
     tag: Optional[List[str]],
     no_license: bool,
     no_readme: bool,
+    has_citation: bool,
+    has_doi: bool,
     archived: bool,
     public: bool,
     private: bool,
@@ -140,6 +143,14 @@ def _build_query_from_flags(
     if no_readme:
         predicates.append("not has_readme")
 
+    # Citation detection (CITATION.cff, .zenodo.json, etc.)
+    if has_citation:
+        predicates.append("has_citation")
+
+    # DOI detection (repos with a DOI in citation metadata)
+    if has_doi:
+        predicates.append("citation_doi != ''")
+
     # GitHub archive status
     if archived:
         predicates.append("github_is_archived")
@@ -180,6 +191,8 @@ def _build_query_from_flags(
 @click.option('--tag', '-t', multiple=True, help='Filter by tag (supports wildcards)')
 @click.option('--no-license', is_flag=True, help='Repos without a license')
 @click.option('--no-readme', is_flag=True, help='Repos without a README')
+@click.option('--has-citation', is_flag=True, help='Repos with citation files (CITATION.cff, .zenodo.json)')
+@click.option('--has-doi', is_flag=True, help='Repos with DOI in citation metadata')
 @click.option('--archived', is_flag=True, help='Archived repos only')
 @click.option('--public', is_flag=True, help='Public repos only')
 @click.option('--private', is_flag=True, help='Private repos only')
@@ -203,6 +216,8 @@ def query_handler(
     tag: tuple,
     no_license: bool,
     no_readme: bool,
+    has_citation: bool,
+    has_doi: bool,
     archived: bool,
     public: bool,
     private: bool,
@@ -264,12 +279,12 @@ def query_handler(
 
     # Build query from flags
     has_flags = any([dirty, clean, language, recent, starred, tag, no_license, no_readme,
-                     archived, public, private, fork, no_fork])
+                     has_citation, has_doi, archived, public, private, fork, no_fork])
     if has_flags:
         query_string = _build_query_from_flags(
             query_string if query_string else None,
             dirty, clean, language, recent, starred, list(tag),
-            no_license, no_readme, archived, public, private, fork, no_fork
+            no_license, no_readme, has_citation, has_doi, archived, public, private, fork, no_fork
         )
 
     # If no query and no flags, show all repos

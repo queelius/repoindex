@@ -88,13 +88,13 @@ class Query:
             logger.debug(f"Found OR operator, splitting into {len(conditions)} conditions")
             return ('or', [self._parse(c.strip()) for c in conditions])
         else:
-            logger.debug(f"No boolean operators found, parsing as single condition")
+            logger.debug("No boolean operators found, parsing as single condition")
             return self._parse_condition(query_str.strip())
     
     def _split_respecting_quotes(self, text: str, delimiter: str) -> List[str]:
         """Split text by delimiter, but respect quoted strings."""
-        parts = []
-        current = []
+        parts: List[str] = []
+        current: List[str] = []
         in_quotes = False
         quote_char = None
         i = 0
@@ -363,7 +363,7 @@ class Query:
                 else:
                     # Fuzzy match on keys
                     best_match = None
-                    best_score = 0
+                    best_score: float = 0.0
                     for key in current.keys():
                         score = fuzz.ratio(part.lower(), key.lower())
                         if score > best_score and score >= 70:  # 70% threshold for keys

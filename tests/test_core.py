@@ -547,10 +547,10 @@ class TestLicenseFunctions:
         assert not license_path.exists()
 
     @patch("repoindex.core.run_command")
-    def test_get_license_info_success(self, mock_run_command):
-        """Test getting license info from a repo."""
+    def test_get_github_license_info_success(self, mock_run_command):
+        """Test getting license info from a repo via GitHub API."""
         mock_run_command.return_value = ('{"licenseInfo": {"spdxId": "MIT", "name": "MIT License"}}', 0)
-        info = core.get_license_info("/fake/repo")
+        info = core.get_github_license_info("/fake/repo")
         assert info["spdx_id"] == "MIT"
         assert info["name"] == "MIT License"
         mock_run_command.assert_called_once_with(
@@ -558,8 +558,8 @@ class TestLicenseFunctions:
         )
 
     @patch("repoindex.core.run_command", side_effect=Exception("GH error"))
-    def test_get_license_info_error(self, mock_run_command):
-        """Test error handling when getting license info."""
-        info = core.get_license_info("/fake/repo")
+    def test_get_github_license_info_error(self, mock_run_command):
+        """Test error handling when getting license info via GitHub API."""
+        info = core.get_github_license_info("/fake/repo")
         assert "error" in info
 

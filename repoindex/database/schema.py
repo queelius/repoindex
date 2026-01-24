@@ -15,7 +15,9 @@ from typing import List, Tuple
 # Current schema version - increment when schema changes
 # v1: Initial schema
 # v2: Renamed GitHub fields with github_ prefix for explicit provenance
-CURRENT_VERSION = 2
+# v3: Added citation detection (has_citation, citation_file)
+# v4: Added citation metadata parsing (citation_doi, citation_title, etc.)
+CURRENT_VERSION = 4
 
 # Schema definition as SQL statements
 SCHEMA_V1 = """
@@ -78,6 +80,18 @@ CREATE TABLE IF NOT EXISTS repos (
     has_readme BOOLEAN DEFAULT 0,
     has_license BOOLEAN DEFAULT 0,
     has_ci BOOLEAN DEFAULT 0,
+
+    -- Citation detection (local files: CITATION.cff, .zenodo.json, CITATION.bib)
+    has_citation BOOLEAN DEFAULT 0,
+    citation_file TEXT,
+
+    -- Citation metadata (parsed from CITATION.cff, .zenodo.json)
+    citation_doi TEXT,           -- DOI identifier (e.g., "10.5281/zenodo.1234567")
+    citation_title TEXT,         -- Software title from citation file
+    citation_authors TEXT,       -- JSON array of author objects
+    citation_version TEXT,       -- Version from citation file
+    citation_repository TEXT,    -- Repository URL from citation file
+    citation_license TEXT,       -- License from citation file
 
     -- GitHub timestamps (nullable, fetched via --enrich-github)
     github_created_at TIMESTAMP,
@@ -149,6 +163,7 @@ CREATE INDEX IF NOT EXISTS idx_repos_owner ON repos(owner);
 CREATE INDEX IF NOT EXISTS idx_repos_github_updated ON repos(github_updated_at);
 CREATE INDEX IF NOT EXISTS idx_repos_github_stars ON repos(github_stars);
 CREATE INDEX IF NOT EXISTS idx_repos_scanned ON repos(scanned_at);
+CREATE INDEX IF NOT EXISTS idx_repos_citation_doi ON repos(citation_doi);
 
 CREATE INDEX IF NOT EXISTS idx_tags_tag ON tags(tag);
 CREATE INDEX IF NOT EXISTS idx_tags_source ON tags(source);
@@ -301,7 +316,7 @@ def apply_schema(conn: sqlite3.Connection, version: int = CURRENT_VERSION) -> No
     conn.executescript(SCHEMA_V1)
     conn.execute(
         "INSERT OR REPLACE INTO _schema_info (version, description) VALUES (?, ?)",
-        (CURRENT_VERSION, "v0.10.0: GitHub fields renamed with github_ prefix for explicit provenance")
+        (CURRENT_VERSION, "v0.10.0: Added citation metadata parsing (citation_doi, citation_title, etc.)")
     )
 
     conn.commit()

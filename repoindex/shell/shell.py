@@ -23,20 +23,17 @@ class RepoIndexShell(cmd.Cmd):
 
     intro = """
 ╔═══════════════════════════════════════════════════════════════════╗
-║                     repoindex Interactive Shell                       ║
+║                   repoindex Interactive Shell                     ║
 ║                                                                   ║
 ║  Navigate repositories with hierarchical tag filesystem          ║
 ║  - /repos/           All repositories                            ║
 ║  - /by-tag/          Hierarchical tag navigation                 ║
 ║  - /by-language/     Grouped by programming language             ║
 ║  - /by-status/       Grouped by git status                       ║
-║  - /config/          Configuration settings                      ║
 ║                                                                   ║
 ║  VFS: cd, ls, pwd, cp, mv, rm, mkdir, refresh                    ║
 ║  Files: cat, head, tail, grep (within repos)                     ║
-║  Git: git [-r] <cmd> - status, log, diff (read-only) (-r = all)  ║
-║  Commands: status, top, query, publish, clone, config            ║
-║  Advanced: export, docs                                          ║
+║  Commands: status, query, config                                 ║
 ║  Shell: !<command> to run bash commands in current directory     ║
 ║  Type 'help' for available commands, 'exit' or Ctrl+D to quit    ║
 ╚═══════════════════════════════════════════════════════════════════╝
@@ -78,7 +75,7 @@ class RepoIndexShell(cmd.Cmd):
         self.repo_paths = find_git_repos_from_config(repo_dirs, recursive=False)
 
         # Build VFS structure
-        vfs = {
+        vfs: Dict[str, Any] = {
             "/": {
                 "type": "directory",
                 "children": {
@@ -91,10 +88,10 @@ class RepoIndexShell(cmd.Cmd):
         }
 
         # Populate repos
-        repos_node = vfs["/"]["children"]["repos"]["children"]
-        by_lang_node = vfs["/"]["children"]["by-language"]["children"]
-        by_tag_node = vfs["/"]["children"]["by-tag"]["children"]
-        by_status_node = vfs["/"]["children"]["by-status"]["children"]
+        repos_node: Dict[str, Any] = vfs["/"]["children"]["repos"]["children"]
+        by_lang_node: Dict[str, Any] = vfs["/"]["children"]["by-language"]["children"]
+        by_tag_node: Dict[str, Any] = vfs["/"]["children"]["by-tag"]["children"]
+        by_status_node: Dict[str, Any] = vfs["/"]["children"]["by-status"]["children"]
 
         for repo_path in self.repo_paths:
             repo_name = Path(repo_path).name
@@ -231,7 +228,7 @@ class RepoIndexShell(cmd.Cmd):
         # Normalize (remove .. and .)
         try:
             resolved = resolved.resolve()
-        except:
+        except OSError:
             return None
 
         # Ensure it starts with /
@@ -314,7 +311,7 @@ class RepoIndexShell(cmd.Cmd):
         if node["type"] in ("repository", "symlink"):
             repo_path = node.get("path") or node.get("repo_path")
             if not repo_path:
-                print(f"ls: could not determine repository path")
+                print("ls: could not determine repository path")
                 return
 
             self._list_repository_contents(repo_path, json_output)
@@ -447,7 +444,7 @@ class RepoIndexShell(cmd.Cmd):
             # Follow symlink
             target = self._resolve_path(node["target"])
             if not target:
-                print(f"cd: broken symlink")
+                print("cd: broken symlink")
                 return
             node = self._get_node(target)
 
@@ -586,159 +583,6 @@ class RepoIndexShell(cmd.Cmd):
         except Exception as e:
             print(f"status: error: {e}")
 
-    def do_events(self, arg):
-        """Scan repositories for events.
-
-        Usage: events [options]
-
-        Options:
-            --since TIME     Events after this time (e.g., 1h, 7d, 2024-01-01)
-            --type TYPE      Filter by event type:
-                             Local: git_tag, commit, branch, merge, version_bump, deps_update,
-                                    license_change, ci_config_change, docs_change, readme_change
-                             GitHub: github_release, pr, issue, workflow_run, security_alert,
-                                     repo_rename, repo_transfer, repo_visibility, repo_archive
-                             Registries: pypi_publish, cran_publish, npm_publish, cargo_publish,
-                                         docker_publish, gem_publish, nuget_publish, maven_publish
-            --github         Include GitHub events (releases, PRs, issues, security alerts, repo events)
-            --pypi           Include PyPI publish events
-            --cran           Include CRAN publish events
-            --npm            Include npm publish events
-            --cargo          Include Cargo (crates.io) publish events
-            --docker         Include Docker Hub publish events
-            --gem            Include RubyGems publish events
-            --nuget          Include NuGet (.NET) publish events
-            --maven          Include Maven Central (Java) publish events
-            --all            Include all event types
-            --stats          Show summary statistics
-            --relative-time  Show relative timestamps (e.g., "2h ago")
-            --limit N        Maximum events (default: 100, use 0 for unlimited)
-
-        Examples:
-            events                         # Local events, last 7 days
-            events --since 1d              # Events in last day
-            events --type git_tag          # Only git tags
-            events --github --since 7d     # Include GitHub events
-            events --npm --cargo           # npm and Cargo publishes
-            events --gem --maven           # RubyGems and Maven publishes
-            events --type security_alert   # Security alerts only
-            events --type license_change   # License changes only
-            events --type repo_rename      # Repo renames only
-            events --stats                 # Show event statistics
-            events --relative-time         # Show "2h ago" style times
-        """
-        # Parse arguments
-        args = arg.split()
-        since = '7d'  # Default to 7 days
-        event_types = []
-        limit = 100  # Default, use 0 for unlimited
-        github = False
-        pypi = False
-        cran = False
-        npm = False
-        cargo = False
-        docker = False
-        gem = False
-        nuget = False
-        maven = False
-        include_all = False
-        stats = False
-        relative_time = False
-
-        i = 0
-        while i < len(args):
-            if args[i] == '--since' and i + 1 < len(args):
-                since = args[i + 1]
-                i += 2
-            elif args[i] == '--type' and i + 1 < len(args):
-                event_types.append(args[i + 1])
-                i += 2
-            elif args[i] == '--limit' and i + 1 < len(args):
-                try:
-                    limit = int(args[i + 1])
-                    i += 2
-                except ValueError:
-                    print(f"events: invalid limit value: {args[i + 1]}")
-                    return
-            elif args[i] == '--github':
-                github = True
-                i += 1
-            elif args[i] == '--pypi':
-                pypi = True
-                i += 1
-            elif args[i] == '--cran':
-                cran = True
-                i += 1
-            elif args[i] == '--npm':
-                npm = True
-                i += 1
-            elif args[i] == '--cargo':
-                cargo = True
-                i += 1
-            elif args[i] == '--docker':
-                docker = True
-                i += 1
-            elif args[i] == '--gem':
-                gem = True
-                i += 1
-            elif args[i] == '--nuget':
-                nuget = True
-                i += 1
-            elif args[i] == '--maven':
-                maven = True
-                i += 1
-            elif args[i] in ('--all', '-a'):
-                include_all = True
-                i += 1
-            elif args[i] == '--stats':
-                stats = True
-                i += 1
-            elif args[i] in ('--relative-time', '-R'):
-                relative_time = True
-                i += 1
-            else:
-                i += 1
-
-        # Import events handler and run
-        from ..commands.poll import events_handler
-        import click
-
-        try:
-            events_handler.callback(
-                event_types=tuple(event_types) if event_types else (),
-                github=github,
-                pypi=pypi,
-                cran=cran,
-                npm=npm,
-                cargo=cargo,
-                docker=docker,
-                gem=gem,
-                nuget=nuget,
-                maven=maven,
-                include_all=include_all,
-                repo=None,
-                since=since,
-                until=None,
-                watch=False,  # No watch mode in shell
-                interval=300,
-                limit=limit,
-                pretty=True,  # Shell always uses pretty mode
-                stats=stats,
-                relative_time=relative_time
-            )
-        except KeyboardInterrupt:
-            print("\nInterrupted")
-        except Exception as e:
-            print(f"events: error: {e}")
-
-    # Alias for backward compatibility
-    def do_top(self, arg):
-        """[Deprecated] Use 'events' instead."""
-        print("'top' is deprecated. Use 'events' instead.")
-        print("Examples:")
-        print("  events --since 24h          # Last 24 hours")
-        print("  events --type commit        # Only commits")
-        print("  events --stats              # Show statistics")
 
     def do_publish(self, arg):
         """Package publishing is handled by external tools.
@@ -785,51 +629,6 @@ class RepoIndexShell(cmd.Cmd):
         print()
         print("For portfolio generation, use external tools that consume repoindex data.")
 
-    def do_docs(self, arg):
-        """Detect documentation tools in repositories.
-
-        Usage: docs [path]
-
-        Shows which documentation tools (mkdocs, sphinx, jekyll, etc.)
-        are used in repositories.
-
-        Examples:
-            docs                     # Detect docs in current repo/path
-            docs /repos/myproject    # Check specific repo
-            docs /by-tag/work        # Check repos with tag
-        """
-        # Import docs detection function
-        from ..commands.docs import get_docs_status
-        import json
-
-        # Determine what to scan
-        if arg and arg.startswith('/'):
-            # VFS path - resolve to repos
-            repo_paths = self._resolve_vfs_path_to_repos(arg)
-            if not repo_paths:
-                print(f"No repository found at: {arg}")
-                return
-        elif self.in_real_fs and self.real_fs_repo:
-            repo_paths = [self.real_fs_repo]
-        else:
-            # Current VFS directory - resolve to repos
-            repo_paths = self._resolve_vfs_path_to_repos(str(self.cwd))
-            if not repo_paths:
-                print(f"No repository in current directory")
-                return
-
-        # Show docs detection for each repo
-        for repo_path in repo_paths:
-            status = get_docs_status(repo_path)
-            if status.get('has_docs'):
-                tool = status.get('docs_tool', 'unknown')
-                config = status.get('docs_config', 'N/A')
-                pages_url = status.get('pages_url', '')
-                print(f"{status['name']}: {tool} (config: {config})")
-                if pages_url:
-                    print(f"  Pages: {pages_url}")
-            else:
-                print(f"{status['name']}: no documentation detected")
 
     def do_config(self, arg):
         """Configuration management.
@@ -921,85 +720,6 @@ class RepoIndexShell(cmd.Cmd):
             print(f"Unknown config subcommand: {subcommand}")
             print("Available: show, repos")
 
-    def do_clone(self, arg):
-        """Clone repositories from GitHub.
-
-        Usage: clone <user/repo> [user/repo2 ...]
-                clone <url>
-                clone --user <username> [--limit N]
-
-        Examples:
-            clone user/repo                # Clone specific repo
-            clone https://github.com/user/repo  # Clone from URL
-            clone user/repo1 user/repo2    # Clone multiple repos
-            clone --user username          # Clone all repos for user
-            clone --user username --limit 10  # Clone first 10 repos
-        """
-        if not arg:
-            print("Usage: clone <user/repo> | <url> | --user <username>")
-            return
-
-        # Import clone handler
-        from ..commands.clone import clone_handler
-        import click
-
-        # Parse arguments
-        import shlex
-        args = shlex.split(arg)
-
-        try:
-            # Build click context
-            if '--user' in args:
-                # Clone user's repos
-                user_idx = args.index('--user')
-                if user_idx + 1 >= len(args):
-                    print("Error: --user requires a username")
-                    return
-
-                username = args[user_idx + 1]
-                limit = 100
-
-                if '--limit' in args:
-                    limit_idx = args.index('--limit')
-                    if limit_idx + 1 < len(args):
-                        try:
-                            limit = int(args[limit_idx + 1])
-                        except ValueError:
-                            print(f"Error: Invalid limit value: {args[limit_idx + 1]}")
-                            return
-
-                clone_handler.callback(
-                    repos=[],
-                    user=username,
-                    target_dir=None,
-                    limit=limit,
-                    private=False,
-                    public=False,
-                    no_forks=False
-                )
-            else:
-                # Clone specific repos
-                repos = [a for a in args if not a.startswith('-')]
-                clone_handler.callback(
-                    repos=repos,
-                    user=None,
-                    target_dir=None,
-                    limit=100,
-                    private=False,
-                    public=False,
-                    no_forks=False
-                )
-
-            # Refresh VFS after cloning
-            print("\n[yellow]Refreshing VFS...[/yellow]")
-            self.config = load_config()
-            self.vfs = self._build_vfs()
-            print("[green]✓[/green] VFS refreshed")
-
-        except click.Abort:
-            pass
-        except Exception as e:
-            print(f"clone: error: {e}")
 
     def do_cp(self, arg):
         """Copy/link repository to add tags.
@@ -1045,7 +765,7 @@ class RepoIndexShell(cmd.Cmd):
             return
 
         if not repo_path:
-            print(f"cp: could not determine repository path")
+            print("cp: could not determine repository path")
             return
 
         # Resolve destination
@@ -1057,7 +777,7 @@ class RepoIndexShell(cmd.Cmd):
         # Extract tag from destination path
         dest_str = str(dest)
         if not dest_str.startswith('/by-tag/'):
-            print(f"cp: destination must be under /by-tag/")
+            print("cp: destination must be under /by-tag/")
             return
 
         # Parse tag from path
@@ -1108,13 +828,13 @@ class RepoIndexShell(cmd.Cmd):
         repo_name = Path(source).name
 
         if not repo_path:
-            print(f"mv: could not determine repository path")
+            print("mv: could not determine repository path")
             return
 
         # Check source is in /by-tag/
         source_str = str(source)
         if not source_str.startswith('/by-tag/'):
-            print(f"mv: source must be under /by-tag/")
+            print("mv: source must be under /by-tag/")
             return
 
         # Resolve destination
@@ -1125,7 +845,7 @@ class RepoIndexShell(cmd.Cmd):
 
         dest_str = str(dest)
         if not dest_str.startswith('/by-tag/'):
-            print(f"mv: destination must be under /by-tag/")
+            print("mv: destination must be under /by-tag/")
             return
 
         # Parse new tag from destination
@@ -1179,7 +899,7 @@ class RepoIndexShell(cmd.Cmd):
 
         path_str = str(path)
         if not path_str.startswith('/by-tag/'):
-            print(f"rm: can only remove tags under /by-tag/")
+            print("rm: can only remove tags under /by-tag/")
             return
 
         # Get repository path and tag
@@ -1188,7 +908,7 @@ class RepoIndexShell(cmd.Cmd):
         repo_name = Path(path).name
 
         if not repo_path or not tag:
-            print(f"rm: could not determine repository or tag")
+            print("rm: could not determine repository or tag")
             return
 
         # Remove tag
@@ -1214,12 +934,12 @@ class RepoIndexShell(cmd.Cmd):
             print("Usage: mkdir [-p] <path>")
             return
 
-        create_parents = False
+        _create_parents = False  # noqa: F841 - parsed but mkdir creates parents by default
         path_arg = None
 
         for arg in args:
             if arg == '-p':
-                create_parents = True
+                _create_parents = True
             else:
                 path_arg = arg
 
@@ -1235,7 +955,7 @@ class RepoIndexShell(cmd.Cmd):
 
         path_str = str(path)
         if not path_str.startswith('/by-tag/'):
-            print(f"mkdir: can only create directories under /by-tag/")
+            print("mkdir: can only create directories under /by-tag/")
             return
 
         # Check if already exists
@@ -1254,7 +974,6 @@ class RepoIndexShell(cmd.Cmd):
             repo_path: Absolute path to repository
             json_output: Whether to output as JSONL
         """
-        import os
 
         repo_path_obj = Path(repo_path)
 
@@ -1658,129 +1377,6 @@ class RepoIndexShell(cmd.Cmd):
         except PermissionError:
             print(f"grep: {file_arg}: Permission denied")
 
-    def do_git(self, arg):
-        """Execute git commands.
-
-        Usage: git [-r] <subcommand> [args]
-
-        Supports: status, log, diff (read-only)
-
-        Options:
-            -r    Recursive - run on all repos in current VFS path
-
-        Examples:
-            git status                    # Status of current repo
-            git log --oneline -n 5        # Log of current repo
-            git -r status                 # Status of all repos in VFS path
-            cd /by-tag/work
-            git -r diff                   # Diff all repos tagged 'work'
-        """
-        if not arg:
-            print("Usage: git [-r] <subcommand> [args]")
-            print("Supported: status, log, diff (read-only)")
-            print("Use -r for recursive operation on all repos in current VFS path")
-            return
-
-        # Parse -r flag
-        recursive = False
-        if arg.startswith('-r '):
-            recursive = True
-            arg = arg[3:].strip()  # Remove '-r '
-
-        # Parse subcommand
-        parts = arg.split(maxsplit=1)
-        subcommand = parts[0]
-        rest_args = parts[1] if len(parts) > 1 else ''
-
-        # Determine VFS path to use
-        # If in real filesystem mode, use the repository root VFS path
-        if self.in_real_fs and self.real_fs_repo:
-            from pathlib import Path as RealPath
-            repo_name = RealPath(self.real_fs_repo).name
-            vfs_path = f"/repos/{repo_name}"
-        else:
-            # Use current VFS directory
-            vfs_path = str(self.cwd)
-
-        # If recursive, get all repos from VFS path
-        if recursive:
-            from ..git_ops.utils import get_repos_from_vfs_path
-            repo_paths = get_repos_from_vfs_path(vfs_path)
-            if not repo_paths:
-                print(f"No repositories found at {vfs_path}")
-                return
-
-            print(f"Running 'git {subcommand}' on {len(repo_paths)} repositories...")
-
-            # Run command on each repo
-            for repo_path in repo_paths:
-                from pathlib import Path as RealPath
-                repo_name = RealPath(repo_path).name
-                print(f"\n[{repo_name}]")
-
-                # Construct VFS path for this repo
-                repo_vfs_path = f"/repos/{repo_name}"
-                self._execute_git_command(subcommand, rest_args, repo_vfs_path)
-
-            return
-
-        # Non-recursive: execute on single repo
-        self._execute_git_command(subcommand, rest_args, vfs_path)
-
-    def _execute_git_command(self, subcommand: str, rest_args: str, vfs_path: str):
-        """Execute a git command on a single repository.
-
-        Args:
-            subcommand: Git subcommand (status, log, diff (read-only))
-            rest_args: Additional arguments for the command
-            vfs_path: VFS path to the repository
-        """
-        # Import the git command handlers (read-only operations only)
-        from ..commands.git import git_status, git_log, git_diff
-        import click
-
-        try:
-            # Create a minimal context for click commands
-            if subcommand == 'status':
-                # Parse flags
-                short = '--short' in rest_args or '-s' in rest_args
-                dirty_only = '--dirty-only' in rest_args
-                git_status.callback(vfs_path, short, dirty_only, False)
-
-            elif subcommand == 'log':
-                # Parse flags
-                oneline = '--oneline' in rest_args
-                max_count = 10
-                since = None
-                author = None
-                graph = '--graph' in rest_args
-                all_branches = '--all' in rest_args
-
-                # Parse -n flag
-                import re
-                n_match = re.search(r'-n\s+(\d+)', rest_args)
-                if n_match:
-                    max_count = int(n_match.group(1))
-
-                git_log.callback(vfs_path, oneline, max_count, since, author, graph, all_branches, False)
-
-            elif subcommand == 'diff':
-                # Parse flags
-                name_only = '--name-only' in rest_args
-                name_status = '--name-status' in rest_args
-                stat = '--stat' in rest_args
-                cached = '--cached' in rest_args or '--staged' in rest_args
-                git_diff.callback(vfs_path, name_only, name_status, stat, cached, False)
-
-            else:
-                print(f"git: '{subcommand}' is not a supported git command")
-                print("Supported: status, log, diff")
-
-        except click.Abort:
-            # User cancelled
-            pass
-        except Exception as e:
-            print(f"git {subcommand}: error: {e}")
 
     def default(self, line):
         """Handle unknown commands."""
@@ -1809,17 +1405,16 @@ class RepoIndexShell(cmd.Cmd):
             # In VFS mode - use current actual directory
             import os
             cwd = os.getcwd()
-            print(f"Note: Running in current directory (not in a repository)")
+            print("Note: Running in current directory (not in a repository)")
 
         try:
             # Run the command
-            result = subprocess.run(
+            subprocess.run(
                 command,
                 shell=True,
                 cwd=cwd,
                 text=True
             )
-            # Exit code is shown by subprocess
         except KeyboardInterrupt:
             print("\n^C")
         except Exception as e:
@@ -1829,7 +1424,6 @@ class RepoIndexShell(cmd.Cmd):
         """Execute a pipeline of commands."""
         import io
         import sys
-        import shlex
 
         # Split by pipe
         commands = [cmd.strip() for cmd in line.split('|')]

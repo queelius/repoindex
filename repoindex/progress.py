@@ -6,7 +6,7 @@ Provides consistent progress reporting that respects piping and redirection.
 
 import sys
 import os
-from typing import Optional, Callable, Any
+from typing import Optional
 from contextlib import contextmanager
 import time
 import signal
@@ -55,8 +55,8 @@ class ProgressReporter:
         else:
             self.use_colors = use_colors
         
-        self.start_time = None
-        self.last_update = 0
+        self.start_time: Optional[float] = None
+        self.last_update: float = 0.0
         self.min_update_interval = 0.1  # Don't update more than 10x per second
         self.spinner_index = 0
         self.interrupted = False
@@ -207,7 +207,7 @@ class ProgressReporter:
         
         def update(current: int, item: str = ""):
             """Update progress for current item."""
-            if self.enabled and total:
+            if self.enabled and total and self.start_time is not None:
                 elapsed = time.time() - self.start_time
                 rate = current / elapsed if elapsed > 0 else 0
                 eta = (total - current) / rate if rate > 0 else 0
@@ -350,7 +350,7 @@ class ProgressBar:
         self.description = description
         self.current = 0
         self.start_time = time.time()
-        self.last_update = 0
+        self.last_update: float = 0.0
     
     def update(self, n: int = 1, item: str = ""):
         """Update progress by n items."""

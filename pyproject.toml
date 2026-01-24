@@ -8,7 +8,7 @@ version = "0.10.0"
 description = "A collection-aware metadata index for git repositories"
 readme = "README.md"
 license-files = [ "LICEN[CS]E.*",]
-requires-python = ">=3.7"
+requires-python = ">=3.8"
 keywords = [ "git", "github", "repository", "metadata", "index", "cli",]
 classifiers = [ "Development Status :: 4 - Beta", "Topic :: Software Development :: Version Control :: Git", "Operating System :: OS Independent", "Programming Language :: Python :: 3",]
 dependencies = [ "pathlib", "toml", "requests>=2.25.0", "packaging>=21.0", "click>=8.0.0", "rich>=13.0.0", "tweepy", "rapidfuzz", "pyyaml>=5.0.0",]
@@ -27,8 +27,7 @@ export = [ "weasyprint>=54.0",]
 network = [ "numpy>=1.20.0",]
 clustering = [ "numpy>=1.20.0", "scikit-learn>=1.0.0", "scipy>=1.7.0",]
 workflow = [ "pyyaml>=5.0.0",]
-tui = [ "textual>=0.40.0", "textual-dev>=1.0.0", "watchdog>=3.0.0",]
-all = [ "numpy>=1.20.0", "scikit-learn>=1.0.0", "scipy>=1.7.0", "textual>=0.40.0", "textual-dev>=1.0.0", "weasyprint>=54.0", "watchdog>=3.0.0",]
+all = [ "numpy>=1.20.0", "scikit-learn>=1.0.0", "scipy>=1.7.0", "weasyprint>=54.0",]
 
 [project.scripts]
 repoindex = "repoindex.cli:main"

@@ -237,7 +237,7 @@ def reset_database(config: Optional[dict] = None) -> None:
         db_path.unlink()
 
     # Recreate with fresh schema
-    with Database(config=config) as db:
+    with Database(config=config) as _db:
         pass  # Schema is applied on connection
 
 
@@ -259,20 +259,25 @@ def get_database_info(config: Optional[dict] = None) -> dict:
     with Database(config=config, read_only=True) as db:
         # Get counts
         db.execute("SELECT COUNT(*) FROM repos")
-        repo_count = db.fetchone()[0]
+        row = db.fetchone()
+        repo_count = row[0] if row else 0
 
         db.execute("SELECT COUNT(*) FROM events")
-        event_count = db.fetchone()[0]
+        row = db.fetchone()
+        event_count = row[0] if row else 0
 
         db.execute("SELECT COUNT(*) FROM tags")
-        tag_count = db.fetchone()[0]
+        row = db.fetchone()
+        tag_count = row[0] if row else 0
 
         db.execute("SELECT COUNT(*) FROM publications")
-        pub_count = db.fetchone()[0]
+        row = db.fetchone()
+        pub_count = row[0] if row else 0
 
         # Get schema version
         db.execute("SELECT MAX(version) FROM _schema_info")
-        schema_version = db.fetchone()[0]
+        row = db.fetchone()
+        schema_version = row[0] if row else 0
 
         # Get file size
         file_size = db_path.stat().st_size
@@ -292,8 +297,9 @@ def get_database_info(config: Optional[dict] = None) -> dict:
 
 def _human_size(size_bytes: int) -> str:
     """Convert bytes to human-readable size."""
+    size: float = float(size_bytes)
     for unit in ['B', 'KB', 'MB', 'GB']:
-        if size_bytes < 1024:
-            return f"{size_bytes:.1f} {unit}"
-        size_bytes /= 1024
-    return f"{size_bytes:.1f} TB"
+        if size < 1024:
+            return f"{size:.1f} {unit}"
+        size /= 1024
+    return f"{size:.1f} TB"

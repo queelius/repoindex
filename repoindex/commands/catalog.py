@@ -9,11 +9,10 @@ import click
 import json
 import os
 from pathlib import Path
-from typing import List, Dict, Any, Optional, Generator
+from typing import List, Dict, Any, Generator, Optional
 from collections import defaultdict
 
 from ..config import load_config, save_config
-from ..render import render_catalog_table, render_catalog_list_table
 from ..utils import find_git_repos_from_config, is_git_repo
 from ..pypi import extract_pypi_tags
 from ..cli_utils import standard_command, add_common_options
@@ -23,7 +22,7 @@ from rich import box
 console = Console()
 
 
-def get_repository_tags(repo_path: str, repo_info: Dict[str, Any] = None) -> List[str]:
+def get_repository_tags(repo_path: str, repo_info: Optional[Dict[str, Any]] = None) -> List[str]:
     """
     Get all tags for a repository (explicit and implicit).
     
@@ -48,7 +47,7 @@ def get_repository_tags(repo_path: str, repo_info: Dict[str, Any] = None) -> Lis
     return sorted(all_tags)
 
 
-def get_implicit_tags(repo_path: str, repo_info: Dict[str, Any] = None) -> List[str]:
+def get_implicit_tags(repo_path: str, repo_info: Optional[Dict[str, Any]] = None) -> List[str]:
     """
     Generate implicit tags for a repository based on its path and metadata.
     
@@ -210,8 +209,7 @@ def get_repositories_by_tags(tag_filters: List[str], config: Dict[str, Any],
     Yields:
         Repository info dictionaries with path, name, and tags
     """
-    from ..tags import filter_tags, parse_tags
-    from ..utils import find_git_repos_from_config
+    from ..tags import filter_tags
     
     # Get repository tags from config
     repo_tags = config.get("repository_tags", {})
@@ -404,7 +402,7 @@ def catalog_import_github(tag_filters, match_all, dry_run, quiet, progress, **kw
         repoindex catalog import-github --dry-run  # Preview changes
         repoindex catalog import-github -q  # Progress only, no JSON output
     """
-    from ..tags import github_metadata_to_tags, merge_tags
+    from ..tags import github_metadata_to_tags
     from ..utils import get_github_repo_info
     from ..exit_codes import NoReposFoundError, APIError, PartialSuccessError
     import time
@@ -426,7 +424,7 @@ def catalog_import_github(tag_filters, match_all, dry_run, quiet, progress, **kw
     progress(f"Found {len(repos)} repositories to process")
     
     # Use progress bar for processing
-    with progress.task(f"Importing GitHub metadata", total=len(repos)) as update:
+    with progress.task("Importing GitHub metadata", total=len(repos)) as update:
         for i, repo in enumerate(repos, 1):
             repo_path = repo["path"]
             repo_name = repo["name"]
@@ -508,11 +506,7 @@ def catalog_import_github(tag_filters, match_all, dry_run, quiet, progress, **kw
                         if "repository_tags" not in config:
                             config["repository_tags"] = {}
                         config["repository_tags"][repo_path] = new_tags
-                        
-                        # Also update catalogs
-                        from ..commands.get import update_catalogs
-                        update_catalogs(config, repo_path, new_tags)
-                        
+
                     updated_count += 1
                 else:
                     result["status"] = "unchanged"
@@ -593,7 +587,7 @@ def catalog_tag(new_tags, remove_tags, directory, tag_filters, match_all, sync_p
         # Tag specific repos by combining filters
         repoindex catalog tag -t needs:review -f org:mycompany -f "stars:0" --all
     """
-    from ..tags import merge_tags, parse_tag
+    from ..tags import merge_tags
     
     config = load_config()
     
@@ -687,11 +681,7 @@ def catalog_tag(new_tags, remove_tags, directory, tag_filters, match_all, sync_p
                 if "repository_tags" not in config:
                     config["repository_tags"] = {}
                 config["repository_tags"][repo_path] = new_tag_list
-                
-                # Update catalogs
-                from ..commands.get import update_catalogs
-                update_catalogs(config, repo_path, new_tag_list)
-                
+
                 # Sync to PyPI if requested
                 if sync_pypi:
                     from ..pypi import sync_pypi_tags, find_packaging_files
@@ -734,7 +724,7 @@ def catalog_tag(new_tags, remove_tags, directory, tag_filters, match_all, sync_p
             filter_desc = " AND ".join(tag_filters) if match_all else " OR ".join(tag_filters)
             console.print(f"Filters: {filter_desc}")
         
-        console.print(f"\n[bold]Results:[/bold]")
+        console.print("\n[bold]Results:[/bold]")
         console.print(f"  Total repositories: {len(repos_to_tag)}")
         console.print(f"  [green]Updated: {updated_count}[/green]")
         console.print(f"  Unchanged: {len(repos_to_tag) - updated_count}")
@@ -907,7 +897,7 @@ def catalog_list(pretty):
         console.print(table)
         
         # Print summary
-        console.print(f"\n[bold]Summary:[/bold]")
+        console.print("\n[bold]Summary:[/bold]")
         console.print(f"  Total tags: {len(tag_counts)}")
         console.print(f"  Total repositories with tags: {len(repo_tags)}")
         console.print(f"  Tag keys: {', '.join(sorted(tag_key_counts.keys()))}")
@@ -1025,8 +1015,6 @@ def catalog_purge(dry_run, yes, tag_filters, older_than, pretty):
     from ..config import load_config, save_config
     from ..utils import is_git_repo
     import click
-    from datetime import datetime, timedelta
-    import time
     
     config = load_config()
     repo_tags = config.get("repository_tags", {})
@@ -1152,12 +1140,12 @@ def catalog_purge(dry_run, yes, tag_filters, older_than, pretty):
     
     # Summary
     if pretty:
-        console.print(f"\n[bold]Summary:[/bold]")
+        console.print("\n[bold]Summary:[/bold]")
         console.print(f"  Checked: {checked_count}")
         console.print(f"  [green]Removed: {removed_count}[/green]")
         console.print(f"  Skipped: {skipped_count}")
         if removed_count > 0:
-            console.print(f"\n[green]✓[/green] Configuration updated")
+            console.print("\n[green]✓[/green] Configuration updated")
     else:
         print(json.dumps({
             "status": "complete",

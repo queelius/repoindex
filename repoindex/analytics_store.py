@@ -8,12 +8,15 @@ Uses raw SQLite queries (no ORM) for simplicity and performance.
 import sqlite3
 import json
 from pathlib import Path
-from typing import Dict, Any, Optional, List, Generator
+from typing import Dict, Any, Optional, List
 from datetime import datetime, timedelta
 from contextlib import contextmanager
 import logging
 
 logger = logging.getLogger(__name__)
+
+# Singleton instance
+_analytics_store: Optional['AnalyticsStore'] = None
 
 
 def get_analytics_db_path() -> Path:
@@ -68,7 +71,7 @@ class AnalyticsStore:
         try:
             yield conn
             conn.commit()
-        except Exception as e:
+        except Exception:
             conn.rollback()
             raise
         finally:
@@ -254,6 +257,7 @@ class AnalyticsStore:
         Returns:
             List of metric snapshots ordered by collection time
         """
+        params: tuple[Any, ...]
         if days:
             cutoff = datetime.now() - timedelta(days=days)
             query = """
@@ -352,7 +356,7 @@ class AnalyticsStore:
             FROM events
             WHERE 1=1
         """
-        params = []
+        params: List[Any] = []
 
         if repo_path:
             query += " AND repo_path = ?"
@@ -463,7 +467,7 @@ class AnalyticsStore:
             INNER JOIN metrics m ON p.id = m.post_id AND m.collected_at = latest.max_collected
         """
 
-        params = []
+        params: List[Any] = []
         if platform:
             query += " WHERE p.platform = ?"
             params.append(platform)
@@ -558,6 +562,6 @@ class AnalyticsStore:
 def get_analytics_store() -> AnalyticsStore:
     """Get the singleton analytics store instance."""
     global _analytics_store
-    if '_analytics_store' not in globals():
+    if _analytics_store is None:
         _analytics_store = AnalyticsStore()
     return _analytics_store

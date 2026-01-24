@@ -101,6 +101,29 @@ The system automatically generates implicit tags from repository metadata:
 
 The query command provides fuzzy matching and complex boolean expressions.
 
+### Citation Metadata Fields
+
+Repositories with CITATION.cff or .zenodo.json files have these queryable fields:
+
+| Field | Description |
+|-------|-------------|
+| `citation_doi` | DOI identifier (e.g., "10.5281/zenodo.1234567") |
+| `citation_title` | Software title from citation file |
+| `citation_authors` | JSON array of author objects |
+| `citation_version` | Version from citation file |
+| `citation_repository` | Repository URL from citation file |
+| `citation_license` | License from citation file |
+
+**Query examples:**
+```bash
+# Repos with DOI
+repoindex query --has-doi
+repoindex query "citation_doi != ''"
+
+# SQL queries for citation data
+repoindex sql "SELECT name, citation_doi, citation_title FROM repos WHERE citation_doi IS NOT NULL"
+```
+
 ### Basic Syntax
 
 ```bash
@@ -174,7 +197,7 @@ Use both systems together for powerful filtering:
 
 ```bash
 # Tag-based filtering with query refinement
-repoindex list -t "lang:python" | jq 'select(.stars > 5)'
+repoindex query --json --tag "lang:python" | jq 'select(.stars > 5)'
 
 # Query with tag conditions
 repoindex query "'work' in tags and language == 'Python'"
@@ -218,7 +241,7 @@ repoindex tag add backend python django postgresql
 repoindex tag add mobile flutter dart
 
 # Find all TypeScript projects (using implicit tag)
-repoindex list -t "lang:typescript"
+repoindex query --json --tag "lang:typescript"
 
 # Or explicit tag
 repoindex tag list -t typescript

@@ -7,8 +7,6 @@ from pathlib import Path
 import re
 import json
 from .config import logger
-import configparser
-import json
 
 JsonValue = str | int | float | bool | None | dict[str, 'JsonValue'] | list['JsonValue']
 
@@ -97,43 +95,9 @@ def get_github_repo_info(owner: str, repo: str) -> dict[str, JsonValue] | None:
         
         if output:
             return json.loads(output)
-    except:
+    except Exception:
         pass
     return None
-
-
-def check_github_repo_status(owner, repo):
-    """
-    Checks if a GitHub repository exists, its visibility (Public/Private), and if it's a fork.
-
-    Args:
-        owner (str): The repository owner.
-        repo (str): The repository name.
-
-    Returns:
-        dict: A dict with 'exists' (bool), 'visibility' (str), and 'is_fork' (bool).
-    """
-    if not owner or not repo:
-        return {'exists': False, 'visibility': 'N/A', 'is_fork': False}
-    try:
-        command = f"gh repo view {owner}/{repo} --json name,visibility,isFork"
-        result, _ = run_command(command, capture_output=True, check=False, log_stderr=False)
-
-        if result:
-            try:
-                data = json.loads(result)
-                return {
-                    'exists': True,
-                    'visibility': data.get('visibility', 'Unknown').capitalize(),
-                    'is_fork': data.get('isFork', False)
-                }
-            except json.JSONDecodeError:
-                return {'exists': False, 'visibility': 'N/A', 'is_fork': False}
-        else:
-            return {'exists': False, 'visibility': 'N/A', 'is_fork': False}
-    except Exception as e:
-        logger.debug(f"Failed to check GitHub status for {owner}/{repo}: {e}")
-        return {'exists': False, 'visibility': 'Error', 'is_fork': False}
 
 
 def run_command(command, cwd=".", dry_run=False, capture_output=False, check=True, log_stderr=True):
@@ -395,103 +359,6 @@ def get_git_status(repo_path):
             'behind': 0
         }
 
-def get_gh_pages_url(repo_path):
-    """
-    Get the GitHub Pages URL for a repository.
-    """
-    try:
-        # Get the remote URL
-        remote_url, _ = run_command("git remote get-url origin", repo_path, capture_output=True, check=False, log_stderr=False)
-        if not remote_url:
-            return None
-        
-        remote_url = remote_url.strip()
-        
-        # Parse the remote URL to get owner and repo name
-        if remote_url.startswith("https://github.com/"):
-            parts = remote_url.replace("https://github.com/", "").replace(".git", "").split("/")
-        elif remote_url.startswith("git@github.com:"):
-            parts = remote_url.replace("git@github.com:", "").replace(".git", "").split("/")
-        else:
-            return None
-        
-        if len(parts) != 2:
-            return None
-        
-        owner, repo = parts
-        
-        # Try multiple methods to detect GitHub Pages
-        
-        # Method 1: Use GitHub CLI if available
-        try:
-            pages_result, _ = run_command(f"gh api repos/{owner}/{repo}/pages", repo_path, capture_output=True, check=False, log_stderr=False)
-            if pages_result:
-                pages_data = json.loads(pages_result)
-                return pages_data.get("html_url")
-        except (json.JSONDecodeError, Exception):
-            pass
-        
-        # Method 2: Check for gh-pages branch
-        try:
-            branches_result, _ = run_command("git branch -r", repo_path, capture_output=True, check=False, log_stderr=False)
-            if branches_result and "origin/gh-pages" in branches_result:
-                return f"https://{owner}.github.io/{repo}/"
-        except Exception:
-            pass
-        
-        # Method 3: Check for docs folder in main branch (GitHub Pages can serve from /docs)
-        docs_path = Path(repo_path) / "docs"
-        if docs_path.exists() and docs_path.is_dir():
-            # Check if there's an index.html or index.md in docs
-            if (docs_path / "index.html").exists() or (docs_path / "index.md").exists():
-                return f"https://{owner}.github.io/{repo}/"
-        
-        # Method 4: Check for GitHub Pages configuration files
-        github_pages_files = [
-            "_config.yml",  # Jekyll
-            "mkdocs.yml",   # MkDocs
-            "conf.py",      # Sphinx (usually in docs/)
-            "book.toml",    # mdBook
-        ]
-        
-        for pages_file in github_pages_files:
-            if (Path(repo_path) / pages_file).exists():
-                return f"https://{owner}.github.io/{repo}/"
-            # Also check in docs/ subdirectory
-            if (Path(repo_path) / "docs" / pages_file).exists():
-                return f"https://{owner}.github.io/{repo}/"
-        
-        # Method 5: Check for common static site generators
-        static_indicators = [
-            "package.json",  # Could be a Node.js static site
-            "gatsby-config.js",  # Gatsby
-            "next.config.js",    # Next.js
-            "nuxt.config.js",    # Nuxt.js
-            "vuepress.config.js", # VuePress
-        ]
-        
-        for indicator in static_indicators:
-            if (Path(repo_path) / indicator).exists():
-                # Check package.json for static site scripts
-                if indicator == "package.json":
-                    try:
-                        with open(Path(repo_path) / "package.json", 'r') as f:
-                            package_data = json.loads(f.read())
-                            scripts = package_data.get("scripts", {})
-                            # Look for common static site build/deploy scripts
-                            static_scripts = ["build", "deploy", "gh-pages", "pages"]
-                            if any(script in scripts for script in static_scripts):
-                                return f"https://{owner}.github.io/{repo}/"
-                    except:
-                        pass
-                else:
-                    return f"https://{owner}.github.io/{repo}/"
-        
-        return None
-        
-    except Exception as e:
-        logger.debug(f"Error getting GitHub Pages URL for {repo_path}: {e}")
-        return None
 
 def find_git_repos_from_config(repo_dirs_config, recursive=False, dedup=True):
     """
@@ -612,7 +479,7 @@ def get_license_info(repo_path):
                     return 'BSD'
                 else:
                     return 'Other'
-            except:
+            except OSError:
                 return 'Unknown'
     
     return 'None'
@@ -653,7 +520,7 @@ def detect_github_pages_locally(repo_path):
                     if 'pages' in content.lower() and ('deploy' in content.lower() or 'publish' in content.lower()):
                         indicators['has_pages_workflow'] = True
                         break
-                except:
+                except OSError:
                     pass
         
         # Check for Jekyll config
@@ -692,7 +559,7 @@ def detect_github_pages_locally(repo_path):
                         try:
                             custom_domain = cname_path.read_text().strip()
                             indicators['pages_url'] = f"https://{custom_domain}"
-                        except:
+                        except OSError:
                             indicators['pages_url'] = f"https://{owner}.github.io/{repo_name}"
                     else:
                         indicators['pages_url'] = f"https://{owner}.github.io/{repo_name}"

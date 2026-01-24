@@ -5,8 +5,6 @@ Commands for managing the list of repository directories in the configuration.
 """
 
 import click
-import os
-from pathlib import Path
 from rich.console import Console
 from rich.table import Table
 
@@ -213,4 +211,4 @@ def repos_clear(yes):
 
     # Save configuration
     save_config(config)
-    console.print(f"[green]✓[/green] Cleared all repository directories")
+    console.print("[green]✓[/green] Cleared all repository directories")

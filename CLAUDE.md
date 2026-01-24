@@ -60,7 +60,7 @@ repoindex status
 repoindex query --dirty
 
 # Find Python repos with GitHub stars
-repoindex query --language python --github-starred
+repoindex query --language python --starred
 
 # What happened recently?
 repoindex events --since 7d
@@ -86,16 +86,19 @@ repoindex query --recent 7d          # Recent local commits
 repoindex query --tag "work/*"       # By tag
 repoindex query --no-license         # Missing license file
 repoindex query --no-readme          # Missing README
+repoindex query --has-citation       # Has citation files (CITATION.cff, .zenodo.json)
+repoindex query --has-doi            # Has DOI in citation metadata
 repoindex query --has-remote         # Has any remote URL
 ```
 
-**GitHub flags** (explicit prefix - requires `--enrich-github` during refresh):
+**GitHub flags** (requires `--github` during refresh):
 ```bash
-repoindex query --github-starred     # Has GitHub stars
-repoindex query --github-private     # Private on GitHub
-repoindex query --github-public      # Public on GitHub
-repoindex query --github-fork        # Is a fork on GitHub
-repoindex query --github-archived    # Archived on GitHub
+repoindex query --starred            # Has GitHub stars
+repoindex query --private            # Private on GitHub
+repoindex query --public             # Public on GitHub
+repoindex query --fork               # Is a fork on GitHub
+repoindex query --no-fork            # Non-forked repos only
+repoindex query --archived           # Archived on GitHub
 ```
 
 ### Event Types
@@ -258,7 +261,7 @@ pytest --cov=repoindex --cov-report=html && open htmlcov/index.html
 ```
 
 **Test Coverage Requirements**:
-- Test suite contains 604+ tests
+- Test suite contains 810+ tests
 - Tests located in `tests/` directory, using `pyfakefs` for filesystem mocking
 - **ALWAYS run coverage after adding new features**: `pytest --cov=repoindex --cov-report=html`
 - Coverage report available in `htmlcov/index.html` after running coverage
@@ -294,6 +297,7 @@ mock_run_command.side_effect = [("output1", 0), ("output2", 0)]  # Multiple call
 - `repository_service.py` - Repository discovery and metadata
 - `tag_service.py` - Tag management
 - `event_service.py` - Event scanning
+- `export_service.py` - ECHO format export
 
 **Command Layer** (`repoindex/commands/`):
 - Individual CLI command implementations
@@ -306,6 +310,7 @@ mock_run_command.side_effect = [("output1", 0), ("output2", 0)]  # Multiple call
 - `repoindex/config.py` - Configuration management with JSON/TOML support
 - `repoindex/utils.py` - Shared utility functions
 - `repoindex/simple_query.py` - Query language with fuzzy matching
+- `repoindex/citation.py` - Citation file parsing (CITATION.cff, .zenodo.json)
 - `repoindex/pypi.py` - PyPI package detection and API integration
 - `repoindex/cran.py` - CRAN package detection
 - `repoindex/events.py` - Stateless event scanning (git tags, commits)
@@ -326,7 +331,7 @@ mock_run_command.side_effect = [("output1", 0), ("output2", 0)]  # Multiple call
 - `rapidfuzz` - Fuzzy string matching for query language
 - `pyyaml` - YAML configuration files
 
-### Commands Implemented (10 commands)
+### Commands Implemented (13 commands)
 
 ```
 repoindex
@@ -335,6 +340,12 @@ repoindex
 ├── events              # Query events from database
 ├── sql                 # Raw SQL queries + database management
 ├── refresh             # Database sync (repos + events)
+├── export              # ECHO format export (durable, self-describing)
+├── copy                # Copy repositories with filtering (backup/redundancy)
+├── link                # Symlink tree management
+│   ├── tree            # Create symlink trees organized by metadata
+│   ├── refresh         # Update existing tree (remove broken links)
+│   └── status          # Show tree health status
 ├── tag                 # Organization (add/remove/list/tree)
 ├── view                # Curated views (list/show/create/delete)
 ├── config              # Settings (show/repos/init)
@@ -386,6 +397,117 @@ We refactored to a clean layered architecture:
   - `"github_stars > 10 and language == 'Python'"` - multiple conditions
   - `"github_is_private"` - repos that are private on GitHub
   - `"pypi_published"` - repos published to PyPI
+  - `"citation_doi != ''"` - repos with DOI in citation metadata
+
+### Citation Metadata
+Repos with CITATION.cff or .zenodo.json files have parsed metadata:
+- `citation_doi` - DOI identifier (e.g., "10.5281/zenodo.1234567")
+- `citation_title` - Software title from citation file
+- `citation_authors` - JSON array of author objects
+- `citation_version` - Version from citation file
+- `citation_repository` - Repository URL from citation file
+- `citation_license` - License from citation file
+
+Query examples:
+```bash
+repoindex query --has-doi                    # Repos with DOI
+repoindex query "citation_doi != ''"          # Same as above
+repoindex sql "SELECT name, citation_doi, citation_title FROM repos WHERE citation_doi IS NOT NULL"
+```
+
+### Export Command
+Export repository index in ECHO-compliant format (durable, self-describing, offline-capable):
+```bash
+# Basic export (database + JSONL + README + manifest)
+repoindex export ~/backups/repos-2026-01
+
+# Include README snapshots from each repository
+repoindex export ~/backups/repos --include-readmes
+
+# Include full event history
+repoindex export ~/backups/repos --include-events
+
+# Include last 10 commits per repo as JSON
+repoindex export ~/backups/repos --include-git-summary 10
+
+# Full export with archives (slow, large)
+repoindex export ~/backups/repos-full --include-readmes --include-events --archive-repos
+
+# Preview without writing
+repoindex export ~/backups/test --dry-run --pretty
+```
+
+Output structure:
+```
+output-dir/
+├── README.md           # Human-readable documentation
+├── index.db            # SQLite database copy
+├── repos.jsonl         # JSONL export of all repos
+├── events.jsonl        # Optional: --include-events
+├── manifest.json       # ECHO manifest
+├── readmes/            # Optional: --include-readmes
+├── git-summaries/      # Optional: --include-git-summary N
+└── archives/           # Optional: --archive-repos
+```
+
+### Copy Command
+Copy repositories to a destination directory with filtering (useful for backups):
+```bash
+# Copy all repos to backup directory
+repoindex copy ~/backups/repos-2026-01
+
+# Copy with query filters (same flags as query command)
+repoindex copy ~/backups/python-repos --language python
+repoindex copy ~/backups/uncommitted --dirty
+repoindex copy ~/backups/work-repos --tag "work/*"
+repoindex copy ~/backups/popular "language == 'Python' and github_stars > 10"
+
+# Options
+repoindex copy ~/backups --exclude-git          # Skip .git directories
+repoindex copy ~/backups --preserve-structure   # Keep parent dir hierarchy
+repoindex copy ~/backups --collision rename     # rename/skip/overwrite
+repoindex copy ~/backups --dry-run --pretty     # Preview
+```
+
+### Link Command
+Create and manage symlink trees organized by metadata:
+```bash
+# Create symlink tree organized by tags
+repoindex link tree ~/links/by-tag --by tag
+
+# Create symlink tree organized by language
+repoindex link tree ~/links/by-language --by language
+
+# Other organization options
+repoindex link tree ~/links/by-year --by modified-year
+repoindex link tree ~/links/by-owner --by owner
+
+# With query filtering (same flags as query command)
+repoindex link tree ~/links/python --by tag --language python
+
+# Preview without creating
+repoindex link tree ~/links/test --by tag --dry-run --pretty
+
+# Check tree status
+repoindex link status ~/links/by-tag
+
+# Refresh tree (remove broken symlinks)
+repoindex link refresh ~/links/by-tag --prune
+```
+
+Output structure for tag-organized tree:
+```
+by-tag/
+├── topic/
+│   ├── ml/
+│   │   └── my-project → /path/my-project
+│   └── web/
+│       └── webapp → /path/webapp
+├── work/
+│   └── active/
+│       └── my-project → /path/my-project
+└── .repoindex-links.json   # Manifest for refresh
+```
 
 ## Project Structure Notes
 
@@ -662,10 +784,10 @@ repoindex events --json --since 7d | jq '.type'
 ```bash
 repoindex refresh                  # Smart refresh (changed repos only)
 repoindex refresh --full           # Force full refresh
-repoindex refresh --enrich-github  # Include GitHub metadata
-repoindex refresh --enrich-pypi    # Include PyPI package status
-repoindex refresh --enrich-cran    # Include CRAN package status
-repoindex refresh --enrich-all     # Include all external metadata
+repoindex refresh --github         # Include GitHub metadata
+repoindex refresh --pypi           # Include PyPI package status
+repoindex refresh --cran           # Include CRAN package status
+repoindex refresh --external       # Include all external metadata
 repoindex refresh --since 30d      # Events from last 30 days
 repoindex sql --reset              # Reset database (then refresh --full)
 ```

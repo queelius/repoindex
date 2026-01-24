@@ -55,7 +55,7 @@ from datetime import datetime
 from pathlib import Path
 import logging
 
-from .domain import Repository, Event, Tag, TagSource
+from .domain import Repository, Event
 from .services import RepositoryService, EventService, TagService
 from .infra import GitClient, GitHubClient, FileStore
 from .config import load_config

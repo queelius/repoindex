@@ -3,12 +3,12 @@
 [![PyPI Version](https://img.shields.io/pypi/v/repoindex.svg)](https://pypi.org/project/repoindex/)
 [![Python Support](https://img.shields.io/pypi/pyversions/repoindex.svg)](https://pypi.org/project/repoindex/)
 [![Test Coverage](https://img.shields.io/badge/coverage-86%25-brightgreen.svg)](https://github.com/queelius/repoindex)
-[![Build Status](https://img.shields.io/badge/tests-604%20passing-brightgreen.svg)](https://github.com/queelius/repoindex)
+[![Build Status](https://img.shields.io/badge/tests-810%2B%20passing-brightgreen.svg)](https://github.com/queelius/repoindex)
 [![License](https://img.shields.io/pypi/l/repoindex.svg)](https://github.com/queelius/repoindex/blob/main/LICENSE)
 
-**A collection-aware metadata index for git repositories.**
+**A filesystem git catalog for managing your repository collection.**
 
-repoindex provides a unified view across all your repositories, enabling queries, organization, and integration with LLM tools like Claude Code.
+repoindex provides a unified view across all your local git repositories, enabling queries, organization, and integration with LLM tools like Claude Code.
 
 ## Philosophy
 
@@ -22,10 +22,10 @@ Claude Code (deep work on ONE repo)
          v
     repoindex (collection awareness)
          |
-         +-- repo://...     -> what exists
-         +-- tags://...     -> organization
-         +-- stats://...    -> aggregations
-         +-- events://...   -> what happened
+         +-- query       -> filter and search
+         +-- status      -> health dashboard
+         +-- events      -> what happened
+         +-- tags        -> organization
 ```
 
 ## Core Capabilities
@@ -36,7 +36,6 @@ Claude Code (deep work on ONE repo)
 - **Event Tracking** - New tags, releases, publishes
 - **Statistics** - Aggregations across the collection
 - **Query Language** - Filter and search with expressions
-- **MCP Server** - LLM integration endpoint for Claude Code
 
 ## Installation
 
@@ -55,88 +54,72 @@ make install
 ## Quick Start
 
 ```bash
-# Configure repository directories
-repoindex config generate
+# Initialize configuration
+repoindex config init
 
-# List all repositories
-repoindex list
+# Refresh database (required before queries)
+repoindex refresh
 
-# Check repository status
-repoindex status -r --pretty
+# Dashboard overview
+repoindex status
 
-# Tag repositories for organization
+# Query repositories (pretty table by default)
+repoindex query --language python
+repoindex query --dirty
+repoindex query --tag "work/*"
+
+# Events from last week
+repoindex events --since 7d
+
+# Tag management
 repoindex tag add myproject topic:ml work/active
+repoindex tag tree
 
-# Query repositories
-repoindex query "language == 'Python' and 'ml' in tags"
-
-# Scan for recent events (releases, tags)
-repoindex events --since 7d --pretty
-
-# View statistics
-repoindex stats --groupby language
+# JSONL output for piping
+repoindex query --json --language python | jq '.name'
 ```
 
 ## Output Format
 
-All commands output **JSONL** (newline-delimited JSON) by default, making them perfect for Unix pipelines:
+Commands output **pretty tables** by default for human readability.
+Use `--json` for JSONL output (piping/scripting):
 
 ```bash
-# Find repos with uncommitted changes
-repoindex status | jq 'select(.status.clean == false)'
+# Pretty table (default)
+repoindex query --language python
 
-# Count repos by language
-repoindex list | jq -s 'group_by(.language) | map({lang: .[0].language, count: length})'
+# JSONL for piping
+repoindex query --json --language python | jq '.name'
+repoindex events --json --since 7d | jq '.type' | sort | uniq -c
 
-# Get all Python repos with ML tags
-repoindex query "language == 'Python'" | jq 'select(.tags | contains(["topic:ml"]))'
+# Brief mode (just repo names)
+repoindex query --brief --dirty
 ```
 
-Use `--pretty` for human-readable table output.
+## Query Flags
 
-## MCP Server (Claude Code Integration)
-
-repoindex includes an MCP (Model Context Protocol) server for integration with LLM tools:
-
+**Local flags** (no external API required):
 ```bash
-# Start MCP server
-repoindex mcp serve
+repoindex query --dirty              # Uncommitted changes
+repoindex query --clean              # No uncommitted changes
+repoindex query --language python    # Python repos (detected locally)
+repoindex query --recent 7d          # Recent local commits
+repoindex query --tag "work/*"       # By tag
+repoindex query --no-license         # Missing license file
+repoindex query --no-readme          # Missing README
+repoindex query --has-citation       # Has citation files (CITATION.cff, .zenodo.json)
+repoindex query --has-doi            # Has DOI in citation metadata
+repoindex query --has-remote         # Has any remote URL
 ```
 
-### Resources (read-only data)
-- `repo://list` - All repositories with basic metadata
-- `repo://{name}` - Full metadata for one repository
-- `repo://{name}/status` - Git status for one repository
-- `tags://list` - All tags
-- `tags://tree` - Hierarchical tag view
-- `stats://summary` - Overall statistics
-- `events://recent` - Recent events
-
-### Tools (actions)
-- `repoindex_tag(repo, tag)` - Add tag to repository
-- `repoindex_untag(repo, tag)` - Remove tag from repository
-- `repoindex_query(expression)` - Query repositories
-- `repoindex_refresh(repo?)` - Refresh metadata
-- `repoindex_stats(groupby)` - Get statistics
-
-## Tag System
-
-Tags provide powerful organization:
-
+**GitHub flags** (requires `--github` during refresh):
 ```bash
-# Explicit tags (user-assigned)
-repoindex tag add myrepo topic:ml/research work/client/acme
-
-# Implicit tags (auto-generated)
-# - repo:name, dir:parent, lang:python, owner:username
-# - status:clean/dirty, visibility:public/private
-# - stars:10+, stars:100+, stars:1000+
-
-# Query with tags
-repoindex list -t "lang:python" -t "topic:ml/*"
-
-# Tag tree view
-repoindex tag tree
+repoindex query --starred            # Has GitHub stars
+repoindex query --private            # Private on GitHub
+repoindex query --public             # Public on GitHub
+repoindex query --fork               # Is a fork on GitHub
+repoindex query --no-fork            # Non-forked repos only
+repoindex query --archived           # Archived on GitHub
 ```
 
 ## Query Language
@@ -151,22 +134,22 @@ repoindex query "language == 'Python'"
 repoindex query "language ~= 'pyton'"
 
 # Comparisons
-repoindex query "stars > 100"
+repoindex query "github_stars > 100"
 
 # Boolean combinations
-repoindex query "language == 'Python' and 'ml' in tags"
+repoindex query "language == 'Python' and tagged('work/*')"
 
 # List membership
-repoindex query "'machine-learning' in topics"
+repoindex query "'machine-learning' in github_topics"
 ```
 
-## Event Scanning
+## Event Tracking
 
 Track activity across your repositories:
 
 ```bash
 # Recent events (default: last 7 days)
-repoindex events --pretty
+repoindex events --since 7d
 
 # Events since specific time
 repoindex events --since 24h
@@ -176,35 +159,94 @@ repoindex events --since 2024-01-15
 repoindex events --type git_tag
 repoindex events --type commit
 
-# Continuous monitoring
-repoindex events --watch --interval 300
+# Filter by repository
+repoindex events --repo myproject
+
+# Summary statistics
+repoindex events --stats
+```
+
+## Tag System
+
+Tags provide powerful organization:
+
+```bash
+# Explicit tags (user-assigned)
+repoindex tag add myrepo topic:ml/research work/client/acme
+
+# Query with tags
+repoindex query --tag "work/*"
+repoindex query "tagged('topic:ml/*')"
+
+# Tag tree view
+repoindex tag tree
+```
+
+## Refresh Database
+
+```bash
+repoindex refresh                  # Smart refresh (changed repos only)
+repoindex refresh --full           # Force full refresh
+repoindex refresh --github         # Include GitHub metadata
+repoindex refresh --pypi           # Include PyPI package status
+repoindex refresh --cran           # Include CRAN package status
+repoindex refresh --external       # Include all external metadata
+repoindex refresh --since 30d      # Events from last 30 days
+repoindex sql --reset              # Reset database (then refresh --full)
+```
+
+## Additional Commands
+
+### Export (ECHO format)
+```bash
+repoindex export ~/backup --include-readmes    # Export with READMEs
+repoindex export ~/backup --include-events     # Include event history
+repoindex export ~/backup --dry-run --pretty   # Preview
+```
+
+### Copy (backup/redundancy)
+```bash
+repoindex copy ~/backup --language python      # Copy Python repos
+repoindex copy ~/backup --dirty --dry-run      # Preview dirty repos
+```
+
+### Link Trees (symlinks organized by metadata)
+```bash
+repoindex link tree ~/links/by-tag --by tag        # Organize by tags
+repoindex link tree ~/links/by-lang --by language  # Organize by language
+repoindex link status ~/links/by-tag               # Check tree health
+repoindex link refresh ~/links/by-tag --prune      # Remove broken links
+```
+
+### Raw SQL Access
+```bash
+repoindex sql "SELECT name, language, github_stars FROM repos ORDER BY github_stars DESC LIMIT 10"
+repoindex sql --info                          # Database info
+repoindex sql --schema                        # Show schema
+repoindex sql -i                              # Interactive SQL shell
 ```
 
 ## Configuration
 
-Configuration file: `~/.repoindex/config.json`
+Configuration file: `~/.repoindex/config.yaml`
 
-```json
-{
-  "general": {
-    "repository_directories": [
-      "~/github",
-      "~/projects/*/repos"
-    ]
-  },
-  "github": {
-    "token": "ghp_..."
-  },
-  "repository_tags": {
-    "/path/to/repo": ["topic:ml", "work/active"]
-  }
-}
+```yaml
+repository_directories:
+  - ~/github
+  - ~/projects/*/repos
+
+github:
+  token: ghp_...
+
+repository_tags:
+  /path/to/repo:
+    - topic:ml
+    - work/active
 ```
 
 Environment variables:
 - `REPOINDEX_CONFIG` - Custom config file path
-- `REPOINDEX_GITHUB_TOKEN` - GitHub API token
-- `REPOINDEX_METADATA_PATH` - Custom metadata store path
+- `GITHUB_TOKEN` or `REPOINDEX_GITHUB_TOKEN` - GitHub API token
 
 ## Architecture
 
@@ -225,6 +267,28 @@ Commands (CLI)  ->  Services  ->  Domain Objects
 - **Services** - Business logic (RepositoryService, TagService, EventService)
 - **Commands** - Thin CLI wrappers that use services
 
+## Commands Reference
+
+```
+repoindex
+├── status              # Dashboard: health overview
+├── query               # Human-friendly repo search with flags
+├── events              # Query events from database
+├── sql                 # Raw SQL queries + database management
+├── refresh             # Database sync (repos + events)
+├── export              # ECHO format export (durable, self-describing)
+├── copy                # Copy repositories with filtering (backup/redundancy)
+├── link                # Symlink tree management
+│   ├── tree            # Create symlink trees organized by metadata
+│   ├── refresh         # Update existing tree (remove broken links)
+│   └── status          # Show tree health status
+├── tag                 # Organization (add/remove/list/tree)
+├── view                # Curated views (list/show/create/delete)
+├── config              # Settings (show/repos/init)
+├── claude              # Skill management (install/uninstall/show)
+└── shell               # Interactive mode
+```
+
 ## Development
 
 ```bash
@@ -241,7 +305,7 @@ pytest --cov=repoindex --cov-report=html
 make docs
 ```
 
-604 tests, 86% coverage.
+810+ tests, 86% coverage.
 
 ## License
 

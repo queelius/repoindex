@@ -2,11 +2,11 @@
 .gitignore generation based on detected languages and project structure.
 """
 
-from typing import Dict, List, Set
+from typing import Dict, List, Optional
 import os
 
 
-def generate_gitignore_content(languages: Dict[str, Dict[str, int]], repo_path: str = None) -> str:
+def generate_gitignore_content(languages: Dict[str, Dict[str, int]], repo_path: Optional[str] = None) -> str:
     """Generate .gitignore content based on detected languages.
     
     Args:

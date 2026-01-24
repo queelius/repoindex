@@ -1,30 +1,27 @@
 #!/usr/bin/env python3
 
-import os
-import json
 import requests
 import tomllib
 from pathlib import Path
-from typing import Dict, Optional, Tuple, List
+from typing import Dict, Optional, List
 import re
 
 from .config import logger
 from .config import load_config
-from .utils import run_command
 
 def find_packaging_files(repo_path: str) -> List[str]:
     """Find Python packaging files in a repository."""
     packaging_files = []
-    repo_path = Path(repo_path)
-    
+    repo_path_obj = Path(repo_path)
+
     # Look for common packaging files
     candidates = ['pyproject.toml', 'setup.py', 'setup.cfg']
-    
+
     for candidate in candidates:
-        file_path = repo_path / candidate
+        file_path = repo_path_obj / candidate
         if file_path.exists():
             packaging_files.append(str(file_path))
-    
+
     return packaging_files
 
 def extract_package_name_from_pyproject(file_path: str) -> Optional[str]:
@@ -109,15 +106,15 @@ def extract_package_name_from_setup_cfg(file_path: str) -> Optional[str]:
 
 def extract_package_name(file_path: str) -> Optional[str]:
     """Extract package name from a packaging file."""
-    file_path = Path(file_path)
-    
-    if file_path.name == 'pyproject.toml':
-        return extract_package_name_from_pyproject(str(file_path))
-    elif file_path.name == 'setup.py':
-        return extract_package_name_from_setup_py(str(file_path))
-    elif file_path.name == 'setup.cfg':
-        return extract_package_name_from_setup_cfg(str(file_path))
-    
+    file_path_obj = Path(file_path)
+
+    if file_path_obj.name == 'pyproject.toml':
+        return extract_package_name_from_pyproject(file_path)
+    elif file_path_obj.name == 'setup.py':
+        return extract_package_name_from_setup_py(file_path)
+    elif file_path_obj.name == 'setup.cfg':
+        return extract_package_name_from_setup_cfg(file_path)
+
     return None
 
 def check_pypi_package(package_name: str) -> Optional[Dict]:
@@ -189,8 +186,9 @@ def detect_pypi_package(repo_path: str) -> Dict:
     
     # Only check PyPI if we found a package name in the packaging files
     # Don't use directory name as fallback for PyPI checks
-    if result['package_name']:
-        pypi_info = check_pypi_package(result['package_name'])
+    package_name_val = result.get('package_name')
+    if package_name_val and isinstance(package_name_val, str):
+        pypi_info = check_pypi_package(package_name_val)
         if pypi_info:
             result['pypi_info'] = pypi_info
             result['is_published'] = pypi_info.get('exists', False)
@@ -478,7 +476,7 @@ def pypi_classifiers_to_tags(classifiers: List[str]) -> List[str]:
 
 def extract_pypi_tags(repo_path: str) -> List[str]:
     """Extract all PyPI-related tags from a repository."""
-    tags = []
+    tags: List[str] = []
     packaging_files = find_packaging_files(repo_path)
     
     if not packaging_files:

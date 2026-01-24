@@ -28,7 +28,7 @@ Every repoindex command outputs newline-delimited JSON (JSONL) by default, makin
 repoindex status | jq 'select(.has_uncommitted_changes == true and .language == "Python")'
 
 # List repos with both GitHub and PyPI presence  
-repoindex list | jq 'select(.topics | contains(["pypi"]) and .provider == "github")'
+repoindex query --json | jq 'select(.topics | contains(["pypi"]) and .provider == "github")'
 
 # Get total stars across all projects
 repoindex query "provider == 'github'" | jq -s 'map(.stargazers_count // 0) | add'
@@ -42,14 +42,14 @@ repoindex query "has_uncommitted or open_issues_count > 0" | \
   repoindex export --format hugo --stdin
 
 # Chain operations: find, update, and report
-repoindex list | \
+repoindex query --json | \
   jq 'select(.language == "Python" and .topics | contains(["cli"]))' | \
   jq -r '.path' | \
   xargs -I {} repoindex update {} | \
   jq '{repo: .name, status: .update_status}'
 
 # Complex aggregation: repos by language
-repoindex list | \
+repoindex query --json | \
   jq -s 'group_by(.language) | 
     map({language: .[0].language, count: length, stars: map(.stargazers_count // 0) | add})'
 ```

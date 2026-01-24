@@ -71,6 +71,19 @@ FIELD_MAPPINGS = {
     'has_license': 'has_license',
     'has_ci': 'has_ci',
 
+    # Citation detection (local)
+    'has_citation': 'has_citation',
+    'citation_file': 'citation_file',
+
+    # Citation metadata (parsed from CITATION.cff, .zenodo.json)
+    'citation_doi': 'citation_doi',
+    'doi': 'citation_doi',  # Convenience alias
+    'citation_title': 'citation_title',
+    'citation_authors': 'citation_authors',
+    'citation_version': 'citation_version',
+    'citation_repository': 'citation_repository',
+    'citation_license': 'citation_license',
+
     # License (local detection)
     'license': 'license_key',
     'license_key': 'license_key',
@@ -590,6 +603,7 @@ class QueryCompiler:
             # Local boolean fields
             'is_clean', 'clean', 'has_readme', 'has_license', 'has_ci',
             'has_upstream', 'uncommitted_changes', 'uncommitted',
+            'has_citation',  # Citation detection
             # GitHub boolean fields (short aliases)
             'is_fork', 'is_archived', 'archived', 'is_private', 'private', 'has_pages',
             # GitHub boolean fields (explicit prefix)

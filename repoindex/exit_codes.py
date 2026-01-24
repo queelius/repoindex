@@ -3,6 +3,7 @@ Standard exit codes for repoindex commands.
 
 Following Unix/POSIX conventions for command-line tools.
 """
+from typing import Optional
 
 # Standard POSIX exit codes
 SUCCESS = 0              # Successful termination
@@ -49,7 +50,7 @@ def get_exit_code_for_exception(exc: Exception) -> int:
     return EXCEPTION_EXIT_CODES.get(exc_name, GENERAL_ERROR)
 
 
-def exit_with_code(code: int, message: str = None):
+def exit_with_code(code: int, message: Optional[str] = None):
     """
     Exit with a specific code and optional message.
     

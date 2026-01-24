@@ -6,12 +6,12 @@ domain objects and database records.
 """
 
 import json
-import os
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Any, Optional, List, Generator, Tuple
+from typing import Dict, Any, Optional, Generator
 
-from ..domain.repository import Repository, GitStatus, GitHubMetadata, PackageMetadata, LicenseInfo
+from ..domain.repository import Repository, GitStatus, GitHubMetadata, LicenseInfo
+from ..citation import parse_citation_file
 from .connection import Database
 
 
@@ -50,7 +50,7 @@ def upsert_repo(db: Database, repo: Repository) -> int:
 
 def _repo_to_record(repo: Repository) -> Dict[str, Any]:
     """Convert Repository domain object to database record."""
-    record = {
+    record: Dict[str, Any] = {
         'name': repo.name,
         'path': repo.path,
         'remote_url': repo.remote_url,
@@ -123,6 +123,28 @@ def _repo_to_record(repo: Repository) -> Dict[str, Any]:
         (repo_path / 'Jenkinsfile').exists(),
     ])
 
+    # Check for citation files (CITATION.cff, .zenodo.json, CITATION.bib, CITATION)
+    citation_files = ['CITATION.cff', '.zenodo.json', 'CITATION.bib', 'CITATION']
+    record['has_citation'] = False
+    record['citation_file'] = None
+    for citation_file in citation_files:
+        if (repo_path / citation_file).exists():
+            record['has_citation'] = True
+            record['citation_file'] = citation_file
+            break
+
+    # Parse citation metadata if file found
+    if record['has_citation'] and record['citation_file']:
+        citation_data = parse_citation_file(str(repo_path), record['citation_file'])
+        if citation_data:
+            record['citation_doi'] = citation_data.get('doi')
+            record['citation_title'] = citation_data.get('title')
+            authors = citation_data.get('authors', [])
+            record['citation_authors'] = json.dumps(authors) if authors else None
+            record['citation_version'] = citation_data.get('version')
+            record['citation_repository'] = citation_data.get('repository')
+            record['citation_license'] = citation_data.get('license')
+
     return record
 
 
@@ -134,7 +156,7 @@ def _insert_repo(db: Database, record: Dict[str, Any]) -> int:
 
     sql = f"INSERT INTO repos ({column_names}) VALUES ({placeholders})"
     db.execute(sql, tuple(record.values()))
-    return db.lastrowid
+    return db.lastrowid or 0
 
 
 def _update_repo(db: Database, repo_id: int, record: Dict[str, Any]) -> None:
@@ -295,7 +317,8 @@ def cleanup_missing_repos(db: Database) -> int:
 def get_repo_count(db: Database) -> int:
     """Get total number of repositories."""
     db.execute("SELECT COUNT(*) FROM repos")
-    return db.fetchone()[0]
+    row = db.fetchone()
+    return row[0] if row else 0
 
 
 def search_repos(db: Database, query: str) -> Generator[Dict[str, Any], None, None]:
@@ -405,7 +428,7 @@ def record_to_domain(record: Dict[str, Any]) -> Repository:
     # Parse GitHub metadata (all fields use github_ prefix)
     github = None
     if record.get('github_owner'):
-        topics = []
+        topics: tuple[Any, ...] = ()
         if record.get('github_topics'):
             try:
                 topics = tuple(json.loads(record['github_topics']))
@@ -442,7 +465,7 @@ def record_to_domain(record: Dict[str, Any]) -> Repository:
             pass
 
     # Parse tags (if included in record)
-    tags = frozenset()
+    tags: frozenset[str] = frozenset()
     if 'tags' in record and record['tags']:
         if isinstance(record['tags'], str):
             tags = frozenset(record['tags'].split(','))

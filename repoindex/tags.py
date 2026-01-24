@@ -9,7 +9,7 @@ Examples:
   - deprecated (simple tag without value)
 """
 
-from typing import Dict, List, Set, Tuple, Optional, Any
+from typing import Dict, List, Tuple, Optional, Any
 import re
 
 
@@ -318,11 +318,11 @@ def auto_detect_tags(repo_path: str) -> List[str]:
     from pathlib import Path
     tags = []
 
-    repo_path = Path(repo_path)
+    repo_path_obj = Path(repo_path)
 
     # Detect fork status from directory structure
     # Repos in directories containing "fork" are likely forks
-    path_parts = [p.lower() for p in repo_path.parts]
+    path_parts = [p.lower() for p in repo_path_obj.parts]
     if 'fork' in path_parts or 'forks' in path_parts:
         tags.append("source:fork")
     
@@ -349,52 +349,52 @@ def auto_detect_tags(repo_path: str) -> List[str]:
     
     detected_langs = set()
     for ext, lang in language_extensions.items():
-        if list(repo_path.rglob(f"*{ext}")):
+        if list(repo_path_obj.rglob(f"*{ext}")):
             detected_langs.add(lang)
-    
+
     for lang in detected_langs:
         tags.append(f"lang:{lang}")
-    
+
     # Detect project types
-    if (repo_path / 'package.json').exists():
+    if (repo_path_obj / 'package.json').exists():
         tags.append("type:node")
-    if (repo_path / 'requirements.txt').exists() or (repo_path / 'setup.py').exists() or (repo_path / 'pyproject.toml').exists():
+    if (repo_path_obj / 'requirements.txt').exists() or (repo_path_obj / 'setup.py').exists() or (repo_path_obj / 'pyproject.toml').exists():
         tags.append("type:python")
-    if (repo_path / 'go.mod').exists():
+    if (repo_path_obj / 'go.mod').exists():
         tags.append("type:go")
-    if (repo_path / 'Cargo.toml').exists():
+    if (repo_path_obj / 'Cargo.toml').exists():
         tags.append("type:rust")
-    if (repo_path / 'pom.xml').exists() or (repo_path / 'build.gradle').exists():
+    if (repo_path_obj / 'pom.xml').exists() or (repo_path_obj / 'build.gradle').exists():
         tags.append("type:java")
-    if (repo_path / 'Gemfile').exists():
+    if (repo_path_obj / 'Gemfile').exists():
         tags.append("type:ruby")
-    if (repo_path / 'composer.json').exists():
+    if (repo_path_obj / 'composer.json').exists():
         tags.append("type:php")
-    
+
     # Detect documentation
-    if (repo_path / 'docs').exists() or (repo_path / 'documentation').exists():
+    if (repo_path_obj / 'docs').exists() or (repo_path_obj / 'documentation').exists():
         tags.append("has:docs")
-    if (repo_path / 'README.md').exists() or (repo_path / 'README.rst').exists():
+    if (repo_path_obj / 'README.md').exists() or (repo_path_obj / 'README.rst').exists():
         tags.append("has:readme")
-    
+
     # Detect CI/CD
-    if (repo_path / '.github' / 'workflows').exists():
+    if (repo_path_obj / '.github' / 'workflows').exists():
         tags.append("ci:github-actions")
-    if (repo_path / '.travis.yml').exists():
+    if (repo_path_obj / '.travis.yml').exists():
         tags.append("ci:travis")
-    if (repo_path / '.circleci').exists():
+    if (repo_path_obj / '.circleci').exists():
         tags.append("ci:circleci")
-    if (repo_path / 'Jenkinsfile').exists():
+    if (repo_path_obj / 'Jenkinsfile').exists():
         tags.append("ci:jenkins")
-    
+
     # Detect testing
-    if (repo_path / 'tests').exists() or (repo_path / 'test').exists():
+    if (repo_path_obj / 'tests').exists() or (repo_path_obj / 'test').exists():
         tags.append("has:tests")
-    
+
     # Detect containerization
-    if (repo_path / 'Dockerfile').exists():
+    if (repo_path_obj / 'Dockerfile').exists():
         tags.append("has:dockerfile")
-    if (repo_path / 'docker-compose.yml').exists() or (repo_path / 'docker-compose.yaml').exists():
+    if (repo_path_obj / 'docker-compose.yml').exists() or (repo_path_obj / 'docker-compose.yaml').exists():
         tags.append("has:docker-compose")
-    
+
     return tags

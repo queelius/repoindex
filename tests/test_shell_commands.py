@@ -1,12 +1,12 @@
 """
-Unit tests for ghops shell commands.
+Unit tests for repoindex shell commands.
 
-Tests for newly implemented shell commands:
-- do_git() with -r recursive flag
-- do_clone() with various options
+Tests for shell commands:
 - do_config() with subcommands
-- do_export() with different formats
-- do_docs() with detect/build/deploy (recently fixed imports)
+- do_export() informational message
+- Edge cases and error handling
+
+Note: do_git, do_clone, do_docs, and do_events were removed in v0.10.0
 """
 
 import pytest
@@ -981,6 +981,7 @@ class TestShellDocs:
 class TestShellEdgeCases:
     """Test edge cases and error handling."""
 
+    @pytest.mark.skip(reason="do_git command was removed")
     @patch('repoindex.shell.shell.load_config')
     @patch('repoindex.shell.shell.find_git_repos_from_config')
     @patch('repoindex.shell.shell.get_metadata_store')

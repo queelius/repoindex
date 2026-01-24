@@ -12,7 +12,6 @@ Tags are immutable value objects with pattern matching support.
 from dataclasses import dataclass
 from typing import Optional, Tuple, List
 from enum import Enum
-import re
 
 
 class TagSource(Enum):
@@ -143,8 +142,8 @@ class Tag:
         else:
             # Simple tag pattern
             if pattern.endswith('*'):
-                prefix = pattern[:-1]
-                return self.value.startswith(prefix)
+                pattern_prefix = pattern[:-1]
+                return self.value.startswith(pattern_prefix)
 
             return self.value == pattern
 

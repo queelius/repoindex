@@ -657,5 +657,135 @@ class TestIntegration(unittest.TestCase):
             self.assertEqual(active_repos[0]['name'], 'active')
 
 
+class TestCitationDetection(unittest.TestCase):
+    """Tests for citation file detection in repositories."""
+
+    def setUp(self):
+        self.temp_dir = tempfile.mkdtemp()
+        self.db_path = Path(self.temp_dir) / 'test.db'
+        self.repo_path = Path(self.temp_dir) / 'test-repo'
+        self.repo_path.mkdir()
+        (self.repo_path / '.git').mkdir()
+        (self.repo_path / '.git' / 'index').touch()
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
+
+    def test_citation_cff_detection(self):
+        """Test detection of CITATION.cff file."""
+        # Create a repo with CITATION.cff
+        (self.repo_path / 'CITATION.cff').write_text(
+            'cff-version: 1.2.0\ntitle: Test Project'
+        )
+
+        repo = Repository(path=str(self.repo_path), name='test-repo')
+
+        with Database(db_path=self.db_path) as db:
+            upsert_repo(db, repo)
+            result = get_repo_by_path(db, str(self.repo_path))
+
+            self.assertTrue(result['has_citation'])
+            self.assertEqual(result['citation_file'], 'CITATION.cff')
+
+    def test_zenodo_json_detection(self):
+        """Test detection of .zenodo.json file."""
+        # Create a repo with .zenodo.json
+        (self.repo_path / '.zenodo.json').write_text(
+            '{"title": "Test Project"}'
+        )
+
+        repo = Repository(path=str(self.repo_path), name='test-repo')
+
+        with Database(db_path=self.db_path) as db:
+            upsert_repo(db, repo)
+            result = get_repo_by_path(db, str(self.repo_path))
+
+            self.assertTrue(result['has_citation'])
+            self.assertEqual(result['citation_file'], '.zenodo.json')
+
+    def test_citation_bib_detection(self):
+        """Test detection of CITATION.bib file."""
+        # Create a repo with CITATION.bib
+        (self.repo_path / 'CITATION.bib').write_text(
+            '@article{test2024, title={Test}}'
+        )
+
+        repo = Repository(path=str(self.repo_path), name='test-repo')
+
+        with Database(db_path=self.db_path) as db:
+            upsert_repo(db, repo)
+            result = get_repo_by_path(db, str(self.repo_path))
+
+            self.assertTrue(result['has_citation'])
+            self.assertEqual(result['citation_file'], 'CITATION.bib')
+
+    def test_citation_plain_detection(self):
+        """Test detection of plain CITATION file."""
+        # Create a repo with CITATION file (no extension)
+        (self.repo_path / 'CITATION').write_text(
+            'Please cite this project as...'
+        )
+
+        repo = Repository(path=str(self.repo_path), name='test-repo')
+
+        with Database(db_path=self.db_path) as db:
+            upsert_repo(db, repo)
+            result = get_repo_by_path(db, str(self.repo_path))
+
+            self.assertTrue(result['has_citation'])
+            self.assertEqual(result['citation_file'], 'CITATION')
+
+    def test_no_citation_file(self):
+        """Test repo without any citation files."""
+        # No citation files created - just the basic repo structure
+        repo = Repository(path=str(self.repo_path), name='test-repo')
+
+        with Database(db_path=self.db_path) as db:
+            upsert_repo(db, repo)
+            result = get_repo_by_path(db, str(self.repo_path))
+
+            self.assertFalse(result['has_citation'])
+            self.assertIsNone(result['citation_file'])
+
+    def test_citation_priority_order(self):
+        """Test that CITATION.cff takes priority over other files."""
+        # Create multiple citation files
+        (self.repo_path / 'CITATION.cff').write_text('cff-version: 1.2.0')
+        (self.repo_path / '.zenodo.json').write_text('{}')
+        (self.repo_path / 'CITATION.bib').write_text('@article{}')
+
+        repo = Repository(path=str(self.repo_path), name='test-repo')
+
+        with Database(db_path=self.db_path) as db:
+            upsert_repo(db, repo)
+            result = get_repo_by_path(db, str(self.repo_path))
+
+            # CITATION.cff should be detected first (priority order)
+            self.assertTrue(result['has_citation'])
+            self.assertEqual(result['citation_file'], 'CITATION.cff')
+
+
+class TestCitationQueryCompiler(unittest.TestCase):
+    """Tests for citation field query compilation."""
+
+    def test_has_citation_boolean_field(self):
+        """Test has_citation as boolean field in query."""
+        result = compile_query("has_citation")
+        self.assertIn("has_citation = 1", result.sql)
+
+    def test_not_has_citation(self):
+        """Test negation of has_citation."""
+        result = compile_query("not has_citation")
+        self.assertIn("NOT", result.sql)
+        self.assertIn("has_citation = 1", result.sql)
+
+    def test_citation_file_equality(self):
+        """Test querying specific citation file type."""
+        result = compile_query("citation_file == 'CITATION.cff'")
+        self.assertIn("citation_file = ?", result.sql)
+        self.assertEqual(result.params, ['CITATION.cff'])
+
+
 if __name__ == '__main__':
     unittest.main()

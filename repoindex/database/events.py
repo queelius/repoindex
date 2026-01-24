@@ -38,7 +38,7 @@ def insert_event(db: Database, event: Event, repo_id: int) -> int:
         event.data.get('author'),
         json.dumps(event.data),
     ))
-    return db.lastrowid
+    return db.lastrowid or 0
 
 
 def insert_events(db: Database, events: List[Event], repo_id: int) -> int:
@@ -83,8 +83,8 @@ def get_events(
     Yields:
         Event records as dictionaries
     """
-    conditions = []
-    params = []
+    conditions: List[str] = []
+    params: List[Any] = []
 
     if repo_id is not None:
         conditions.append("e.repo_id = ?")
@@ -172,8 +172,8 @@ def count_events(
     since: Optional[datetime] = None,
 ) -> int:
     """Count events matching criteria."""
-    conditions = []
-    params = []
+    conditions: List[str] = []
+    params: List[Any] = []
 
     if repo_id is not None:
         conditions.append("repo_id = ?")
@@ -190,7 +190,8 @@ def count_events(
     where_clause = " AND ".join(conditions) if conditions else "1=1"
 
     db.execute(f"SELECT COUNT(*) FROM events WHERE {where_clause}", tuple(params))
-    return db.fetchone()[0]
+    row = db.fetchone()
+    return row[0] if row else 0
 
 
 def delete_events_for_repo(db: Database, repo_id: int) -> int:
@@ -234,8 +235,8 @@ def get_event_summary(db: Database, days: int = 30) -> Dict[str, Any]:
 
     return {
         'period_days': days,
-        'total_events': row['total'],
-        'repos_with_events': row['repos'],
+        'total_events': row['total'] if row else 0,
+        'repos_with_events': row['repos'] if row else 0,
         'by_type': by_type,
     }
 
@@ -339,7 +340,8 @@ def event_count(
         f"SELECT COUNT(*) FROM events WHERE {where_clause}",
         tuple(params)
     )
-    return db.fetchone()[0]
+    row = db.fetchone()
+    return row[0] if row else 0
 
 
 def last_event_timestamp(
