@@ -45,6 +45,10 @@ def upsert_repo(db: Database, repo: Repository) -> int:
     if repo.tags:
         _sync_tags(db, repo_id, repo.tags, source='user')
 
+    # Handle package/publication metadata
+    if repo.package:
+        _upsert_publication(db, repo_id, repo.package)
+
     return repo_id
 
 
@@ -164,6 +168,65 @@ def _update_repo(db: Database, repo_id: int, record: Dict[str, Any]) -> None:
     set_clause = ', '.join([f"{k} = ?" for k in record.keys()])
     sql = f"UPDATE repos SET {set_clause} WHERE id = ?"
     db.execute(sql, tuple(record.values()) + (repo_id,))
+
+
+def _upsert_publication(db: Database, repo_id: int, package) -> None:
+    """
+    Insert or update a publication record for a repository.
+
+    Args:
+        db: Database connection
+        repo_id: Repository ID
+        package: PackageMetadata object
+    """
+    if not package:
+        return
+
+    # Check if publication exists for this repo and registry
+    db.execute(
+        "SELECT id FROM publications WHERE repo_id = ? AND registry = ?",
+        (repo_id, package.registry)
+    )
+    existing = db.fetchone()
+
+    if existing:
+        # Update existing
+        db.execute("""
+            UPDATE publications SET
+                package_name = ?,
+                current_version = ?,
+                published = ?,
+                url = ?,
+                downloads_total = ?,
+                last_published = ?,
+                scanned_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+        """, (
+            package.name,
+            package.version,
+            package.published,
+            package.url,
+            package.downloads,
+            package.last_updated,
+            existing['id']
+        ))
+    else:
+        # Insert new
+        db.execute("""
+            INSERT INTO publications (
+                repo_id, registry, package_name, current_version,
+                published, url, downloads_total, last_published
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            repo_id,
+            package.registry,
+            package.name,
+            package.version,
+            package.published,
+            package.url,
+            package.downloads,
+            package.last_updated
+        ))
 
 
 def _sync_tags(db: Database, repo_id: int, tags: frozenset, source: str = 'user') -> None:

@@ -57,7 +57,7 @@ from repoindex.database.query_compiler import (
 )
 
 # Domain objects
-from repoindex.domain.repository import Repository, GitStatus, LicenseInfo
+from repoindex.domain.repository import Repository, GitStatus, LicenseInfo, PackageMetadata
 from repoindex.domain.event import Event
 
 
@@ -340,6 +340,76 @@ class TestRepositoryOperations(unittest.TestCase):
             self.assertEqual(domain_obj.language, 'Python')
             self.assertEqual(domain_obj.status.branch, 'main')
             self.assertEqual(domain_obj.license.key, 'mit')
+
+    def test_upsert_repo_with_package_metadata(self):
+        """Test that package metadata is stored in publications table."""
+        package = PackageMetadata(
+            registry='pypi',
+            name='test-package',
+            version='1.0.0',
+            published=True,
+            url='https://pypi.org/project/test-package/',
+        )
+        repo = Repository(
+            path=str(self.repo_path),
+            name='test-repo',
+            status=GitStatus(branch='main', clean=True),
+            language='Python',
+            package=package,
+        )
+
+        with Database(db_path=self.db_path) as db:
+            repo_id = upsert_repo(db, repo)
+
+            # Verify publication was inserted
+            db.execute("SELECT * FROM publications WHERE repo_id = ?", (repo_id,))
+            row = db.fetchone()
+            self.assertIsNotNone(row)
+            self.assertEqual(row['registry'], 'pypi')
+            self.assertEqual(row['package_name'], 'test-package')
+            self.assertEqual(row['current_version'], '1.0.0')
+            self.assertEqual(row['published'], 1)
+
+    def test_upsert_repo_updates_publication(self):
+        """Test that publication is updated on subsequent upserts."""
+        package_v1 = PackageMetadata(
+            registry='pypi',
+            name='test-package',
+            version='1.0.0',
+            published=True,
+        )
+        repo = Repository(
+            path=str(self.repo_path),
+            name='test-repo',
+            package=package_v1,
+        )
+
+        with Database(db_path=self.db_path) as db:
+            repo_id = upsert_repo(db, repo)
+
+            # Update with new version
+            package_v2 = PackageMetadata(
+                registry='pypi',
+                name='test-package',
+                version='2.0.0',
+                published=True,
+            )
+            repo_updated = Repository(
+                path=str(self.repo_path),
+                name='test-repo',
+                package=package_v2,
+            )
+            upsert_repo(db, repo_updated)
+
+            # Verify publication was updated
+            db.execute("SELECT * FROM publications WHERE repo_id = ?", (repo_id,))
+            row = db.fetchone()
+            self.assertEqual(row['current_version'], '2.0.0')
+
+            # Verify only one publication record exists
+            db.execute("SELECT COUNT(*) FROM publications WHERE repo_id = ?", (repo_id,))
+            count = db.fetchone()[0]
+            self.assertEqual(count, 1)
 
 
 class TestEventOperations(unittest.TestCase):

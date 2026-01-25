@@ -1,0 +1,11 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "repoindex"
+version: "0.10.1"
+license: MIT
+repository-code: "https://github.com/queelius/repoindex"
+url: "https://pypi.org/project/repoindex/"
+authors:
+  - family-names: "Towell"
+    given-names: "Alexander"
+    orcid: "https://orcid.org/0000-0001-6443-9897"
