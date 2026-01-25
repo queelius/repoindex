@@ -5,6 +5,38 @@ All notable changes to repoindex will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.1] - 2026-01-25
+
+### Fixed
+- **Publications table population**: `refresh --pypi --cran` now properly stores package metadata in the publications table
+- Added `_upsert_publication()` function for reliable publication tracking
+
+### Added
+- **CITATION.cff**: Added citation file for proper academic attribution
+- Unit tests for publication storage and update operations
+
+## [0.10.0] - 2026-01-23
+
+### Added
+- **Filesystem git catalog philosophy**: Path is now the canonical identity
+- **Database-first architecture**: SQLite database is the canonical cache
+- **Citation metadata parsing**: CITATION.cff, .zenodo.json support with DOI extraction
+- **Export command**: ECHO-compliant export format with archives and git summaries
+- **Copy command**: Repository backup with filtering and collision handling
+- **Link command**: Symlink tree management organized by metadata
+- **View command**: Curated SQL views for common queries
+- **Publications table**: Track PyPI/CRAN publication status
+
+### Changed
+- **Platform-namespaced fields**: All GitHub fields now use `github_` prefix
+- **Local-first operation**: External APIs (GitHub, PyPI, CRAN) are opt-in
+- **Smart refresh**: Only updates repos that have changed (git index mtime)
+- **Query output**: Pretty tables by default, `--json` for JSONL
+
+### Removed
+- MCP server (moved to separate package)
+- Remote-URL based deduplication (path is identity now)
+
 ## [0.8.2] - 2025-12-15
 
 ### Added

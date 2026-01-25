@@ -1,0 +1,39 @@
+{
+  "@context": "https://doi.org/10.5063/schema/codemeta-2.0",
+  "@type": "SoftwareSourceCode",
+  "name": "repoindex",
+  "description": "A collection-aware metadata index for git repositories",
+  "version": "0.10.1",
+  "license": "https://spdx.org/licenses/MIT",
+  "codeRepository": "https://github.com/queelius/repoindex",
+  "issueTracker": "https://github.com/queelius/repoindex/issues",
+  "programmingLanguage": {
+    "@type": "ComputerLanguage",
+    "name": "Python",
+    "url": "https://www.python.org/"
+  },
+  "operatingSystem": ["Linux", "macOS", "Windows"],
+  "softwareRequirements": "Python >= 3.8",
+  "applicationCategory": "Developer Tools",
+  "keywords": [
+    "git",
+    "repository",
+    "metadata",
+    "index",
+    "cli",
+    "developer-tools"
+  ],
+  "author": [
+    {
+      "@type": "Person",
+      "givenName": "Alexander",
+      "familyName": "Towell",
+      "email": "lex@metafunctor.com",
+      "@id": "https://orcid.org/0000-0001-6443-9897"
+    }
+  ],
+  "dateCreated": "2024-01-01",
+  "dateModified": "2026-01-25",
+  "downloadUrl": "https://pypi.org/project/repoindex/",
+  "releaseNotes": "https://github.com/queelius/repoindex/releases/tag/v0.10.1"
+}
