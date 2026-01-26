@@ -407,7 +407,8 @@ class RepositoryService:
                 return None
 
             # Use the detected registry (cran or bioconductor)
-            registry = r_info.get('registry', 'cran')
+            # Note: .get() returns None if key exists with None value, so use 'or' pattern
+            registry = r_info.get('registry') or 'cran'
             registry_info = r_info.get('cran_info') or r_info.get('bioconductor_info') or {}
 
             return PackageMetadata(
