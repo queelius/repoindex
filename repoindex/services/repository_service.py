@@ -111,6 +111,12 @@ class RepositoryService:
         if not os.path.isdir(path):
             return
 
+        # Check if any path component matches exclude patterns
+        # This catches repos inside build/_deps/ when expanded by glob
+        path_parts = Path(path).parts
+        if any(part in exclude for part in path_parts):
+            return
+
         # Check if path itself is a git repo
         if self.git.is_git_repo(path):
             if path not in seen_paths:
