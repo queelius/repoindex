@@ -27,7 +27,8 @@ Claude Code (deep work on ONE repo)
          ├── query       → filter and search
          ├── status      → health dashboard
          ├── events      → what happened
-         └── tags        → organization
+         ├── tags        → organization
+         └── ops         → collection operations (push/pull, citations)
 ```
 
 ### Core Principles (v0.10.0)
@@ -45,6 +46,7 @@ Claude Code (deep work on ONE repo)
 4. **Event Tracking** - New tags, releases, publishes (28 event types)
 5. **Statistics** - Aggregations across the collection
 6. **Query Language** - Filter and search with expressions
+7. **Collection Operations** - Multi-repo git push/pull, metadata generation
 
 ## Using repoindex with Claude Code
 
@@ -331,7 +333,7 @@ mock_run_command.side_effect = [("output1", 0), ("output2", 0)]  # Multiple call
 - `rapidfuzz` - Fuzzy string matching for query language
 - `pyyaml` - YAML configuration files
 
-### Commands Implemented (13 commands)
+### Commands Implemented (14 commands)
 
 ```
 repoindex
@@ -346,6 +348,15 @@ repoindex
 │   ├── tree            # Create symlink trees organized by metadata
 │   ├── refresh         # Update existing tree (remove broken links)
 │   └── status          # Show tree health status
+├── ops                 # Collection-level operations
+│   ├── git             # Multi-repo git operations
+│   │   ├── push        # Push repos with unpushed commits
+│   │   ├── pull        # Pull updates from remotes
+│   │   └── status      # Multi-repo git status summary
+│   └── generate        # Metadata file generation
+│       ├── citation    # Generate CITATION.cff files
+│       ├── codemeta    # Generate codemeta.json files
+│       └── license     # Generate LICENSE files
 ├── tag                 # Organization (add/remove/list/tree)
 ├── view                # Curated views (list/show/create/delete)
 ├── config              # Settings (show/repos/init)
@@ -362,6 +373,23 @@ Key configuration sections:
 - `github.token` - GitHub API token (or use GITHUB_TOKEN env var)
 - `github.rate_limit` - Retry configuration with exponential backoff
 - `repository_tags` - Manual tag assignments for repos
+- `author` - Author identity for metadata generation (see below)
+
+### Author Configuration
+The `author` section stores identity information for metadata generation:
+```yaml
+author:
+  name: "Alexander Towell"     # Full name for citations
+  alias: "Alex Towell"          # Short/preferred name
+  email: "alex@example.com"
+  orcid: "0000-0001-6443-9897"  # ORCID identifier
+  github: "queelius"            # GitHub username
+  affiliation: "University"
+  url: "https://example.com"
+  zenodo_token: ""              # For future Zenodo integration
+```
+
+Environment variable overrides: `REPOINDEX_AUTHOR_NAME`, `REPOINDEX_AUTHOR_EMAIL`, `REPOINDEX_AUTHOR_ORCID`, `REPOINDEX_AUTHOR_GITHUB`
 
 The SQLite database (`~/.repoindex/repoindex.db`) is the canonical cache. Run `repoindex refresh` to populate.
 
@@ -508,6 +536,51 @@ by-tag/
 │       └── my-project → /path/my-project
 └── .repoindex-links.json   # Manifest for refresh
 ```
+
+### Ops Command
+Collection-level operations: git push/pull across multiple repos, metadata generation.
+
+```bash
+# Git operations - push repos with unpushed commits
+repoindex ops git push                          # Push all unpushed repos
+repoindex ops git push --dry-run                # Preview without pushing
+repoindex ops git push --language python        # Push only Python repos
+repoindex ops git push --tag "work/*"           # Push repos with work/* tags
+repoindex ops git push --yes                    # Skip confirmation prompt
+
+# Git operations - pull updates
+repoindex ops git pull                          # Pull all repos
+repoindex ops git pull --dry-run                # Preview (fetches first)
+
+# Git status across repos
+repoindex ops git status                        # Status summary
+repoindex ops git status --json                 # JSONL output
+
+# Generate CITATION.cff files
+repoindex ops generate citation                 # All repos without citation
+repoindex ops generate citation "not has_citation"
+repoindex ops generate citation --dry-run       # Preview
+repoindex ops generate citation --force         # Overwrite existing
+repoindex ops generate citation --author "Name" --orcid "0000-0001-..."
+
+# Generate codemeta.json files
+repoindex ops generate codemeta                 # All repos
+repoindex ops generate codemeta --language python
+
+# Generate LICENSE files
+repoindex ops generate license --license mit    # MIT license
+repoindex ops generate license --license apache-2.0
+repoindex ops generate license --license gpl-3.0
+```
+
+**Safety Model**:
+- `--dry-run`: Preview changes without writing
+- Confirmation prompt for git push/pull (skip with `--yes`)
+- `--force`: Required to overwrite existing files
+
+**Query Integration**: All ops subcommands support the same query flags as `query`:
+- `--dirty`, `--clean`, `--language`, `--tag`, `--starred`, etc.
+- Or use a query expression as positional argument
 
 ## Project Structure Notes
 

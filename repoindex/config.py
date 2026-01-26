@@ -208,6 +208,20 @@ def get_default_config():
         # Supports glob patterns: ~/github/** for recursive
         "repository_directories": [],
 
+        # Author identity for operations (citation generation, etc.)
+        # Used by `repoindex ops generate` commands as defaults
+        "author": {
+            "name": "",           # Full name: "Alexander Towell"
+            "alias": "",          # Preferred/short name: "Alex Towell"
+            "email": "",          # Email address
+            "orcid": "",          # ORCID identifier: "0000-0001-6443-9897"
+            "github": "",         # GitHub username
+            "affiliation": "",    # Institution/organization
+            "url": "",            # Personal website
+            # API tokens for external services
+            "zenodo_token": "",   # Zenodo API token (for future integration)
+        },
+
         # GitHub API access (optional, for richer metadata)
         # Can also use GITHUB_TOKEN environment variable
         "github": {
@@ -242,7 +256,7 @@ def generate_config_example():
     config_path.parent.mkdir(parents=True, exist_ok=True)
 
     example_content = """# repoindex Configuration
-# A read-only metadata index for git repositories
+# A filesystem git catalog for repository collection management
 # The SQLite database serves as the cache - run 'repoindex refresh' to populate
 
 # Where to find repositories
@@ -252,6 +266,19 @@ repository_directories:
   - ~/github/**
   # - ~/projects
   # - /work/repos
+
+# Author identity for operations (citation generation, etc.)
+# Used by `repoindex ops generate` commands as defaults
+# Can also use environment variables: REPOINDEX_AUTHOR_NAME, etc.
+author:
+  name: ""           # Full name: "Alexander Towell"
+  alias: ""          # Preferred/short name: "Alex Towell"
+  email: ""          # Email address
+  orcid: ""          # ORCID identifier: "0000-0001-6443-9897"
+  github: ""         # GitHub username
+  affiliation: ""    # Institution/organization
+  url: ""            # Personal website
+  zenodo_token: ""   # Zenodo API token (for future integration)
 
 # GitHub API (optional, for richer metadata)
 # Alternatively, set GITHUB_TOKEN environment variable
@@ -331,6 +358,11 @@ def apply_env_overrides(config):
 
     Supports:
     - GITHUB_TOKEN: GitHub API token (standard convention)
+    - REPOINDEX_AUTHOR_NAME: Author full name
+    - REPOINDEX_AUTHOR_EMAIL: Author email
+    - REPOINDEX_AUTHOR_ORCID: Author ORCID identifier
+    - REPOINDEX_AUTHOR_GITHUB: Author GitHub username
+    - REPOINDEX_ZENODO_TOKEN: Zenodo API token
     """
     # Handle GITHUB_TOKEN (standard convention)
     github_token = os.environ.get('GITHUB_TOKEN')
@@ -338,6 +370,26 @@ def apply_env_overrides(config):
         if 'github' not in config:
             config['github'] = {}
         config['github']['token'] = github_token
+
+    # Handle author-related environment variables
+    if 'author' not in config:
+        config['author'] = {}
+
+    author_env_mappings = [
+        ('REPOINDEX_AUTHOR_NAME', 'name'),
+        ('REPOINDEX_AUTHOR_ALIAS', 'alias'),
+        ('REPOINDEX_AUTHOR_EMAIL', 'email'),
+        ('REPOINDEX_AUTHOR_ORCID', 'orcid'),
+        ('REPOINDEX_AUTHOR_GITHUB', 'github'),
+        ('REPOINDEX_AUTHOR_AFFILIATION', 'affiliation'),
+        ('REPOINDEX_AUTHOR_URL', 'url'),
+        ('REPOINDEX_ZENODO_TOKEN', 'zenodo_token'),
+    ]
+
+    for env_var, config_key in author_env_mappings:
+        value = os.environ.get(env_var)
+        if value:
+            config['author'][config_key] = value
 
     return config
 

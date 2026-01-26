@@ -14,6 +14,7 @@ from repoindex.commands.claude import claude_handler
 from repoindex.commands.export import export_handler
 from repoindex.commands.copy import copy_handler
 from repoindex.commands.link import link_cmd
+from repoindex.commands.ops import ops_cmd
 
 
 @click.group()
@@ -51,6 +52,7 @@ cli.add_command(shell_handler, name='shell')
 cli.add_command(tag_cmd)
 cli.add_command(view_cmd)
 cli.add_command(link_cmd)
+cli.add_command(ops_cmd)
 cli.add_command(config_cmd)
 cli.add_command(claude_handler, name='claude')
 

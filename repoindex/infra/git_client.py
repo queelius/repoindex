@@ -374,3 +374,106 @@ class GitClient:
             cmd += f" {branch}"
         _, code = self._run(cmd, cwd=path)
         return code == 0
+
+    def push(
+        self,
+        path: str,
+        remote: str = "origin",
+        branch: Optional[str] = None,
+        set_upstream: bool = False,
+        dry_run: bool = False
+    ) -> Tuple[bool, Optional[str]]:
+        """
+        Push to remote.
+
+        Args:
+            path: Path to git repository
+            remote: Remote name (default: "origin")
+            branch: Branch to push (default: current branch)
+            set_upstream: Set upstream tracking (-u flag)
+            dry_run: Perform dry-run only (--dry-run flag)
+
+        Returns:
+            Tuple of (success: bool, output: Optional[str])
+            Output contains git push output or error message
+        """
+        cmd = f"git push {remote}"
+        if branch:
+            cmd += f" {branch}"
+        if set_upstream:
+            cmd += " -u"
+        if dry_run:
+            cmd += " --dry-run"
+
+        output, code = self._run(cmd, cwd=path, capture_stderr=True)
+        return code == 0, output
+
+    def get_commits_ahead(self, path: str, remote: str = "origin") -> int:
+        """
+        Get number of commits ahead of remote.
+
+        Args:
+            path: Path to git repository
+            remote: Remote name (default: "origin")
+
+        Returns:
+            Number of commits ahead, or 0 if error/no upstream
+        """
+        # Get current branch
+        branch_output, code = self._run("git rev-parse --abbrev-ref HEAD", cwd=path)
+        if code != 0 or not branch_output:
+            return 0
+
+        branch = branch_output.strip()
+
+        # Check if upstream exists
+        _, code = self._run(f"git rev-parse --abbrev-ref {branch}@{{upstream}}", cwd=path)
+        if code != 0:
+            return 0  # No upstream set
+
+        # Count commits ahead
+        output, code = self._run(
+            f"git rev-list --count {remote}/{branch}..HEAD",
+            cwd=path
+        )
+        if code == 0 and output:
+            try:
+                return int(output.strip())
+            except ValueError:
+                return 0
+        return 0
+
+    def get_commits_behind(self, path: str, remote: str = "origin") -> int:
+        """
+        Get number of commits behind remote.
+
+        Args:
+            path: Path to git repository
+            remote: Remote name (default: "origin")
+
+        Returns:
+            Number of commits behind, or 0 if error/no upstream
+        """
+        # Get current branch
+        branch_output, code = self._run("git rev-parse --abbrev-ref HEAD", cwd=path)
+        if code != 0 or not branch_output:
+            return 0
+
+        branch = branch_output.strip()
+
+        # Check if upstream exists
+        _, code = self._run(f"git rev-parse --abbrev-ref {branch}@{{upstream}}", cwd=path)
+        if code != 0:
+            return 0  # No upstream set
+
+        # Count commits behind
+        output, code = self._run(
+            f"git rev-list --count HEAD..{remote}/{branch}",
+            cwd=path
+        )
+        if code == 0 and output:
+            try:
+                return int(output.strip())
+            except ValueError:
+                return 0
+        return 0
