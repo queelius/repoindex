@@ -3,7 +3,7 @@ Operations command group for repoindex.
 
 Provides collection-level write operations:
 - git push/pull across multiple repos
-- Citation/codemeta/license generation
+- Boilerplate file generation (codemeta, license, gitignore, code of conduct, contributing)
 """
 
 import click
@@ -14,11 +14,12 @@ from typing import Optional
 from ..config import load_config
 from ..database import Database, compile_query, QueryCompileError
 from ..services.git_ops_service import GitOpsService, GitOpsOptions
-from ..services.citation_generator_service import (
-    CitationGeneratorService,
+from ..services.boilerplate_service import (
+    BoilerplateService,
     GenerationOptions,
     AuthorInfo,
     LICENSES,
+    GITIGNORE_TEMPLATES,
 )
 from .query import _build_query_from_flags
 
@@ -42,8 +43,11 @@ def ops_cmd():
         # Pull updates for dirty repos
         repoindex ops git pull --dirty
 
-        # Generate citations for repos without them
-        repoindex ops generate citation "not has_citation"
+        # Generate codemeta for Python repos
+        repoindex ops generate codemeta --language python
+
+        # Generate .gitignore files
+        repoindex ops generate gitignore --lang python
 
         # Multi-repo git status
         repoindex ops git status --dirty
@@ -751,127 +755,29 @@ def _no_repos_message(output_json, pretty):
 
 @ops_cmd.group('generate')
 def generate_cmd():
-    """Generate metadata files for repositories.
+    """Generate boilerplate files for repositories.
 
-    Creates CITATION.cff, codemeta.json, and LICENSE files.
-    Uses author information from config or command-line options.
+    Creates codemeta.json, LICENSE, .gitignore, CODE_OF_CONDUCT.md,
+    and CONTRIBUTING.md files. Uses author information from config.
 
     Examples:
-
-        # Generate citations for repos without them
-        repoindex ops generate citation "not has_citation" --dry-run
 
         # Generate codemeta.json for Python repos
         repoindex ops generate codemeta --language python --dry-run
 
         # Generate MIT license for repos without license
         repoindex ops generate license --no-license --license mit --dry-run
+
+        # Generate .gitignore for Python repos
+        repoindex ops generate gitignore --lang python --dry-run
+
+        # Generate CODE_OF_CONDUCT.md
+        repoindex ops generate code-of-conduct --dry-run
+
+        # Generate CONTRIBUTING.md
+        repoindex ops generate contributing --dry-run
     """
     pass
-
-
-# ============================================================================
-# Generate citation command
-# ============================================================================
-
-@generate_cmd.command('citation')
-@click.argument('query_string', required=False, default='')
-@click.option('--json', 'output_json', is_flag=True, help='Output as JSONL')
-@click.option('--pretty', is_flag=True, help='Display with rich formatting')
-@click.option('--dry-run', is_flag=True, help='Preview without writing files')
-@click.option('--force', is_flag=True, help='Overwrite existing CITATION.cff files')
-@click.option('--author', help='Author name (overrides config)')
-@click.option('--orcid', help='ORCID identifier (overrides config)')
-@click.option('--email', help='Author email (overrides config)')
-@click.option('--affiliation', help='Author affiliation (overrides config)')
-@click.option('--debug', is_flag=True, help='Enable debug logging')
-@query_options
-def generate_citation_handler(
-    query_string: str,
-    output_json: bool,
-    pretty: bool,
-    dry_run: bool,
-    force: bool,
-    author: Optional[str],
-    orcid: Optional[str],
-    email: Optional[str],
-    affiliation: Optional[str],
-    debug: bool,
-    # Query flags
-    dirty: bool,
-    clean: bool,
-    language: Optional[str],
-    recent: Optional[str],
-    starred: bool,
-    tag: tuple,
-    no_license: bool,
-    no_readme: bool,
-    has_citation: bool,
-    has_doi: bool,
-    archived: bool,
-    public: bool,
-    private: bool,
-    fork: bool,
-    no_fork: bool,
-):
-    """
-    Generate CITATION.cff files for repositories.
-
-    Creates Citation File Format (CFF 1.2.0) files for software citation.
-    Uses author information from config (~/.repoindex/config.yaml) by default.
-
-    Examples:
-
-        # Generate for repos without citations
-        repoindex ops generate citation "not has_citation" --dry-run
-
-        # Generate for all Python repos
-        repoindex ops generate citation --language python --dry-run
-
-        # Override author info
-        repoindex ops generate citation --author "John Smith" --orcid "0000-0001-2345-6789"
-
-        # Force overwrite existing files
-        repoindex ops generate citation --force --dry-run
-    """
-    if debug:
-        import logging
-        logging.basicConfig(level=logging.DEBUG)
-
-    config = load_config()
-
-    try:
-        repos = _get_repos_from_query(
-            config, query_string,
-            dirty, clean, language, recent, starred, tag,
-            no_license, no_readme, has_citation, has_doi,
-            archived, public, private, fork, no_fork, debug
-        )
-    except QueryCompileError as e:
-        _handle_query_error(e, query_string, output_json)
-        return
-
-    if not repos:
-        _no_repos_message(output_json, pretty)
-        return
-
-    # Build author info from options or config
-    author_info = _build_author_info(config, author, orcid, email, affiliation)
-
-    options = GenerationOptions(
-        dry_run=dry_run,
-        force=force,
-        author=author_info,
-    )
-
-    service = CitationGeneratorService(config=config)
-
-    if pretty:
-        _generate_pretty(service, 'citation', repos, options)
-    elif output_json:
-        _generate_json(service, 'citation', repos, options)
-    else:
-        _generate_simple(service, 'citation', repos, options)
 
 
 # ============================================================================
@@ -964,14 +870,14 @@ def generate_codemeta_handler(
         author=author_info,
     )
 
-    service = CitationGeneratorService(config=config)
+    service = BoilerplateService(config=config)
 
     if pretty:
-        _generate_pretty(service, 'codemeta', repos, options)
+        _generate_codemeta_pretty(service, repos, options)
     elif output_json:
-        _generate_json(service, 'codemeta', repos, options)
+        _generate_codemeta_json(service, repos, options)
     else:
-        _generate_simple(service, 'codemeta', repos, options)
+        _generate_codemeta_simple(service, repos, options)
 
 
 # ============================================================================
@@ -1066,7 +972,7 @@ def generate_license_handler(
         license=license_type,
     )
 
-    service = CitationGeneratorService(config=config)
+    service = BoilerplateService(config=config)
 
     if pretty:
         _generate_license_pretty(service, repos, options, license_type)
@@ -1117,16 +1023,11 @@ def _build_author_info(
     return base_author
 
 
-def _generate_simple(service: CitationGeneratorService, file_type: str, repos: list, options: GenerationOptions):
-    """Simple text output for generate commands."""
+def _generate_codemeta_simple(service: BoilerplateService, repos: list, options: GenerationOptions):
+    """Simple text output for codemeta generation."""
     mode = "[dry run] " if options.dry_run else ""
 
-    if file_type == 'citation':
-        gen = service.generate_citation(repos, options)
-    else:
-        gen = service.generate_codemeta(repos, options)
-
-    for progress in gen:
+    for progress in service.generate_codemeta(repos, options):
         print(f"{mode}{progress}", file=sys.stderr)
 
     result = service.last_result
@@ -1140,14 +1041,9 @@ def _generate_simple(service: CitationGeneratorService, file_type: str, repos: l
             sys.exit(1)
 
 
-def _generate_json(service: CitationGeneratorService, file_type: str, repos: list, options: GenerationOptions):
-    """JSONL output for generate commands."""
-    if file_type == 'citation':
-        gen = service.generate_citation(repos, options)
-    else:
-        gen = service.generate_codemeta(repos, options)
-
-    for progress in gen:
+def _generate_codemeta_json(service: BoilerplateService, repos: list, options: GenerationOptions):
+    """JSONL output for codemeta generation."""
+    for progress in service.generate_codemeta(repos, options):
         print(json.dumps({'progress': progress}), flush=True)
 
     result = service.last_result
@@ -1157,26 +1053,20 @@ def _generate_json(service: CitationGeneratorService, file_type: str, repos: lis
         print(json.dumps(result.to_dict()), flush=True)
 
 
-def _generate_pretty(service: CitationGeneratorService, file_type: str, repos: list, options: GenerationOptions):
-    """Rich formatted output for generate commands."""
+def _generate_codemeta_pretty(service: BoilerplateService, repos: list, options: GenerationOptions):
+    """Rich formatted output for codemeta generation."""
     from rich.console import Console
     from rich.progress import Progress, SpinnerColumn, TextColumn
     from rich.table import Table
 
     console = Console()
     mode = "[bold yellow]DRY RUN[/bold yellow] " if options.dry_run else ""
-    file_name = "CITATION.cff" if file_type == 'citation' else "codemeta.json"
 
-    console.print(f"\n{mode}[bold]Generate {file_name}[/bold]")
+    console.print(f"\n{mode}[bold]Generate codemeta.json[/bold]")
     console.print(f"[bold]Repositories:[/bold] {len(repos)}")
     if options.author:
         console.print(f"[bold]Author:[/bold] {options.author.name}")
     console.print()
-
-    if file_type == 'citation':
-        gen = service.generate_citation(repos, options)
-    else:
-        gen = service.generate_codemeta(repos, options)
 
     with Progress(
         SpinnerColumn(),
@@ -1185,7 +1075,7 @@ def _generate_pretty(service: CitationGeneratorService, file_type: str, repos: l
     ) as progress:
         task = progress.add_task("Generating...", total=None)
 
-        for message in gen:
+        for message in service.generate_codemeta(repos, options):
             progress.update(task, description=message)
 
     result = service.last_result
@@ -1212,10 +1102,10 @@ def _generate_pretty(service: CitationGeneratorService, file_type: str, repos: l
         sys.exit(1)
 
     if not options.dry_run and result.successful > 0:
-        console.print(f"\n[bold green]✓[/bold green] Generated {result.successful} {file_name} files")
+        console.print(f"\n[bold green]✓[/bold green] Generated {result.successful} codemeta.json files")
 
 
-def _generate_license_simple(service: CitationGeneratorService, repos: list, options: GenerationOptions, license_type: str):
+def _generate_license_simple(service: BoilerplateService, repos: list, options: GenerationOptions, license_type: str):
     """Simple text output for license generation."""
     mode = "[dry run] " if options.dry_run else ""
 
@@ -1233,7 +1123,7 @@ def _generate_license_simple(service: CitationGeneratorService, repos: list, opt
             sys.exit(1)
 
 
-def _generate_license_json(service: CitationGeneratorService, repos: list, options: GenerationOptions, license_type: str):
+def _generate_license_json(service: BoilerplateService, repos: list, options: GenerationOptions, license_type: str):
     """JSONL output for license generation."""
     for progress in service.generate_license(repos, options, license_type):
         print(json.dumps({'progress': progress}), flush=True)
@@ -1245,7 +1135,7 @@ def _generate_license_json(service: CitationGeneratorService, repos: list, optio
         print(json.dumps(result.to_dict()), flush=True)
 
 
-def _generate_license_pretty(service: CitationGeneratorService, repos: list, options: GenerationOptions, license_type: str):
+def _generate_license_pretty(service: BoilerplateService, repos: list, options: GenerationOptions, license_type: str):
     """Rich formatted output for license generation."""
     from rich.console import Console
     from rich.progress import Progress, SpinnerColumn, TextColumn
@@ -1299,3 +1189,529 @@ def _generate_license_pretty(service: CitationGeneratorService, repos: list, opt
 
     if not options.dry_run and result.successful > 0:
         console.print(f"\n[bold green]✓[/bold green] Generated {result.successful} LICENSE files")
+
+
+# ============================================================================
+# Generate gitignore command
+# ============================================================================
+
+@generate_cmd.command('gitignore')
+@click.argument('query_string', required=False, default='')
+@click.option('--json', 'output_json', is_flag=True, help='Output as JSONL')
+@click.option('--pretty', is_flag=True, help='Display with rich formatting')
+@click.option('--dry-run', is_flag=True, help='Preview without writing files')
+@click.option('--force', is_flag=True, help='Overwrite existing .gitignore files')
+@click.option('--lang', 'language_template', default='python',
+              type=click.Choice(list(GITIGNORE_TEMPLATES.keys())),
+              help='Language template (default: python)')
+@click.option('--debug', is_flag=True, help='Enable debug logging')
+@query_options
+def generate_gitignore_handler(
+    query_string: str,
+    output_json: bool,
+    pretty: bool,
+    dry_run: bool,
+    force: bool,
+    language_template: str,
+    debug: bool,
+    # Query flags
+    dirty: bool,
+    clean: bool,
+    language: Optional[str],
+    recent: Optional[str],
+    starred: bool,
+    tag: tuple,
+    no_license: bool,
+    no_readme: bool,
+    has_citation: bool,
+    has_doi: bool,
+    archived: bool,
+    public: bool,
+    private: bool,
+    fork: bool,
+    no_fork: bool,
+):
+    """
+    Generate .gitignore files for repositories.
+
+    Creates .gitignore files with standard patterns for the specified language.
+    Supports: python, node, rust, go, cpp, java.
+
+    Examples:
+
+        # Generate Python .gitignore for all repos
+        repoindex ops generate gitignore --dry-run
+
+        # Generate Node.js .gitignore
+        repoindex ops generate gitignore --lang node --dry-run
+
+        # Generate for Python repos only
+        repoindex ops generate gitignore --language python --dry-run
+
+        # Force overwrite existing files
+        repoindex ops generate gitignore --force --dry-run
+    """
+    if debug:
+        import logging
+        logging.basicConfig(level=logging.DEBUG)
+
+    config = load_config()
+
+    try:
+        repos = _get_repos_from_query(
+            config, query_string,
+            dirty, clean, language, recent, starred, tag,
+            no_license, no_readme, has_citation, has_doi,
+            archived, public, private, fork, no_fork, debug
+        )
+    except QueryCompileError as e:
+        _handle_query_error(e, query_string, output_json)
+        return
+
+    if not repos:
+        _no_repos_message(output_json, pretty)
+        return
+
+    options = GenerationOptions(
+        dry_run=dry_run,
+        force=force,
+    )
+
+    service = BoilerplateService(config=config)
+
+    if pretty:
+        _generate_gitignore_pretty(service, repos, options, language_template)
+    elif output_json:
+        _generate_gitignore_json(service, repos, options, language_template)
+    else:
+        _generate_gitignore_simple(service, repos, options, language_template)
+
+
+def _generate_gitignore_simple(service: BoilerplateService, repos: list, options: GenerationOptions, lang: str):
+    """Simple text output for gitignore generation."""
+    mode = "[dry run] " if options.dry_run else ""
+
+    for progress in service.generate_gitignore(repos, options, lang):
+        print(f"{mode}{progress}", file=sys.stderr)
+
+    result = service.last_result
+    if result:
+        print(f"\n{mode}Generation complete:", file=sys.stderr)
+        print(f"  Generated: {result.successful}", file=sys.stderr)
+        if result.skipped > 0:
+            print(f"  Skipped: {result.skipped}", file=sys.stderr)
+        if result.failed > 0:
+            print(f"  Failed: {result.failed}", file=sys.stderr)
+            sys.exit(1)
+
+
+def _generate_gitignore_json(service: BoilerplateService, repos: list, options: GenerationOptions, lang: str):
+    """JSONL output for gitignore generation."""
+    for progress in service.generate_gitignore(repos, options, lang):
+        print(json.dumps({'progress': progress}), flush=True)
+
+    result = service.last_result
+    if result:
+        for detail in result.details:
+            print(json.dumps(detail.to_dict()), flush=True)
+        print(json.dumps(result.to_dict()), flush=True)
+
+
+def _generate_gitignore_pretty(service: BoilerplateService, repos: list, options: GenerationOptions, lang: str):
+    """Rich formatted output for gitignore generation."""
+    from rich.console import Console
+    from rich.progress import Progress, SpinnerColumn, TextColumn
+    from rich.table import Table
+
+    console = Console()
+    mode = "[bold yellow]DRY RUN[/bold yellow] " if options.dry_run else ""
+
+    console.print(f"\n{mode}[bold]Generate .gitignore[/bold]")
+    console.print(f"[bold]Language:[/bold] {lang}")
+    console.print(f"[bold]Repositories:[/bold] {len(repos)}")
+    console.print()
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console,
+    ) as progress:
+        task = progress.add_task("Generating...", total=None)
+
+        for message in service.generate_gitignore(repos, options, lang):
+            progress.update(task, description=message)
+
+    result = service.last_result
+    if not result:
+        console.print("[red]Generation failed - no result[/red]")
+        sys.exit(1)
+
+    table = Table(title=f"{mode}Generation Summary", show_header=True)
+    table.add_column("Metric", style="cyan")
+    table.add_column("Value", justify="right")
+
+    table.add_row("Generated", f"[green]{result.successful}[/green]")
+    if result.skipped > 0:
+        table.add_row("Skipped", f"[yellow]{result.skipped}[/yellow]")
+    if result.failed > 0:
+        table.add_row("Failed", f"[red]{result.failed}[/red]")
+
+    console.print(table)
+
+    if result.errors:
+        console.print(f"\n[red]Errors ({len(result.errors)}):[/red]")
+        for error in result.errors:
+            console.print(f"  [red]•[/red] {error}")
+        sys.exit(1)
+
+    if not options.dry_run and result.successful > 0:
+        console.print(f"\n[bold green]✓[/bold green] Generated {result.successful} .gitignore files")
+
+
+# ============================================================================
+# Generate code-of-conduct command
+# ============================================================================
+
+@generate_cmd.command('code-of-conduct')
+@click.argument('query_string', required=False, default='')
+@click.option('--json', 'output_json', is_flag=True, help='Output as JSONL')
+@click.option('--pretty', is_flag=True, help='Display with rich formatting')
+@click.option('--dry-run', is_flag=True, help='Preview without writing files')
+@click.option('--force', is_flag=True, help='Overwrite existing CODE_OF_CONDUCT.md files')
+@click.option('--email', help='Contact email (overrides config)')
+@click.option('--debug', is_flag=True, help='Enable debug logging')
+@query_options
+def generate_code_of_conduct_handler(
+    query_string: str,
+    output_json: bool,
+    pretty: bool,
+    dry_run: bool,
+    force: bool,
+    email: Optional[str],
+    debug: bool,
+    # Query flags
+    dirty: bool,
+    clean: bool,
+    language: Optional[str],
+    recent: Optional[str],
+    starred: bool,
+    tag: tuple,
+    no_license: bool,
+    no_readme: bool,
+    has_citation: bool,
+    has_doi: bool,
+    archived: bool,
+    public: bool,
+    private: bool,
+    fork: bool,
+    no_fork: bool,
+):
+    """
+    Generate CODE_OF_CONDUCT.md files for repositories.
+
+    Creates CODE_OF_CONDUCT.md using Contributor Covenant v2.1.
+    Uses contact email from config or command-line option.
+
+    Examples:
+
+        # Generate for all repos
+        repoindex ops generate code-of-conduct --dry-run
+
+        # With custom contact email
+        repoindex ops generate code-of-conduct --email "contact@example.com" --dry-run
+
+        # For Python repos only
+        repoindex ops generate code-of-conduct --language python --dry-run
+
+        # Force overwrite existing files
+        repoindex ops generate code-of-conduct --force --dry-run
+    """
+    if debug:
+        import logging
+        logging.basicConfig(level=logging.DEBUG)
+
+    config = load_config()
+
+    try:
+        repos = _get_repos_from_query(
+            config, query_string,
+            dirty, clean, language, recent, starred, tag,
+            no_license, no_readme, has_citation, has_doi,
+            archived, public, private, fork, no_fork, debug
+        )
+    except QueryCompileError as e:
+        _handle_query_error(e, query_string, output_json)
+        return
+
+    if not repos:
+        _no_repos_message(output_json, pretty)
+        return
+
+    # Build author info with optional email override
+    author_info = _build_author_info(config, None, None, email, None)
+
+    options = GenerationOptions(
+        dry_run=dry_run,
+        force=force,
+        author=author_info,
+    )
+
+    service = BoilerplateService(config=config)
+
+    if pretty:
+        _generate_coc_pretty(service, repos, options)
+    elif output_json:
+        _generate_coc_json(service, repos, options)
+    else:
+        _generate_coc_simple(service, repos, options)
+
+
+def _generate_coc_simple(service: BoilerplateService, repos: list, options: GenerationOptions):
+    """Simple text output for code of conduct generation."""
+    mode = "[dry run] " if options.dry_run else ""
+
+    for progress in service.generate_code_of_conduct(repos, options):
+        print(f"{mode}{progress}", file=sys.stderr)
+
+    result = service.last_result
+    if result:
+        print(f"\n{mode}Generation complete:", file=sys.stderr)
+        print(f"  Generated: {result.successful}", file=sys.stderr)
+        if result.skipped > 0:
+            print(f"  Skipped: {result.skipped}", file=sys.stderr)
+        if result.failed > 0:
+            print(f"  Failed: {result.failed}", file=sys.stderr)
+            sys.exit(1)
+
+
+def _generate_coc_json(service: BoilerplateService, repos: list, options: GenerationOptions):
+    """JSONL output for code of conduct generation."""
+    for progress in service.generate_code_of_conduct(repos, options):
+        print(json.dumps({'progress': progress}), flush=True)
+
+    result = service.last_result
+    if result:
+        for detail in result.details:
+            print(json.dumps(detail.to_dict()), flush=True)
+        print(json.dumps(result.to_dict()), flush=True)
+
+
+def _generate_coc_pretty(service: BoilerplateService, repos: list, options: GenerationOptions):
+    """Rich formatted output for code of conduct generation."""
+    from rich.console import Console
+    from rich.progress import Progress, SpinnerColumn, TextColumn
+    from rich.table import Table
+
+    console = Console()
+    mode = "[bold yellow]DRY RUN[/bold yellow] " if options.dry_run else ""
+
+    console.print(f"\n{mode}[bold]Generate CODE_OF_CONDUCT.md[/bold]")
+    console.print(f"[bold]Repositories:[/bold] {len(repos)}")
+    if options.author and options.author.email:
+        console.print(f"[bold]Contact:[/bold] {options.author.email}")
+    console.print()
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console,
+    ) as progress:
+        task = progress.add_task("Generating...", total=None)
+
+        for message in service.generate_code_of_conduct(repos, options):
+            progress.update(task, description=message)
+
+    result = service.last_result
+    if not result:
+        console.print("[red]Generation failed - no result[/red]")
+        sys.exit(1)
+
+    table = Table(title=f"{mode}Generation Summary", show_header=True)
+    table.add_column("Metric", style="cyan")
+    table.add_column("Value", justify="right")
+
+    table.add_row("Generated", f"[green]{result.successful}[/green]")
+    if result.skipped > 0:
+        table.add_row("Skipped", f"[yellow]{result.skipped}[/yellow]")
+    if result.failed > 0:
+        table.add_row("Failed", f"[red]{result.failed}[/red]")
+
+    console.print(table)
+
+    if result.errors:
+        console.print(f"\n[red]Errors ({len(result.errors)}):[/red]")
+        for error in result.errors:
+            console.print(f"  [red]•[/red] {error}")
+        sys.exit(1)
+
+    if not options.dry_run and result.successful > 0:
+        console.print(f"\n[bold green]✓[/bold green] Generated {result.successful} CODE_OF_CONDUCT.md files")
+
+
+# ============================================================================
+# Generate contributing command
+# ============================================================================
+
+@generate_cmd.command('contributing')
+@click.argument('query_string', required=False, default='')
+@click.option('--json', 'output_json', is_flag=True, help='Output as JSONL')
+@click.option('--pretty', is_flag=True, help='Display with rich formatting')
+@click.option('--dry-run', is_flag=True, help='Preview without writing files')
+@click.option('--force', is_flag=True, help='Overwrite existing CONTRIBUTING.md files')
+@click.option('--debug', is_flag=True, help='Enable debug logging')
+@query_options
+def generate_contributing_handler(
+    query_string: str,
+    output_json: bool,
+    pretty: bool,
+    dry_run: bool,
+    force: bool,
+    debug: bool,
+    # Query flags
+    dirty: bool,
+    clean: bool,
+    language: Optional[str],
+    recent: Optional[str],
+    starred: bool,
+    tag: tuple,
+    no_license: bool,
+    no_readme: bool,
+    has_citation: bool,
+    has_doi: bool,
+    archived: bool,
+    public: bool,
+    private: bool,
+    fork: bool,
+    no_fork: bool,
+):
+    """
+    Generate CONTRIBUTING.md files for repositories.
+
+    Creates CONTRIBUTING.md with standard contribution guidelines.
+    Uses repository name for project-specific content.
+
+    Examples:
+
+        # Generate for all repos
+        repoindex ops generate contributing --dry-run
+
+        # For Python repos only
+        repoindex ops generate contributing --language python --dry-run
+
+        # Force overwrite existing files
+        repoindex ops generate contributing --force --dry-run
+    """
+    if debug:
+        import logging
+        logging.basicConfig(level=logging.DEBUG)
+
+    config = load_config()
+
+    try:
+        repos = _get_repos_from_query(
+            config, query_string,
+            dirty, clean, language, recent, starred, tag,
+            no_license, no_readme, has_citation, has_doi,
+            archived, public, private, fork, no_fork, debug
+        )
+    except QueryCompileError as e:
+        _handle_query_error(e, query_string, output_json)
+        return
+
+    if not repos:
+        _no_repos_message(output_json, pretty)
+        return
+
+    options = GenerationOptions(
+        dry_run=dry_run,
+        force=force,
+    )
+
+    service = BoilerplateService(config=config)
+
+    if pretty:
+        _generate_contributing_pretty(service, repos, options)
+    elif output_json:
+        _generate_contributing_json(service, repos, options)
+    else:
+        _generate_contributing_simple(service, repos, options)
+
+
+def _generate_contributing_simple(service: BoilerplateService, repos: list, options: GenerationOptions):
+    """Simple text output for contributing generation."""
+    mode = "[dry run] " if options.dry_run else ""
+
+    for progress in service.generate_contributing(repos, options):
+        print(f"{mode}{progress}", file=sys.stderr)
+
+    result = service.last_result
+    if result:
+        print(f"\n{mode}Generation complete:", file=sys.stderr)
+        print(f"  Generated: {result.successful}", file=sys.stderr)
+        if result.skipped > 0:
+            print(f"  Skipped: {result.skipped}", file=sys.stderr)
+        if result.failed > 0:
+            print(f"  Failed: {result.failed}", file=sys.stderr)
+            sys.exit(1)
+
+
+def _generate_contributing_json(service: BoilerplateService, repos: list, options: GenerationOptions):
+    """JSONL output for contributing generation."""
+    for progress in service.generate_contributing(repos, options):
+        print(json.dumps({'progress': progress}), flush=True)
+
+    result = service.last_result
+    if result:
+        for detail in result.details:
+            print(json.dumps(detail.to_dict()), flush=True)
+        print(json.dumps(result.to_dict()), flush=True)
+
+
+def _generate_contributing_pretty(service: BoilerplateService, repos: list, options: GenerationOptions):
+    """Rich formatted output for contributing generation."""
+    from rich.console import Console
+    from rich.progress import Progress, SpinnerColumn, TextColumn
+    from rich.table import Table
+
+    console = Console()
+    mode = "[bold yellow]DRY RUN[/bold yellow] " if options.dry_run else ""
+
+    console.print(f"\n{mode}[bold]Generate CONTRIBUTING.md[/bold]")
+    console.print(f"[bold]Repositories:[/bold] {len(repos)}")
+    console.print()
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console,
+    ) as progress:
+        task = progress.add_task("Generating...", total=None)
+
+        for message in service.generate_contributing(repos, options):
+            progress.update(task, description=message)
+
+    result = service.last_result
+    if not result:
+        console.print("[red]Generation failed - no result[/red]")
+        sys.exit(1)
+
+    table = Table(title=f"{mode}Generation Summary", show_header=True)
+    table.add_column("Metric", style="cyan")
+    table.add_column("Value", justify="right")
+
+    table.add_row("Generated", f"[green]{result.successful}[/green]")
+    if result.skipped > 0:
+        table.add_row("Skipped", f"[yellow]{result.skipped}[/yellow]")
+    if result.failed > 0:
+        table.add_row("Failed", f"[red]{result.failed}[/red]")
+
+    console.print(table)
+
+    if result.errors:
+        console.print(f"\n[red]Errors ({len(result.errors)}):[/red]")
+        for error in result.errors:
+            console.print(f"  [red]•[/red] {error}")
+        sys.exit(1)
+
+    if not options.dry_run and result.successful > 0:
+        console.print(f"\n[bold green]✓[/bold green] Generated {result.successful} CONTRIBUTING.md files")

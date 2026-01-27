@@ -3,7 +3,7 @@ Tests for ops services and commands.
 
 Tests cover:
 - GitOpsService (push, pull, status operations)
-- CitationGeneratorService (citation, codemeta, license generation)
+- BoilerplateService (codemeta, license, gitignore, code of conduct, contributing)
 - OperationResult domain objects
 - ops CLI commands
 """
@@ -26,11 +26,12 @@ from repoindex.services.git_ops_service import (
     GitOpsOptions,
     MultiRepoStatus,
 )
-from repoindex.services.citation_generator_service import (
-    CitationGeneratorService,
+from repoindex.services.boilerplate_service import (
+    BoilerplateService,
     GenerationOptions,
     AuthorInfo,
     LICENSES,
+    GITIGNORE_TEMPLATES,
 )
 from repoindex.infra.git_client import GitClient, GitStatus
 
@@ -451,7 +452,7 @@ class TestGitOpsService:
 
 
 # ============================================================================
-# CitationGeneratorService Tests
+# BoilerplateService Tests
 # ============================================================================
 
 class TestAuthorInfo:
@@ -484,33 +485,6 @@ class TestAuthorInfo:
         author = AuthorInfo.from_config(config)
 
         assert author is None
-
-    def test_to_cff_dict(self):
-        """Test converting to CFF format."""
-        author = AuthorInfo(
-            name='John Smith',
-            given_names='John',
-            family_names='Smith',
-            orcid='0000-0001-2345-6789',
-        )
-
-        d = author.to_cff_dict()
-
-        assert d['given-names'] == 'John'
-        assert d['family-names'] == 'Smith'
-        assert d['orcid'] == 'https://orcid.org/0000-0001-2345-6789'
-
-    def test_to_cff_dict_orcid_url(self):
-        """Test ORCID URL formatting."""
-        author = AuthorInfo(
-            name='Test Author',
-            orcid='https://orcid.org/0000-0001-2345-6789',
-        )
-
-        d = author.to_cff_dict()
-
-        # Should not double-add the URL prefix
-        assert d['orcid'] == 'https://orcid.org/0000-0001-2345-6789'
 
     def test_to_codemeta_dict(self):
         """Test converting to codemeta format."""
@@ -561,8 +535,8 @@ class TestGenerationOptions:
         assert options.license == 'MIT'
 
 
-class TestCitationGeneratorService:
-    """Tests for CitationGeneratorService."""
+class TestBoilerplateService:
+    """Tests for BoilerplateService."""
 
     @pytest.fixture
     def sample_repos(self, tmp_path):
@@ -580,94 +554,21 @@ class TestCitationGeneratorService:
             })
         return repos
 
-    def test_generate_citation_empty(self):
+    def test_generate_codemeta_empty(self):
         """Test generation with empty repos list."""
-        service = CitationGeneratorService(config={})
+        service = BoilerplateService(config={})
         options = GenerationOptions()
 
-        messages = list(service.generate_citation([], options))
+        messages = list(service.generate_codemeta([], options))
         result = service.last_result
 
         assert "No repositories to process" in messages[0]
         assert result.total == 0
 
-    def test_generate_citation_dry_run(self, sample_repos):
-        """Test citation generation in dry run mode."""
-        service = CitationGeneratorService(config={})
-        options = GenerationOptions(dry_run=True)
-
-        messages = list(service.generate_citation(sample_repos, options))
-        result = service.last_result
-
-        assert result.successful == 2
-        assert result.dry_run is True
-
-        # Files should not exist
-        for repo in sample_repos:
-            assert not (Path(repo['path']) / 'CITATION.cff').exists()
-
-    def test_generate_citation_creates_file(self, sample_repos):
-        """Test that citation generation creates files."""
-        author = AuthorInfo(
-            name='Test Author',
-            given_names='Test',
-            family_names='Author',
-        )
-        service = CitationGeneratorService(config={})
-        options = GenerationOptions(author=author)
-
-        list(service.generate_citation(sample_repos, options))
-        result = service.last_result
-
-        assert result.successful == 2
-
-        # Check files exist and have content
-        for repo in sample_repos:
-            cff_path = Path(repo['path']) / 'CITATION.cff'
-            assert cff_path.exists()
-            content = cff_path.read_text()
-            assert 'cff-version: 1.2.0' in content
-            assert repo['name'] in content
-
-    def test_generate_citation_skips_existing(self, sample_repos):
-        """Test that existing files are skipped without --force."""
-        # Create existing file
-        existing_path = Path(sample_repos[0]['path']) / 'CITATION.cff'
-        existing_path.write_text('# Existing')
-
-        service = CitationGeneratorService(config={})
-        options = GenerationOptions()
-
-        list(service.generate_citation(sample_repos, options))
-        result = service.last_result
-
-        assert result.successful == 1
-        assert result.skipped == 1
-
-        # Original should be preserved
-        assert existing_path.read_text() == '# Existing'
-
-    def test_generate_citation_force_overwrite(self, sample_repos):
-        """Test that --force overwrites existing files."""
-        existing_path = Path(sample_repos[0]['path']) / 'CITATION.cff'
-        existing_path.write_text('# Existing')
-
-        service = CitationGeneratorService(config={})
-        options = GenerationOptions(force=True)
-
-        list(service.generate_citation(sample_repos, options))
-        result = service.last_result
-
-        assert result.successful == 2
-        assert result.skipped == 0
-
-        # Should be overwritten
-        assert '# Existing' not in existing_path.read_text()
-
     def test_generate_codemeta_creates_file(self, sample_repos):
         """Test that codemeta generation creates files."""
         author = AuthorInfo(name='Test Author')
-        service = CitationGeneratorService(config={})
+        service = BoilerplateService(config={})
         options = GenerationOptions(author=author)
 
         list(service.generate_codemeta(sample_repos, options))
@@ -685,7 +586,7 @@ class TestCitationGeneratorService:
     def test_generate_license_mit(self, sample_repos):
         """Test MIT license generation."""
         author = AuthorInfo(name='Test Author')
-        service = CitationGeneratorService(config={})
+        service = BoilerplateService(config={})
         options = GenerationOptions(author=author)
 
         list(service.generate_license(sample_repos, options, 'mit'))
@@ -703,7 +604,7 @@ class TestCitationGeneratorService:
     def test_generate_license_apache(self, sample_repos):
         """Test Apache 2.0 license generation."""
         author = AuthorInfo(name='Test Author')
-        service = CitationGeneratorService(config={})
+        service = BoilerplateService(config={})
         options = GenerationOptions(author=author)
 
         list(service.generate_license(sample_repos, options, 'apache-2.0'))
@@ -716,7 +617,7 @@ class TestCitationGeneratorService:
 
     def test_generate_license_unknown_type(self, sample_repos):
         """Test unknown license type handling."""
-        service = CitationGeneratorService(config={})
+        service = BoilerplateService(config={})
         options = GenerationOptions()
 
         messages = list(service.generate_license(sample_repos, options, 'unknown-license'))
@@ -725,24 +626,117 @@ class TestCitationGeneratorService:
         assert "Unknown license type" in messages[0]
         assert result.total == 0
 
-    def test_generate_with_config_author(self, sample_repos):
-        """Test using author from config."""
-        config = {
-            'author': {
-                'name': 'Config Author',
-                'orcid': '0000-0001-2345-6789',
-            }
-        }
-        service = CitationGeneratorService(config=config)
+    def test_generate_gitignore_creates_file(self, sample_repos):
+        """Test that gitignore generation creates files."""
+        service = BoilerplateService(config={})
         options = GenerationOptions()
 
-        list(service.generate_citation(sample_repos, options))
+        list(service.generate_gitignore(sample_repos, options, 'python'))
         result = service.last_result
 
-        # Check that config author was used
-        cff_path = Path(sample_repos[0]['path']) / 'CITATION.cff'
-        content = cff_path.read_text()
-        assert 'Config Author' in content or 'Author' in content
+        assert result.successful == 2
+
+        for repo in sample_repos:
+            gi_path = Path(repo['path']) / '.gitignore'
+            assert gi_path.exists()
+            content = gi_path.read_text()
+            assert '__pycache__/' in content
+            assert '.venv/' in content
+
+    def test_generate_gitignore_node(self, sample_repos):
+        """Test Node.js gitignore generation."""
+        service = BoilerplateService(config={})
+        options = GenerationOptions()
+
+        list(service.generate_gitignore(sample_repos, options, 'node'))
+        result = service.last_result
+
+        for repo in sample_repos:
+            gi_path = Path(repo['path']) / '.gitignore'
+            content = gi_path.read_text()
+            assert 'node_modules/' in content
+
+    def test_generate_gitignore_unknown_lang(self, sample_repos):
+        """Test unknown language handling for gitignore."""
+        service = BoilerplateService(config={})
+        options = GenerationOptions()
+
+        messages = list(service.generate_gitignore(sample_repos, options, 'unknown-lang'))
+        result = service.last_result
+
+        assert "Unknown language" in messages[0]
+        assert result.total == 0
+
+    def test_generate_code_of_conduct_creates_file(self, sample_repos):
+        """Test that code of conduct generation creates files."""
+        author = AuthorInfo(name='Test', email='test@example.com')
+        service = BoilerplateService(config={})
+        options = GenerationOptions(author=author)
+
+        list(service.generate_code_of_conduct(sample_repos, options))
+        result = service.last_result
+
+        assert result.successful == 2
+
+        for repo in sample_repos:
+            coc_path = Path(repo['path']) / 'CODE_OF_CONDUCT.md'
+            assert coc_path.exists()
+            content = coc_path.read_text()
+            assert 'Contributor Covenant' in content
+            assert 'test@example.com' in content
+
+    def test_generate_contributing_creates_file(self, sample_repos):
+        """Test that contributing generation creates files."""
+        service = BoilerplateService(config={})
+        options = GenerationOptions()
+
+        list(service.generate_contributing(sample_repos, options))
+        result = service.last_result
+
+        assert result.successful == 2
+
+        for repo in sample_repos:
+            contrib_path = Path(repo['path']) / 'CONTRIBUTING.md'
+            assert contrib_path.exists()
+            content = contrib_path.read_text()
+            assert 'Contributing to' in content
+            assert repo['name'] in content
+
+    def test_generate_contributing_skips_existing(self, sample_repos):
+        """Test that existing files are skipped without --force."""
+        existing_path = Path(sample_repos[0]['path']) / 'CONTRIBUTING.md'
+        existing_path.write_text('# Existing')
+
+        service = BoilerplateService(config={})
+        options = GenerationOptions()
+
+        list(service.generate_contributing(sample_repos, options))
+        result = service.last_result
+
+        assert result.successful == 1
+        assert result.skipped == 1
+
+        # Original should be preserved
+        assert existing_path.read_text() == '# Existing'
+
+
+class TestGitignoreTemplates:
+    """Tests for gitignore template constants."""
+
+    def test_templates_defined(self):
+        """Test that common language templates are defined."""
+        assert 'python' in GITIGNORE_TEMPLATES
+        assert 'node' in GITIGNORE_TEMPLATES
+        assert 'rust' in GITIGNORE_TEMPLATES
+        assert 'go' in GITIGNORE_TEMPLATES
+        assert 'cpp' in GITIGNORE_TEMPLATES
+        assert 'java' in GITIGNORE_TEMPLATES
+
+    def test_templates_have_content(self):
+        """Test that templates have content."""
+        for lang, template in GITIGNORE_TEMPLATES.items():
+            assert len(template) > 0
+            assert '# ' in template  # Should have comments
 
 
 class TestLicenses:
@@ -799,9 +793,11 @@ class TestOpsCommands:
         assert generate_cmd is not None
 
         commands = list(generate_cmd.commands.keys())
-        assert 'citation' in commands
         assert 'codemeta' in commands
         assert 'license' in commands
+        assert 'gitignore' in commands
+        assert 'code-of-conduct' in commands
+        assert 'contributing' in commands
 
     def test_query_options_decorator(self):
         """Test that query_options adds expected options."""
@@ -921,30 +917,62 @@ class TestOpsIntegration:
 
         return config, repos
 
-    def test_citation_generation_integration(self, full_test_setup):
-        """Test citation generation with real files."""
+    def test_gitignore_generation_integration(self, full_test_setup):
+        """Test gitignore generation with real files."""
         config, repos = full_test_setup
 
-        author = AuthorInfo(
-            name='Integration Test',
-            orcid='0000-0001-2345-6789',
-        )
-        service = CitationGeneratorService(config=config)
-        options = GenerationOptions(author=author)
+        service = BoilerplateService(config=config)
+        options = GenerationOptions()
 
-        list(service.generate_citation(repos, options))
+        list(service.generate_gitignore(repos, options, 'python'))
         result = service.last_result
 
         assert result.successful == 2
 
         # Verify file contents
         for repo in repos:
-            cff_path = Path(repo['path']) / 'CITATION.cff'
-            assert cff_path.exists()
-            content = cff_path.read_text()
+            gi_path = Path(repo['path']) / '.gitignore'
+            assert gi_path.exists()
+            content = gi_path.read_text()
 
-            # Check required CFF fields
-            assert 'cff-version: 1.2.0' in content
-            assert 'title:' in content
-            assert 'authors:' in content
-            assert 'Integration Test' in content or 'Test' in content
+            # Check Python gitignore patterns
+            assert '__pycache__/' in content
+            assert '*.py[cod]' in content
+
+    def test_code_of_conduct_generation_integration(self, full_test_setup):
+        """Test code of conduct generation with real files."""
+        config, repos = full_test_setup
+
+        author = AuthorInfo(name='Tester', email='tester@example.com')
+        service = BoilerplateService(config=config)
+        options = GenerationOptions(author=author)
+
+        list(service.generate_code_of_conduct(repos, options))
+        result = service.last_result
+
+        assert result.successful == 2
+
+        for repo in repos:
+            coc_path = Path(repo['path']) / 'CODE_OF_CONDUCT.md'
+            assert coc_path.exists()
+            content = coc_path.read_text()
+            assert 'Contributor Covenant' in content
+
+    def test_contributing_generation_integration(self, full_test_setup):
+        """Test contributing generation with real files."""
+        config, repos = full_test_setup
+
+        service = BoilerplateService(config=config)
+        options = GenerationOptions()
+
+        list(service.generate_contributing(repos, options))
+        result = service.last_result
+
+        assert result.successful == 2
+
+        for repo in repos:
+            contrib_path = Path(repo['path']) / 'CONTRIBUTING.md'
+            assert contrib_path.exists()
+            content = contrib_path.read_text()
+            assert 'Contributing to' in content
+            assert repo['name'] in content

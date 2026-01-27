@@ -353,10 +353,12 @@ repoindex
 │   │   ├── push        # Push repos with unpushed commits
 │   │   ├── pull        # Pull updates from remotes
 │   │   └── status      # Multi-repo git status summary
-│   └── generate        # Metadata file generation
-│       ├── citation    # Generate CITATION.cff files
-│       ├── codemeta    # Generate codemeta.json files
-│       └── license     # Generate LICENSE files
+│   └── generate        # Boilerplate file generation
+│       ├── codemeta        # Generate codemeta.json files
+│       ├── license         # Generate LICENSE files
+│       ├── gitignore       # Generate .gitignore files
+│       ├── code-of-conduct # Generate CODE_OF_CONDUCT.md
+│       └── contributing    # Generate CONTRIBUTING.md
 ├── tag                 # Organization (add/remove/list/tree)
 ├── view                # Curated views (list/show/create/delete)
 ├── config              # Settings (show/repos/init)
@@ -556,13 +558,6 @@ repoindex ops git pull --dry-run                # Preview (fetches first)
 repoindex ops git status                        # Status summary
 repoindex ops git status --json                 # JSONL output
 
-# Generate CITATION.cff files
-repoindex ops generate citation                 # All repos without citation
-repoindex ops generate citation "not has_citation"
-repoindex ops generate citation --dry-run       # Preview
-repoindex ops generate citation --force         # Overwrite existing
-repoindex ops generate citation --author "Name" --orcid "0000-0001-..."
-
 # Generate codemeta.json files
 repoindex ops generate codemeta                 # All repos
 repoindex ops generate codemeta --language python
@@ -571,6 +566,16 @@ repoindex ops generate codemeta --language python
 repoindex ops generate license --license mit    # MIT license
 repoindex ops generate license --license apache-2.0
 repoindex ops generate license --license gpl-3.0
+
+# Generate .gitignore files by language
+repoindex ops generate gitignore --lang python
+repoindex ops generate gitignore --lang node
+
+# Generate CODE_OF_CONDUCT.md
+repoindex ops generate code-of-conduct
+
+# Generate CONTRIBUTING.md
+repoindex ops generate contributing
 ```
 
 **Safety Model**:

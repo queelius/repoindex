@@ -1,7 +1,8 @@
 """
-Citation generator service for repoindex.
+Boilerplate file generator service for repoindex.
 
-Generates CITATION.cff, codemeta.json, and LICENSE files for repositories.
+Generates boilerplate files: LICENSE, codemeta.json, .gitignore,
+CODE_OF_CONDUCT.md, and CONTRIBUTING.md for repositories.
 Used by the `repoindex ops generate` command group.
 """
 
@@ -51,6 +52,56 @@ LICENSES = {
     },
 }
 
+# Gitignore templates by language
+GITIGNORE_TEMPLATES = {
+    'python': """# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+""",
+    'node': """# Node.js
+node_modules/
+npm-debug.log*
+.env
+.env.local
+dist/
+coverage/
+""",
+    'rust': """# Rust
+/target/
+Cargo.lock
+""",
+    'go': """# Go
+/bin/
+/pkg/
+*.exe
+""",
+    'cpp': """# C/C++
+build/
+cmake-build-*/
+*.o
+*.a
+*.so
+*.dylib
+""",
+    'java': """# Java
+target/
+*.class
+*.jar
+.gradle/
+""",
+}
+
 
 @dataclass
 class AuthorInfo:
@@ -88,30 +139,6 @@ class AuthorInfo:
             affiliation=author_config.get('affiliation'),
         )
 
-    def to_cff_dict(self) -> Dict[str, Any]:
-        """Convert to CFF author format."""
-        result = {}
-        # CFF supports both structured names (given-names/family-names)
-        # and simple name for entities or when structured isn't available
-        if self.family_names:
-            result['family-names'] = self.family_names
-        if self.given_names:
-            result['given-names'] = self.given_names
-        # If no structured names, use 'name' field as fallback
-        if not self.family_names and not self.given_names and self.name:
-            result['name'] = self.name
-        if self.email:
-            result['email'] = self.email
-        if self.orcid:
-            # CFF expects full ORCID URL
-            orcid = self.orcid
-            if not orcid.startswith('https://'):
-                orcid = f'https://orcid.org/{orcid}'
-            result['orcid'] = orcid
-        if self.affiliation:
-            result['affiliation'] = self.affiliation
-        return result
-
     def to_codemeta_dict(self) -> Dict[str, Any]:
         """Convert to codemeta.json Person format."""
         result = {
@@ -146,18 +173,18 @@ class GenerationOptions:
     license: Optional[str] = None  # SPDX identifier
 
 
-class CitationGeneratorService:
+class BoilerplateService:
     """
-    Service for generating citation and metadata files.
+    Service for generating boilerplate files.
 
-    Generates CITATION.cff, codemeta.json, and LICENSE files
-    based on repository metadata and configuration.
+    Generates LICENSE, codemeta.json, .gitignore, CODE_OF_CONDUCT.md,
+    and CONTRIBUTING.md files based on repository metadata and configuration.
 
     Example:
-        service = CitationGeneratorService()
+        service = BoilerplateService()
         options = GenerationOptions(dry_run=True)
 
-        for progress in service.generate_citation(repos, options):
+        for progress in service.generate_license(repos, options, 'mit'):
             print(progress)
 
         result = service.last_result
@@ -166,7 +193,7 @@ class CitationGeneratorService:
 
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         """
-        Initialize CitationGeneratorService.
+        Initialize BoilerplateService.
 
         Args:
             config: Configuration dict (loads default if None)
@@ -182,174 +209,6 @@ class CitationGeneratorService:
             return __version__
         except ImportError:
             return "unknown"
-
-    def generate_citation(
-        self,
-        repos: List[Dict[str, Any]],
-        options: GenerationOptions
-    ) -> Generator[str, None, OperationSummary]:
-        """
-        Generate CITATION.cff files for repositories.
-
-        Args:
-            repos: List of repository dicts (from query)
-            options: Generation options
-
-        Yields:
-            Progress messages
-
-        Returns:
-            OperationSummary with results
-        """
-        result = OperationSummary(operation="generate_citation", dry_run=options.dry_run)
-        self.last_result = result
-
-        if not repos:
-            yield "No repositories to process"
-            return result
-
-        # Get author from options or config
-        author = options.author or AuthorInfo.from_config(self.config)
-
-        for repo in repos:
-            path = repo.get('path', '')
-            name = repo.get('name', path)
-
-            if not path:
-                continue
-
-            repo_path = Path(path)
-            citation_file = repo_path / 'CITATION.cff'
-
-            # Check if file exists
-            if citation_file.exists() and not options.force:
-                yield f"Skipping {name} (CITATION.cff exists, use --force to overwrite)"
-                detail = FileGenerationResult(
-                    repo_path=path,
-                    repo_name=name,
-                    status=OperationStatus.SKIPPED,
-                    action="skipped",
-                    message="File exists",
-                    file_type="citation",
-                )
-                result.add_detail(detail)
-                continue
-
-            # Generate content
-            try:
-                content = self._generate_cff_content(repo, author, options.license)
-
-                if options.dry_run:
-                    yield f"Would generate CITATION.cff for {name}"
-                    detail = FileGenerationResult(
-                        repo_path=path,
-                        repo_name=name,
-                        status=OperationStatus.DRY_RUN,
-                        action="would_generate",
-                        file_path=str(citation_file),
-                        file_type="citation",
-                    )
-                else:
-                    citation_file.write_text(content)
-                    yield f"Generated CITATION.cff for {name}"
-                    detail = FileGenerationResult(
-                        repo_path=path,
-                        repo_name=name,
-                        status=OperationStatus.SUCCESS,
-                        action="generated",
-                        file_path=str(citation_file),
-                        file_type="citation",
-                        overwritten=citation_file.exists(),
-                    )
-
-                result.add_detail(detail)
-
-            except Exception as e:
-                logger.error(f"Failed to generate citation for {name}: {e}")
-                yield f"Error generating CITATION.cff for {name}: {e}"
-                detail = FileGenerationResult(
-                    repo_path=path,
-                    repo_name=name,
-                    status=OperationStatus.FAILED,
-                    action="generation_failed",
-                    error=str(e),
-                    file_type="citation",
-                )
-                result.add_detail(detail)
-
-        return result
-
-    def _generate_cff_content(
-        self,
-        repo: Dict[str, Any],
-        author: Optional[AuthorInfo],
-        license_id: Optional[str]
-    ) -> str:
-        """Generate CITATION.cff content."""
-        name = repo.get('name', 'Unknown')
-        description = repo.get('description') or repo.get('github_description', '')
-        remote_url = repo.get('remote_url', '')
-        version = repo.get('version') or repo.get('pypi_version', '')
-
-        # Detect license from repo or use provided
-        repo_license = license_id or repo.get('license') or repo.get('license_key', '')
-
-        lines = [
-            'cff-version: 1.2.0',
-            f'title: "{name}"',
-            'type: software',
-        ]
-
-        if description:
-            # Escape quotes in description
-            desc_escaped = description.replace('"', '\\"')
-            lines.append('message: "If you use this software, please cite it as below."')
-            lines.append(f'abstract: "{desc_escaped}"')
-
-        # Authors section
-        lines.append('authors:')
-        if author:
-            author_dict = author.to_cff_dict()
-            first = True
-            for key, value in author_dict.items():
-                prefix = '  - ' if first else '    '
-                lines.append(f'{prefix}{key}: "{value}"')
-                first = False
-        else:
-            lines.append('  - name: "Author Name"')
-
-        # Repository URL
-        if remote_url:
-            # Convert SSH to HTTPS for display
-            display_url = remote_url
-            if display_url.startswith('git@github.com:'):
-                display_url = display_url.replace('git@github.com:', 'https://github.com/')
-            if display_url.endswith('.git'):
-                display_url = display_url[:-4]
-            lines.append(f'repository-code: "{display_url}"')
-
-        # License
-        if repo_license:
-            license_upper = repo_license.upper()
-            # Map common names to SPDX
-            spdx_map = {
-                'MIT': 'MIT',
-                'APACHE-2.0': 'Apache-2.0',
-                'GPL-3.0': 'GPL-3.0-only',
-                'BSD-3-CLAUSE': 'BSD-3-Clause',
-                'MPL-2.0': 'MPL-2.0',
-            }
-            spdx = spdx_map.get(license_upper, repo_license)
-            lines.append(f'license: {spdx}')
-
-        # Version
-        if version:
-            lines.append(f'version: "{version}"')
-
-        # Date
-        lines.append(f'date-released: "{date.today().isoformat()}"')
-
-        return '\n'.join(lines) + '\n'
 
     def generate_codemeta(
         self,
@@ -701,3 +560,382 @@ file, You can obtain one at https://mozilla.org/MPL/2.0/.
 """
         else:
             return f"# License\n\nCopyright (c) {year} {author_name}\n"
+
+    def generate_gitignore(
+        self,
+        repos: List[Dict[str, Any]],
+        options: GenerationOptions,
+        language: str = 'python'
+    ) -> Generator[str, None, OperationSummary]:
+        """
+        Generate .gitignore files for repositories.
+
+        Args:
+            repos: List of repository dicts (from query)
+            options: Generation options
+            language: Language template (python, node, rust, go, cpp, java)
+
+        Yields:
+            Progress messages
+
+        Returns:
+            OperationSummary with results
+        """
+        result = OperationSummary(operation="generate_gitignore", dry_run=options.dry_run)
+        self.last_result = result
+
+        if not repos:
+            yield "No repositories to process"
+            return result
+
+        lang_key = language.lower()
+        if lang_key not in GITIGNORE_TEMPLATES:
+            yield f"Unknown language: {language}"
+            yield f"Supported: {', '.join(GITIGNORE_TEMPLATES.keys())}"
+            return result
+
+        template = GITIGNORE_TEMPLATES[lang_key]
+
+        for repo in repos:
+            path = repo.get('path', '')
+            name = repo.get('name', path)
+
+            if not path:
+                continue
+
+            repo_path = Path(path)
+            gitignore_file = repo_path / '.gitignore'
+
+            if gitignore_file.exists() and not options.force:
+                yield f"Skipping {name} (.gitignore exists, use --force to overwrite)"
+                detail = FileGenerationResult(
+                    repo_path=path,
+                    repo_name=name,
+                    status=OperationStatus.SKIPPED,
+                    action="skipped",
+                    message="File exists",
+                    file_type="gitignore",
+                )
+                result.add_detail(detail)
+                continue
+
+            try:
+                if options.dry_run:
+                    yield f"Would generate .gitignore ({language}) for {name}"
+                    detail = FileGenerationResult(
+                        repo_path=path,
+                        repo_name=name,
+                        status=OperationStatus.DRY_RUN,
+                        action="would_generate",
+                        file_path=str(gitignore_file),
+                        file_type="gitignore",
+                    )
+                else:
+                    gitignore_file.write_text(template)
+                    yield f"Generated .gitignore ({language}) for {name}"
+                    detail = FileGenerationResult(
+                        repo_path=path,
+                        repo_name=name,
+                        status=OperationStatus.SUCCESS,
+                        action="generated",
+                        file_path=str(gitignore_file),
+                        file_type="gitignore",
+                        overwritten=gitignore_file.exists(),
+                    )
+
+                result.add_detail(detail)
+
+            except Exception as e:
+                logger.error(f"Failed to generate .gitignore for {name}: {e}")
+                yield f"Error generating .gitignore for {name}: {e}"
+                detail = FileGenerationResult(
+                    repo_path=path,
+                    repo_name=name,
+                    status=OperationStatus.FAILED,
+                    action="generation_failed",
+                    error=str(e),
+                    file_type="gitignore",
+                )
+                result.add_detail(detail)
+
+        return result
+
+    def generate_code_of_conduct(
+        self,
+        repos: List[Dict[str, Any]],
+        options: GenerationOptions
+    ) -> Generator[str, None, OperationSummary]:
+        """
+        Generate CODE_OF_CONDUCT.md files for repositories.
+
+        Uses Contributor Covenant v2.1.
+
+        Args:
+            repos: List of repository dicts (from query)
+            options: Generation options
+
+        Yields:
+            Progress messages
+
+        Returns:
+            OperationSummary with results
+        """
+        result = OperationSummary(operation="generate_code_of_conduct", dry_run=options.dry_run)
+        self.last_result = result
+
+        if not repos:
+            yield "No repositories to process"
+            return result
+
+        author = options.author or AuthorInfo.from_config(self.config)
+        contact_email = author.email if author else "maintainer@example.com"
+
+        for repo in repos:
+            path = repo.get('path', '')
+            name = repo.get('name', path)
+
+            if not path:
+                continue
+
+            repo_path = Path(path)
+            coc_file = repo_path / 'CODE_OF_CONDUCT.md'
+
+            if coc_file.exists() and not options.force:
+                yield f"Skipping {name} (CODE_OF_CONDUCT.md exists, use --force to overwrite)"
+                detail = FileGenerationResult(
+                    repo_path=path,
+                    repo_name=name,
+                    status=OperationStatus.SKIPPED,
+                    action="skipped",
+                    message="File exists",
+                    file_type="code_of_conduct",
+                )
+                result.add_detail(detail)
+                continue
+
+            try:
+                content = self._generate_code_of_conduct_content(contact_email)
+
+                if options.dry_run:
+                    yield f"Would generate CODE_OF_CONDUCT.md for {name}"
+                    detail = FileGenerationResult(
+                        repo_path=path,
+                        repo_name=name,
+                        status=OperationStatus.DRY_RUN,
+                        action="would_generate",
+                        file_path=str(coc_file),
+                        file_type="code_of_conduct",
+                    )
+                else:
+                    coc_file.write_text(content)
+                    yield f"Generated CODE_OF_CONDUCT.md for {name}"
+                    detail = FileGenerationResult(
+                        repo_path=path,
+                        repo_name=name,
+                        status=OperationStatus.SUCCESS,
+                        action="generated",
+                        file_path=str(coc_file),
+                        file_type="code_of_conduct",
+                        overwritten=coc_file.exists(),
+                    )
+
+                result.add_detail(detail)
+
+            except Exception as e:
+                logger.error(f"Failed to generate CODE_OF_CONDUCT.md for {name}: {e}")
+                yield f"Error generating CODE_OF_CONDUCT.md for {name}: {e}"
+                detail = FileGenerationResult(
+                    repo_path=path,
+                    repo_name=name,
+                    status=OperationStatus.FAILED,
+                    action="generation_failed",
+                    error=str(e),
+                    file_type="code_of_conduct",
+                )
+                result.add_detail(detail)
+
+        return result
+
+    def _generate_code_of_conduct_content(self, contact_email: str) -> str:
+        """Generate CODE_OF_CONDUCT.md content (Contributor Covenant v2.1)."""
+        return f"""# Contributor Covenant Code of Conduct
+
+## Our Pledge
+
+We as members, contributors, and leaders pledge to make participation in our
+community a harassment-free experience for everyone.
+
+## Our Standards
+
+Examples of behavior that contributes to a positive environment:
+
+* Using welcoming and inclusive language
+* Being respectful of differing viewpoints and experiences
+* Gracefully accepting constructive criticism
+* Focusing on what is best for the community
+
+Examples of unacceptable behavior:
+
+* Trolling, insulting or derogatory comments
+* Public or private harassment
+* Publishing others' private information without permission
+* Other conduct which could reasonably be considered inappropriate
+
+## Enforcement Responsibilities
+
+Community leaders are responsible for clarifying and enforcing our standards
+of acceptable behavior.
+
+## Scope
+
+This Code of Conduct applies within all community spaces, and also applies
+when an individual is officially representing the community in public spaces.
+
+## Enforcement
+
+Instances of abusive, harassing, or otherwise unacceptable behavior may be
+reported to the community leaders responsible for enforcement at
+{contact_email}.
+
+## Attribution
+
+This Code of Conduct is adapted from the [Contributor Covenant][homepage],
+version 2.1.
+
+[homepage]: https://www.contributor-covenant.org
+"""
+
+    def generate_contributing(
+        self,
+        repos: List[Dict[str, Any]],
+        options: GenerationOptions
+    ) -> Generator[str, None, OperationSummary]:
+        """
+        Generate CONTRIBUTING.md files for repositories.
+
+        Args:
+            repos: List of repository dicts (from query)
+            options: Generation options
+
+        Yields:
+            Progress messages
+
+        Returns:
+            OperationSummary with results
+        """
+        result = OperationSummary(operation="generate_contributing", dry_run=options.dry_run)
+        self.last_result = result
+
+        if not repos:
+            yield "No repositories to process"
+            return result
+
+        for repo in repos:
+            path = repo.get('path', '')
+            name = repo.get('name', path)
+
+            if not path:
+                continue
+
+            repo_path = Path(path)
+            contributing_file = repo_path / 'CONTRIBUTING.md'
+
+            if contributing_file.exists() and not options.force:
+                yield f"Skipping {name} (CONTRIBUTING.md exists, use --force to overwrite)"
+                detail = FileGenerationResult(
+                    repo_path=path,
+                    repo_name=name,
+                    status=OperationStatus.SKIPPED,
+                    action="skipped",
+                    message="File exists",
+                    file_type="contributing",
+                )
+                result.add_detail(detail)
+                continue
+
+            try:
+                content = self._generate_contributing_content(name)
+
+                if options.dry_run:
+                    yield f"Would generate CONTRIBUTING.md for {name}"
+                    detail = FileGenerationResult(
+                        repo_path=path,
+                        repo_name=name,
+                        status=OperationStatus.DRY_RUN,
+                        action="would_generate",
+                        file_path=str(contributing_file),
+                        file_type="contributing",
+                    )
+                else:
+                    contributing_file.write_text(content)
+                    yield f"Generated CONTRIBUTING.md for {name}"
+                    detail = FileGenerationResult(
+                        repo_path=path,
+                        repo_name=name,
+                        status=OperationStatus.SUCCESS,
+                        action="generated",
+                        file_path=str(contributing_file),
+                        file_type="contributing",
+                        overwritten=contributing_file.exists(),
+                    )
+
+                result.add_detail(detail)
+
+            except Exception as e:
+                logger.error(f"Failed to generate CONTRIBUTING.md for {name}: {e}")
+                yield f"Error generating CONTRIBUTING.md for {name}: {e}"
+                detail = FileGenerationResult(
+                    repo_path=path,
+                    repo_name=name,
+                    status=OperationStatus.FAILED,
+                    action="generation_failed",
+                    error=str(e),
+                    file_type="contributing",
+                )
+                result.add_detail(detail)
+
+        return result
+
+    def _generate_contributing_content(self, project_name: str) -> str:
+        """Generate CONTRIBUTING.md content."""
+        return f"""# Contributing to {project_name}
+
+Thank you for your interest in contributing to {project_name}!
+
+## How to Contribute
+
+### Reporting Issues
+
+- Check if the issue already exists
+- Include steps to reproduce the problem
+- Include expected vs actual behavior
+
+### Pull Requests
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/your-feature`)
+3. Make your changes
+4. Write or update tests as needed
+5. Ensure tests pass
+6. Commit your changes (`git commit -m 'Add your feature'`)
+7. Push to your branch (`git push origin feature/your-feature`)
+8. Open a Pull Request
+
+### Code Style
+
+- Follow the existing code style
+- Add tests for new functionality
+- Update documentation as needed
+
+### Development Setup
+
+```bash
+git clone <repository-url>
+cd {project_name}
+# Follow project-specific setup instructions in README
+```
+
+## Questions?
+
+Open an issue for any questions about contributing.
+"""
