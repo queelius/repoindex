@@ -141,8 +141,8 @@ repoindex query --brief --dirty
 - **Text streams are the universal interface**: JSONL is our text stream format
 
 ### 2. Output Format Rules
-- **Human-first for interactive commands**: `query` and `events` output pretty tables by default
-- **JSONL for scripting**: Use `--json` flag for JSONL output (pipeable)
+- **Read commands** (`query`, `events`): Pretty tables by default, `--json` for JSONL
+- **Write/ops commands** (`export`, `copy`, `link`, `ops`): Simple text to stderr, `--pretty` for rich formatting, `--json` for JSONL
 - **Stream, don't collect**: Output each object as it's processed
 - **Errors go to stderr**: Keep stdout clean for piping
 - **Brief mode**: Use `--brief` for just repo names (one per line)
@@ -305,7 +305,7 @@ mock_run_command.side_effect = [("output1", 0), ("output2", 0)]  # Multiple call
 - Individual CLI command implementations
 - Parse arguments with Click
 - Use services for business logic
-- Format output: JSONL (default) or --pretty
+- Format output: Pretty tables (default), `--json` for JSONL
 
 ### Core Modules
 - `repoindex/cli.py` - Main CLI entry point using Click framework
@@ -322,7 +322,7 @@ mock_run_command.side_effect = [("output1", 0), ("output2", 0)]  # Multiple call
 - **Layered Architecture**: Domain → Infrastructure → Services → Commands
 - **Dependency Injection**: Services receive clients via constructor
 - **Immutable Domain Objects**: Frozen dataclasses for thread safety
-- **JSONL Streaming**: Default output format for Unix pipelines
+- **JSONL Streaming**: `--json` flag enables JSONL for Unix pipelines
 - **Configuration Cascading**: Defaults → config file → environment variables
 
 ### Dependencies
@@ -443,6 +443,80 @@ Query examples:
 repoindex query --has-doi                    # Repos with DOI
 repoindex query "citation_doi != ''"          # Same as above
 repoindex sql "SELECT name, citation_doi, citation_title FROM repos WHERE citation_doi IS NOT NULL"
+```
+
+### SQL Data Model
+
+The SQLite database (`~/.repoindex/repoindex.db`) is the canonical cache. Use `repoindex sql` for direct access.
+
+**repos table** (main repository data):
+```
+-- Core identity
+id, name, path (UNIQUE), branch, remote_url, owner
+
+-- Git status
+is_clean, ahead, behind, has_upstream, uncommitted_changes, untracked_files
+
+-- Metadata
+language, languages (JSON array), description, readme_content
+
+-- License
+license_key (SPDX), license_name, license_file
+
+-- File presence
+has_readme, has_license, has_ci, has_citation, citation_file
+
+-- Citation metadata (from CITATION.cff/.zenodo.json)
+citation_doi, citation_title, citation_authors (JSON), citation_version,
+citation_repository, citation_license
+
+-- GitHub metadata (all github_ prefixed)
+github_owner, github_name, github_description,
+github_stars, github_forks, github_watchers, github_open_issues,
+github_is_fork, github_is_private, github_is_archived,
+github_has_issues, github_has_wiki, github_has_pages, github_pages_url,
+github_topics (JSON array),
+github_created_at, github_updated_at, github_pushed_at
+
+-- Operational
+scanned_at, git_index_mtime
+```
+
+**events table** (git activity):
+```
+id, repo_id (FK→repos), event_id (UNIQUE), type, timestamp, ref, message, author, metadata (JSON)
+-- Types: git_tag, commit, branch, merge
+```
+
+**tags table** (repo organization):
+```
+repo_id (FK→repos), tag, source ('user'|'implicit'|'github'), created_at
+-- Primary key: (repo_id, tag)
+```
+
+**publications table** (package registries):
+```
+repo_id (FK→repos), registry ('pypi'|'npm'|'cran'|'cargo'|'docker'),
+package_name, current_version, published, url, downloads_total, downloads_30d
+-- Unique: (repo_id, registry)
+```
+
+**Example SQL queries**:
+```bash
+# Top starred repos
+repoindex sql "SELECT name, github_stars FROM repos WHERE github_stars > 0 ORDER BY github_stars DESC LIMIT 10"
+
+# Missing license
+repoindex sql "SELECT name, path FROM repos WHERE has_license = 0"
+
+# Recent commits by repo
+repoindex sql "SELECT r.name, COUNT(*) as n FROM events e JOIN repos r ON e.repo_id = r.id WHERE e.type = 'commit' AND e.timestamp > datetime('now', '-30 days') GROUP BY r.id ORDER BY n DESC"
+
+# Published packages
+repoindex sql "SELECT r.name, p.registry, p.package_name FROM publications p JOIN repos r ON p.repo_id = r.id WHERE p.published = 1"
+
+# Repos by language
+repoindex sql "SELECT language, COUNT(*) as n FROM repos GROUP BY language ORDER BY n DESC"
 ```
 
 ### Export Command
@@ -640,26 +714,26 @@ make docs
 1. **Create command file** in `repoindex/commands/your_command.py`:
 ```python
 import click
+import json
 from ..config import load_config
 from ..services.repository_service import RepositoryService
 
 @click.command('your-command')
-@click.option('--pretty', is_flag=True, help='Display as formatted table')
-def your_command_handler(pretty):
+@click.option('--json', 'output_json', is_flag=True, help='Output as JSONL')
+def your_command_handler(output_json):
     """Brief description of your command."""
     # Get data from service
     service = RepositoryService(config=load_config())
     results = service.your_method()
 
-    if pretty:
-        # Render as table for humans
-        from ..render import render_table
-        render_table(list(results), columns=['key1', 'key2'])
-    else:
-        # Stream JSONL (default)
-        import json
+    if output_json:
+        # Stream JSONL for piping
         for result in results:
             print(json.dumps(result), flush=True)
+    else:
+        # Pretty table (default for read commands)
+        from ..render import render_table
+        render_table(list(results), columns=['key1', 'key2'])
 ```
 
 2. **Add service method** in `repoindex/services/`:
