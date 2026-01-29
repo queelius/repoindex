@@ -871,13 +871,21 @@ def generate_codemeta_handler(
     )
 
     service = BoilerplateService(config=config)
+    file_label = "codemeta.json files"
+    extra_headers = []
+    if options.author:
+        extra_headers.append(("Author", options.author.name))
 
     if pretty:
-        _generate_codemeta_pretty(service, repos, options)
+        _generate_pretty(
+            service, service.generate_codemeta(repos, options), options,
+            file_label, "Generate codemeta.json", len(repos),
+            extra_headers=extra_headers or None,
+        )
     elif output_json:
-        _generate_codemeta_json(service, repos, options)
+        _generate_json(service, service.generate_codemeta(repos, options), options, file_label)
     else:
-        _generate_codemeta_simple(service, repos, options)
+        _generate_simple(service, service.generate_codemeta(repos, options), options, file_label)
 
 
 # ============================================================================
@@ -973,13 +981,23 @@ def generate_license_handler(
     )
 
     service = BoilerplateService(config=config)
+    file_label = "LICENSE files"
+    license_info = LICENSES.get(license_type, {'name': license_type})
+    license_name = license_info.get('name', license_type)
+    extra_headers = [("License", license_name)]
+    if options.author:
+        extra_headers.append(("Copyright holder", options.author.name))
 
     if pretty:
-        _generate_license_pretty(service, repos, options, license_type)
+        _generate_pretty(
+            service, service.generate_license(repos, options, license_type), options,
+            file_label, "Generate LICENSE", len(repos),
+            extra_headers=extra_headers,
+        )
     elif output_json:
-        _generate_license_json(service, repos, options, license_type)
+        _generate_json(service, service.generate_license(repos, options, license_type), options, file_label)
     else:
-        _generate_license_simple(service, repos, options, license_type)
+        _generate_simple(service, service.generate_license(repos, options, license_type), options, file_label)
 
 
 # ============================================================================
@@ -1023,11 +1041,11 @@ def _build_author_info(
     return base_author
 
 
-def _generate_codemeta_simple(service: BoilerplateService, repos: list, options: GenerationOptions):
-    """Simple text output for codemeta generation."""
+def _generate_simple(service: BoilerplateService, progress_iter, options: GenerationOptions, file_label: str):
+    """Simple text output for any boilerplate generation."""
     mode = "[dry run] " if options.dry_run else ""
 
-    for progress in service.generate_codemeta(repos, options):
+    for progress in progress_iter:
         print(f"{mode}{progress}", file=sys.stderr)
 
     result = service.last_result
@@ -1041,9 +1059,9 @@ def _generate_codemeta_simple(service: BoilerplateService, repos: list, options:
             sys.exit(1)
 
 
-def _generate_codemeta_json(service: BoilerplateService, repos: list, options: GenerationOptions):
-    """JSONL output for codemeta generation."""
-    for progress in service.generate_codemeta(repos, options):
+def _generate_json(service: BoilerplateService, progress_iter, options: GenerationOptions, file_label: str):
+    """JSONL output for any boilerplate generation."""
+    for progress in progress_iter:
         print(json.dumps({'progress': progress}), flush=True)
 
     result = service.last_result
@@ -1053,8 +1071,16 @@ def _generate_codemeta_json(service: BoilerplateService, repos: list, options: G
         print(json.dumps(result.to_dict()), flush=True)
 
 
-def _generate_codemeta_pretty(service: BoilerplateService, repos: list, options: GenerationOptions):
-    """Rich formatted output for codemeta generation."""
+def _generate_pretty(
+    service: BoilerplateService,
+    progress_iter,
+    options: GenerationOptions,
+    file_label: str,
+    title: str,
+    repo_count: int,
+    extra_headers: Optional[list] = None,
+):
+    """Rich formatted output for any boilerplate generation."""
     from rich.console import Console
     from rich.progress import Progress, SpinnerColumn, TextColumn
     from rich.table import Table
@@ -1062,10 +1088,11 @@ def _generate_codemeta_pretty(service: BoilerplateService, repos: list, options:
     console = Console()
     mode = "[bold yellow]DRY RUN[/bold yellow] " if options.dry_run else ""
 
-    console.print(f"\n{mode}[bold]Generate codemeta.json[/bold]")
-    console.print(f"[bold]Repositories:[/bold] {len(repos)}")
-    if options.author:
-        console.print(f"[bold]Author:[/bold] {options.author.name}")
+    console.print(f"\n{mode}[bold]{title}[/bold]")
+    if extra_headers:
+        for label, value in extra_headers:
+            console.print(f"[bold]{label}:[/bold] {value}")
+    console.print(f"[bold]Repositories:[/bold] {repo_count}")
     console.print()
 
     with Progress(
@@ -1075,7 +1102,7 @@ def _generate_codemeta_pretty(service: BoilerplateService, repos: list, options:
     ) as progress:
         task = progress.add_task("Generating...", total=None)
 
-        for message in service.generate_codemeta(repos, options):
+        for message in progress_iter:
             progress.update(task, description=message)
 
     result = service.last_result
@@ -1102,93 +1129,7 @@ def _generate_codemeta_pretty(service: BoilerplateService, repos: list, options:
         sys.exit(1)
 
     if not options.dry_run and result.successful > 0:
-        console.print(f"\n[bold green]✓[/bold green] Generated {result.successful} codemeta.json files")
-
-
-def _generate_license_simple(service: BoilerplateService, repos: list, options: GenerationOptions, license_type: str):
-    """Simple text output for license generation."""
-    mode = "[dry run] " if options.dry_run else ""
-
-    for progress in service.generate_license(repos, options, license_type):
-        print(f"{mode}{progress}", file=sys.stderr)
-
-    result = service.last_result
-    if result:
-        print(f"\n{mode}Generation complete:", file=sys.stderr)
-        print(f"  Generated: {result.successful}", file=sys.stderr)
-        if result.skipped > 0:
-            print(f"  Skipped: {result.skipped}", file=sys.stderr)
-        if result.failed > 0:
-            print(f"  Failed: {result.failed}", file=sys.stderr)
-            sys.exit(1)
-
-
-def _generate_license_json(service: BoilerplateService, repos: list, options: GenerationOptions, license_type: str):
-    """JSONL output for license generation."""
-    for progress in service.generate_license(repos, options, license_type):
-        print(json.dumps({'progress': progress}), flush=True)
-
-    result = service.last_result
-    if result:
-        for detail in result.details:
-            print(json.dumps(detail.to_dict()), flush=True)
-        print(json.dumps(result.to_dict()), flush=True)
-
-
-def _generate_license_pretty(service: BoilerplateService, repos: list, options: GenerationOptions, license_type: str):
-    """Rich formatted output for license generation."""
-    from rich.console import Console
-    from rich.progress import Progress, SpinnerColumn, TextColumn
-    from rich.table import Table
-
-    console = Console()
-    mode = "[bold yellow]DRY RUN[/bold yellow] " if options.dry_run else ""
-
-    license_info = LICENSES.get(license_type, {'name': license_type})
-    license_name = license_info.get('name', license_type)
-
-    console.print(f"\n{mode}[bold]Generate LICENSE[/bold]")
-    console.print(f"[bold]License:[/bold] {license_name}")
-    console.print(f"[bold]Repositories:[/bold] {len(repos)}")
-    if options.author:
-        console.print(f"[bold]Copyright holder:[/bold] {options.author.name}")
-    console.print()
-
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        console=console,
-    ) as progress:
-        task = progress.add_task("Generating...", total=None)
-
-        for message in service.generate_license(repos, options, license_type):
-            progress.update(task, description=message)
-
-    result = service.last_result
-    if not result:
-        console.print("[red]Generation failed - no result[/red]")
-        sys.exit(1)
-
-    table = Table(title=f"{mode}Generation Summary", show_header=True)
-    table.add_column("Metric", style="cyan")
-    table.add_column("Value", justify="right")
-
-    table.add_row("Generated", f"[green]{result.successful}[/green]")
-    if result.skipped > 0:
-        table.add_row("Skipped", f"[yellow]{result.skipped}[/yellow]")
-    if result.failed > 0:
-        table.add_row("Failed", f"[red]{result.failed}[/red]")
-
-    console.print(table)
-
-    if result.errors:
-        console.print(f"\n[red]Errors ({len(result.errors)}):[/red]")
-        for error in result.errors:
-            console.print(f"  [red]•[/red] {error}")
-        sys.exit(1)
-
-    if not options.dry_run and result.successful > 0:
-        console.print(f"\n[bold green]✓[/bold green] Generated {result.successful} LICENSE files")
+        console.print(f"\n[bold green]✓[/bold green] Generated {result.successful} {file_label}")
 
 
 # ============================================================================
@@ -1278,94 +1219,19 @@ def generate_gitignore_handler(
     )
 
     service = BoilerplateService(config=config)
+    file_label = ".gitignore files"
+    extra_headers = [("Language", language_template)]
 
     if pretty:
-        _generate_gitignore_pretty(service, repos, options, language_template)
+        _generate_pretty(
+            service, service.generate_gitignore(repos, options, language_template), options,
+            file_label, "Generate .gitignore", len(repos),
+            extra_headers=extra_headers,
+        )
     elif output_json:
-        _generate_gitignore_json(service, repos, options, language_template)
+        _generate_json(service, service.generate_gitignore(repos, options, language_template), options, file_label)
     else:
-        _generate_gitignore_simple(service, repos, options, language_template)
-
-
-def _generate_gitignore_simple(service: BoilerplateService, repos: list, options: GenerationOptions, lang: str):
-    """Simple text output for gitignore generation."""
-    mode = "[dry run] " if options.dry_run else ""
-
-    for progress in service.generate_gitignore(repos, options, lang):
-        print(f"{mode}{progress}", file=sys.stderr)
-
-    result = service.last_result
-    if result:
-        print(f"\n{mode}Generation complete:", file=sys.stderr)
-        print(f"  Generated: {result.successful}", file=sys.stderr)
-        if result.skipped > 0:
-            print(f"  Skipped: {result.skipped}", file=sys.stderr)
-        if result.failed > 0:
-            print(f"  Failed: {result.failed}", file=sys.stderr)
-            sys.exit(1)
-
-
-def _generate_gitignore_json(service: BoilerplateService, repos: list, options: GenerationOptions, lang: str):
-    """JSONL output for gitignore generation."""
-    for progress in service.generate_gitignore(repos, options, lang):
-        print(json.dumps({'progress': progress}), flush=True)
-
-    result = service.last_result
-    if result:
-        for detail in result.details:
-            print(json.dumps(detail.to_dict()), flush=True)
-        print(json.dumps(result.to_dict()), flush=True)
-
-
-def _generate_gitignore_pretty(service: BoilerplateService, repos: list, options: GenerationOptions, lang: str):
-    """Rich formatted output for gitignore generation."""
-    from rich.console import Console
-    from rich.progress import Progress, SpinnerColumn, TextColumn
-    from rich.table import Table
-
-    console = Console()
-    mode = "[bold yellow]DRY RUN[/bold yellow] " if options.dry_run else ""
-
-    console.print(f"\n{mode}[bold]Generate .gitignore[/bold]")
-    console.print(f"[bold]Language:[/bold] {lang}")
-    console.print(f"[bold]Repositories:[/bold] {len(repos)}")
-    console.print()
-
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        console=console,
-    ) as progress:
-        task = progress.add_task("Generating...", total=None)
-
-        for message in service.generate_gitignore(repos, options, lang):
-            progress.update(task, description=message)
-
-    result = service.last_result
-    if not result:
-        console.print("[red]Generation failed - no result[/red]")
-        sys.exit(1)
-
-    table = Table(title=f"{mode}Generation Summary", show_header=True)
-    table.add_column("Metric", style="cyan")
-    table.add_column("Value", justify="right")
-
-    table.add_row("Generated", f"[green]{result.successful}[/green]")
-    if result.skipped > 0:
-        table.add_row("Skipped", f"[yellow]{result.skipped}[/yellow]")
-    if result.failed > 0:
-        table.add_row("Failed", f"[red]{result.failed}[/red]")
-
-    console.print(table)
-
-    if result.errors:
-        console.print(f"\n[red]Errors ({len(result.errors)}):[/red]")
-        for error in result.errors:
-            console.print(f"  [red]•[/red] {error}")
-        sys.exit(1)
-
-    if not options.dry_run and result.successful > 0:
-        console.print(f"\n[bold green]✓[/bold green] Generated {result.successful} .gitignore files")
+        _generate_simple(service, service.generate_gitignore(repos, options, language_template), options, file_label)
 
 
 # ============================================================================
@@ -1457,95 +1323,21 @@ def generate_code_of_conduct_handler(
     )
 
     service = BoilerplateService(config=config)
+    file_label = "CODE_OF_CONDUCT.md files"
+    extra_headers = []
+    if options.author and options.author.email:
+        extra_headers.append(("Contact", options.author.email))
 
     if pretty:
-        _generate_coc_pretty(service, repos, options)
+        _generate_pretty(
+            service, service.generate_code_of_conduct(repos, options), options,
+            file_label, "Generate CODE_OF_CONDUCT.md", len(repos),
+            extra_headers=extra_headers or None,
+        )
     elif output_json:
-        _generate_coc_json(service, repos, options)
+        _generate_json(service, service.generate_code_of_conduct(repos, options), options, file_label)
     else:
-        _generate_coc_simple(service, repos, options)
-
-
-def _generate_coc_simple(service: BoilerplateService, repos: list, options: GenerationOptions):
-    """Simple text output for code of conduct generation."""
-    mode = "[dry run] " if options.dry_run else ""
-
-    for progress in service.generate_code_of_conduct(repos, options):
-        print(f"{mode}{progress}", file=sys.stderr)
-
-    result = service.last_result
-    if result:
-        print(f"\n{mode}Generation complete:", file=sys.stderr)
-        print(f"  Generated: {result.successful}", file=sys.stderr)
-        if result.skipped > 0:
-            print(f"  Skipped: {result.skipped}", file=sys.stderr)
-        if result.failed > 0:
-            print(f"  Failed: {result.failed}", file=sys.stderr)
-            sys.exit(1)
-
-
-def _generate_coc_json(service: BoilerplateService, repos: list, options: GenerationOptions):
-    """JSONL output for code of conduct generation."""
-    for progress in service.generate_code_of_conduct(repos, options):
-        print(json.dumps({'progress': progress}), flush=True)
-
-    result = service.last_result
-    if result:
-        for detail in result.details:
-            print(json.dumps(detail.to_dict()), flush=True)
-        print(json.dumps(result.to_dict()), flush=True)
-
-
-def _generate_coc_pretty(service: BoilerplateService, repos: list, options: GenerationOptions):
-    """Rich formatted output for code of conduct generation."""
-    from rich.console import Console
-    from rich.progress import Progress, SpinnerColumn, TextColumn
-    from rich.table import Table
-
-    console = Console()
-    mode = "[bold yellow]DRY RUN[/bold yellow] " if options.dry_run else ""
-
-    console.print(f"\n{mode}[bold]Generate CODE_OF_CONDUCT.md[/bold]")
-    console.print(f"[bold]Repositories:[/bold] {len(repos)}")
-    if options.author and options.author.email:
-        console.print(f"[bold]Contact:[/bold] {options.author.email}")
-    console.print()
-
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        console=console,
-    ) as progress:
-        task = progress.add_task("Generating...", total=None)
-
-        for message in service.generate_code_of_conduct(repos, options):
-            progress.update(task, description=message)
-
-    result = service.last_result
-    if not result:
-        console.print("[red]Generation failed - no result[/red]")
-        sys.exit(1)
-
-    table = Table(title=f"{mode}Generation Summary", show_header=True)
-    table.add_column("Metric", style="cyan")
-    table.add_column("Value", justify="right")
-
-    table.add_row("Generated", f"[green]{result.successful}[/green]")
-    if result.skipped > 0:
-        table.add_row("Skipped", f"[yellow]{result.skipped}[/yellow]")
-    if result.failed > 0:
-        table.add_row("Failed", f"[red]{result.failed}[/red]")
-
-    console.print(table)
-
-    if result.errors:
-        console.print(f"\n[red]Errors ({len(result.errors)}):[/red]")
-        for error in result.errors:
-            console.print(f"  [red]•[/red] {error}")
-        sys.exit(1)
-
-    if not options.dry_run and result.successful > 0:
-        console.print(f"\n[bold green]✓[/bold green] Generated {result.successful} CODE_OF_CONDUCT.md files")
+        _generate_simple(service, service.generate_code_of_conduct(repos, options), options, file_label)
 
 
 # ============================================================================
@@ -1628,90 +1420,14 @@ def generate_contributing_handler(
     )
 
     service = BoilerplateService(config=config)
+    file_label = "CONTRIBUTING.md files"
 
     if pretty:
-        _generate_contributing_pretty(service, repos, options)
+        _generate_pretty(
+            service, service.generate_contributing(repos, options), options,
+            file_label, "Generate CONTRIBUTING.md", len(repos),
+        )
     elif output_json:
-        _generate_contributing_json(service, repos, options)
+        _generate_json(service, service.generate_contributing(repos, options), options, file_label)
     else:
-        _generate_contributing_simple(service, repos, options)
-
-
-def _generate_contributing_simple(service: BoilerplateService, repos: list, options: GenerationOptions):
-    """Simple text output for contributing generation."""
-    mode = "[dry run] " if options.dry_run else ""
-
-    for progress in service.generate_contributing(repos, options):
-        print(f"{mode}{progress}", file=sys.stderr)
-
-    result = service.last_result
-    if result:
-        print(f"\n{mode}Generation complete:", file=sys.stderr)
-        print(f"  Generated: {result.successful}", file=sys.stderr)
-        if result.skipped > 0:
-            print(f"  Skipped: {result.skipped}", file=sys.stderr)
-        if result.failed > 0:
-            print(f"  Failed: {result.failed}", file=sys.stderr)
-            sys.exit(1)
-
-
-def _generate_contributing_json(service: BoilerplateService, repos: list, options: GenerationOptions):
-    """JSONL output for contributing generation."""
-    for progress in service.generate_contributing(repos, options):
-        print(json.dumps({'progress': progress}), flush=True)
-
-    result = service.last_result
-    if result:
-        for detail in result.details:
-            print(json.dumps(detail.to_dict()), flush=True)
-        print(json.dumps(result.to_dict()), flush=True)
-
-
-def _generate_contributing_pretty(service: BoilerplateService, repos: list, options: GenerationOptions):
-    """Rich formatted output for contributing generation."""
-    from rich.console import Console
-    from rich.progress import Progress, SpinnerColumn, TextColumn
-    from rich.table import Table
-
-    console = Console()
-    mode = "[bold yellow]DRY RUN[/bold yellow] " if options.dry_run else ""
-
-    console.print(f"\n{mode}[bold]Generate CONTRIBUTING.md[/bold]")
-    console.print(f"[bold]Repositories:[/bold] {len(repos)}")
-    console.print()
-
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        console=console,
-    ) as progress:
-        task = progress.add_task("Generating...", total=None)
-
-        for message in service.generate_contributing(repos, options):
-            progress.update(task, description=message)
-
-    result = service.last_result
-    if not result:
-        console.print("[red]Generation failed - no result[/red]")
-        sys.exit(1)
-
-    table = Table(title=f"{mode}Generation Summary", show_header=True)
-    table.add_column("Metric", style="cyan")
-    table.add_column("Value", justify="right")
-
-    table.add_row("Generated", f"[green]{result.successful}[/green]")
-    if result.skipped > 0:
-        table.add_row("Skipped", f"[yellow]{result.skipped}[/yellow]")
-    if result.failed > 0:
-        table.add_row("Failed", f"[red]{result.failed}[/red]")
-
-    console.print(table)
-
-    if result.errors:
-        console.print(f"\n[red]Errors ({len(result.errors)}):[/red]")
-        for error in result.errors:
-            console.print(f"  [red]•[/red] {error}")
-        sys.exit(1)
-
-    if not options.dry_run and result.successful > 0:
-        console.print(f"\n[bold green]✓[/bold green] Generated {result.successful} CONTRIBUTING.md files")
+        _generate_simple(service, service.generate_contributing(repos, options), options, file_label)

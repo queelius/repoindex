@@ -520,22 +520,23 @@ repoindex sql "SELECT language, COUNT(*) as n FROM repos GROUP BY language ORDER
 ```
 
 ### Export Command
-Export repository index in ECHO-compliant format (durable, self-describing, offline-capable):
+Export repository index in ECHO-compliant format (durable, self-describing, offline-capable).
+READMEs and a browsable site/ directory are always included (they are metadata).
+Supports the same query flags as `query` to export a subset.
 ```bash
-# Basic export (database + JSONL + README + manifest)
+# Basic export (database + JSONL + READMEs + site + manifest)
 repoindex export ~/backups/repos-2026-01
-
-# Include README snapshots from each repository
-repoindex export ~/backups/repos --include-readmes
 
 # Include full event history
 repoindex export ~/backups/repos --include-events
 
-# Include last 10 commits per repo as JSON
-repoindex export ~/backups/repos --include-git-summary 10
+# Export subset using query flags
+repoindex export ~/backups/python-repos --language python
+repoindex export ~/backups/starred --starred
+repoindex export ~/backups/work --tag "work/*"
 
-# Full export with archives (slow, large)
-repoindex export ~/backups/repos-full --include-readmes --include-events --archive-repos
+# DSL query expression
+repoindex export ~/backups/popular "language == 'Python' and github_stars > 10"
 
 # Preview without writing
 repoindex export ~/backups/test --dry-run --pretty
@@ -545,13 +546,31 @@ Output structure:
 ```
 output-dir/
 ├── README.md           # Human-readable documentation
-├── index.db            # SQLite database copy
-├── repos.jsonl         # JSONL export of all repos
-├── events.jsonl        # Optional: --include-events
-├── manifest.json       # ECHO manifest
-├── readmes/            # Optional: --include-readmes
-├── git-summaries/      # Optional: --include-git-summary N
-└── archives/           # Optional: --archive-repos
+├── manifest.json       # ECHO manifest (standard schema)
+├── index.db            # SQLite database copy (full snapshot)
+├── repos.jsonl         # Repository records (with publications)
+├── readmes/            # README from each repo (always included)
+│   ├── my-project.md
+│   └── other-repo.md
+├── site/               # Browsable HTML dashboard (always included)
+│   └── index.html
+└── events.jsonl        # Optional: --include-events
+```
+
+ECHO manifest schema (`manifest.json`):
+```json
+{
+  "version": "1.0",
+  "name": "Repository Index",
+  "description": "Git repository collection (N repos, top languages: ...)",
+  "type": "database",
+  "icon": "code",
+  "_repoindex": {
+    "toolkit_version": "0.10.0",
+    "exported_at": "2026-01-28T...",
+    "stats": {"total_repos": 120, "languages": {...}}
+  }
+}
 ```
 
 ### Copy Command

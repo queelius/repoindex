@@ -8,7 +8,7 @@ Used by the `repoindex ops generate` command group.
 
 import json
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
 from typing import Dict, Any, Generator, List, Optional
@@ -210,6 +210,107 @@ class BoilerplateService:
         except ImportError:
             return "unknown"
 
+    def _generate_files(
+        self,
+        repos: List[Dict[str, Any]],
+        options: GenerationOptions,
+        operation_name: str,
+        filename: str,
+        file_type: str,
+        display_name: str,
+        content_fn,
+    ) -> Generator[str, None, OperationSummary]:
+        """
+        Common generator for all boilerplate file generation.
+
+        Args:
+            repos: List of repository dicts (from query)
+            options: Generation options
+            operation_name: Name for the OperationSummary (e.g., "generate_codemeta")
+            filename: Target filename (e.g., "codemeta.json", "LICENSE")
+            file_type: Type label for FileGenerationResult (e.g., "codemeta", "license")
+            display_name: Human-readable name for progress messages (e.g., "codemeta.json")
+            content_fn: Callable(repo_dict, repo_name) -> str that generates file content
+
+        Yields:
+            Progress messages
+
+        Returns:
+            OperationSummary with results
+        """
+        result = OperationSummary(operation=operation_name, dry_run=options.dry_run)
+        self.last_result = result
+
+        if not repos:
+            yield "No repositories to process"
+            return result
+
+        for repo in repos:
+            path = repo.get('path', '')
+            name = repo.get('name', path)
+
+            if not path:
+                continue
+
+            repo_path = Path(path)
+            target_file = repo_path / filename
+
+            if target_file.exists() and not options.force:
+                yield f"Skipping {name} ({filename} exists, use --force to overwrite)"
+                detail = FileGenerationResult(
+                    repo_path=path,
+                    repo_name=name,
+                    status=OperationStatus.SKIPPED,
+                    action="skipped",
+                    message="File exists",
+                    file_type=file_type,
+                )
+                result.add_detail(detail)
+                continue
+
+            try:
+                content = content_fn(repo, name)
+
+                if options.dry_run:
+                    yield f"Would generate {display_name} for {name}"
+                    detail = FileGenerationResult(
+                        repo_path=path,
+                        repo_name=name,
+                        status=OperationStatus.DRY_RUN,
+                        action="would_generate",
+                        file_path=str(target_file),
+                        file_type=file_type,
+                    )
+                else:
+                    target_file.write_text(content)
+                    yield f"Generated {display_name} for {name}"
+                    detail = FileGenerationResult(
+                        repo_path=path,
+                        repo_name=name,
+                        status=OperationStatus.SUCCESS,
+                        action="generated",
+                        file_path=str(target_file),
+                        file_type=file_type,
+                        overwritten=target_file.exists(),
+                    )
+
+                result.add_detail(detail)
+
+            except Exception as e:
+                logger.error(f"Failed to generate {display_name} for {name}: {e}")
+                yield f"Error generating {display_name} for {name}: {e}"
+                detail = FileGenerationResult(
+                    repo_path=path,
+                    repo_name=name,
+                    status=OperationStatus.FAILED,
+                    action="generation_failed",
+                    error=str(e),
+                    file_type=file_type,
+                )
+                result.add_detail(detail)
+
+        return result
+
     def generate_codemeta(
         self,
         repos: List[Dict[str, Any]],
@@ -228,80 +329,16 @@ class BoilerplateService:
         Returns:
             OperationSummary with results
         """
-        result = OperationSummary(operation="generate_codemeta", dry_run=options.dry_run)
-        self.last_result = result
-
-        if not repos:
-            yield "No repositories to process"
-            return result
-
         author = options.author or AuthorInfo.from_config(self.config)
 
-        for repo in repos:
-            path = repo.get('path', '')
-            name = repo.get('name', path)
-
-            if not path:
-                continue
-
-            repo_path = Path(path)
-            codemeta_file = repo_path / 'codemeta.json'
-
-            if codemeta_file.exists() and not options.force:
-                yield f"Skipping {name} (codemeta.json exists, use --force to overwrite)"
-                detail = FileGenerationResult(
-                    repo_path=path,
-                    repo_name=name,
-                    status=OperationStatus.SKIPPED,
-                    action="skipped",
-                    message="File exists",
-                    file_type="codemeta",
-                )
-                result.add_detail(detail)
-                continue
-
-            try:
-                content = self._generate_codemeta_content(repo, author, options.license)
-
-                if options.dry_run:
-                    yield f"Would generate codemeta.json for {name}"
-                    detail = FileGenerationResult(
-                        repo_path=path,
-                        repo_name=name,
-                        status=OperationStatus.DRY_RUN,
-                        action="would_generate",
-                        file_path=str(codemeta_file),
-                        file_type="codemeta",
-                    )
-                else:
-                    codemeta_file.write_text(content)
-                    yield f"Generated codemeta.json for {name}"
-                    detail = FileGenerationResult(
-                        repo_path=path,
-                        repo_name=name,
-                        status=OperationStatus.SUCCESS,
-                        action="generated",
-                        file_path=str(codemeta_file),
-                        file_type="codemeta",
-                        overwritten=codemeta_file.exists(),
-                    )
-
-                result.add_detail(detail)
-
-            except Exception as e:
-                logger.error(f"Failed to generate codemeta for {name}: {e}")
-                yield f"Error generating codemeta.json for {name}: {e}"
-                detail = FileGenerationResult(
-                    repo_path=path,
-                    repo_name=name,
-                    status=OperationStatus.FAILED,
-                    action="generation_failed",
-                    error=str(e),
-                    file_type="codemeta",
-                )
-                result.add_detail(detail)
-
-        return result
+        return (yield from self._generate_files(
+            repos, options,
+            operation_name="generate_codemeta",
+            filename="codemeta.json",
+            file_type="codemeta",
+            display_name="codemeta.json",
+            content_fn=lambda repo, name: self._generate_codemeta_content(repo, author, options.license),
+        ))
 
     def _generate_codemeta_content(
         self,
@@ -371,15 +408,10 @@ class BoilerplateService:
         Returns:
             OperationSummary with results
         """
-        result = OperationSummary(operation="generate_license", dry_run=options.dry_run)
-        self.last_result = result
-
-        if not repos:
-            yield "No repositories to process"
-            return result
-
         license_key = license_type.lower()
         if license_key not in LICENSES:
+            result = OperationSummary(operation="generate_license", dry_run=options.dry_run)
+            self.last_result = result
             yield f"Unknown license type: {license_type}"
             yield f"Supported: {', '.join(LICENSES.keys())}"
             return result
@@ -387,71 +419,14 @@ class BoilerplateService:
         author = options.author or AuthorInfo.from_config(self.config)
         author_name = author.name if author else "Author"
 
-        for repo in repos:
-            path = repo.get('path', '')
-            name = repo.get('name', path)
-
-            if not path:
-                continue
-
-            repo_path = Path(path)
-            license_file = repo_path / 'LICENSE'
-
-            if license_file.exists() and not options.force:
-                yield f"Skipping {name} (LICENSE exists, use --force to overwrite)"
-                detail = FileGenerationResult(
-                    repo_path=path,
-                    repo_name=name,
-                    status=OperationStatus.SKIPPED,
-                    action="skipped",
-                    message="File exists",
-                    file_type="license",
-                )
-                result.add_detail(detail)
-                continue
-
-            try:
-                content = self._generate_license_content(license_key, author_name)
-
-                if options.dry_run:
-                    yield f"Would generate LICENSE ({license_type}) for {name}"
-                    detail = FileGenerationResult(
-                        repo_path=path,
-                        repo_name=name,
-                        status=OperationStatus.DRY_RUN,
-                        action="would_generate",
-                        file_path=str(license_file),
-                        file_type="license",
-                    )
-                else:
-                    license_file.write_text(content)
-                    yield f"Generated LICENSE ({license_type}) for {name}"
-                    detail = FileGenerationResult(
-                        repo_path=path,
-                        repo_name=name,
-                        status=OperationStatus.SUCCESS,
-                        action="generated",
-                        file_path=str(license_file),
-                        file_type="license",
-                        overwritten=license_file.exists(),
-                    )
-
-                result.add_detail(detail)
-
-            except Exception as e:
-                logger.error(f"Failed to generate license for {name}: {e}")
-                yield f"Error generating LICENSE for {name}: {e}"
-                detail = FileGenerationResult(
-                    repo_path=path,
-                    repo_name=name,
-                    status=OperationStatus.FAILED,
-                    action="generation_failed",
-                    error=str(e),
-                    file_type="license",
-                )
-                result.add_detail(detail)
-
-        return result
+        return (yield from self._generate_files(
+            repos, options,
+            operation_name="generate_license",
+            filename="LICENSE",
+            file_type="license",
+            display_name=f"LICENSE ({license_type})",
+            content_fn=lambda repo, name: self._generate_license_content(license_key, author_name),
+        ))
 
     def _generate_license_content(self, license_type: str, author_name: str) -> str:
         """Generate license file content."""
@@ -581,84 +556,24 @@ file, You can obtain one at https://mozilla.org/MPL/2.0/.
         Returns:
             OperationSummary with results
         """
-        result = OperationSummary(operation="generate_gitignore", dry_run=options.dry_run)
-        self.last_result = result
-
-        if not repos:
-            yield "No repositories to process"
-            return result
-
         lang_key = language.lower()
         if lang_key not in GITIGNORE_TEMPLATES:
+            result = OperationSummary(operation="generate_gitignore", dry_run=options.dry_run)
+            self.last_result = result
             yield f"Unknown language: {language}"
             yield f"Supported: {', '.join(GITIGNORE_TEMPLATES.keys())}"
             return result
 
         template = GITIGNORE_TEMPLATES[lang_key]
 
-        for repo in repos:
-            path = repo.get('path', '')
-            name = repo.get('name', path)
-
-            if not path:
-                continue
-
-            repo_path = Path(path)
-            gitignore_file = repo_path / '.gitignore'
-
-            if gitignore_file.exists() and not options.force:
-                yield f"Skipping {name} (.gitignore exists, use --force to overwrite)"
-                detail = FileGenerationResult(
-                    repo_path=path,
-                    repo_name=name,
-                    status=OperationStatus.SKIPPED,
-                    action="skipped",
-                    message="File exists",
-                    file_type="gitignore",
-                )
-                result.add_detail(detail)
-                continue
-
-            try:
-                if options.dry_run:
-                    yield f"Would generate .gitignore ({language}) for {name}"
-                    detail = FileGenerationResult(
-                        repo_path=path,
-                        repo_name=name,
-                        status=OperationStatus.DRY_RUN,
-                        action="would_generate",
-                        file_path=str(gitignore_file),
-                        file_type="gitignore",
-                    )
-                else:
-                    gitignore_file.write_text(template)
-                    yield f"Generated .gitignore ({language}) for {name}"
-                    detail = FileGenerationResult(
-                        repo_path=path,
-                        repo_name=name,
-                        status=OperationStatus.SUCCESS,
-                        action="generated",
-                        file_path=str(gitignore_file),
-                        file_type="gitignore",
-                        overwritten=gitignore_file.exists(),
-                    )
-
-                result.add_detail(detail)
-
-            except Exception as e:
-                logger.error(f"Failed to generate .gitignore for {name}: {e}")
-                yield f"Error generating .gitignore for {name}: {e}"
-                detail = FileGenerationResult(
-                    repo_path=path,
-                    repo_name=name,
-                    status=OperationStatus.FAILED,
-                    action="generation_failed",
-                    error=str(e),
-                    file_type="gitignore",
-                )
-                result.add_detail(detail)
-
-        return result
+        return (yield from self._generate_files(
+            repos, options,
+            operation_name="generate_gitignore",
+            filename=".gitignore",
+            file_type="gitignore",
+            display_name=f".gitignore ({language})",
+            content_fn=lambda repo, name: template,
+        ))
 
     def generate_code_of_conduct(
         self,
@@ -680,81 +595,17 @@ file, You can obtain one at https://mozilla.org/MPL/2.0/.
         Returns:
             OperationSummary with results
         """
-        result = OperationSummary(operation="generate_code_of_conduct", dry_run=options.dry_run)
-        self.last_result = result
-
-        if not repos:
-            yield "No repositories to process"
-            return result
-
         author = options.author or AuthorInfo.from_config(self.config)
         contact_email = author.email if author else "maintainer@example.com"
 
-        for repo in repos:
-            path = repo.get('path', '')
-            name = repo.get('name', path)
-
-            if not path:
-                continue
-
-            repo_path = Path(path)
-            coc_file = repo_path / 'CODE_OF_CONDUCT.md'
-
-            if coc_file.exists() and not options.force:
-                yield f"Skipping {name} (CODE_OF_CONDUCT.md exists, use --force to overwrite)"
-                detail = FileGenerationResult(
-                    repo_path=path,
-                    repo_name=name,
-                    status=OperationStatus.SKIPPED,
-                    action="skipped",
-                    message="File exists",
-                    file_type="code_of_conduct",
-                )
-                result.add_detail(detail)
-                continue
-
-            try:
-                content = self._generate_code_of_conduct_content(contact_email)
-
-                if options.dry_run:
-                    yield f"Would generate CODE_OF_CONDUCT.md for {name}"
-                    detail = FileGenerationResult(
-                        repo_path=path,
-                        repo_name=name,
-                        status=OperationStatus.DRY_RUN,
-                        action="would_generate",
-                        file_path=str(coc_file),
-                        file_type="code_of_conduct",
-                    )
-                else:
-                    coc_file.write_text(content)
-                    yield f"Generated CODE_OF_CONDUCT.md for {name}"
-                    detail = FileGenerationResult(
-                        repo_path=path,
-                        repo_name=name,
-                        status=OperationStatus.SUCCESS,
-                        action="generated",
-                        file_path=str(coc_file),
-                        file_type="code_of_conduct",
-                        overwritten=coc_file.exists(),
-                    )
-
-                result.add_detail(detail)
-
-            except Exception as e:
-                logger.error(f"Failed to generate CODE_OF_CONDUCT.md for {name}: {e}")
-                yield f"Error generating CODE_OF_CONDUCT.md for {name}: {e}"
-                detail = FileGenerationResult(
-                    repo_path=path,
-                    repo_name=name,
-                    status=OperationStatus.FAILED,
-                    action="generation_failed",
-                    error=str(e),
-                    file_type="code_of_conduct",
-                )
-                result.add_detail(detail)
-
-        return result
+        return (yield from self._generate_files(
+            repos, options,
+            operation_name="generate_code_of_conduct",
+            filename="CODE_OF_CONDUCT.md",
+            file_type="code_of_conduct",
+            display_name="CODE_OF_CONDUCT.md",
+            content_fn=lambda repo, name: self._generate_code_of_conduct_content(contact_email),
+        ))
 
     def _generate_code_of_conduct_content(self, contact_email: str) -> str:
         """Generate CODE_OF_CONDUCT.md content (Contributor Covenant v2.1)."""
@@ -823,78 +674,14 @@ version 2.1.
         Returns:
             OperationSummary with results
         """
-        result = OperationSummary(operation="generate_contributing", dry_run=options.dry_run)
-        self.last_result = result
-
-        if not repos:
-            yield "No repositories to process"
-            return result
-
-        for repo in repos:
-            path = repo.get('path', '')
-            name = repo.get('name', path)
-
-            if not path:
-                continue
-
-            repo_path = Path(path)
-            contributing_file = repo_path / 'CONTRIBUTING.md'
-
-            if contributing_file.exists() and not options.force:
-                yield f"Skipping {name} (CONTRIBUTING.md exists, use --force to overwrite)"
-                detail = FileGenerationResult(
-                    repo_path=path,
-                    repo_name=name,
-                    status=OperationStatus.SKIPPED,
-                    action="skipped",
-                    message="File exists",
-                    file_type="contributing",
-                )
-                result.add_detail(detail)
-                continue
-
-            try:
-                content = self._generate_contributing_content(name)
-
-                if options.dry_run:
-                    yield f"Would generate CONTRIBUTING.md for {name}"
-                    detail = FileGenerationResult(
-                        repo_path=path,
-                        repo_name=name,
-                        status=OperationStatus.DRY_RUN,
-                        action="would_generate",
-                        file_path=str(contributing_file),
-                        file_type="contributing",
-                    )
-                else:
-                    contributing_file.write_text(content)
-                    yield f"Generated CONTRIBUTING.md for {name}"
-                    detail = FileGenerationResult(
-                        repo_path=path,
-                        repo_name=name,
-                        status=OperationStatus.SUCCESS,
-                        action="generated",
-                        file_path=str(contributing_file),
-                        file_type="contributing",
-                        overwritten=contributing_file.exists(),
-                    )
-
-                result.add_detail(detail)
-
-            except Exception as e:
-                logger.error(f"Failed to generate CONTRIBUTING.md for {name}: {e}")
-                yield f"Error generating CONTRIBUTING.md for {name}: {e}"
-                detail = FileGenerationResult(
-                    repo_path=path,
-                    repo_name=name,
-                    status=OperationStatus.FAILED,
-                    action="generation_failed",
-                    error=str(e),
-                    file_type="contributing",
-                )
-                result.add_detail(detail)
-
-        return result
+        return (yield from self._generate_files(
+            repos, options,
+            operation_name="generate_contributing",
+            filename="CONTRIBUTING.md",
+            file_type="contributing",
+            display_name="CONTRIBUTING.md",
+            content_fn=lambda repo, name: self._generate_contributing_content(name),
+        ))
 
     def _generate_contributing_content(self, project_name: str) -> str:
         """Generate CONTRIBUTING.md content."""

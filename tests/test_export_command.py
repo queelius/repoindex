@@ -97,33 +97,54 @@ class TestExportCommandCLI:
 
             assert result.exit_code == 0 or 'Export complete' in result.output
 
-    def test_export_with_include_readmes(self, setup_test_environment, tmp_path):
-        """Test export command with include-readmes flag."""
+    def test_export_with_language_filter(self, setup_test_environment, tmp_path):
+        """Test export command with language filter flag."""
         config, db_path, source_tmp = setup_test_environment
-        output_dir = tmp_path / 'export-readmes'
+        output_dir = tmp_path / 'export-python'
 
         runner = CliRunner()
 
         with patch('repoindex.commands.export.load_config') as mock_config:
             mock_config.return_value = config
 
-            result = runner.invoke(cli, ['export', str(output_dir), '--include-readmes', '--dry-run'])
+            result = runner.invoke(cli, ['export', str(output_dir), '--language', 'python', '--dry-run'])
 
             assert result.exit_code == 0 or 'Export complete' in result.output
 
-    def test_export_with_git_summary(self, setup_test_environment, tmp_path):
-        """Test export command with include-git-summary option."""
+    def test_export_with_dsl_query(self, setup_test_environment, tmp_path):
+        """Test export command with DSL query expression."""
         config, db_path, source_tmp = setup_test_environment
-        output_dir = tmp_path / 'export-git'
+        output_dir = tmp_path / 'export-dsl'
 
         runner = CliRunner()
 
         with patch('repoindex.commands.export.load_config') as mock_config:
             mock_config.return_value = config
 
-            result = runner.invoke(cli, ['export', str(output_dir), '--include-git-summary', '5', '--dry-run'])
+            result = runner.invoke(cli, [
+                'export', str(output_dir),
+                "language == 'Python'",
+                '--dry-run'
+            ])
 
             assert result.exit_code == 0 or 'Export complete' in result.output
+
+    def test_export_removed_flags_error(self, tmp_path):
+        """Test that removed flags are rejected by Click."""
+        runner = CliRunner()
+
+        # --archive-repos should no longer exist
+        result = runner.invoke(cli, ['export', str(tmp_path / 'out'), '--archive-repos'])
+        assert result.exit_code != 0
+        assert 'No such option' in result.output or 'no such option' in result.output.lower()
+
+        # --include-git-summary should no longer exist
+        result = runner.invoke(cli, ['export', str(tmp_path / 'out'), '--include-git-summary', '5'])
+        assert result.exit_code != 0
+
+        # --include-readmes should no longer exist
+        result = runner.invoke(cli, ['export', str(tmp_path / 'out'), '--include-readmes'])
+        assert result.exit_code != 0
 
 
 class TestExportOutputModes:
@@ -140,8 +161,6 @@ class TestExportOutputModes:
             repos_exported=2,
             events_exported=10,
             readmes_exported=2,
-            git_summaries_exported=0,
-            archives_created=0,
             errors=[],
         )
         return mock_service
@@ -151,7 +170,7 @@ class TestExportOutputModes:
         from repoindex.services.export_service import ExportOptions
         from repoindex.commands.export import _export_simple
 
-        options = ExportOptions(output_dir=tmp_path, include_events=True, include_readmes=True)
+        options = ExportOptions(output_dir=tmp_path, include_events=True)
 
         _export_simple(mock_export_service, options, dry_run=False)
 
@@ -192,43 +211,24 @@ class TestExportOutputModes:
 
         assert exc_info.value.code == 1
 
-    def test_export_simple_output_with_git_summary(self, tmp_path, capsys):
-        """Test simple output mode with git summary enabled."""
+    def test_export_simple_output_shows_filter(self, tmp_path, capsys):
+        """Test simple output shows query filter when set."""
         from repoindex.services.export_service import ExportResult, ExportOptions
         from repoindex.commands.export import _export_simple
 
         mock_service = MagicMock()
         mock_service.export.return_value = iter(['Exporting...'])
-        mock_service.last_result = ExportResult(
-            repos_exported=2,
-            git_summaries_exported=5,
-        )
+        mock_service.last_result = ExportResult(repos_exported=5)
 
-        options = ExportOptions(output_dir=tmp_path, include_git_summary=5)
+        options = ExportOptions(
+            output_dir=tmp_path,
+            query_filter="language == 'Python'",
+        )
 
         _export_simple(mock_service, options, dry_run=False)
 
         captured = capsys.readouterr()
-        assert 'Git summaries: 5' in captured.err
-
-    def test_export_simple_output_with_archives(self, tmp_path, capsys):
-        """Test simple output mode with archives enabled."""
-        from repoindex.services.export_service import ExportResult, ExportOptions
-        from repoindex.commands.export import _export_simple
-
-        mock_service = MagicMock()
-        mock_service.export.return_value = iter(['Exporting...'])
-        mock_service.last_result = ExportResult(
-            repos_exported=2,
-            archives_created=2,
-        )
-
-        options = ExportOptions(output_dir=tmp_path, archive_repos=True)
-
-        _export_simple(mock_service, options, dry_run=False)
-
-        captured = capsys.readouterr()
-        assert 'Archives: 2' in captured.err
+        assert "language == 'Python'" in captured.err
 
     def test_export_pretty_output_dry_run(self, mock_export_service, tmp_path):
         """Test pretty output in dry run mode."""
@@ -240,8 +240,8 @@ class TestExportOutputModes:
         # Should not raise
         _export_pretty(mock_export_service, options)
 
-    def test_export_pretty_output_with_all_options(self, tmp_path):
-        """Test pretty output with all options enabled."""
+    def test_export_pretty_output_with_events(self, tmp_path):
+        """Test pretty output with events enabled."""
         from repoindex.services.export_service import ExportResult, ExportOptions
         from repoindex.commands.export import _export_pretty
 
@@ -251,16 +251,11 @@ class TestExportOutputModes:
             repos_exported=2,
             events_exported=10,
             readmes_exported=2,
-            git_summaries_exported=5,
-            archives_created=2,
         )
 
         options = ExportOptions(
             output_dir=tmp_path,
             include_events=True,
-            include_readmes=True,
-            include_git_summary=5,
-            archive_repos=True,
         )
 
         # Should not raise

@@ -8,58 +8,74 @@ durable, self-describing, and works offline.
 import click
 import sys
 from pathlib import Path
+from typing import Optional
 
 from ..config import load_config
 from ..services.export_service import ExportService, ExportOptions
+from ..database import compile_query, QueryCompileError
+from .ops import query_options, _get_repos_from_query
+from .query import _build_query_from_flags
 
 
 @click.command('export')
 @click.argument('output_dir', type=click.Path())
-@click.option('--include-readmes', is_flag=True, help='Include README snapshots from each repo')
+@click.argument('query_string', required=False, default='')
 @click.option('--include-events', is_flag=True, help='Include git event history (commits, tags)')
-@click.option('--include-git-summary', type=int, default=0, metavar='N',
-              help='Include last N commits per repo as JSON summaries')
-@click.option('--archive-repos', is_flag=True, help='Create tar.gz archives of repositories')
 @click.option('--dry-run', is_flag=True, help='Preview export without writing files')
 @click.option('--pretty', is_flag=True, help='Show progress with rich formatting')
 @click.option('--debug', is_flag=True, help='Enable debug logging')
+@query_options
 def export_handler(
     output_dir: str,
-    include_readmes: bool,
+    query_string: str,
     include_events: bool,
-    include_git_summary: int,
-    archive_repos: bool,
     dry_run: bool,
     pretty: bool,
     debug: bool,
+    # Query flags
+    dirty: bool,
+    clean: bool,
+    language: Optional[str],
+    recent: Optional[str],
+    starred: bool,
+    tag: tuple,
+    no_license: bool,
+    no_readme: bool,
+    has_citation: bool,
+    has_doi: bool,
+    archived: bool,
+    public: bool,
+    private: bool,
+    fork: bool,
+    no_fork: bool,
 ):
     """
     Export repository index in ECHO format.
 
     Creates a durable, self-describing export that works without repoindex.
-    Output includes SQLite database, JSONL exports, README, and manifest.
+    Output includes SQLite database, JSONL exports, READMEs, browsable site,
+    and ECHO manifest.
 
-    ECHO format exports are designed to remain useful for decades:
-    - Durable formats (SQLite, JSONL, Markdown)
-    - Self-describing (README explains everything)
-    - No dependencies (works without original tool)
+    READMEs and a browsable site/ directory are always included --
+    they are metadata, not content.
+
+    Supports the same query flags as the query command to export a subset.
 
     Examples:
 
-        # Basic export (database + JSONL + README + manifest)
+        # Basic export (database + JSONL + READMEs + site + manifest)
         repoindex export ~/backups/repos-2026-01
-
-        # Include README snapshots from each repository
-        repoindex export ~/backups/repos --include-readmes
 
         # Include full event history
         repoindex export ~/backups/repos --include-events
 
-        # Include last 10 commits per repo as JSON
-        repoindex export ~/backups/repos --include-git-summary 10
+        # Export subset using query flags
+        repoindex export ~/backups/python-repos --language python
+        repoindex export ~/backups/starred --starred
+        repoindex export ~/backups/work --tag "work/*"
 
-        # Full export with archives (slow, large)
-        repoindex export ~/backups/repos-full --include-readmes --include-events --archive-repos
+        # DSL query expression
+        repoindex export ~/backups/popular "language == 'Python' and github_stars > 10"
 
         # Preview without writing
         repoindex export ~/backups/test --dry-run --pretty
@@ -72,15 +88,27 @@ def export_handler(
         )
 
     config = load_config()
+
+    # Build query filter from flags and/or DSL expression
+    has_flags = any([dirty, clean, language, recent, starred, tag, no_license, no_readme,
+                     has_citation, has_doi, archived, public, private, fork, no_fork])
+
+    query_filter = None
+    if has_flags or query_string:
+        query_filter = _build_query_from_flags(
+            query_string if query_string else None,
+            dirty, clean, language, recent, starred, list(tag),
+            no_license, no_readme, has_citation, has_doi,
+            archived, public, private, fork, no_fork
+        )
+
     service = ExportService(config=config)
 
     options = ExportOptions(
         output_dir=Path(output_dir),
-        include_readmes=include_readmes,
         include_events=include_events,
-        include_git_summary=include_git_summary,
-        archive_repos=archive_repos,
         dry_run=dry_run,
+        query_filter=query_filter,
     )
 
     if pretty:
@@ -102,12 +130,10 @@ def _export_simple(service: ExportService, options: ExportOptions, dry_run: bool
         print(f"  Repositories: {result.repos_exported}", file=sys.stderr)
         if options.include_events:
             print(f"  Events: {result.events_exported}", file=sys.stderr)
-        if options.include_readmes:
-            print(f"  READMEs: {result.readmes_exported}", file=sys.stderr)
-        if options.include_git_summary > 0:
-            print(f"  Git summaries: {result.git_summaries_exported}", file=sys.stderr)
-        if options.archive_repos:
-            print(f"  Archives: {result.archives_created}", file=sys.stderr)
+        print(f"  READMEs: {result.readmes_exported}", file=sys.stderr)
+
+        if options.query_filter:
+            print(f"  Filter: {options.query_filter}", file=sys.stderr)
 
         if result.errors:
             print(f"\nErrors ({len(result.errors)}):", file=sys.stderr)
@@ -129,6 +155,9 @@ def _export_pretty(service: ExportService, options: ExportOptions):
     mode = "[bold yellow]DRY RUN[/bold yellow] " if options.dry_run else ""
 
     console.print(f"\n{mode}[bold]Exporting to:[/bold] {options.output_dir}\n")
+
+    if options.query_filter:
+        console.print(f"[bold]Filter:[/bold] {options.query_filter}\n")
 
     with Progress(
         SpinnerColumn(),
@@ -153,12 +182,7 @@ def _export_pretty(service: ExportService, options: ExportOptions):
     table.add_row("Repositories", str(result.repos_exported))
     if options.include_events:
         table.add_row("Events", str(result.events_exported))
-    if options.include_readmes:
-        table.add_row("READMEs", str(result.readmes_exported))
-    if options.include_git_summary > 0:
-        table.add_row("Git summaries", str(result.git_summaries_exported))
-    if options.archive_repos:
-        table.add_row("Archives", str(result.archives_created))
+    table.add_row("READMEs", str(result.readmes_exported))
 
     console.print(table)
 
@@ -175,11 +199,7 @@ def _export_pretty(service: ExportService, options: ExportOptions):
         console.print("  • [cyan]repos.jsonl[/cyan] - Repository records")
         if options.include_events:
             console.print("  • [cyan]events.jsonl[/cyan] - Event history")
+        console.print("  • [cyan]readmes/[/cyan] - README snapshots")
+        console.print("  • [cyan]site/[/cyan] - Browsable HTML dashboard")
         console.print("  • [cyan]README.md[/cyan] - Documentation")
         console.print("  • [cyan]manifest.json[/cyan] - ECHO manifest")
-        if options.include_readmes:
-            console.print("  • [cyan]readmes/[/cyan] - README snapshots")
-        if options.include_git_summary > 0:
-            console.print("  • [cyan]git-summaries/[/cyan] - Commit history")
-        if options.archive_repos:
-            console.print("  • [cyan]archives/[/cyan] - Repo archives")

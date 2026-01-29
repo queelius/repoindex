@@ -12,7 +12,6 @@ ECHO philosophy: exports that remain useful decades from now.
 import json
 import logging
 import shutil
-import tarfile
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -29,11 +28,9 @@ logger = logging.getLogger(__name__)
 class ExportOptions:
     """Options for export operation."""
     output_dir: Path
-    include_readmes: bool = False
-    include_git_summary: int = 0  # Number of commits per repo
     include_events: bool = False
-    archive_repos: bool = False
     dry_run: bool = False
+    query_filter: Optional[str] = None  # DSL query to filter repos
 
 
 @dataclass
@@ -42,8 +39,6 @@ class ExportResult:
     repos_exported: int = 0
     events_exported: int = 0
     readmes_exported: int = 0
-    git_summaries_exported: int = 0
-    archives_created: int = 0
     errors: List[str] = field(default_factory=list)
 
     @property
@@ -117,17 +112,36 @@ class ExportService:
         if not options.dry_run:
             output_dir.mkdir(parents=True, exist_ok=True)
 
+        # Get filtered repos if query specified
+        filtered_repo_ids = None
+        if options.query_filter:
+            yield "Filtering repositories..."
+            filtered_repo_ids = self._get_filtered_repo_ids(options.query_filter)
+
         try:
-            # Tier 1: Core exports (always included)
+            # Core exports (always included)
             yield "Exporting database..."
             self._export_database(output_dir, options.dry_run)
 
             yield "Exporting repos.jsonl..."
-            result.repos_exported = self._export_repos_jsonl(output_dir, options.dry_run)
+            result.repos_exported = self._export_repos_jsonl(
+                output_dir, options.dry_run, filtered_repo_ids
+            )
 
             if options.include_events:
                 yield "Exporting events.jsonl..."
-                result.events_exported = self._export_events_jsonl(output_dir, options.dry_run)
+                result.events_exported = self._export_events_jsonl(
+                    output_dir, options.dry_run, filtered_repo_ids
+                )
+
+            # READMEs are metadata -- always included
+            yield "Exporting repository READMEs..."
+            result.readmes_exported = self._export_repo_readmes(
+                output_dir, options.dry_run, filtered_repo_ids
+            )
+
+            yield "Generating site/..."
+            self._generate_site(output_dir, result, options, filtered_repo_ids)
 
             yield "Generating README.md..."
             self._generate_readme(output_dir, result, options)
@@ -135,27 +149,26 @@ class ExportService:
             yield "Generating manifest.json..."
             self._generate_manifest(output_dir, result, options)
 
-            # Tier 2: Optional enhanced exports
-            if options.include_readmes:
-                yield "Exporting repository READMEs..."
-                result.readmes_exported = self._export_repo_readmes(output_dir, options.dry_run)
-
-            if options.include_git_summary > 0:
-                yield f"Exporting git summaries (last {options.include_git_summary} commits)..."
-                result.git_summaries_exported = self._export_git_summaries(
-                    output_dir, options.include_git_summary, options.dry_run
-                )
-
-            # Tier 3: Archive repos (heavy operation)
-            if options.archive_repos:
-                yield "Creating repository archives..."
-                result.archives_created = self._create_archives(output_dir, options.dry_run)
-
         except Exception as e:
             logger.error(f"Export failed: {e}")
             result.errors.append(str(e))
 
         return result
+
+    def _get_filtered_repo_ids(self, query_filter: str) -> set:
+        """Get repo IDs matching the query filter."""
+        from ..database import compile_query
+
+        views = self.config.get('views', {})
+        compiled = compile_query(query_filter, views=views)
+
+        repo_ids = set()
+        with Database(config=self.config, read_only=True) as db:
+            db.execute(compiled.sql, compiled.params)
+            for row in db.fetchall():
+                repo_ids.add(row['id'])
+
+        return repo_ids
 
     def _export_database(self, output_dir: Path, dry_run: bool) -> None:
         """Copy SQLite database to export directory."""
@@ -172,39 +185,82 @@ class ExportService:
             shutil.copy2(db_path, dest)
             logger.debug(f"Copied database to {dest}")
 
-    def _export_repos_jsonl(self, output_dir: Path, dry_run: bool) -> int:
-        """Export all repositories to JSONL."""
+    def _export_repos_jsonl(
+        self, output_dir: Path, dry_run: bool, filtered_ids: Optional[set] = None
+    ) -> int:
+        """Export repositories to JSONL, including publication data."""
         count = 0
 
         if dry_run:
             with Database(config=self.config, read_only=True) as db:
-                for _ in get_repos_with_tags(db):
+                for repo in get_repos_with_tags(db):
+                    if filtered_ids is not None and repo.get('id') not in filtered_ids:
+                        continue
                     count += 1
             return count
 
         dest = output_dir / 'repos.jsonl'
         with Database(config=self.config, read_only=True) as db:
+            # Pre-load publication data keyed by repo_id
+            publications = self._get_publications(db)
+
             with open(dest, 'w', encoding='utf-8') as f:
                 for repo in get_repos_with_tags(db):
-                    # Clean up record for export
+                    if filtered_ids is not None and repo.get('id') not in filtered_ids:
+                        continue
+
                     record = self._clean_record(repo)
+
+                    # Merge publication data
+                    repo_id = repo.get('id')
+                    if repo_id in publications:
+                        record['publications'] = publications[repo_id]
+
                     f.write(json.dumps(record, ensure_ascii=False, default=str) + '\n')
                     count += 1
 
         logger.debug(f"Exported {count} repos to {dest}")
         return count
 
-    def _export_events_jsonl(self, output_dir: Path, dry_run: bool) -> int:
-        """Export all events to JSONL."""
+    def _get_publications(self, db: Database) -> Dict[int, list]:
+        """Load all publication records grouped by repo_id."""
+        publications: Dict[int, list] = {}
+        db.execute("""
+            SELECT repo_id, registry, package_name, current_version,
+                   published, url, downloads_total, downloads_30d
+            FROM publications
+        """)
+        for row in db.fetchall():
+            record = dict(row)
+            repo_id = record.pop('repo_id')
+            publications.setdefault(repo_id, []).append(record)
+        return publications
+
+    def _export_events_jsonl(
+        self, output_dir: Path, dry_run: bool, filtered_ids: Optional[set] = None
+    ) -> int:
+        """Export events to JSONL."""
         count = 0
 
         with Database(config=self.config, read_only=True) as db:
-            db.execute("""
-                SELECT e.*, r.name as repo_name, r.path as repo_path
-                FROM events e
-                JOIN repos r ON r.id = e.repo_id
-                ORDER BY e.timestamp DESC
-            """)
+            if filtered_ids is not None:
+                # Filter events to matching repos
+                placeholders = ','.join('?' for _ in filtered_ids)
+                sql = f"""
+                    SELECT e.*, r.name as repo_name, r.path as repo_path
+                    FROM events e
+                    JOIN repos r ON r.id = e.repo_id
+                    WHERE e.repo_id IN ({placeholders})
+                    ORDER BY e.timestamp DESC
+                """
+                db.execute(sql, tuple(filtered_ids))
+            else:
+                db.execute("""
+                    SELECT e.*, r.name as repo_name, r.path as repo_path
+                    FROM events e
+                    JOIN repos r ON r.id = e.repo_id
+                    ORDER BY e.timestamp DESC
+                """)
             rows = db.fetchall()
 
             if dry_run:
@@ -262,14 +318,8 @@ class ExportService:
         if options.include_events:
             readme_content += "| `events.jsonl` | Git events (commits, tags, etc.) |\n"
 
-        if options.include_readmes:
-            readme_content += "| `readmes/` | README snapshots from each repo |\n"
-
-        if options.include_git_summary > 0:
-            readme_content += f"| `git-summaries/` | Last {options.include_git_summary} commits per repo |\n"
-
-        if options.archive_repos:
-            readme_content += "| `archives/` | Full repository archives (.tar.gz) |\n"
+        readme_content += "| `readmes/` | README snapshots from each repo |\n"
+        readme_content += "| `site/` | Browsable HTML dashboard |\n"
 
         readme_content += """| `manifest.json` | ECHO manifest with metadata |
 
@@ -339,6 +389,10 @@ jq -r 'select(.language == "Python") | .name' repos.jsonl
 ### tags table
 - User-assigned and auto-generated tags for categorization
 
+### publications table
+- Package registry status (PyPI, CRAN, npm, etc.)
+- `registry`, `package_name`, `current_version`, `published`
+
 ## ECHO Compliance
 
 This export follows ECHO principles:
@@ -360,11 +414,11 @@ Generated by [repoindex](https://github.com/queelius/repoindex)
         result: ExportResult,
         options: ExportOptions
     ) -> None:
-        """Generate ECHO manifest."""
+        """Generate ECHO-compliant manifest."""
         if options.dry_run:
             return
 
-        # Get language distribution
+        # Get language distribution for description
         languages = {}
         with Database(config=self.config, read_only=True) as db:
             db.execute("""
@@ -378,46 +432,43 @@ Generated by [repoindex](https://github.com/queelius/repoindex)
             for row in db.fetchall():
                 languages[row['language']] = row['count']
 
+        # Build human-readable description
+        top_langs = list(languages.keys())[:3]
+        lang_str = ', '.join(top_langs) if top_langs else 'various'
+        description = (
+            f"Git repository collection "
+            f"({result.repos_exported} repos, top languages: {lang_str})"
+        )
+
         manifest: Dict[str, Any] = {
-            "echo_version": "1.0",
-            "toolkit": "repoindex",
-            "toolkit_version": self._version,
-            "exported_at": datetime.now().isoformat(),
-            "contents": {
-                "index.db": {
-                    "type": "sqlite3",
-                    "description": "Full database with schema"
+            "version": "1.0",
+            "name": "Repository Index",
+            "description": description,
+            "type": "database",
+            "icon": "code",
+            "_repoindex": {
+                "toolkit_version": self._version,
+                "exported_at": datetime.now().isoformat(),
+                "stats": {
+                    "total_repos": result.repos_exported,
+                    "events_exported": result.events_exported,
+                    "readmes_exported": result.readmes_exported,
+                    "languages": languages,
                 },
-                "repos.jsonl": {
-                    "type": "jsonl",
-                    "count": result.repos_exported,
-                    "description": "Repository records"
-                }
-            },
-            "stats": {
-                "total_repos": result.repos_exported,
-                "languages": languages
-            },
-            "options": {
-                "include_readmes": options.include_readmes,
-                "include_events": options.include_events,
-                "include_git_summary": options.include_git_summary,
-                "archive_repos": options.archive_repos
+                "options": {
+                    "include_events": options.include_events,
+                    "query_filter": options.query_filter,
+                },
             }
         }
-
-        if options.include_events:
-            manifest["contents"]["events.jsonl"] = {
-                "type": "jsonl",
-                "count": result.events_exported,
-                "description": "Git event history"
-            }
 
         dest = output_dir / 'manifest.json'
         dest.write_text(json.dumps(manifest, indent=2, ensure_ascii=False))
         logger.debug(f"Generated manifest at {dest}")
 
-    def _export_repo_readmes(self, output_dir: Path, dry_run: bool) -> int:
+    def _export_repo_readmes(
+        self, output_dir: Path, dry_run: bool, filtered_ids: Optional[set] = None
+    ) -> int:
         """Export README files from each repository."""
         if dry_run:
             return 0
@@ -430,6 +481,9 @@ Generated by [repoindex](https://github.com/queelius/repoindex)
 
         with Database(config=self.config, read_only=True) as db:
             for repo in get_all_repos(db):
+                if filtered_ids is not None and repo.get('id') not in filtered_ids:
+                    continue
+
                 repo_path = Path(repo['path'])
                 if not repo_path.exists():
                     continue
@@ -449,72 +503,141 @@ Generated by [repoindex](https://github.com/queelius/repoindex)
         logger.debug(f"Exported {count} READMEs to {readmes_dir}")
         return count
 
-    def _export_git_summaries(self, output_dir: Path, n_commits: int, dry_run: bool) -> int:
-        """Export git log summaries for each repo."""
-        if dry_run:
-            return 0
+    def _generate_site(
+        self,
+        output_dir: Path,
+        result: ExportResult,
+        options: ExportOptions,
+        filtered_ids: Optional[set] = None,
+    ) -> None:
+        """Generate a browsable site/ directory with an HTML dashboard."""
+        if options.dry_run:
+            return
 
-        summaries_dir = output_dir / 'git-summaries'
-        summaries_dir.mkdir(exist_ok=True)
-        count = 0
+        site_dir = output_dir / 'site'
+        site_dir.mkdir(exist_ok=True)
 
-        with Database(config=self.config, read_only=True) as db:
-            for repo in get_all_repos(db):
-                repo_path = Path(repo['path'])
-                if not repo_path.exists():
-                    continue
-
-                # Get recent commits from events table
-                db.execute("""
-                    SELECT timestamp, message, author
-                    FROM events
-                    WHERE repo_id = ? AND type = 'commit'
-                    ORDER BY timestamp DESC
-                    LIMIT ?
-                """, (repo['id'], n_commits))
-                commits = [dict(row) for row in db.fetchall()]
-
-                if commits:
-                    summary = {
-                        "repo": repo['name'],
-                        "path": repo['path'],
-                        "commits": commits
-                    }
-                    dest = summaries_dir / (self._safe_filename(repo['name']) + '.json')
-                    dest.write_text(json.dumps(summary, indent=2, ensure_ascii=False, default=str))
-                    count += 1
-
-        logger.debug(f"Exported {count} git summaries to {summaries_dir}")
-        return count
-
-    def _create_archives(self, output_dir: Path, dry_run: bool) -> int:
-        """Create tar.gz archives of repositories."""
-        if dry_run:
-            return 0
-
-        archives_dir = output_dir / 'archives'
-        archives_dir.mkdir(exist_ok=True)
-        count = 0
+        # Gather data for the dashboard
+        repos_data = []
+        languages: Dict[str, int] = {}
 
         with Database(config=self.config, read_only=True) as db:
-            for repo in get_all_repos(db):
-                repo_path = Path(repo['path'])
-                if not repo_path.exists():
+            for repo in get_repos_with_tags(db):
+                if filtered_ids is not None and repo.get('id') not in filtered_ids:
                     continue
 
-                archive_name = self._safe_filename(repo['name']) + '.tar.gz'
-                archive_path = archives_dir / archive_name
+                repos_data.append({
+                    'name': repo.get('name', ''),
+                    'language': repo.get('language', ''),
+                    'branch': repo.get('branch', ''),
+                    'description': repo.get('description') or repo.get('github_description') or '',
+                    'stars': repo.get('github_stars') or 0,
+                    'tags': repo.get('tags', []),
+                })
 
-                try:
-                    with tarfile.open(archive_path, 'w:gz') as tar:
-                        tar.add(repo_path, arcname=repo['name'])
-                    count += 1
-                    logger.debug(f"Created archive: {archive_path}")
-                except (IOError, OSError, tarfile.TarError) as e:
-                    logger.debug(f"Failed to archive {repo['name']}: {e}")
+                lang = repo.get('language')
+                if lang:
+                    languages[lang] = languages.get(lang, 0) + 1
 
-        logger.debug(f"Created {count} archives in {archives_dir}")
-        return count
+        # Sort repos by name
+        repos_data.sort(key=lambda r: r['name'].lower())
+
+        # Sort languages by count descending
+        sorted_langs = sorted(languages.items(), key=lambda x: -x[1])
+
+        # Build the HTML
+        html = self._build_site_html(repos_data, sorted_langs, options)
+        (site_dir / 'index.html').write_text(html, encoding='utf-8')
+        logger.debug(f"Generated site at {site_dir}")
+
+    def _build_site_html(
+        self,
+        repos: list,
+        languages: list,
+        options: ExportOptions,
+    ) -> str:
+        """Build a self-contained HTML dashboard."""
+        now = datetime.now().isoformat(timespec='seconds')
+        total = len(repos)
+
+        # Language stats rows
+        lang_rows = ''.join(
+            f'<tr><td>{lang}</td><td>{count}</td></tr>'
+            for lang, count in languages
+        )
+
+        # Repo table rows
+        repo_rows = ''
+        for r in repos:
+            tags_str = ', '.join(r['tags'][:5])
+            if len(r['tags']) > 5:
+                tags_str += f' (+{len(r["tags"]) - 5})'
+            desc = _html_escape(r['description'][:120]) if r['description'] else ''
+            repo_rows += (
+                f'<tr>'
+                f'<td>{_html_escape(r["name"])}</td>'
+                f'<td>{_html_escape(r["language"])}</td>'
+                f'<td>{r["stars"]}</td>'
+                f'<td>{_html_escape(r["branch"])}</td>'
+                f'<td class="desc">{desc}</td>'
+                f'<td class="tags">{_html_escape(tags_str)}</td>'
+                f'</tr>\n'
+            )
+
+        filter_note = ''
+        if options.query_filter:
+            filter_note = f'<p class="filter">Filtered by: <code>{_html_escape(options.query_filter)}</code></p>'
+
+        return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Repository Index</title>
+<style>
+  body {{ font-family: system-ui, -apple-system, sans-serif; margin: 2rem; color: #222; }}
+  h1 {{ margin-bottom: .25rem; }}
+  .meta {{ color: #666; font-size: .9rem; margin-bottom: 1.5rem; }}
+  .filter {{ background: #fff3cd; padding: .5rem 1rem; border-radius: 4px; margin-bottom: 1rem; }}
+  .stats {{ display: flex; gap: 2rem; margin-bottom: 2rem; flex-wrap: wrap; }}
+  .stat-card {{ background: #f5f5f5; padding: 1rem 1.5rem; border-radius: 8px; }}
+  .stat-card .num {{ font-size: 1.8rem; font-weight: bold; }}
+  .stat-card .label {{ color: #666; font-size: .85rem; }}
+  table {{ border-collapse: collapse; width: 100%; font-size: .9rem; }}
+  th, td {{ text-align: left; padding: .5rem .75rem; border-bottom: 1px solid #e0e0e0; }}
+  th {{ background: #f5f5f5; position: sticky; top: 0; }}
+  td.desc {{ max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }}
+  td.tags {{ max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #666; font-size: .85rem; }}
+  .lang-table {{ max-width: 300px; margin-bottom: 2rem; }}
+  .lang-table td:last-child {{ text-align: right; }}
+  footer {{ margin-top: 2rem; color: #999; font-size: .8rem; }}
+</style>
+</head>
+<body>
+<h1>Repository Index</h1>
+<p class="meta">Exported {now} &middot; repoindex {_html_escape(self._version)}</p>
+{filter_note}
+
+<div class="stats">
+  <div class="stat-card"><div class="num">{total}</div><div class="label">Repositories</div></div>
+  <div class="stat-card"><div class="num">{len(languages)}</div><div class="label">Languages</div></div>
+</div>
+
+<h2>Languages</h2>
+<table class="lang-table">
+<tr><th>Language</th><th>Count</th></tr>
+{lang_rows}
+</table>
+
+<h2>Repositories</h2>
+<table>
+<tr><th>Name</th><th>Language</th><th>Stars</th><th>Branch</th><th>Description</th><th>Tags</th></tr>
+{repo_rows}
+</table>
+
+<footer>Generated by repoindex &middot; ECHO-compliant export</footer>
+</body>
+</html>"""
 
     def _safe_filename(self, name: str) -> str:
         """Convert a name to a safe filename."""
@@ -533,3 +656,13 @@ Generated by [repoindex](https://github.com/queelius/repoindex)
         elif filename.endswith('.txt'):
             return '.txt'
         return '.txt'  # Default for plain README
+
+
+def _html_escape(text: str) -> str:
+    """Minimal HTML escaping for safe output."""
+    return (
+        text.replace('&', '&amp;')
+        .replace('<', '&lt;')
+        .replace('>', '&gt;')
+        .replace('"', '&quot;')
+    )
