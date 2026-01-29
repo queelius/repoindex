@@ -24,7 +24,7 @@ DSL_PATTERNS = [
     r'==', r'!=', r'>=', r'<=', r'>', r'<', r'~=',
     r'\bcontains\b', r'\bin\b', r'\band\b', r'\bor\b', r'\bnot\b',
     r'\border\s+by\b', r'\blimit\b', r'\bhas_event\b', r'\btagged\b',
-    r'\bupdated_since\b', r'\bis_published\b', r"'[^']*'", r'"[^"]*"',
+    r'\bupdated_since\b', r'\bis_published\b', r'\bhas_doi\b', r"'[^']*'", r'"[^"]*"',
 ]
 
 # Known boolean field names that should be treated as DSL predicates, not text search
@@ -147,9 +147,9 @@ def _build_query_from_flags(
     if has_citation:
         predicates.append("has_citation")
 
-    # DOI detection (repos with a DOI in citation metadata)
+    # DOI detection (repos with DOI from citation files OR Zenodo/registry publications)
     if has_doi:
-        predicates.append("citation_doi != ''")
+        predicates.append("has_doi()")
 
     # GitHub archive status
     if archived:
@@ -192,7 +192,7 @@ def _build_query_from_flags(
 @click.option('--no-license', is_flag=True, help='Repos without a license')
 @click.option('--no-readme', is_flag=True, help='Repos without a README')
 @click.option('--has-citation', is_flag=True, help='Repos with citation files (CITATION.cff, .zenodo.json)')
-@click.option('--has-doi', is_flag=True, help='Repos with DOI in citation metadata')
+@click.option('--has-doi', is_flag=True, help='Repos with DOI (citation files or Zenodo)')
 @click.option('--archived', is_flag=True, help='Archived repos only')
 @click.option('--public', is_flag=True, help='Public repos only')
 @click.option('--private', is_flag=True, help='Private repos only')
@@ -232,39 +232,31 @@ def query_handler(
 
     Output is a formatted table by default. Use --json for JSONL output.
 
+    \b
     Examples:
-
         # List all repos (pretty table by default)
         repoindex query
-
         # Simple text search (auto-detected)
         repoindex query "bayes"
-
         # Convenience flags
         repoindex query --dirty
         repoindex query --language python
         repoindex query --recent 7d
         repoindex query --tag "work/*"
-
         # Combine flags with DSL
         repoindex query "stars > 10" --language python
-
         # JSONL output for piping
         repoindex query --json | jq '.name'
-
         # DSL queries
         repoindex query "language == 'Python' and stars > 10"
         repoindex query "is_clean and not archived"
         repoindex query "has_event('commit', since='30d')"
-
         # Ordering and limiting
         repoindex query "language == 'Python' order by stars desc"
         repoindex query "stars > 0 order by stars desc limit 10"
-
         # Audit queries
         repoindex query --no-license
         repoindex query --no-readme
-
         # Show compiled SQL and params
         repoindex query "language == 'Python'" --explain
     """

@@ -208,6 +208,11 @@ def get_default_config():
         # Supports glob patterns: ~/github/** for recursive
         "repository_directories": [],
 
+        # Directories to exclude from repository discovery
+        # Paths are matched as prefixes after ~ expansion
+        # Example: ["~/github/archived", "~/github/forks"]
+        "exclude_directories": [],
+
         # Author identity for operations (citation generation, etc.)
         # Used by `repoindex ops generate` commands as defaults
         "author": {
@@ -243,6 +248,7 @@ def get_default_config():
                 "github": False,   # GitHub API (stars, topics) - moderate speed
                 "pypi": False,     # PyPI package status - slow
                 "cran": False,     # CRAN package status - slow
+                "zenodo": False,   # Zenodo DOI enrichment (requires author.orcid)
             }
         },
 
@@ -266,6 +272,12 @@ repository_directories:
   - ~/github/**
   # - ~/projects
   # - /work/repos
+
+# Directories to exclude from repository discovery
+# Paths are matched as prefixes after ~ expansion
+# exclude_directories:
+#   - ~/github/archived
+#   - ~/github/forks
 
 # Author identity for operations (citation generation, etc.)
 # Used by `repoindex ops generate` commands as defaults
@@ -319,6 +331,7 @@ def generate_default_config():
 
     minimal_config = {
         "repository_directories": [],
+        "exclude_directories": [],
         "repository_tags": {}
     }
 
@@ -405,6 +418,19 @@ def get_repository_directories(config: dict) -> list:
         List of directory paths/patterns (empty if not configured)
     """
     return config.get('repository_directories', [])
+
+
+def get_exclude_directories(config: dict) -> list:
+    """
+    Get exclude directories from config.
+
+    Args:
+        config: Configuration dictionary
+
+    Returns:
+        List of directory paths/patterns to exclude (empty if not configured)
+    """
+    return config.get('exclude_directories', [])
 
 
 

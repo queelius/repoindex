@@ -17,7 +17,8 @@ from typing import List, Tuple
 # v2: Renamed GitHub fields with github_ prefix for explicit provenance
 # v3: Added citation detection (has_citation, citation_file)
 # v4: Added citation metadata parsing (citation_doi, citation_title, etc.)
-CURRENT_VERSION = 4
+# v5: Added doi column to publications table (for Zenodo DOIs, etc.)
+CURRENT_VERSION = 5
 
 # Schema definition as SQL statements
 SCHEMA_V1 = """
@@ -130,15 +131,16 @@ CREATE TABLE IF NOT EXISTS events (
     FOREIGN KEY (repo_id) REFERENCES repos(id) ON DELETE CASCADE
 );
 
--- Publications table (PyPI, npm, CRAN, etc.)
+-- Publications table (PyPI, npm, CRAN, Zenodo, etc.)
 CREATE TABLE IF NOT EXISTS publications (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     repo_id INTEGER NOT NULL,
-    registry TEXT NOT NULL,  -- 'pypi', 'npm', 'cran', 'cargo', 'docker'
+    registry TEXT NOT NULL,  -- 'pypi', 'npm', 'cran', 'cargo', 'docker', 'zenodo'
     package_name TEXT NOT NULL,
     current_version TEXT,
     published BOOLEAN DEFAULT 0,
     url TEXT,
+    doi TEXT,  -- DOI identifier (e.g., "10.5281/zenodo.1234567")
     downloads_total INTEGER,
     downloads_30d INTEGER,
     last_published TIMESTAMP,
@@ -175,6 +177,7 @@ CREATE INDEX IF NOT EXISTS idx_events_repo_type_ts ON events(repo_id, type, time
 
 CREATE INDEX IF NOT EXISTS idx_publications_registry ON publications(registry);
 CREATE INDEX IF NOT EXISTS idx_publications_package ON publications(package_name);
+CREATE INDEX IF NOT EXISTS idx_publications_doi ON publications(doi);
 
 CREATE INDEX IF NOT EXISTS idx_scan_errors_path ON scan_errors(path);
 
@@ -316,7 +319,7 @@ def apply_schema(conn: sqlite3.Connection, version: int = CURRENT_VERSION) -> No
     conn.executescript(SCHEMA_V1)
     conn.execute(
         "INSERT OR REPLACE INTO _schema_info (version, description) VALUES (?, ?)",
-        (CURRENT_VERSION, "v0.10.0: Added citation metadata parsing (citation_doi, citation_title, etc.)")
+        (CURRENT_VERSION, "v0.10.0: Added doi column to publications table (Zenodo, etc.)")
     )
 
     conn.commit()

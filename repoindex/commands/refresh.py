@@ -58,7 +58,8 @@ def _resolve_external_flag(explicit: Optional[bool], external: bool, config_defa
 @click.option('--github/--no-github', default=None, help='Fetch GitHub metadata (stars, topics)')
 @click.option('--pypi/--no-pypi', default=None, help='Fetch PyPI package status')
 @click.option('--cran/--no-cran', default=None, help='Fetch CRAN package status')
-@click.option('--external', is_flag=True, help='Enable all external sources (github, pypi, cran)')
+@click.option('--zenodo/--no-zenodo', default=None, help='Fetch Zenodo DOI metadata (requires author.orcid in config)')
+@click.option('--external', is_flag=True, help='Enable all external sources (github, pypi, cran, zenodo)')
 @click.option('-d', '--dir', 'directory', type=click.Path(exists=True),
               help='Refresh specific directory instead of configured paths')
 @click.option('--dry-run', is_flag=True, help='Show what would be refreshed')
@@ -70,6 +71,7 @@ def refresh_handler(
     github: Optional[bool],
     pypi: Optional[bool],
     cran: Optional[bool],
+    zenodo: Optional[bool],
     external: bool,
     directory: Optional[str],
     dry_run: bool,
@@ -86,43 +88,39 @@ def refresh_handler(
     By default, performs a smart refresh that only updates repos
     that have changed since the last scan.
 
-    External sources (GitHub, PyPI, CRAN) are disabled by default
+    External sources (GitHub, PyPI, CRAN, Zenodo) are disabled by default
     but can be enabled via flags or config. These make API calls
     and can be slow for large collections.
 
+    \b
     Examples:
-
         # Smart refresh (only changed repos)
         repoindex refresh
-
         # Full refresh of all repos
         repoindex refresh --full
-
         # Include GitHub metadata
         repoindex refresh --github
-
         # Include all external sources (slower)
         repoindex refresh --external
-
         # Include PyPI and CRAN package status
         repoindex refresh --pypi --cran
-
+        # Include Zenodo DOI metadata (requires author.orcid)
+        repoindex refresh --zenodo
         # Refresh specific directory
         repoindex refresh -d ~/projects
-
         # Scan events from last 30 days only
         repoindex refresh --since 30d
-
         # Reset and rebuild: use sql --reset first
         repoindex sql --reset && repoindex refresh --full
 
+    \b
     External source config defaults (in config.yaml):
-
         refresh:
           external_sources:
             github: true   # Enable by default
             pypi: false    # Disabled by default
             cran: false    # Disabled by default
+            zenodo: false  # Disabled by default (requires author.orcid)
     """
     config = load_config()
 
@@ -133,6 +131,7 @@ def refresh_handler(
     fetch_github = _resolve_external_flag(github, external, ext_config.get('github', False))
     fetch_pypi = _resolve_external_flag(pypi, external, ext_config.get('pypi', False))
     fetch_cran = _resolve_external_flag(cran, external, ext_config.get('cran', False))
+    fetch_zenodo = _resolve_external_flag(zenodo, external, ext_config.get('zenodo', False))
 
     # Get paths to scan
     if directory:
@@ -164,6 +163,24 @@ def refresh_handler(
 
     # Initialize service
     service = RepositoryService(config=config)
+
+    # Batch-fetch Zenodo records (single API call for all repos)
+    zenodo_records = []
+    if fetch_zenodo:
+        orcid = config.get('author', {}).get('orcid', '')
+        if orcid:
+            from ..infra.zenodo_client import ZenodoClient
+            try:
+                zenodo_client = ZenodoClient()
+                zenodo_records = zenodo_client.search_by_orcid(orcid)
+                if not quiet:
+                    click.echo(f"Zenodo: fetched {len(zenodo_records)} records for ORCID {orcid}", err=True)
+            except Exception as e:
+                if not quiet:
+                    click.echo(f"Warning: Zenodo fetch failed: {e}", err=True)
+        else:
+            if not quiet:
+                click.echo("Warning: --zenodo requires author.orcid in config (skipping)", err=True)
 
     # Stats tracking
     stats = {
@@ -210,6 +227,7 @@ def refresh_handler(
                         fetch_github=fetch_github,
                         fetch_pypi=fetch_pypi,
                         fetch_cran=fetch_cran,
+                        zenodo_records=zenodo_records,
                         dry_run=dry_run,
                         quiet=quiet
                     )
@@ -223,6 +241,7 @@ def refresh_handler(
                     fetch_github=fetch_github,
                     fetch_pypi=fetch_pypi,
                     fetch_cran=fetch_cran,
+                    zenodo_records=zenodo_records,
                     dry_run=dry_run,
                     quiet=quiet
                 )
@@ -255,6 +274,7 @@ def _process_repo(
     fetch_github: bool,
     fetch_pypi: bool,
     fetch_cran: bool,
+    zenodo_records: list,
     dry_run: bool,
     quiet: bool,
 ):
@@ -287,6 +307,14 @@ def _process_repo(
 
         # Upsert to database
         repo_id = upsert_repo(db, enriched)
+
+        # Handle Zenodo publication (separate from main package field)
+        # Zenodo uses batch-fetch, so we match pre-fetched records here
+        if zenodo_records and repo_id:
+            zenodo_package = service.match_zenodo_record(enriched, zenodo_records)
+            if zenodo_package:
+                from ..database.repository import _upsert_publication
+                _upsert_publication(db, repo_id, zenodo_package)
         stats['updated'] += 1
 
         # Clear any previous scan errors for this path
@@ -399,14 +427,12 @@ def db_handler(show_info: bool, show_path: bool, reset: bool):
     """
     Database management commands.
 
+    \b
     Examples:
-
         # Show database info
         repoindex db --info
-
         # Show database path
         repoindex db --path
-
         # Reset database
         repoindex db --reset
     """
@@ -459,26 +485,21 @@ def sql_handler(
 
     Also provides database management operations via flags.
 
+    \b
     Examples:
-
         # Query data
         repoindex sql "SELECT name, stars FROM repos ORDER BY stars DESC LIMIT 10"
-
         # Database info
         repoindex sql --info
         repoindex sql --path
         repoindex sql --schema
         repoindex sql --stats
-
         # Query from file
         repoindex sql -f query.sql
-
         # CSV output
         repoindex sql "SELECT * FROM repos" --format csv
-
         # Interactive shell
         repoindex sql -i
-
         # Database maintenance
         repoindex sql --integrity
         repoindex sql --vacuum

@@ -14,6 +14,7 @@ import re
 from ..domain import Repository, GitStatus, GitHubMetadata, PackageMetadata
 from ..domain.repository import LicenseInfo
 from ..infra import GitClient, GitHubClient
+from ..infra.zenodo_client import ZenodoRecord, _normalize_github_url
 
 logger = logging.getLogger(__name__)
 
@@ -427,6 +428,54 @@ class RepositoryService:
         except Exception as e:
             logger.debug(f"Failed to fetch CRAN/R metadata for {path}: {e}")
             return None
+
+    def match_zenodo_record(
+        self,
+        repo: Repository,
+        zenodo_records: List[ZenodoRecord]
+    ) -> Optional[PackageMetadata]:
+        """
+        Match a repository to a Zenodo record.
+
+        Two-stage matching:
+        1. Normalize remote_url and compare to record's github_url
+        2. Case-insensitive repo name vs record title fallback
+
+        Args:
+            repo: Repository to match
+            zenodo_records: Pre-fetched Zenodo records (from ORCID search)
+
+        Returns:
+            PackageMetadata for the matched Zenodo record, or None
+        """
+        if not zenodo_records:
+            return None
+
+        # Strategy 1: Match via GitHub URL
+        if repo.remote_url:
+            normalized_remote = _normalize_github_url(repo.remote_url)
+            for record in zenodo_records:
+                if record.github_url and record.github_url == normalized_remote:
+                    return self._zenodo_record_to_metadata(record)
+
+        # Strategy 2: Case-insensitive name/title match
+        repo_name_lower = repo.name.lower()
+        for record in zenodo_records:
+            if record.title and repo_name_lower == record.title.lower():
+                return self._zenodo_record_to_metadata(record)
+
+        return None
+
+    def _zenodo_record_to_metadata(self, record: ZenodoRecord) -> PackageMetadata:
+        """Convert a ZenodoRecord to PackageMetadata."""
+        return PackageMetadata(
+            registry='zenodo',
+            name=record.title or '',
+            version=record.version,
+            published=True,
+            url=record.url,
+            doi=record.concept_doi or record.doi,
+        )
 
     def filter_by_query(
         self,

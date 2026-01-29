@@ -88,12 +88,13 @@ class GitHubMetadata:
 
 @dataclass(frozen=True)
 class PackageMetadata:
-    """Package registry metadata (PyPI, CRAN, npm, etc.)."""
-    registry: str  # pypi, cran, npm, cargo, etc.
+    """Package registry metadata (PyPI, CRAN, npm, Zenodo, etc.)."""
+    registry: str  # pypi, cran, npm, cargo, zenodo, etc.
     name: str
     version: Optional[str] = None
     published: bool = False
     url: Optional[str] = None
+    doi: Optional[str] = None
     downloads: Optional[int] = None
     last_updated: Optional[str] = None
 
@@ -104,6 +105,7 @@ class PackageMetadata:
             'version': self.version,
             'published': self.published,
             'url': self.url,
+            'doi': self.doi,
             'downloads': self.downloads,
             'last_updated': self.last_updated
         }

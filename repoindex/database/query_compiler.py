@@ -494,6 +494,18 @@ class QueryCompiler:
                 )"""
             return sql, params
 
+        if name == 'has_doi':
+            # Check both citation_doi (from local files) and publications.doi (from registries)
+            sql = """(
+                (citation_doi IS NOT NULL AND citation_doi != '')
+                OR EXISTS (
+                    SELECT 1 FROM publications p
+                    WHERE p.repo_id = repos.id
+                    AND p.doi IS NOT NULL AND p.doi != ''
+                )
+            )"""
+            return sql, []
+
         raise QueryCompileError(f"Unknown function: {name}")
 
     def _compile_comparison(
