@@ -262,7 +262,7 @@ class TestGitOpsService:
 
     @pytest.fixture
     def sample_repos(self, tmp_path):
-        """Create sample repo data."""
+        """Create sample repo data with real directories on disk."""
         repos = []
         for name in ['repo-a', 'repo-b', 'repo-c']:
             repo_path = tmp_path / name
@@ -272,6 +272,14 @@ class TestGitOpsService:
                 'name': name,
             })
         return repos
+
+    @pytest.fixture
+    def missing_repos(self):
+        """Repo dicts whose paths do not exist on disk."""
+        return [
+            {'path': '/nonexistent/path/repo-a', 'name': 'repo-a'},
+            {'path': '/nonexistent/path/repo-b', 'name': 'repo-b'},
+        ]
 
     def test_push_repos_empty(self, mock_git_client):
         """Test push with empty repos list."""
@@ -449,6 +457,63 @@ class TestGitOpsService:
         assert len(needing) == 1
         assert needing[0]['name'] == 'repo-b'
         assert needing[0]['commits_ahead'] == 3
+
+    def test_push_repos_skips_missing_path(self, mock_git_client, missing_repos):
+        """Test that push_repos skips repos whose paths don't exist."""
+        service = GitOpsService(config={}, git_client=mock_git_client)
+        messages = list(service.push_repos(missing_repos, GitOpsOptions()))
+
+        mock_git_client.get_commits_ahead.assert_not_called()
+        assert sum('path not found' in m for m in messages) == len(missing_repos)
+
+    def test_pull_repos_skips_missing_path(self, mock_git_client, missing_repos):
+        """Test that pull_repos skips repos whose paths don't exist."""
+        service = GitOpsService(config={}, git_client=mock_git_client)
+        messages = list(service.pull_repos(missing_repos, GitOpsOptions()))
+
+        mock_git_client.remote_url.assert_not_called()
+        assert sum('path not found' in m for m in messages) == len(missing_repos)
+
+    def test_status_repos_skips_missing_path(self, mock_git_client, missing_repos):
+        """Test that status_repos skips repos whose paths don't exist."""
+        service = GitOpsService(config={}, git_client=mock_git_client)
+        messages = list(service.status_repos(missing_repos, GitOpsOptions()))
+
+        mock_git_client.status.assert_not_called()
+        assert service.last_status.total == 0
+        assert sum('path not found' in m for m in messages) == len(missing_repos)
+
+    def test_get_repos_needing_push_skips_missing_path(self, mock_git_client, missing_repos):
+        """Test that get_repos_needing_push skips missing paths silently."""
+        service = GitOpsService(config={}, git_client=mock_git_client)
+
+        assert service.get_repos_needing_push(missing_repos) == []
+        mock_git_client.get_commits_ahead.assert_not_called()
+
+    def test_get_repos_needing_pull_skips_missing_path(self, mock_git_client, missing_repos):
+        """Test that get_repos_needing_pull skips missing paths silently."""
+        service = GitOpsService(config={}, git_client=mock_git_client)
+
+        assert service.get_repos_needing_pull(missing_repos) == []
+        mock_git_client.fetch.assert_not_called()
+
+    def test_status_repos_mixed_existing_and_missing(self, mock_git_client, sample_repos):
+        """Test status with a mix of existing and non-existent paths."""
+        repos = sample_repos + [
+            {'path': '/nonexistent/stale/repo', 'name': 'stale-repo'},
+        ]
+        mock_git_client.status.return_value = GitStatus(
+            branch="main", clean=True, ahead=0, behind=0
+        )
+
+        service = GitOpsService(config={}, git_client=mock_git_client)
+        messages = list(service.status_repos(repos, GitOpsOptions()))
+        status = service.last_status
+
+        assert status.total == 3
+        assert status.clean == 3
+        assert mock_git_client.status.call_count == 3
+        assert sum('path not found' in m for m in messages) == 1
 
 
 # ============================================================================
@@ -876,6 +941,128 @@ class TestOpsCommandHelpers:
 # ============================================================================
 # Integration Tests
 # ============================================================================
+
+class TestGetReposFromQueryExclude:
+    """Tests for exclude_directories filtering in _get_repos_from_query."""
+
+    @pytest.fixture
+    def db_setup(self, tmp_path):
+        """Set up database with repos including some in excluded dirs."""
+        from repoindex.database import Database
+        from repoindex.database.schema import apply_schema
+
+        db_path = tmp_path / 'test.db'
+        config = {'database': {'path': str(db_path)}}
+
+        repo_data = [
+            ('active-repo', '/home/user/github/active-repo', 'Python'),
+            ('archived-repo', '/home/user/github/archived/old-repo', 'Python'),
+            ('another-archived', '/home/user/github/archived/another', 'Rust'),
+            ('work-repo', '/home/user/github/work/project', 'Python'),
+        ]
+
+        with Database(config=config) as db:
+            apply_schema(db.conn)
+            for name, path, lang in repo_data:
+                db.execute("""
+                    INSERT INTO repos (name, path, language, branch)
+                    VALUES (?, ?, ?, 'main')
+                """, (name, path, lang))
+            db.conn.commit()
+
+        return config, repo_data
+
+    def test_no_excludes_returns_all(self, db_setup):
+        """Without exclude_directories, all repos are returned."""
+        from repoindex.commands.ops import _get_repos_from_query
+
+        config, repo_data = db_setup
+        repos = _get_repos_from_query(
+            config, '', False, False, None, None, False, (),
+            False, False, False, False, False, False, False, False, False
+        )
+        assert len(repos) == len(repo_data)
+
+    def test_exclude_filters_matching_repos(self, db_setup):
+        """Repos under excluded directories are filtered out."""
+        from repoindex.commands.ops import _get_repos_from_query
+
+        config, repo_data = db_setup
+        config['exclude_directories'] = ['/home/user/github/archived/']
+
+        repos = _get_repos_from_query(
+            config, '', False, False, None, None, False, (),
+            False, False, False, False, False, False, False, False, False
+        )
+        names = [r['name'] for r in repos]
+        assert 'active-repo' in names
+        assert 'work-repo' in names
+        assert 'archived-repo' not in names
+        assert 'another-archived' not in names
+
+    def test_exclude_without_trailing_slash(self, db_setup):
+        """Exclude works regardless of trailing slash."""
+        from repoindex.commands.ops import _get_repos_from_query
+
+        config, repo_data = db_setup
+        config['exclude_directories'] = ['/home/user/github/archived']
+
+        repos = _get_repos_from_query(
+            config, '', False, False, None, None, False, (),
+            False, False, False, False, False, False, False, False, False
+        )
+        names = [r['name'] for r in repos]
+        assert 'archived-repo' not in names
+        assert 'another-archived' not in names
+        assert len(repos) == 2
+
+    def test_exclude_multiple_directories(self, db_setup):
+        """Multiple directories can be excluded."""
+        from repoindex.commands.ops import _get_repos_from_query
+
+        config, repo_data = db_setup
+        config['exclude_directories'] = [
+            '/home/user/github/archived/',
+            '/home/user/github/work/',
+        ]
+
+        repos = _get_repos_from_query(
+            config, '', False, False, None, None, False, (),
+            False, False, False, False, False, False, False, False, False
+        )
+        names = [r['name'] for r in repos]
+        assert names == ['active-repo']
+
+    def test_exclude_with_tilde_expansion(self, db_setup):
+        """Exclude paths with ~ are expanded."""
+        from repoindex.commands.ops import _get_repos_from_query
+        from pathlib import Path
+
+        config, repo_data = db_setup
+        home = str(Path.home())
+        # Use a tilde path that won't match any test repo (home != /home/user)
+        config['exclude_directories'] = [f'{home}/nonexistent/']
+
+        repos = _get_repos_from_query(
+            config, '', False, False, None, None, False, (),
+            False, False, False, False, False, False, False, False, False
+        )
+        # Nothing excluded since paths don't match
+        assert len(repos) == 4
+
+    def test_empty_exclude_list(self, db_setup):
+        """Empty exclude list returns all repos."""
+        from repoindex.commands.ops import _get_repos_from_query
+
+        config, repo_data = db_setup
+        config['exclude_directories'] = []
+
+        repos = _get_repos_from_query(
+            config, '', False, False, None, None, False, (),
+            False, False, False, False, False, False, False, False, False
+        )
+        assert len(repos) == len(repo_data)
+
 
 class TestOpsIntegration:
     """Integration tests for ops functionality."""

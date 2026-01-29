@@ -61,22 +61,18 @@ def export_handler(
 
     Supports the same query flags as the query command to export a subset.
 
+    \b
     Examples:
-
         # Basic export (database + JSONL + READMEs + site + manifest)
         repoindex export ~/backups/repos-2026-01
-
         # Include full event history
         repoindex export ~/backups/repos --include-events
-
         # Export subset using query flags
         repoindex export ~/backups/python-repos --language python
         repoindex export ~/backups/starred --starred
         repoindex export ~/backups/work --tag "work/*"
-
         # DSL query expression
         repoindex export ~/backups/popular "language == 'Python' and github_stars > 10"
-
         # Preview without writing
         repoindex export ~/backups/test --dry-run --pretty
     """

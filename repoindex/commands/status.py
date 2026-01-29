@@ -25,14 +25,12 @@ def status_handler(output_json: bool, repos: bool, pretty: bool):
 
     Displays a quick overview of your repository collection from the database.
 
+    \b
     Examples:
-
         # Dashboard view
         repoindex status
-
         # JSON output for scripting
         repoindex status --json
-
         # List all repos
         repoindex status --repos
     """

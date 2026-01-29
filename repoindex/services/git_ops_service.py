@@ -6,6 +6,7 @@ Used by the `repoindex ops git` command group.
 """
 
 import logging
+import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from typing import Dict, Any, Generator, List, Optional
@@ -89,6 +90,17 @@ class GitOpsService:
         self.last_result: Optional[OperationSummary] = None
         self.last_status: Optional[MultiRepoStatus] = None
 
+    @staticmethod
+    def _repo_path(repo: Dict[str, Any]) -> Optional[str]:
+        """Return the repo's path if it is a non-empty, existing directory.
+
+        Returns None if the path is missing, empty, or does not exist on disk.
+        """
+        path = repo.get('path', '')
+        if path and os.path.isdir(path):
+            return path
+        return None
+
     def push_repos(
         self,
         repos: List[Dict[str, Any]],
@@ -119,8 +131,11 @@ class GitOpsService:
         # Filter to repos with commits to push
         pushable_repos = []
         for repo in repos:
-            path = repo.get('path', '')
+            path = self._repo_path(repo)
             if not path:
+                name = repo.get('name', repo.get('path', ''))
+                if repo.get('path'):
+                    yield f"Skipping {name} (path not found)"
                 continue
 
             commits_ahead = self.git.get_commits_ahead(path, options.remote)
@@ -300,8 +315,11 @@ class GitOpsService:
         # Optionally fetch first to get accurate behind counts
         pullable_repos = []
         for repo in repos:
-            path = repo.get('path', '')
+            path = self._repo_path(repo)
             if not path:
+                name = repo.get('name', repo.get('path', ''))
+                if repo.get('path'):
+                    yield f"Skipping {name} (path not found)"
                 continue
 
             # Check if repo has a remote
@@ -395,10 +413,11 @@ class GitOpsService:
         yield f"Checking status of {len(repos)} repositories..."
 
         for repo in repos:
-            path = repo.get('path', '')
-            name = repo.get('name', path)
-
+            name = repo.get('name', repo.get('path', ''))
+            path = self._repo_path(repo)
             if not path:
+                if repo.get('path'):
+                    yield f"  {name}: path not found (stale entry)"
                 continue
 
             status.total += 1
@@ -470,7 +489,7 @@ class GitOpsService:
         needing_push = []
 
         for repo in repos:
-            path = repo.get('path', '')
+            path = self._repo_path(repo)
             if not path:
                 continue
 
@@ -502,7 +521,7 @@ class GitOpsService:
         needing_pull = []
 
         for repo in repos:
-            path = repo.get('path', '')
+            path = self._repo_path(repo)
             if not path:
                 continue
 

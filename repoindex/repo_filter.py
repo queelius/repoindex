@@ -66,7 +66,10 @@ def get_filtered_repos(
         # Check config
         repo_dirs = get_repository_directories(config)
         if repo_dirs:
-            repos = find_git_repos_from_config(repo_dirs, recursive)
+            repos = find_git_repos_from_config(
+                repo_dirs, recursive,
+                exclude_dirs_config=config.get('exclude_directories', [])
+            )
         else:
             # Fallback: current directory
             cwd = os.getcwd()

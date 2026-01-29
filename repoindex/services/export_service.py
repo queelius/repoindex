@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Dict, Any, Generator, List, Optional
 
 from ..config import load_config
-from ..database import Database
+from ..database import Database, get_db_path
 from ..database.repository import get_all_repos, get_repos_with_tags
 
 logger = logging.getLogger(__name__)
@@ -172,10 +172,7 @@ class ExportService:
 
     def _export_database(self, output_dir: Path, dry_run: bool) -> None:
         """Copy SQLite database to export directory."""
-        db_path = Path(self.config.get('database', {}).get(
-            'path',
-            Path.home() / '.repoindex' / 'repoindex.db'
-        ))
+        db_path = get_db_path(self.config)
 
         if not db_path.exists():
             raise FileNotFoundError(f"Database not found: {db_path}")

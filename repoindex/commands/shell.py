@@ -12,32 +12,32 @@ def shell_handler():
 
     The shell provides a filesystem-like interface for repository management:
 
+    \b
     VFS Structure:
       /repos/              - All repositories (actual files)
       /by-language/        - Grouped by programming language
       /by-tag/             - Grouped by tags
       /by-status/          - Grouped by git status (clean/dirty/unpushed)
-
+    \b
     Navigation Commands:
       cd <path>            - Change directory
       ls [path]            - List directory contents
       pwd                  - Print working directory
-
+    \b
     Query Commands:
       query <expr>         - Query repositories with expression
       find [options]       - Find repositories by criteria
-
+    \b
     Repository Commands:
       status               - Show repository status
       update               - Update repositories
-
+    \b
     Other:
       help                 - Show available commands
       exit                 - Exit shell (or Ctrl+D)
-
+    \b
     Examples:
         repoindex shell
-
         repoindex:/> ls
         repoindex:/> cd by-language/Python
         repoindex:/by-language/Python> ls

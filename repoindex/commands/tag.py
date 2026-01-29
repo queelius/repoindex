@@ -212,6 +212,7 @@ def get_repo_tags_from_database(config: Dict[str, Any]) -> Dict[str, List[str]]:
 def tag_cmd():
     """Manage repository tags with hierarchical support.
 
+    \b
     Tag operations mirror the shell's filesystem commands:
     - add: Add tags to repositories (like shell 'cp')
     - remove: Remove tags from repositories (like shell 'rm')
@@ -228,9 +229,11 @@ def tag_cmd():
 def tag_add(repository, tags):
     """Add one or more tags to a repository.
 
+    \b
     REPOSITORY: Path or name of the repository
     TAGS: One or more tags to add (supports hierarchical tags)
 
+    \b
     Examples:
         repoindex tag add myproject alex/beta
         repoindex tag add myproject topic:ml/research work/active
@@ -289,9 +292,11 @@ def tag_add(repository, tags):
 def tag_remove(repository, tags):
     """Remove one or more tags from a repository.
 
+    \b
     REPOSITORY: Path or name of the repository
     TAGS: One or more tags to remove
 
+    \b
     Examples:
         repoindex tag remove myproject alex/beta
         repoindex tag remove myproject topic:ml/research work/active
@@ -348,12 +353,14 @@ def tag_remove(repository, tags):
 def tag_move(repository, old_tag, new_tag):
     """Move a repository from one tag to another.
 
+    \b
     REPOSITORY: Path or name of the repository
     OLD_TAG: Tag to remove
     NEW_TAG: Tag to add
 
     This is equivalent to removing old_tag and adding new_tag.
 
+    \b
     Examples:
         repoindex tag move myproject alex/beta alex/production
         repoindex tag move myproject topic:ml topic:nlp
@@ -401,6 +408,7 @@ def tag_move(repository, old_tag, new_tag):
 def tag_list(tag_filter, json_output, repository):
     """List tags and their repositories.
 
+    \b
     Examples:
         repoindex tag list                      # List all tags
         repoindex tag list -t "alex/*"          # List alex/* tags
@@ -461,6 +469,7 @@ def tag_list(tag_filter, json_output, repository):
 def tag_tree(tag_prefix):
     """Show tag hierarchy as a tree.
 
+    \b
     Examples:
         repoindex tag tree                 # Show full tag hierarchy
         repoindex tag tree -t alex         # Show alex/* hierarchy
@@ -511,7 +520,10 @@ def resolve_repository_path(repository: str, config: Dict[str, Any]) -> str:
 
     # Search for repository by name
     repo_dirs = config.get("repository_directories", [])
-    for repo_path in find_git_repos_from_config(repo_dirs):
+    for repo_path in find_git_repos_from_config(
+        repo_dirs,
+        exclude_dirs_config=config.get('exclude_directories', [])
+    ):
         if Path(repo_path).name == repository:
             return repo_path
 

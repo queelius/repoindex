@@ -82,7 +82,8 @@ def get_repositories_from_path(base_dir: str, recursive: bool = False) -> Genera
         # Use configured directories if no base_dir specified
         repo_paths = find_git_repos_from_config(
             config.get('repository_directories', []),
-            recursive
+            recursive,
+            exclude_dirs_config=config.get('exclude_directories', [])
         )
         if repo_paths:
             # These are already absolute paths from find_git_repos_from_config
@@ -172,7 +173,10 @@ def _get_filtered_repositories(base_dir: str, recursive: bool, tag_filters: list
     else:
         # Only use config if no base_dir specified
         repo_dirs = config.get("repository_directories", [])
-        repos = list(find_git_repos_from_config(repo_dirs))
+        repos = list(find_git_repos_from_config(
+            repo_dirs,
+            exclude_dirs_config=config.get('exclude_directories', [])
+        ))
     
     # Get filtered repos by tags
     filtered_repos = list(get_repositories_by_tags(tag_filters, config, all_tags))

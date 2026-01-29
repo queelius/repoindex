@@ -360,7 +360,49 @@ def get_git_status(repo_path):
         }
 
 
-def find_git_repos_from_config(repo_dirs_config, recursive=False, dedup=True):
+def _expand_exclude_paths(exclude_dirs_config):
+    """
+    Expand exclude directory patterns to absolute paths.
+
+    Handles:
+    - ~ expansion (~/github/archived -> /home/user/github/archived)
+    - Trailing /** or /* stripping
+    - Glob expansion
+
+    Args:
+        exclude_dirs_config (list): List of directory paths/patterns
+
+    Returns:
+        list: List of absolute directory paths to exclude
+    """
+    import glob as glob_module
+
+    exclude_paths = []
+    for pattern in exclude_dirs_config:
+        # Expand ~ to home directory
+        expanded = os.path.expanduser(pattern)
+
+        # Strip trailing /** or /* (we want the directory itself)
+        for suffix in ('/**', '/*'):
+            if expanded.endswith(suffix):
+                expanded = expanded[:-len(suffix)]
+                break
+
+        # Try glob expansion
+        glob_results = glob_module.glob(expanded)
+        if glob_results:
+            for match in glob_results:
+                abs_path = os.path.abspath(match)
+                if os.path.isdir(abs_path):
+                    exclude_paths.append(abs_path)
+        else:
+            # Use as-is (may not exist yet, but still useful for filtering)
+            exclude_paths.append(os.path.abspath(expanded))
+
+    return exclude_paths
+
+
+def find_git_repos_from_config(repo_dirs_config, recursive=False, dedup=True, exclude_dirs_config=None):
     """
     Find git repositories from configuration directories.
 
@@ -373,6 +415,7 @@ def find_git_repos_from_config(repo_dirs_config, recursive=False, dedup=True):
         repo_dirs_config (list): List of directory paths from configuration
         recursive (bool): Whether to search recursively (can be overridden by ** pattern)
         dedup (bool): Whether to deduplicate repos by remote URL (default: True)
+        exclude_dirs_config (list): List of directory paths/patterns to exclude from discovery
 
     Returns:
         list: List of git repository paths
@@ -425,6 +468,19 @@ def find_git_repos_from_config(repo_dirs_config, recursive=False, dedup=True):
         # Use pattern-specific recursive setting if available, otherwise use parameter
         search_recursive = recursive_dirs.get(dir_path, recursive)
         all_repos.extend(find_git_repos(dir_path, recursive=search_recursive))
+
+    # Apply exclude directory filtering
+    if exclude_dirs_config:
+        exclude_paths = _expand_exclude_paths(exclude_dirs_config)
+        if exclude_paths:
+            all_repos = [
+                repo for repo in all_repos
+                if not any(
+                    os.path.abspath(repo) == exc or
+                    os.path.abspath(repo).startswith(exc + os.sep)
+                    for exc in exclude_paths
+                )
+            ]
 
     # Deduplicate by remote URL if requested
     if dedup and all_repos:

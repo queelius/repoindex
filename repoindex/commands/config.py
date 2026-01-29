@@ -51,6 +51,10 @@ def config_cmd():
 from .config_repos import config_repos  # noqa: E402
 config_cmd.add_command(config_repos)
 
+# Register excludes subgroup
+from .config_excludes import config_excludes  # noqa: E402
+config_cmd.add_command(config_excludes)
+
 
 @config_cmd.command("init")
 @click.option("-d", "--dir", "directory", type=click.Path(exists=True),
@@ -63,14 +67,12 @@ def config_init(directory, yes, recursive):
 
     Detects repository directories and creates ~/.repoindex/config.json.
 
+    \b
     Examples:
-
         # Auto-detect repos directory
         repoindex config init
-
         # Use specific directory
         repoindex config init -d ~/projects
-
         # Non-interactive mode
         repoindex config init -y -d ~/github
     """

@@ -467,6 +467,103 @@ class TestFindGitReposFromConfig:
         result = find_git_repos_from_config(["/home/user/nonexistent"])
         assert result == []
 
+    def test_exclude_single_directory(self, fs):
+        """Excludes a single directory from results."""
+        fs.create_dir("/home/user/github/repo1/.git")
+        fs.create_dir("/home/user/github/archived/repo2/.git")
+        fs.create_dir("/home/user/github/repo3/.git")
+        result = find_git_repos_from_config(
+            ["/home/user/github/**"],
+            exclude_dirs_config=["/home/user/github/archived"]
+        )
+        assert "/home/user/github/repo1" in result
+        assert "/home/user/github/repo3" in result
+        assert "/home/user/github/archived/repo2" not in result
+
+    def test_exclude_multiple_directories(self, fs):
+        """Excludes multiple directories from results."""
+        fs.create_dir("/home/user/github/repo1/.git")
+        fs.create_dir("/home/user/github/archived/repo2/.git")
+        fs.create_dir("/home/user/github/forks/repo3/.git")
+        fs.create_dir("/home/user/github/active/repo4/.git")
+        result = find_git_repos_from_config(
+            ["/home/user/github/**"],
+            exclude_dirs_config=[
+                "/home/user/github/archived",
+                "/home/user/github/forks",
+            ]
+        )
+        assert "/home/user/github/repo1" in result
+        assert "/home/user/github/active/repo4" in result
+        assert "/home/user/github/archived/repo2" not in result
+        assert "/home/user/github/forks/repo3" not in result
+
+    def test_exclude_with_tilde_expansion(self, fs):
+        """Excludes paths with ~ expansion."""
+        home = os.path.expanduser("~")
+        fs.create_dir(f"{home}/github/repo1/.git")
+        fs.create_dir(f"{home}/github/archived/repo2/.git")
+        result = find_git_repos_from_config(
+            [f"{home}/github/**"],
+            exclude_dirs_config=["~/github/archived"]
+        )
+        assert f"{home}/github/repo1" in result
+        assert f"{home}/github/archived/repo2" not in result
+
+    def test_exclude_empty_list_no_effect(self, fs):
+        """Empty exclude list has no effect."""
+        fs.create_dir("/home/user/github/repo1/.git")
+        fs.create_dir("/home/user/github/repo2/.git")
+        result = find_git_repos_from_config(
+            ["/home/user/github/**"],
+            exclude_dirs_config=[]
+        )
+        assert len(result) == 2
+
+    def test_exclude_none_no_effect(self, fs):
+        """None exclude list has no effect."""
+        fs.create_dir("/home/user/github/repo1/.git")
+        fs.create_dir("/home/user/github/repo2/.git")
+        result = find_git_repos_from_config(
+            ["/home/user/github/**"],
+            exclude_dirs_config=None
+        )
+        assert len(result) == 2
+
+    def test_exclude_prefix_safety(self, fs):
+        """Excluding /foo/bar does NOT exclude /foo/bar-extra."""
+        fs.create_dir("/home/user/github/bar/.git")
+        fs.create_dir("/home/user/github/bar-extra/.git")
+        result = find_git_repos_from_config(
+            ["/home/user/github/**"],
+            exclude_dirs_config=["/home/user/github/bar"]
+        )
+        # bar should be excluded, bar-extra should remain
+        assert "/home/user/github/bar" not in result
+        assert "/home/user/github/bar-extra" in result
+
+    def test_exclude_exact_repo_path(self, fs):
+        """Excluding the exact repo path removes it."""
+        fs.create_dir("/home/user/github/repo1/.git")
+        fs.create_dir("/home/user/github/repo2/.git")
+        result = find_git_repos_from_config(
+            ["/home/user/github/**"],
+            exclude_dirs_config=["/home/user/github/repo1"]
+        )
+        assert "/home/user/github/repo1" not in result
+        assert "/home/user/github/repo2" in result
+
+    def test_exclude_with_trailing_glob(self, fs):
+        """Trailing /** or /* is stripped from exclude paths."""
+        fs.create_dir("/home/user/github/repo1/.git")
+        fs.create_dir("/home/user/github/archived/repo2/.git")
+        result = find_git_repos_from_config(
+            ["/home/user/github/**"],
+            exclude_dirs_config=["/home/user/github/archived/**"]
+        )
+        assert "/home/user/github/repo1" in result
+        assert "/home/user/github/archived/repo2" not in result
+
 
 # ============================================================================
 # Tests for detect_github_pages_locally

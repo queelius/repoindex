@@ -159,7 +159,7 @@ class TestBuildVFSStructure(unittest.TestCase):
                 vfs = build_vfs_structure({'repository_directories': []})
 
         # Then: find_git_repos_from_config should be called with ['.']
-        mock_find.assert_called_with(['.'], recursive=False)
+        mock_find.assert_called_with(['.'], recursive=False, exclude_dirs_config=[])
 
     def test_build_vfs_structure_adds_repos_to_repos_node(self):
         """Test that discovered repos are added to /repos."""

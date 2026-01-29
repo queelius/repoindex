@@ -72,7 +72,10 @@ class RepoIndexShell(cmd.Cmd):
         if not repo_dirs:
             repo_dirs = ['.']
 
-        self.repo_paths = find_git_repos_from_config(repo_dirs, recursive=False)
+        self.repo_paths = find_git_repos_from_config(
+            repo_dirs, recursive=False,
+            exclude_dirs_config=self.config.get('exclude_directories', [])
+        )
 
         # Build VFS structure
         vfs: Dict[str, Any] = {

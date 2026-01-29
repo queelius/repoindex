@@ -9,6 +9,7 @@ Provides collection-level write operations:
 import click
 import json
 import sys
+from pathlib import Path
 from typing import Optional
 
 from ..config import load_config
@@ -35,20 +36,16 @@ def ops_cmd():
     Operations are write actions that modify repositories or generate files.
     Use with caution - always preview with --dry-run first.
 
+    \b
     Examples:
-
         # Push all repos with unpushed commits
         repoindex ops git push --dry-run
-
         # Pull updates for dirty repos
         repoindex ops git pull --dirty
-
         # Generate codemeta for Python repos
         repoindex ops generate codemeta --language python
-
         # Generate .gitignore files
         repoindex ops generate gitignore --lang python
-
         # Multi-repo git status
         repoindex ops git status --dirty
     """
@@ -66,17 +63,14 @@ def git_cmd():
     Push, pull, and check status across your repository collection.
     Supports the same query filters as the query command.
 
+    \b
     Examples:
-
         # Push all repos with unpushed commits
         repoindex ops git push --dry-run
-
         # Pull updates for Python repos
         repoindex ops git pull --language python
-
         # Multi-repo status
         repoindex ops git status
-
         # Status of dirty repos only
         repoindex ops git status --dirty
     """
@@ -153,6 +147,12 @@ def _get_repos_from_query(
         for row in db.fetchall():
             repos.append(dict(row))
 
+    # Post-filter excluded directories from config
+    exclude_dirs = config.get('exclude_directories', [])
+    if exclude_dirs:
+        expanded = [str(Path(d).expanduser()).rstrip('/') for d in exclude_dirs]
+        repos = [r for r in repos if not any(r['path'].startswith(e) for e in expanded)]
+
     return repos
 
 
@@ -204,23 +204,18 @@ def git_push_handler(
     Only pushes repos that have commits ahead of the remote.
     Use --dry-run to preview what would be pushed.
 
+    \b
     Examples:
-
         # Preview what would be pushed
         repoindex ops git push --dry-run
-
         # Push all repos with unpushed commits
         repoindex ops git push --yes
-
         # Push only Python repos
         repoindex ops git push --language python --dry-run
-
         # Push repos with specific tag
         repoindex ops git push --tag "work/*" --yes
-
         # Push with DSL query
         repoindex ops git push "language == 'Python'" --dry-run
-
         # Parallel push (faster for many repos)
         repoindex ops git push --parallel 4 --yes
     """
@@ -408,17 +403,14 @@ def git_pull_handler(
 
     Use --dry-run to preview what would be pulled (fetches to check).
 
+    \b
     Examples:
-
         # Preview what would be pulled
         repoindex ops git pull --dry-run
-
         # Pull all repos
         repoindex ops git pull --yes
-
         # Pull only clean repos (no uncommitted changes)
         repoindex ops git pull --clean --yes
-
         # Pull Python repos
         repoindex ops git pull --language python --yes
     """
@@ -576,17 +568,14 @@ def git_status_handler(
 
     Aggregates status across your repository collection.
 
+    \b
     Examples:
-
         # Status of all repos
         repoindex ops git status
-
         # Status of dirty repos only
         repoindex ops git status --dirty
-
         # Status of Python repos
         repoindex ops git status --language python
-
         # JSONL output for scripting
         repoindex ops git status --json | jq 'select(.ahead > 0)'
     """
@@ -702,9 +691,11 @@ def _git_status_pretty(service: GitOpsService, repos: list, options: GitOpsOptio
         detail_table = Table(show_header=True, box=None)
         detail_table.add_column("Repo")
         detail_table.add_column("Branch")
+        detail_table.add_column("Path", style="dim")
         detail_table.add_column("Status")
 
-        for d in dirty_repos[:20]:
+        home = str(Path.home())
+        for d in dirty_repos:
             status_parts = []
             if not d['clean']:
                 status_parts.append("[yellow]dirty[/yellow]")
@@ -712,12 +703,12 @@ def _git_status_pretty(service: GitOpsService, repos: list, options: GitOpsOptio
                 status_parts.append(f"[blue]↑{d['ahead']}[/blue]")
             if d['behind'] > 0:
                 status_parts.append(f"[magenta]↓{d['behind']}[/magenta]")
-            detail_table.add_row(d['name'], d['branch'], ' '.join(status_parts))
+            path = d.get('path', '')
+            if path.startswith(home):
+                path = '~' + path[len(home):]
+            detail_table.add_row(d['name'], d['branch'], path, ' '.join(status_parts))
 
         console.print(detail_table)
-
-        if len(dirty_repos) > 20:
-            console.print(f"[dim]... and {len(dirty_repos) - 20} more[/dim]")
 
 
 # ============================================================================
@@ -760,20 +751,16 @@ def generate_cmd():
     Creates codemeta.json, LICENSE, .gitignore, CODE_OF_CONDUCT.md,
     and CONTRIBUTING.md files. Uses author information from config.
 
+    \b
     Examples:
-
         # Generate codemeta.json for Python repos
         repoindex ops generate codemeta --language python --dry-run
-
         # Generate MIT license for repos without license
         repoindex ops generate license --no-license --license mit --dry-run
-
         # Generate .gitignore for Python repos
         repoindex ops generate gitignore --lang python --dry-run
-
         # Generate CODE_OF_CONDUCT.md
         repoindex ops generate code-of-conduct --dry-run
-
         # Generate CONTRIBUTING.md
         repoindex ops generate contributing --dry-run
     """
@@ -830,14 +817,12 @@ def generate_codemeta_handler(
     Creates CodeMeta metadata files following the schema.org vocabulary.
     Useful for software discoverability and citation.
 
+    \b
     Examples:
-
         # Generate for Python repos
         repoindex ops generate codemeta --language python --dry-run
-
         # Generate with author info
         repoindex ops generate codemeta --author "Jane Doe" --dry-run
-
         # Force overwrite existing files
         repoindex ops generate codemeta --force --dry-run
     """
@@ -936,17 +921,14 @@ def generate_license_handler(
     Creates LICENSE files with the specified license type.
     Supports: MIT, Apache-2.0, GPL-3.0, BSD-3-Clause, MPL-2.0.
 
+    \b
     Examples:
-
         # Generate MIT license for repos without license
         repoindex ops generate license --no-license --dry-run
-
         # Generate Apache 2.0 license
         repoindex ops generate license --license apache-2.0 --no-license --dry-run
-
         # With custom author name
         repoindex ops generate license --author "My Company Inc." --dry-run
-
         # Force overwrite existing licenses
         repoindex ops generate license --force --license gpl-3.0 --dry-run
     """
@@ -1178,17 +1160,14 @@ def generate_gitignore_handler(
     Creates .gitignore files with standard patterns for the specified language.
     Supports: python, node, rust, go, cpp, java.
 
+    \b
     Examples:
-
         # Generate Python .gitignore for all repos
         repoindex ops generate gitignore --dry-run
-
         # Generate Node.js .gitignore
         repoindex ops generate gitignore --lang node --dry-run
-
         # Generate for Python repos only
         repoindex ops generate gitignore --language python --dry-run
-
         # Force overwrite existing files
         repoindex ops generate gitignore --force --dry-run
     """
@@ -1278,17 +1257,14 @@ def generate_code_of_conduct_handler(
     Creates CODE_OF_CONDUCT.md using Contributor Covenant v2.1.
     Uses contact email from config or command-line option.
 
+    \b
     Examples:
-
         # Generate for all repos
         repoindex ops generate code-of-conduct --dry-run
-
         # With custom contact email
         repoindex ops generate code-of-conduct --email "contact@example.com" --dry-run
-
         # For Python repos only
         repoindex ops generate code-of-conduct --language python --dry-run
-
         # Force overwrite existing files
         repoindex ops generate code-of-conduct --force --dry-run
     """
@@ -1382,14 +1358,12 @@ def generate_contributing_handler(
     Creates CONTRIBUTING.md with standard contribution guidelines.
     Uses repository name for project-specific content.
 
+    \b
     Examples:
-
         # Generate for all repos
         repoindex ops generate contributing --dry-run
-
         # For Python repos only
         repoindex ops generate contributing --language python --dry-run
-
         # Force overwrite existing files
         repoindex ops generate contributing --force --dry-run
     """

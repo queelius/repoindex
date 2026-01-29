@@ -26,17 +26,14 @@ def link_cmd():
     Create hierarchical symlink structures organized by tags, language,
     year, or owner. Repos can appear in multiple locations.
 
+    \b
     Examples:
-
         # Create symlink tree by tags
         repoindex link tree ~/links/by-tag --by tag
-
         # Create symlink tree by language
         repoindex link tree ~/links/by-language --by language
-
         # Check tree status
         repoindex link status ~/links/by-tag
-
         # Refresh tree and remove broken links
         repoindex link refresh ~/links/by-tag --prune
     """
@@ -106,23 +103,18 @@ def tree_handler(
     Supports the same query filters as the query command for selecting
     which repositories to include.
 
+    \b
     Examples:
-
         # Create symlink tree organized by tags
         repoindex link tree ~/links/by-tag --by tag
-
         # Organize by language
         repoindex link tree ~/links/by-language --by language
-
         # Organize by year of last modification
         repoindex link tree ~/links/by-year --by modified-year
-
         # Organize by repository owner
         repoindex link tree ~/links/by-owner --by owner
-
         # Filter to only Python repos
         repoindex link tree ~/links/python-by-tag --by tag --language python
-
         # Preview without creating
         repoindex link tree ~/links/test --by tag --dry-run --pretty
     """
@@ -337,14 +329,12 @@ def refresh_handler(
 
     Checks for broken symlinks and optionally removes them.
 
+    \b
     Examples:
-
         # Check and remove broken links
         repoindex link refresh ~/links/by-tag --prune
-
         # Preview what would be pruned
         repoindex link refresh ~/links/by-tag --prune --dry-run
-
         # Just scan without pruning
         repoindex link refresh ~/links/by-tag
     """
@@ -472,8 +462,8 @@ def status_handler(
 
     Non-modifying operation that reports on link health.
 
+    \b
     Examples:
-
         repoindex link status ~/links/by-tag
         repoindex link status ~/links/by-tag --pretty
     """

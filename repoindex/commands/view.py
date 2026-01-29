@@ -48,6 +48,7 @@ def get_repo_lookup(config: Dict[str, Any]):
 def view_cmd():
     """Manage curated repository views.
 
+    \b
     Views are ordered collections of repositories with:
     - Selection: queries, tags, or explicit lists
     - Composition: union, intersect, subtract operations
@@ -57,6 +58,7 @@ def view_cmd():
     Views follow SICP principles - all operations produce views,
     enabling arbitrary composition.
 
+    \b
     Examples:
         repoindex view list
         repoindex view show portfolio
@@ -72,6 +74,7 @@ def view_cmd():
 def view_list(output_json: bool, templates: bool):
     """List all defined views.
 
+    \b
     Examples:
         repoindex view list
         repoindex view list --templates
@@ -141,6 +144,7 @@ def view_show(name: str, output_json: bool):
 
     NAME: Name of the view to show
 
+    \b
     Examples:
         repoindex view show portfolio
         repoindex view show portfolio --json
@@ -167,6 +171,7 @@ def view_eval(name: str, output_json: bool, full: bool):
 
     NAME: Name of the view to evaluate
 
+    \b
     Examples:
         repoindex view eval portfolio
         repoindex view eval portfolio --full
@@ -214,6 +219,7 @@ def view_create(
 
     NAME: Name for the new view
 
+    \b
     Examples:
         repoindex view create portfolio --repos repoindex ctk btk
         repoindex view create python-libs --query "language == 'Python'"
@@ -254,6 +260,7 @@ def view_delete(name: str, force: bool):
 
     NAME: Name of the view to delete
 
+    \b
     Examples:
         repoindex view delete old-portfolio
         repoindex view delete temp --force
@@ -284,6 +291,7 @@ def view_repos(repo_name: str, output_json: bool):
 
     REPO_NAME: Name of the repository to look up
 
+    \b
     Examples:
         repoindex view repos repoindex
         repoindex view repos myproject --json | jq '.view'
@@ -339,9 +347,11 @@ def view_overlay(
 ):
     """Add or update overlay/annotation for a repo in a view.
 
+    \b
     VIEW_NAME: Name of the view
     REPO_NAME: Name of the repository
 
+    \b
     Examples:
         repoindex view overlay portfolio repoindex -d "Repository management toolkit"
         repoindex view overlay teaching algebraic-ds --highlight -n "Start here"

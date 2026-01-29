@@ -14,7 +14,8 @@ from repoindex.config import (
     save_config,
     generate_config_example,
     get_default_config,
-    get_repository_directories
+    get_repository_directories,
+    get_exclude_directories
 )
 
 
@@ -41,11 +42,15 @@ class TestConfigManagement(unittest.TestCase):
 
         # Check that all required sections exist
         self.assertIn('repository_directories', config)
+        self.assertIn('exclude_directories', config)
         self.assertIn('github', config)
         self.assertIn('repository_tags', config)
 
         # Check repository_directories is empty list by default
         self.assertEqual(config['repository_directories'], [])
+
+        # Check exclude_directories is empty list by default
+        self.assertEqual(config['exclude_directories'], [])
 
         # Check GitHub config
         self.assertIn('token', config['github'])
@@ -156,6 +161,22 @@ npm = true
         # Empty config
         config = {}
         dirs = get_repository_directories(config)
+        self.assertEqual(dirs, [])
+
+    def test_get_exclude_directories(self):
+        """Test get_exclude_directories helper"""
+        config = {'exclude_directories': ['/excluded1', '/excluded2']}
+        dirs = get_exclude_directories(config)
+        self.assertEqual(dirs, ['/excluded1', '/excluded2'])
+
+        # Empty config
+        config = {}
+        dirs = get_exclude_directories(config)
+        self.assertEqual(dirs, [])
+
+        # Config with empty list
+        config = {'exclude_directories': []}
+        dirs = get_exclude_directories(config)
         self.assertEqual(dirs, [])
 
 

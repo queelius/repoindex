@@ -217,7 +217,10 @@ def get_repositories_by_tags(tag_filters: List[str], config: Dict[str, Any],
     # If no filters, return all repositories
     if not tag_filters:
         repo_dirs = config.get("general", {}).get("repository_directories", [])
-        for repo_path in find_git_repos_from_config(repo_dirs):
+        for repo_path in find_git_repos_from_config(
+            repo_dirs,
+            exclude_dirs_config=config.get('exclude_directories', [])
+        ):
             # Try to find tags using both absolute and relative paths
             tags = repo_tags.get(repo_path, [])
             if not tags:
@@ -259,7 +262,10 @@ def get_repositories_by_tags(tag_filters: List[str], config: Dict[str, Any],
     
     # Find repositories matching filters
     repo_dirs = config.get("general", {}).get("repository_directories", [])
-    for repo_path in find_git_repos_from_config(repo_dirs):
+    for repo_path in find_git_repos_from_config(
+        repo_dirs,
+        exclude_dirs_config=config.get('exclude_directories', [])
+    ):
         # Try to find tags using both absolute and relative paths
         tags = repo_tags.get(repo_path, [])
         if not tags:

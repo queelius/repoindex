@@ -70,24 +70,19 @@ def events_handler(
 
     Output is a formatted table by default. Use --json for JSONL output.
 
+    \b
     Examples:
-
         # Recent events (default: last 7 days, pretty table)
         repoindex events
-
         # Events from last 24 hours
         repoindex events --since 24h
-
         # Filter by type
         repoindex events --type commit --since 7d
         repoindex events --type git_tag
-
         # Filter by repository
         repoindex events --repo myproject
-
         # JSONL output for piping
         repoindex events --json | jq '.type'
-
         # Summary statistics
         repoindex events --stats
     """

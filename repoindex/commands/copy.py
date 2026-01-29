@@ -89,23 +89,18 @@ def copy_handler(
     Supports the same query filters as the query command for selecting
     which repositories to copy.
 
+    \b
     Examples:
-
         # Copy all repos to backup directory
         repoindex copy ~/backups/repos-2026-01
-
         # Copy only Python repos
         repoindex copy ~/backups/python --language python
-
         # Copy dirty repos (with uncommitted changes)
         repoindex copy ~/backups/uncommitted --dirty
-
         # Copy repos with specific tag
         repoindex copy ~/backups/work --tag "work/*"
-
         # Copy with DSL query
         repoindex copy ~/backups/popular "language == 'Python' and github_stars > 10"
-
         # Options
         repoindex copy ~/backups --exclude-git          # Skip .git directories
         repoindex copy ~/backups --preserve-structure   # Keep parent dir hierarchy

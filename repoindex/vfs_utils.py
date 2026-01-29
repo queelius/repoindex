@@ -82,7 +82,10 @@ def build_vfs_structure(config: Dict[str, Any]) -> Dict[str, Any]:
     if not repo_dirs:
         repo_dirs = ['.']
 
-    repo_paths = find_git_repos_from_config(repo_dirs, recursive=False)
+    repo_paths = find_git_repos_from_config(
+        repo_dirs, recursive=False,
+        exclude_dirs_config=config.get('exclude_directories', [])
+    )
     metadata_store = get_metadata_store()
 
     # Build VFS structure
