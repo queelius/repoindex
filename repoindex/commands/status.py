@@ -173,10 +173,10 @@ def _gather_dashboard_data(config: dict, db_info: dict) -> Dict[str, Any]:
     try:
         with Database(config=config, read_only=True) as db:
             # Get last refresh time
-            db.execute("SELECT MAX(last_scan) as last_scan FROM repos")
+            db.execute("SELECT MAX(scanned_at) as scanned_at FROM repos")
             row = db.fetchone()
-            if row and row['last_scan']:
-                data['database']['last_refresh'] = row['last_scan']
+            if row and row['scanned_at']:
+                data['database']['last_refresh'] = row['scanned_at']
 
             # Get health stats
             db.execute("SELECT COUNT(*) as count FROM repos WHERE is_clean = 1")
