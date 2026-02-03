@@ -863,6 +863,25 @@ class TestOpsCommands:
         assert 'gitignore' in commands
         assert 'code-of-conduct' in commands
         assert 'contributing' in commands
+        assert 'citation' in commands
+        assert 'zenodo' in commands
+        assert 'mkdocs' in commands
+        assert 'gh-pages' in commands
+
+    def test_github_subgroup_exists(self):
+        """Test that github subgroup exists."""
+        from repoindex.commands.ops import github_cmd
+        assert github_cmd is not None
+
+        commands = list(github_cmd.commands.keys())
+        assert 'set-topics' in commands
+        assert 'set-description' in commands
+
+    def test_audit_command_exists(self):
+        """Test that audit command exists."""
+        from repoindex.commands.ops import ops_cmd
+        commands = list(ops_cmd.commands.keys())
+        assert 'audit' in commands
 
     def test_query_options_decorator(self):
         """Test that query_options adds expected options."""
@@ -977,10 +996,7 @@ class TestGetReposFromQueryExclude:
         from repoindex.commands.ops import _get_repos_from_query
 
         config, repo_data = db_setup
-        repos = _get_repos_from_query(
-            config, '', False, False, None, None, False, (),
-            False, False, False, False, False, False, False, False, False
-        )
+        repos = _get_repos_from_query(config, '')
         assert len(repos) == len(repo_data)
 
     def test_exclude_filters_matching_repos(self, db_setup):
@@ -990,10 +1006,7 @@ class TestGetReposFromQueryExclude:
         config, repo_data = db_setup
         config['exclude_directories'] = ['/home/user/github/archived/']
 
-        repos = _get_repos_from_query(
-            config, '', False, False, None, None, False, (),
-            False, False, False, False, False, False, False, False, False
-        )
+        repos = _get_repos_from_query(config, '')
         names = [r['name'] for r in repos]
         assert 'active-repo' in names
         assert 'work-repo' in names
@@ -1007,10 +1020,7 @@ class TestGetReposFromQueryExclude:
         config, repo_data = db_setup
         config['exclude_directories'] = ['/home/user/github/archived']
 
-        repos = _get_repos_from_query(
-            config, '', False, False, None, None, False, (),
-            False, False, False, False, False, False, False, False, False
-        )
+        repos = _get_repos_from_query(config, '')
         names = [r['name'] for r in repos]
         assert 'archived-repo' not in names
         assert 'another-archived' not in names
@@ -1026,10 +1036,7 @@ class TestGetReposFromQueryExclude:
             '/home/user/github/work/',
         ]
 
-        repos = _get_repos_from_query(
-            config, '', False, False, None, None, False, (),
-            False, False, False, False, False, False, False, False, False
-        )
+        repos = _get_repos_from_query(config, '')
         names = [r['name'] for r in repos]
         assert names == ['active-repo']
 
@@ -1043,10 +1050,7 @@ class TestGetReposFromQueryExclude:
         # Use a tilde path that won't match any test repo (home != /home/user)
         config['exclude_directories'] = [f'{home}/nonexistent/']
 
-        repos = _get_repos_from_query(
-            config, '', False, False, None, None, False, (),
-            False, False, False, False, False, False, False, False, False
-        )
+        repos = _get_repos_from_query(config, '')
         # Nothing excluded since paths don't match
         assert len(repos) == 4
 
@@ -1057,10 +1061,7 @@ class TestGetReposFromQueryExclude:
         config, repo_data = db_setup
         config['exclude_directories'] = []
 
-        repos = _get_repos_from_query(
-            config, '', False, False, None, None, False, (),
-            False, False, False, False, False, False, False, False, False
-        )
+        repos = _get_repos_from_query(config, '')
         assert len(repos) == len(repo_data)
 
 
@@ -1163,3 +1164,723 @@ class TestOpsIntegration:
             content = contrib_path.read_text()
             assert 'Contributing to' in content
             assert repo['name'] in content
+
+
+# ============================================================================
+# extract_project_metadata Tests
+# ============================================================================
+
+class TestExtractProjectMetadata:
+    """Tests for extract_project_metadata function."""
+
+    def test_full_pyproject(self, tmp_path):
+        """Test extracting all fields from a full pyproject.toml."""
+        from repoindex.pypi import extract_project_metadata
+
+        pyproject = tmp_path / 'pyproject.toml'
+        pyproject.write_text('''
+[project]
+name = "my-tool"
+version = "1.2.3"
+description = "A great tool"
+license = "MIT"
+keywords = ["cli", "tool", "python"]
+authors = [{name = "John Smith", email = "john@example.com"}]
+
+[project.urls]
+Homepage = "https://example.com"
+Repository = "https://github.com/user/my-tool"
+''')
+
+        result = extract_project_metadata(str(tmp_path))
+
+        assert result['name'] == 'my-tool'
+        assert result['version'] == '1.2.3'
+        assert result['description'] == 'A great tool'
+        assert result['license'] == 'MIT'
+        assert result['keywords'] == ['cli', 'tool', 'python']
+        assert len(result['authors']) == 1
+        assert result['authors'][0]['name'] == 'John Smith'
+        assert result['homepage'] == 'https://example.com'
+        assert result['repository'] == 'https://github.com/user/my-tool'
+
+    def test_minimal_pyproject(self, tmp_path):
+        """Test extracting from a minimal pyproject.toml."""
+        from repoindex.pypi import extract_project_metadata
+
+        pyproject = tmp_path / 'pyproject.toml'
+        pyproject.write_text('''
+[project]
+name = "simple"
+version = "0.1.0"
+''')
+
+        result = extract_project_metadata(str(tmp_path))
+
+        assert result['name'] == 'simple'
+        assert result['version'] == '0.1.0'
+        assert result['description'] == ''
+        assert result['keywords'] == []
+
+    def test_no_pyproject(self, tmp_path):
+        """Test when pyproject.toml doesn't exist."""
+        from repoindex.pypi import extract_project_metadata
+
+        result = extract_project_metadata(str(tmp_path))
+
+        assert result['name'] == ''
+        assert result['version'] == ''
+        assert result['keywords'] == []
+
+    def test_license_as_table(self, tmp_path):
+        """Test extracting license when it's a table format."""
+        from repoindex.pypi import extract_project_metadata
+
+        pyproject = tmp_path / 'pyproject.toml'
+        pyproject.write_text('''
+[project]
+name = "licensed"
+version = "1.0.0"
+license = {text = "Apache-2.0"}
+''')
+
+        result = extract_project_metadata(str(tmp_path))
+        assert result['license'] == 'Apache-2.0'
+
+    def test_urls_with_various_keys(self, tmp_path):
+        """Test URL extraction with different key conventions."""
+        from repoindex.pypi import extract_project_metadata
+
+        pyproject = tmp_path / 'pyproject.toml'
+        pyproject.write_text('''
+[project]
+name = "urls-test"
+version = "1.0.0"
+
+[project.urls]
+Home = "https://example.com/home"
+"Source Code" = "https://github.com/user/repo"
+''')
+
+        result = extract_project_metadata(str(tmp_path))
+        assert result['homepage'] == 'https://example.com/home'
+        assert result['repository'] == 'https://github.com/user/repo'
+
+
+# ============================================================================
+# AuthorInfo serialization Tests
+# ============================================================================
+
+class TestAuthorInfoSerialization:
+    """Tests for AuthorInfo CFF and Zenodo conversion methods."""
+
+    def test_to_cff_dict(self):
+        """Test CFF format conversion."""
+        author = AuthorInfo(
+            name='John Smith',
+            given_names='John',
+            family_names='Smith',
+            email='john@example.com',
+            orcid='0000-0001-2345-6789',
+            affiliation='University',
+        )
+
+        d = author.to_cff_dict()
+
+        assert d['family-names'] == 'Smith'
+        assert d['given-names'] == 'John'
+        assert d['email'] == 'john@example.com'
+        assert d['orcid'] == 'https://orcid.org/0000-0001-2345-6789'
+        assert d['affiliation'] == 'University'
+
+    def test_to_cff_dict_orcid_already_url(self):
+        """Test CFF conversion when ORCID is already a full URL."""
+        author = AuthorInfo(
+            name='Jane Doe',
+            given_names='Jane',
+            family_names='Doe',
+            orcid='https://orcid.org/0000-0001-2345-6789',
+        )
+
+        d = author.to_cff_dict()
+        assert d['orcid'] == 'https://orcid.org/0000-0001-2345-6789'
+
+    def test_to_zenodo_dict(self):
+        """Test Zenodo format conversion."""
+        author = AuthorInfo(
+            name='John Smith',
+            given_names='John',
+            family_names='Smith',
+            orcid='0000-0001-2345-6789',
+            affiliation='University',
+        )
+
+        d = author.to_zenodo_dict()
+
+        assert d['name'] == 'Smith, John'
+        assert d['orcid'] == '0000-0001-2345-6789'
+        assert d['affiliation'] == 'University'
+
+    def test_to_zenodo_dict_strips_url_prefix(self):
+        """Test Zenodo conversion strips ORCID URL prefix."""
+        author = AuthorInfo(
+            name='Jane Doe',
+            given_names='Jane',
+            family_names='Doe',
+            orcid='https://orcid.org/0000-0001-2345-6789',
+        )
+
+        d = author.to_zenodo_dict()
+        assert d['orcid'] == '0000-0001-2345-6789'
+
+    def test_to_zenodo_dict_single_name(self):
+        """Test Zenodo with single name (no family/given split)."""
+        author = AuthorInfo(name='Mononym')
+
+        d = author.to_zenodo_dict()
+        assert d['name'] == 'Mononym'
+
+
+# ============================================================================
+# CITATION.cff Generation Tests
+# ============================================================================
+
+class TestCitationCffGeneration:
+    """Tests for CITATION.cff file generation."""
+
+    @pytest.fixture
+    def repos_with_pyproject(self, tmp_path):
+        """Create repos with pyproject.toml files."""
+        repos = []
+        for name in ['project-a', 'project-b']:
+            repo_path = tmp_path / name
+            repo_path.mkdir()
+            pyproject = repo_path / 'pyproject.toml'
+            pyproject.write_text(f'''
+[project]
+name = "{name}"
+version = "1.0.0"
+description = "Description for {name}"
+license = "MIT"
+keywords = ["python", "cli"]
+
+[project.urls]
+Homepage = "https://example.com/{name}"
+''')
+            repos.append({
+                'path': str(repo_path),
+                'name': name,
+                'remote_url': f'https://github.com/user/{name}',
+            })
+        return repos
+
+    def test_generates_cff_files(self, repos_with_pyproject):
+        """Test that CITATION.cff files are created."""
+        import yaml
+
+        author = AuthorInfo(
+            name='John Smith',
+            given_names='John',
+            family_names='Smith',
+            orcid='0000-0001-2345-6789',
+        )
+        service = BoilerplateService(config={})
+        options = GenerationOptions(author=author)
+
+        list(service.generate_citation_cff(repos_with_pyproject, options))
+        result = service.last_result
+
+        assert result.successful == 2
+
+        for repo in repos_with_pyproject:
+            cff_path = Path(repo['path']) / 'CITATION.cff'
+            assert cff_path.exists()
+            data = yaml.safe_load(cff_path.read_text())
+            assert data['cff-version'] == '1.2.0'
+            assert data['type'] == 'software'
+            assert data['title'] == repo['name']
+            assert data['version'] == '1.0.0'
+            assert data['license'] == 'MIT'
+            assert 'python' in data['keywords']
+            assert data['authors'][0]['family-names'] == 'Smith'
+            assert data['authors'][0]['orcid'] == 'https://orcid.org/0000-0001-2345-6789'
+            assert data['repository-code'] == f"https://github.com/user/{repo['name']}"
+
+    def test_preserves_doi_on_force(self, tmp_path):
+        """Test that existing DOI is preserved when --force regenerating."""
+        import yaml
+
+        repo_path = tmp_path / 'doi-repo'
+        repo_path.mkdir()
+
+        # Create existing CITATION.cff with DOI
+        existing_cff = {
+            'cff-version': '1.2.0',
+            'title': 'doi-repo',
+            'identifiers': [{'type': 'doi', 'value': '10.5281/zenodo.1234567'}],
+        }
+        (repo_path / 'CITATION.cff').write_text(yaml.dump(existing_cff))
+
+        # Create pyproject.toml
+        (repo_path / 'pyproject.toml').write_text('''
+[project]
+name = "doi-repo"
+version = "2.0.0"
+description = "Has a DOI"
+license = "MIT"
+''')
+
+        repos = [{'path': str(repo_path), 'name': 'doi-repo', 'remote_url': ''}]
+        author = AuthorInfo(name='Test Author', given_names='Test', family_names='Author')
+        service = BoilerplateService(config={})
+        options = GenerationOptions(author=author, force=True)
+
+        list(service.generate_citation_cff(repos, options))
+
+        new_data = yaml.safe_load((repo_path / 'CITATION.cff').read_text())
+        assert new_data['version'] == '2.0.0'
+        # DOI should be preserved
+        assert new_data['identifiers'][0]['value'] == '10.5281/zenodo.1234567'
+
+    def test_skips_existing_without_force(self, repos_with_pyproject):
+        """Test that existing files are skipped without --force."""
+        # Create existing file
+        (Path(repos_with_pyproject[0]['path']) / 'CITATION.cff').write_text('existing')
+
+        service = BoilerplateService(config={})
+        options = GenerationOptions()
+
+        list(service.generate_citation_cff(repos_with_pyproject, options))
+        result = service.last_result
+
+        assert result.skipped == 1
+        assert result.successful == 1
+
+    def test_dry_run_does_not_write(self, repos_with_pyproject):
+        """Test dry run does not create files."""
+        service = BoilerplateService(config={})
+        options = GenerationOptions(dry_run=True)
+
+        list(service.generate_citation_cff(repos_with_pyproject, options))
+        result = service.last_result
+
+        assert result.successful == 2
+        for repo in repos_with_pyproject:
+            assert not (Path(repo['path']) / 'CITATION.cff').exists()
+
+
+# ============================================================================
+# .zenodo.json Generation Tests
+# ============================================================================
+
+class TestZenodoJsonGeneration:
+    """Tests for .zenodo.json file generation."""
+
+    @pytest.fixture
+    def repos_with_pyproject(self, tmp_path):
+        """Create repos with pyproject.toml files."""
+        repos = []
+        for name in ['zen-a', 'zen-b']:
+            repo_path = tmp_path / name
+            repo_path.mkdir()
+            (repo_path / 'pyproject.toml').write_text(f'''
+[project]
+name = "{name}"
+version = "0.5.0"
+description = "Zenodo test {name}"
+license = "Apache-2.0"
+keywords = ["science", "data"]
+''')
+            repos.append({
+                'path': str(repo_path),
+                'name': name,
+                'remote_url': f'git@github.com:user/{name}.git',
+            })
+        return repos
+
+    def test_generates_zenodo_files(self, repos_with_pyproject):
+        """Test that .zenodo.json files are created."""
+        author = AuthorInfo(
+            name='Jane Doe',
+            given_names='Jane',
+            family_names='Doe',
+            orcid='0000-0002-1234-5678',
+            affiliation='MIT',
+        )
+        service = BoilerplateService(config={})
+        options = GenerationOptions(author=author)
+
+        list(service.generate_zenodo_json(repos_with_pyproject, options))
+        result = service.last_result
+
+        assert result.successful == 2
+
+        for repo in repos_with_pyproject:
+            zenodo_path = Path(repo['path']) / '.zenodo.json'
+            assert zenodo_path.exists()
+            data = json.loads(zenodo_path.read_text())
+            assert data['upload_type'] == 'software'
+            assert data['version'] == '0.5.0'
+            assert data['license'] == {'id': 'Apache-2.0'}
+            assert data['creators'][0]['name'] == 'Doe, Jane'
+            assert data['creators'][0]['orcid'] == '0000-0002-1234-5678'
+            assert data['creators'][0]['affiliation'] == 'MIT'
+            # Remote URL should be normalized from SSH to HTTPS
+            assert 'https://github.com/user/' in data['related_identifiers'][0]['identifier']
+
+    def test_preserves_doi_on_force(self, tmp_path):
+        """Test that existing DOI is preserved when --force regenerating."""
+        repo_path = tmp_path / 'zen-doi'
+        repo_path.mkdir()
+
+        # Create existing .zenodo.json with DOI
+        existing = {'doi': '10.5281/zenodo.9999999', 'title': 'old'}
+        (repo_path / '.zenodo.json').write_text(json.dumps(existing))
+
+        (repo_path / 'pyproject.toml').write_text('''
+[project]
+name = "zen-doi"
+version = "3.0.0"
+''')
+
+        repos = [{'path': str(repo_path), 'name': 'zen-doi', 'remote_url': ''}]
+        service = BoilerplateService(config={})
+        options = GenerationOptions(force=True)
+
+        list(service.generate_zenodo_json(repos, options))
+
+        data = json.loads((repo_path / '.zenodo.json').read_text())
+        assert data['doi'] == '10.5281/zenodo.9999999'
+        assert data['version'] == '3.0.0'
+
+
+# ============================================================================
+# mkdocs.yml Generation Tests
+# ============================================================================
+
+class TestMkdocsGeneration:
+    """Tests for mkdocs.yml file generation."""
+
+    def test_generates_mkdocs_yml(self, tmp_path):
+        """Test mkdocs.yml generation with Material theme."""
+        import yaml
+
+        repo_path = tmp_path / 'docs-repo'
+        repo_path.mkdir()
+        (repo_path / 'pyproject.toml').write_text('''
+[project]
+name = "docs-repo"
+description = "A documented project"
+''')
+
+        repos = [{'path': str(repo_path), 'name': 'docs-repo',
+                  'remote_url': 'https://github.com/user/docs-repo',
+                  'description': 'A documented project'}]
+        service = BoilerplateService(config={})
+        options = GenerationOptions()
+
+        list(service.generate_mkdocs(repos, options))
+        result = service.last_result
+
+        assert result.successful == 1
+        mkdocs_path = repo_path / 'mkdocs.yml'
+        assert mkdocs_path.exists()
+
+        data = yaml.safe_load(mkdocs_path.read_text())
+        assert data['site_name'] == 'docs-repo'
+        assert data['theme']['name'] == 'material'
+        assert len(data['theme']['palette']) == 2  # light + dark
+        assert 'pymdownx.highlight' in data['markdown_extensions']
+
+    def test_picks_up_existing_docs(self, tmp_path):
+        """Test that nav is built from existing docs/ directory."""
+        import yaml
+
+        repo_path = tmp_path / 'nav-repo'
+        repo_path.mkdir()
+        docs_dir = repo_path / 'docs'
+        docs_dir.mkdir()
+        (docs_dir / 'index.md').write_text('# Home')
+        (docs_dir / 'getting-started.md').write_text('# Getting Started')
+        (docs_dir / 'api-reference.md').write_text('# API')
+
+        (repo_path / 'pyproject.toml').write_text('''
+[project]
+name = "nav-repo"
+''')
+
+        repos = [{'path': str(repo_path), 'name': 'nav-repo', 'remote_url': ''}]
+        service = BoilerplateService(config={})
+        options = GenerationOptions()
+
+        list(service.generate_mkdocs(repos, options))
+
+        data = yaml.safe_load((repo_path / 'mkdocs.yml').read_text())
+        nav_titles = [list(entry.keys())[0] for entry in data['nav']]
+        assert 'Home' in nav_titles
+        assert 'Api Reference' in nav_titles
+        assert 'Getting Started' in nav_titles
+
+
+# ============================================================================
+# GitHub Pages Workflow Generation Tests
+# ============================================================================
+
+class TestGhPagesGeneration:
+    """Tests for deploy-docs.yml workflow generation."""
+
+    def test_generates_workflow(self, tmp_path):
+        """Test that deploy-docs.yml is created in .github/workflows/."""
+        repo_path = tmp_path / 'gh-pages-repo'
+        repo_path.mkdir()
+
+        repos = [{'path': str(repo_path), 'name': 'gh-pages-repo', 'remote_url': ''}]
+        service = BoilerplateService(config={})
+        options = GenerationOptions()
+
+        list(service.generate_gh_pages_workflow(repos, options))
+        result = service.last_result
+
+        assert result.successful == 1
+        workflow_path = repo_path / '.github' / 'workflows' / 'deploy-docs.yml'
+        assert workflow_path.exists()
+        content = workflow_path.read_text()
+        assert 'mkdocs build' in content
+        assert 'actions/deploy-pages' in content
+        assert 'github-pages' in content
+
+
+# ============================================================================
+# GitHub Operations Service Tests
+# ============================================================================
+
+class TestGitHubOpsService:
+    """Tests for GitHubOpsService."""
+
+    @pytest.fixture
+    def sample_repos(self, tmp_path):
+        """Create repos with GitHub remotes and pyproject.toml."""
+        repos = []
+        for name in ['gh-repo-a', 'gh-repo-b']:
+            repo_path = tmp_path / name
+            repo_path.mkdir()
+            (repo_path / 'pyproject.toml').write_text(f'''
+[project]
+name = "{name}"
+description = "Description for {name}"
+keywords = ["python", "tool"]
+''')
+            repos.append({
+                'path': str(repo_path),
+                'name': name,
+                'remote_url': f'https://github.com/user/{name}',
+            })
+        return repos
+
+    def test_get_repo_nwo_https(self):
+        """Test NWO extraction from HTTPS URL."""
+        from repoindex.services.github_ops_service import GitHubOpsService
+        service = GitHubOpsService(config={})
+        repo = {'remote_url': 'https://github.com/user/repo.git'}
+        assert service._get_repo_nwo(repo) == 'user/repo'
+
+    def test_get_repo_nwo_ssh(self):
+        """Test NWO extraction from SSH URL."""
+        from repoindex.services.github_ops_service import GitHubOpsService
+        service = GitHubOpsService(config={})
+        repo = {'remote_url': 'git@github.com:user/repo.git'}
+        assert service._get_repo_nwo(repo) == 'user/repo'
+
+    def test_get_repo_nwo_no_remote(self):
+        """Test NWO extraction with no remote."""
+        from repoindex.services.github_ops_service import GitHubOpsService
+        service = GitHubOpsService(config={})
+        repo = {'remote_url': ''}
+        assert service._get_repo_nwo(repo) is None
+
+    def test_set_topics_dry_run(self, sample_repos):
+        """Test set_topics in dry run mode."""
+        from repoindex.services.github_ops_service import GitHubOpsService, GitHubOpsOptions
+        service = GitHubOpsService(config={})
+        options = GitHubOpsOptions(dry_run=True)
+
+        messages = list(service.set_topics(
+            sample_repos, options, topics=['python', 'cli'],
+        ))
+        result = service.last_result
+
+        assert result.successful == 2
+        assert result.dry_run is True
+
+    def test_set_topics_from_pyproject_dry_run(self, sample_repos):
+        """Test syncing topics from pyproject.toml keywords."""
+        from repoindex.services.github_ops_service import GitHubOpsService, GitHubOpsOptions
+        service = GitHubOpsService(config={})
+        options = GitHubOpsOptions(dry_run=True)
+
+        messages = list(service.set_topics(
+            sample_repos, options, from_pyproject=True,
+        ))
+        result = service.last_result
+
+        assert result.successful == 2
+        # Check that topics were read from pyproject.toml
+        for detail in result.details:
+            topics = detail.metadata.get('topics', [])
+            assert 'python' in topics
+            assert 'tool' in topics
+
+    def test_set_topics_skips_no_remote(self):
+        """Test that repos without GitHub remote are skipped."""
+        from repoindex.services.github_ops_service import GitHubOpsService, GitHubOpsOptions
+        service = GitHubOpsService(config={})
+        options = GitHubOpsOptions(dry_run=True)
+
+        repos = [{'path': '/tmp/test', 'name': 'no-remote', 'remote_url': ''}]
+        messages = list(service.set_topics(repos, options, topics=['test']))
+        result = service.last_result
+
+        assert result.skipped == 1
+
+    @patch('repoindex.services.github_ops_service.subprocess.run')
+    def test_set_topics_actual_call(self, mock_run, sample_repos):
+        """Test that actual gh CLI call is made correctly."""
+        from repoindex.services.github_ops_service import GitHubOpsService, GitHubOpsOptions
+        mock_run.return_value = MagicMock(returncode=0, stderr='')
+
+        service = GitHubOpsService(config={})
+        options = GitHubOpsOptions(dry_run=False)
+
+        messages = list(service.set_topics(
+            sample_repos[:1], options, topics=['python', 'cli'],
+        ))
+        result = service.last_result
+
+        assert result.successful == 1
+        mock_run.assert_called_once()
+        call_args = mock_run.call_args[0][0]
+        assert 'gh' in call_args
+        assert '--add-topic' in call_args
+        assert 'python' in call_args
+
+    def test_set_description_dry_run(self, sample_repos):
+        """Test set_description in dry run mode."""
+        from repoindex.services.github_ops_service import GitHubOpsService, GitHubOpsOptions
+        service = GitHubOpsService(config={})
+        options = GitHubOpsOptions(dry_run=True)
+
+        messages = list(service.set_description(
+            sample_repos, options, text='New description',
+        ))
+        result = service.last_result
+
+        assert result.successful == 2
+
+    def test_set_description_from_pyproject_dry_run(self, sample_repos):
+        """Test syncing description from pyproject.toml."""
+        from repoindex.services.github_ops_service import GitHubOpsService, GitHubOpsOptions
+        service = GitHubOpsService(config={})
+        options = GitHubOpsOptions(dry_run=True)
+
+        messages = list(service.set_description(
+            sample_repos, options, from_pyproject=True,
+        ))
+        result = service.last_result
+
+        assert result.successful == 2
+
+    def test_set_description_truncates_long_text(self, sample_repos):
+        """Test that long descriptions are truncated to 350 chars."""
+        from repoindex.services.github_ops_service import GitHubOpsService, GitHubOpsOptions
+        service = GitHubOpsService(config={})
+        options = GitHubOpsOptions(dry_run=True)
+
+        long_desc = 'x' * 500
+        messages = list(service.set_description(
+            sample_repos[:1], options, text=long_desc,
+        ))
+        result = service.last_result
+
+        detail = result.details[0]
+        assert len(detail.metadata['description']) <= 350
+
+
+# ============================================================================
+# Audit Tests
+# ============================================================================
+
+class TestAudit:
+    """Tests for ops audit functionality."""
+
+    @pytest.fixture
+    def audit_repos(self, tmp_path):
+        """Create repos with varying metadata completeness."""
+        # Complete repo
+        complete = tmp_path / 'complete'
+        complete.mkdir()
+        (complete / 'pyproject.toml').write_text('[project]\nname = "complete"\n')
+        (complete / 'mkdocs.yml').write_text('site_name: complete\n')
+
+        # Incomplete repo
+        incomplete = tmp_path / 'incomplete'
+        incomplete.mkdir()
+
+        return [
+            {
+                'path': str(complete),
+                'name': 'complete',
+                'has_readme': True,
+                'has_license': True,
+                'has_ci': True,
+                'has_citation': True,
+                'citation_doi': '10.5281/zenodo.1234',
+                'github_description': 'A complete repo',
+                'github_topics': '["python"]',
+                'github_has_pages': True,
+            },
+            {
+                'path': str(incomplete),
+                'name': 'incomplete',
+                'has_readme': False,
+                'has_license': False,
+                'has_ci': False,
+                'has_citation': False,
+                'citation_doi': None,
+                'github_description': '',
+                'github_topics': '[]',
+                'github_has_pages': False,
+            },
+        ]
+
+    def test_audit_complete_repo(self, audit_repos):
+        """Test that a complete repo passes all checks."""
+        repo = audit_repos[0]
+        checks = [
+            ('has_readme', lambda r: bool(r.get('has_readme'))),
+            ('has_license', lambda r: bool(r.get('has_license'))),
+            ('has_ci', lambda r: bool(r.get('has_ci'))),
+            ('has_citation', lambda r: bool(r.get('has_citation'))),
+            ('has_doi', lambda r: bool(r.get('citation_doi'))),
+            ('has_description', lambda r: bool(r.get('github_description'))),
+            ('has_topics', lambda r: bool(r.get('github_topics') and r.get('github_topics') != '[]')),
+            ('has_pages', lambda r: bool(r.get('github_has_pages'))),
+            ('has_pyproject', lambda r: Path(r.get('path', '')).joinpath('pyproject.toml').exists()),
+            ('has_mkdocs', lambda r: Path(r.get('path', '')).joinpath('mkdocs.yml').exists()),
+        ]
+
+        missing = [cid for cid, fn in checks if not fn(repo)]
+        assert missing == []  # Complete repo should pass all checks
+
+    def test_audit_incomplete_repo(self, audit_repos):
+        """Test that an incomplete repo fails expected checks."""
+        repo = audit_repos[1]
+        checks = [
+            ('has_readme', lambda r: bool(r.get('has_readme'))),
+            ('has_license', lambda r: bool(r.get('has_license'))),
+            ('has_pyproject', lambda r: Path(r.get('path', '')).joinpath('pyproject.toml').exists()),
+        ]
+
+        missing = [cid for cid, fn in checks if not fn(repo)]
+        assert 'has_readme' in missing
+        assert 'has_license' in missing
+        assert 'has_pyproject' in missing

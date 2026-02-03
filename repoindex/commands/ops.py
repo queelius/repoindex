@@ -6,24 +6,25 @@ Provides collection-level write operations:
 - Boilerplate file generation (codemeta, license, gitignore, code of conduct, contributing)
 """
 
-import click
 import json
 import sys
 from pathlib import Path
 from typing import Optional
 
+import click
+
 from ..config import load_config
-from ..database import Database, compile_query, QueryCompileError
-from ..services.git_ops_service import GitOpsService, GitOpsOptions
+from ..database import Database, QueryCompileError, compile_query
 from ..services.boilerplate_service import (
+    GITIGNORE_TEMPLATES,
+    LICENSES,
+    AuthorInfo,
     BoilerplateService,
     GenerationOptions,
-    AuthorInfo,
-    LICENSES,
-    GITIGNORE_TEMPLATES,
 )
+from ..services.git_ops_service import GitOpsOptions, GitOpsService
+from ..services.github_ops_service import GitHubOpsOptions, GitHubOpsService
 from .query import _build_query_from_flags
-
 
 # ============================================================================
 # Main ops command group
@@ -98,27 +99,25 @@ def query_options(f):
     return f
 
 
-def _get_repos_from_query(
-    config,
-    query_string: str,
-    dirty: bool,
-    clean: bool,
-    language: Optional[str],
-    recent: Optional[str],
-    starred: bool,
-    tag: tuple,
-    no_license: bool,
-    no_readme: bool,
-    has_citation: bool,
-    has_doi: bool,
-    archived: bool,
-    public: bool,
-    private: bool,
-    fork: bool,
-    no_fork: bool,
-    debug: bool = False,
-):
+def _get_repos_from_query(config, query_string: str, debug: bool = False, **query_flags):
     """Get repos matching query and flags."""
+    # Extract flags with defaults
+    dirty = query_flags.get('dirty', False)
+    clean = query_flags.get('clean', False)
+    language = query_flags.get('language', None)
+    recent = query_flags.get('recent', None)
+    starred = query_flags.get('starred', False)
+    tag = query_flags.get('tag', ())
+    no_license = query_flags.get('no_license', False)
+    no_readme = query_flags.get('no_readme', False)
+    has_citation = query_flags.get('has_citation', False)
+    has_doi = query_flags.get('has_doi', False)
+    archived = query_flags.get('archived', False)
+    public = query_flags.get('public', False)
+    private = query_flags.get('private', False)
+    fork = query_flags.get('fork', False)
+    no_fork = query_flags.get('no_fork', False)
+
     # Build query from flags
     has_flags = any([dirty, clean, language, recent, starred, tag, no_license, no_readme,
                      has_citation, has_doi, archived, public, private, fork, no_fork])
@@ -154,6 +153,213 @@ def _get_repos_from_query(
         repos = [r for r in repos if not any(r['path'].startswith(e) for e in expanded)]
 
     return repos
+
+
+def _resolve_repos(output_json, pretty, debug, query_string, **query_flags):
+    """Load config, resolve repos from query, handle errors.
+
+    Returns (config, repos) on success, None on failure (after printing error).
+    """
+    if debug:
+        import logging
+        logging.basicConfig(level=logging.DEBUG)
+
+    config = load_config()
+
+    try:
+        repos = _get_repos_from_query(config, query_string, debug=debug, **query_flags)
+    except QueryCompileError as e:
+        _handle_query_error(e, query_string, output_json)
+        return None
+
+    if not repos:
+        _no_repos_message(output_json, pretty)
+        return None
+
+    return config, repos
+
+
+# ============================================================================
+# Audit command
+# ============================================================================
+
+@ops_cmd.command('audit')
+@click.argument('query_string', required=False, default='')
+@click.option('--json', 'output_json', is_flag=True, help='Output as JSONL')
+@click.option('--pretty', is_flag=True, help='Display with rich formatting')
+@click.option('--debug', is_flag=True, help='Enable debug logging')
+@query_options
+def ops_audit_handler(
+    query_string: str,
+    output_json: bool,
+    pretty: bool,
+    debug: bool,
+    # Query flags
+    dirty: bool,
+    clean: bool,
+    language: Optional[str],
+    recent: Optional[str],
+    starred: bool,
+    tag: tuple,
+    no_license: bool,
+    no_readme: bool,
+    has_citation: bool,
+    has_doi: bool,
+    archived: bool,
+    public: bool,
+    private: bool,
+    fork: bool,
+    no_fork: bool,
+):
+    """
+    Audit metadata completeness for repositories.
+
+    Checks each repository for common metadata items: README, LICENSE,
+    CI, citation, DOI, GitHub description, topics, pages, pyproject.toml,
+    and mkdocs.yml. Reports what's missing per-repo and collection-wide.
+
+    \b
+    Examples:
+        # Audit all repos
+        repoindex ops audit --pretty
+        # Audit Python repos only
+        repoindex ops audit --language python --pretty
+        # Machine-readable output
+        repoindex ops audit --json
+    """
+    result = _resolve_repos(
+        output_json, pretty, debug, query_string,
+        dirty=dirty, clean=clean, language=language, recent=recent,
+        starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
+        has_citation=has_citation, has_doi=has_doi, archived=archived,
+        public=public, private=private, fork=fork, no_fork=no_fork,
+    )
+    if result is None:
+        return
+    config, repos = result
+
+    # Run audit checks
+    checks = [
+        ('has_readme', 'README', lambda r: bool(r.get('has_readme'))),
+        ('has_license', 'LICENSE', lambda r: bool(r.get('has_license'))),
+        ('has_ci', 'CI', lambda r: bool(r.get('has_ci'))),
+        ('has_citation', 'Citation file', lambda r: bool(r.get('has_citation'))),
+        ('has_doi', 'DOI', lambda r: bool(r.get('citation_doi'))),
+        ('has_description', 'GitHub description', lambda r: bool(r.get('github_description'))),
+        ('has_topics', 'GitHub topics', lambda r: bool(r.get('github_topics') and r.get('github_topics') != '[]')),
+        ('has_pages', 'GitHub Pages', lambda r: bool(r.get('github_has_pages'))),
+        ('has_pyproject', 'pyproject.toml', lambda r: Path(r.get('path', '')).joinpath('pyproject.toml').exists() if r.get('path') else False),
+        ('has_mkdocs', 'mkdocs.yml', lambda r: Path(r.get('path', '')).joinpath('mkdocs.yml').exists() if r.get('path') else False),
+    ]
+
+    audit_results = []
+    summary_counts = {check_id: 0 for check_id, _, _ in checks}
+
+    for repo in repos:
+        repo_audit = {
+            'name': repo.get('name', ''),
+            'path': repo.get('path', ''),
+            'missing': [],
+            'present': [],
+        }
+        for check_id, _label, check_fn in checks:
+            if check_fn(repo):
+                repo_audit['present'].append(check_id)
+                summary_counts[check_id] += 1
+            else:
+                repo_audit['missing'].append(check_id)
+        repo_audit['score'] = len(repo_audit['present'])
+        repo_audit['total'] = len(checks)
+        audit_results.append(repo_audit)
+
+    total_repos = len(repos)
+
+    if output_json:
+        for result in audit_results:
+            print(json.dumps(result), flush=True)
+        summary = {
+            'type': 'summary',
+            'total_repos': total_repos,
+            'checks': {check_id: {'label': label, 'count': summary_counts[check_id], 'missing': total_repos - summary_counts[check_id]}
+                       for check_id, label, _ in checks},
+        }
+        print(json.dumps(summary), flush=True)
+
+    elif pretty:
+        from rich.console import Console
+        from rich.table import Table
+
+        console = Console()
+        console.print("\n[bold]Metadata Audit[/bold]")
+        console.print(f"[bold]Repositories:[/bold] {total_repos}\n")
+
+        # Repos missing items (sorted by score ascending = worst first)
+        incomplete = [r for r in audit_results if r['missing']]
+        incomplete.sort(key=lambda r: r['score'])
+
+        if incomplete:
+            table = Table(title="Repos with Missing Metadata", show_header=True, show_lines=False)
+            table.add_column("Repo", style="cyan")
+            table.add_column("Score", justify="center")
+            table.add_column("Missing", style="yellow")
+
+            for r in incomplete:
+                missing_labels = []
+                for check_id, label, _ in checks:
+                    if check_id in r['missing']:
+                        missing_labels.append(label)
+                score_str = f"{r['score']}/{r['total']}"
+                table.add_row(r['name'], score_str, ', '.join(missing_labels))
+
+            console.print(table)
+        else:
+            console.print("[green]All repositories have complete metadata![/green]")
+
+        # Summary table
+        console.print()
+        summary_table = Table(title="Collection Summary", show_header=True)
+        summary_table.add_column("Check", style="cyan")
+        summary_table.add_column("Present", justify="right")
+        summary_table.add_column("Missing", justify="right")
+        summary_table.add_column("Coverage", justify="right")
+
+        for check_id, label, _ in checks:
+            count = summary_counts[check_id]
+            missing = total_repos - count
+            pct = (count / total_repos * 100) if total_repos > 0 else 0
+            if pct == 100:
+                pct_str = f"[green]{pct:.0f}%[/green]"
+            elif pct >= 80:
+                pct_str = f"[yellow]{pct:.0f}%[/yellow]"
+            else:
+                pct_str = f"[red]{pct:.0f}%[/red]"
+            summary_table.add_row(
+                label,
+                f"[green]{count}[/green]",
+                f"[red]{missing}[/red]" if missing > 0 else "[dim]0[/dim]",
+                pct_str,
+            )
+
+        console.print(summary_table)
+
+    else:
+        # Simple text output
+        for r in audit_results:
+            if r['missing']:
+                missing_labels = []
+                for check_id, label, _ in checks:
+                    if check_id in r['missing']:
+                        missing_labels.append(label)
+                print(f"{r['name']}: missing {', '.join(missing_labels)}", file=sys.stderr)
+
+        print(f"\nSummary ({total_repos} repos):", file=sys.stderr)
+        for check_id, label, _ in checks:
+            count = summary_counts[check_id]
+            missing = total_repos - count
+            if missing > 0:
+                print(f"  {label}: {count}/{total_repos} ({missing} missing)", file=sys.stderr)
+            else:
+                print(f"  {label}: {count}/{total_repos}", file=sys.stderr)
 
 
 # ============================================================================
@@ -219,26 +425,16 @@ def git_push_handler(
         # Parallel push (faster for many repos)
         repoindex ops git push --parallel 4 --yes
     """
-    if debug:
-        import logging
-        logging.basicConfig(level=logging.DEBUG)
-
-    config = load_config()
-
-    try:
-        repos = _get_repos_from_query(
-            config, query_string,
-            dirty, clean, language, recent, starred, tag,
-            no_license, no_readme, has_citation, has_doi,
-            archived, public, private, fork, no_fork, debug
-        )
-    except QueryCompileError as e:
-        _handle_query_error(e, query_string, output_json)
+    result = _resolve_repos(
+        output_json, pretty, debug, query_string,
+        dirty=dirty, clean=clean, language=language, recent=recent,
+        starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
+        has_citation=has_citation, has_doi=has_doi, archived=archived,
+        public=public, private=private, fork=fork, no_fork=no_fork,
+    )
+    if result is None:
         return
-
-    if not repos:
-        _no_repos_message(output_json, pretty)
-        return
+    config, repos = result
 
     # Set up service
     options = GitOpsOptions(
@@ -266,98 +462,16 @@ def git_push_handler(
             return
 
     # Execute
+    progress_iter = service.push_repos(repos, options)
     if pretty:
-        _git_push_pretty(service, repos, options)
+        _ops_output_pretty(service, progress_iter, options, "Git Push", len(repos),
+                           extra_headers=[("Remote", options.remote)],
+                           success_msg="Pushed {count} repositories")
     elif output_json:
-        _git_push_json(service, repos, options)
+        _ops_output_json(service, progress_iter, options)
     else:
-        _git_push_simple(service, repos, options)
+        _ops_output_simple(service, progress_iter, options, "Push complete")
 
-
-def _git_push_simple(service: GitOpsService, repos: list, options: GitOpsOptions):
-    """Simple text output for git push."""
-    mode = "[dry run] " if options.dry_run else ""
-
-    for progress in service.push_repos(repos, options):
-        print(f"{mode}{progress}", file=sys.stderr)
-
-    result = service.last_result
-    if result:
-        print(f"\n{mode}Push complete:", file=sys.stderr)
-        print(f"  Successful: {result.successful}", file=sys.stderr)
-        if result.skipped > 0:
-            print(f"  Skipped: {result.skipped}", file=sys.stderr)
-        if result.failed > 0:
-            print(f"  Failed: {result.failed}", file=sys.stderr)
-            for error in result.errors:
-                print(f"    - {error}", file=sys.stderr)
-            sys.exit(1)
-
-
-def _git_push_json(service: GitOpsService, repos: list, options: GitOpsOptions):
-    """JSONL output for git push."""
-    for progress in service.push_repos(repos, options):
-        print(json.dumps({'progress': progress}), flush=True)
-
-    result = service.last_result
-    if result:
-        for detail in result.details:
-            print(json.dumps(detail.to_dict()), flush=True)
-        print(json.dumps(result.to_dict()), flush=True)
-
-
-def _git_push_pretty(service: GitOpsService, repos: list, options: GitOpsOptions):
-    """Rich formatted output for git push."""
-    from rich.console import Console
-    from rich.progress import Progress, SpinnerColumn, TextColumn
-    from rich.table import Table
-
-    console = Console()
-    mode = "[bold yellow]DRY RUN[/bold yellow] " if options.dry_run else ""
-
-    console.print(f"\n{mode}[bold]Git Push[/bold]")
-    console.print(f"[bold]Remote:[/bold] {options.remote}")
-    console.print(f"[bold]Repositories:[/bold] {len(repos)}")
-    console.print()
-
-    messages = []
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        console=console,
-    ) as progress:
-        task = progress.add_task("Pushing...", total=None)
-
-        for message in service.push_repos(repos, options):
-            progress.update(task, description=message)
-            messages.append(message)
-
-    result = service.last_result
-    if not result:
-        console.print("[red]Push failed - no result[/red]")
-        sys.exit(1)
-
-    # Summary table
-    table = Table(title=f"{mode}Push Summary", show_header=True)
-    table.add_column("Metric", style="cyan")
-    table.add_column("Value", justify="right")
-
-    table.add_row("Successful", f"[green]{result.successful}[/green]")
-    if result.skipped > 0:
-        table.add_row("Skipped", f"[yellow]{result.skipped}[/yellow]")
-    if result.failed > 0:
-        table.add_row("Failed", f"[red]{result.failed}[/red]")
-
-    console.print(table)
-
-    if result.errors:
-        console.print(f"\n[red]Errors ({len(result.errors)}):[/red]")
-        for error in result.errors:
-            console.print(f"  [red]•[/red] {error}")
-        sys.exit(1)
-
-    if not options.dry_run and result.successful > 0:
-        console.print(f"\n[bold green]✓[/bold green] Pushed {result.successful} repositories")
 
 
 # ============================================================================
@@ -414,26 +528,16 @@ def git_pull_handler(
         # Pull Python repos
         repoindex ops git pull --language python --yes
     """
-    if debug:
-        import logging
-        logging.basicConfig(level=logging.DEBUG)
-
-    config = load_config()
-
-    try:
-        repos = _get_repos_from_query(
-            config, query_string,
-            dirty, clean, language, recent, starred, tag,
-            no_license, no_readme, has_citation, has_doi,
-            archived, public, private, fork, no_fork, debug
-        )
-    except QueryCompileError as e:
-        _handle_query_error(e, query_string, output_json)
+    result = _resolve_repos(
+        output_json, pretty, debug, query_string,
+        dirty=dirty, clean=clean, language=language, recent=recent,
+        starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
+        has_citation=has_citation, has_doi=has_doi, archived=archived,
+        public=public, private=private, fork=fork, no_fork=no_fork,
+    )
+    if result is None:
         return
-
-    if not repos:
-        _no_repos_message(output_json, pretty)
-        return
+    config, repos = result
 
     # Confirmation prompt
     if not dry_run and not yes:
@@ -444,89 +548,15 @@ def git_pull_handler(
     options = GitOpsOptions(remote=remote, dry_run=dry_run)
     service = GitOpsService(config=config)
 
+    progress_iter = service.pull_repos(repos, options)
     if pretty:
-        _git_pull_pretty(service, repos, options)
+        _ops_output_pretty(service, progress_iter, options, "Git Pull", len(repos),
+                           extra_headers=[("Remote", options.remote)],
+                           success_msg="Pulled {count} repositories")
     elif output_json:
-        _git_pull_json(service, repos, options)
+        _ops_output_json(service, progress_iter, options)
     else:
-        _git_pull_simple(service, repos, options)
-
-
-def _git_pull_simple(service: GitOpsService, repos: list, options: GitOpsOptions):
-    """Simple text output for git pull."""
-    mode = "[dry run] " if options.dry_run else ""
-
-    for progress in service.pull_repos(repos, options):
-        print(f"{mode}{progress}", file=sys.stderr)
-
-    result = service.last_result
-    if result:
-        print(f"\n{mode}Pull complete:", file=sys.stderr)
-        print(f"  Successful: {result.successful}", file=sys.stderr)
-        if result.failed > 0:
-            print(f"  Failed: {result.failed}", file=sys.stderr)
-            sys.exit(1)
-
-
-def _git_pull_json(service: GitOpsService, repos: list, options: GitOpsOptions):
-    """JSONL output for git pull."""
-    for progress in service.pull_repos(repos, options):
-        print(json.dumps({'progress': progress}), flush=True)
-
-    result = service.last_result
-    if result:
-        for detail in result.details:
-            print(json.dumps(detail.to_dict()), flush=True)
-        print(json.dumps(result.to_dict()), flush=True)
-
-
-def _git_pull_pretty(service: GitOpsService, repos: list, options: GitOpsOptions):
-    """Rich formatted output for git pull."""
-    from rich.console import Console
-    from rich.progress import Progress, SpinnerColumn, TextColumn
-    from rich.table import Table
-
-    console = Console()
-    mode = "[bold yellow]DRY RUN[/bold yellow] " if options.dry_run else ""
-
-    console.print(f"\n{mode}[bold]Git Pull[/bold]")
-    console.print(f"[bold]Remote:[/bold] {options.remote}")
-    console.print(f"[bold]Repositories:[/bold] {len(repos)}")
-    console.print()
-
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        console=console,
-    ) as progress:
-        task = progress.add_task("Pulling...", total=None)
-
-        for message in service.pull_repos(repos, options):
-            progress.update(task, description=message)
-
-    result = service.last_result
-    if not result:
-        console.print("[red]Pull failed - no result[/red]")
-        sys.exit(1)
-
-    table = Table(title=f"{mode}Pull Summary", show_header=True)
-    table.add_column("Metric", style="cyan")
-    table.add_column("Value", justify="right")
-
-    table.add_row("Successful", f"[green]{result.successful}[/green]")
-    if result.failed > 0:
-        table.add_row("Failed", f"[red]{result.failed}[/red]")
-
-    console.print(table)
-
-    if result.errors:
-        console.print(f"\n[red]Errors ({len(result.errors)}):[/red]")
-        for error in result.errors:
-            console.print(f"  [red]•[/red] {error}")
-        sys.exit(1)
-
-    if not options.dry_run and result.successful > 0:
-        console.print(f"\n[bold green]✓[/bold green] Pulled {result.successful} repositories")
+        _ops_output_simple(service, progress_iter, options, "Pull complete")
 
 
 # ============================================================================
@@ -579,26 +609,16 @@ def git_status_handler(
         # JSONL output for scripting
         repoindex ops git status --json | jq 'select(.ahead > 0)'
     """
-    if debug:
-        import logging
-        logging.basicConfig(level=logging.DEBUG)
-
-    config = load_config()
-
-    try:
-        repos = _get_repos_from_query(
-            config, query_string,
-            dirty, clean, language, recent, starred, tag,
-            no_license, no_readme, has_citation, has_doi,
-            archived, public, private, fork, no_fork, debug
-        )
-    except QueryCompileError as e:
-        _handle_query_error(e, query_string, output_json)
+    result = _resolve_repos(
+        output_json, pretty, debug, query_string,
+        dirty=dirty, clean=clean, language=language, recent=recent,
+        starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
+        has_citation=has_citation, has_doi=has_doi, archived=archived,
+        public=public, private=private, fork=fork, no_fork=no_fork,
+    )
+    if result is None:
         return
-
-    if not repos:
-        _no_repos_message(output_json, pretty)
-        return
+    config, repos = result
 
     options = GitOpsOptions(remote=remote)
     service = GitOpsService(config=config)
@@ -618,7 +638,7 @@ def _git_status_simple(service: GitOpsService, repos: list, options: GitOpsOptio
 
     status = service.last_status
     if status:
-        print(f"\nSummary:", file=sys.stderr)
+        print("\nSummary:", file=sys.stderr)
         print(f"  Total: {status.total}", file=sys.stderr)
         print(f"  Clean: {status.clean}", file=sys.stderr)
         print(f"  Dirty: {status.dirty}", file=sys.stderr)
@@ -647,7 +667,7 @@ def _git_status_pretty(service: GitOpsService, repos: list, options: GitOpsOptio
 
     console = Console()
 
-    console.print(f"\n[bold]Git Status[/bold]")
+    console.print("\n[bold]Git Status[/bold]")
     console.print(f"[bold]Repositories:[/bold] {len(repos)}")
     console.print()
 
@@ -712,6 +732,181 @@ def _git_status_pretty(service: GitOpsService, repos: list, options: GitOpsOptio
 
 
 # ============================================================================
+# GitHub operations subgroup
+# ============================================================================
+
+@ops_cmd.group('github')
+def github_cmd():
+    """GitHub write operations across multiple repositories.
+
+    Set topics, descriptions, and other GitHub settings.
+    Requires the gh CLI to be installed and authenticated.
+
+    \b
+    Examples:
+        # Sync pyproject.toml keywords as GitHub topics
+        repoindex ops github set-topics --from-pyproject --language python --dry-run
+        # Set specific topics
+        repoindex ops github set-topics --topics python,cli,tools --dry-run
+        # Set description from pyproject.toml
+        repoindex ops github set-description --from-pyproject --dry-run
+    """
+    pass
+
+
+@github_cmd.command('set-topics')
+@click.argument('query_string', required=False, default='')
+@click.option('--json', 'output_json', is_flag=True, help='Output as JSONL')
+@click.option('--pretty', is_flag=True, help='Display with rich formatting')
+@click.option('--dry-run', is_flag=True, help='Preview without setting topics')
+@click.option('--topics', help='Comma-separated list of topics to set')
+@click.option('--from-pyproject', is_flag=True, help='Read keywords from pyproject.toml')
+@click.option('--debug', is_flag=True, help='Enable debug logging')
+@query_options
+def github_set_topics_handler(
+    query_string: str,
+    output_json: bool,
+    pretty: bool,
+    dry_run: bool,
+    topics: Optional[str],
+    from_pyproject: bool,
+    debug: bool,
+    # Query flags
+    dirty: bool,
+    clean: bool,
+    language: Optional[str],
+    recent: Optional[str],
+    starred: bool,
+    tag: tuple,
+    no_license: bool,
+    no_readme: bool,
+    has_citation: bool,
+    has_doi: bool,
+    archived: bool,
+    public: bool,
+    private: bool,
+    fork: bool,
+    no_fork: bool,
+):
+    """
+    Set GitHub topics for repositories.
+
+    Sets repository topics on GitHub. Topics can come from an explicit
+    list or be synced from pyproject.toml keywords.
+
+    \b
+    Examples:
+        # Sync from pyproject.toml keywords
+        repoindex ops github set-topics --from-pyproject --language python --dry-run
+        # Set specific topics for all repos
+        repoindex ops github set-topics --topics python,cli,tools --dry-run
+        # Combine: pyproject keywords + extra topics
+        repoindex ops github set-topics --from-pyproject --topics extra-topic --dry-run
+    """
+    if not topics and not from_pyproject:
+        click.echo("Error: specify --topics or --from-pyproject", err=True)
+        return
+
+    result = _resolve_repos(
+        output_json, pretty, debug, query_string,
+        dirty=dirty, clean=clean, language=language, recent=recent,
+        starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
+        has_citation=has_citation, has_doi=has_doi, archived=archived,
+        public=public, private=private, fork=fork, no_fork=no_fork,
+    )
+    if result is None:
+        return
+    config, repos = result
+
+    topic_list = [t.strip() for t in topics.split(',')] if topics else None
+    options = GitHubOpsOptions(dry_run=dry_run)
+    service = GitHubOpsService(config=config)
+
+    progress_iter = service.set_topics(repos, options, topics=topic_list, from_pyproject=from_pyproject)
+    if pretty:
+        _ops_output_pretty(service, progress_iter, options, "Set GitHub Topics", len(repos))
+    elif output_json:
+        _ops_output_json(service, progress_iter, options)
+    else:
+        _ops_output_simple(service, progress_iter, options)
+
+
+@github_cmd.command('set-description')
+@click.argument('query_string', required=False, default='')
+@click.option('--json', 'output_json', is_flag=True, help='Output as JSONL')
+@click.option('--pretty', is_flag=True, help='Display with rich formatting')
+@click.option('--dry-run', is_flag=True, help='Preview without setting description')
+@click.option('--text', help='Description text to set')
+@click.option('--from-pyproject', is_flag=True, help='Read description from pyproject.toml')
+@click.option('--debug', is_flag=True, help='Enable debug logging')
+@query_options
+def github_set_description_handler(
+    query_string: str,
+    output_json: bool,
+    pretty: bool,
+    dry_run: bool,
+    text: Optional[str],
+    from_pyproject: bool,
+    debug: bool,
+    # Query flags
+    dirty: bool,
+    clean: bool,
+    language: Optional[str],
+    recent: Optional[str],
+    starred: bool,
+    tag: tuple,
+    no_license: bool,
+    no_readme: bool,
+    has_citation: bool,
+    has_doi: bool,
+    archived: bool,
+    public: bool,
+    private: bool,
+    fork: bool,
+    no_fork: bool,
+):
+    """
+    Set GitHub description for repositories.
+
+    Sets the repository description on GitHub. Description can be
+    explicit text or synced from pyproject.toml.
+
+    \b
+    Examples:
+        # Sync from pyproject.toml
+        repoindex ops github set-description --from-pyproject --language python --dry-run
+        # Set explicit description
+        repoindex ops github set-description --text "My project" "name == 'my-repo'" --dry-run
+    """
+    if not text and not from_pyproject:
+        click.echo("Error: specify --text or --from-pyproject", err=True)
+        return
+
+    result = _resolve_repos(
+        output_json, pretty, debug, query_string,
+        dirty=dirty, clean=clean, language=language, recent=recent,
+        starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
+        has_citation=has_citation, has_doi=has_doi, archived=archived,
+        public=public, private=private, fork=fork, no_fork=no_fork,
+    )
+    if result is None:
+        return
+    config, repos = result
+
+    options = GitHubOpsOptions(dry_run=dry_run)
+    service = GitHubOpsService(config=config)
+
+    progress_iter = service.set_description(repos, options, text=text, from_pyproject=from_pyproject)
+    if pretty:
+        _ops_output_pretty(service, progress_iter, options, "Set GitHub Description", len(repos))
+    elif output_json:
+        _ops_output_json(service, progress_iter, options)
+    else:
+        _ops_output_simple(service, progress_iter, options)
+
+
+
+# ============================================================================
 # Helper functions
 # ============================================================================
 
@@ -732,12 +927,117 @@ def _handle_query_error(e, query_string, output_json):
 def _no_repos_message(output_json, pretty):
     """Show message when no repos match."""
     if output_json:
-        print(json.dumps({'warning': 'No repositories found matching query'}))
+        print(json.dumps({'warning': 'No repositories found matching query'}), file=sys.stderr)
     elif pretty:
         from rich.console import Console
         Console().print("[yellow]No repositories found matching query.[/yellow]")
     else:
         print("No repositories found matching query.", file=sys.stderr)
+
+
+# ============================================================================
+# Unified output helpers (for operations that produce OperationSummary)
+# ============================================================================
+
+def _ops_output_simple(service, progress_iter, options, op_label="Complete",
+                       success_label="Successful"):
+    """Simple text output for any operation that yields progress and produces OperationSummary."""
+    mode = "[dry run] " if options.dry_run else ""
+
+    for progress in progress_iter:
+        print(f"{mode}{progress}", file=sys.stderr)
+
+    result = service.last_result
+    if result:
+        print(f"\n{mode}{op_label}:", file=sys.stderr)
+        print(f"  {success_label}: {result.successful}", file=sys.stderr)
+        if result.skipped > 0:
+            print(f"  Skipped: {result.skipped}", file=sys.stderr)
+        if result.failed > 0:
+            print(f"  Failed: {result.failed}", file=sys.stderr)
+            for error in result.errors:
+                print(f"    - {error}", file=sys.stderr)
+            sys.exit(1)
+
+
+def _ops_output_json(service, progress_iter, options):
+    """JSONL output for any operation that yields progress and produces OperationSummary."""
+    for progress in progress_iter:
+        print(json.dumps({'progress': progress}), flush=True)
+
+    result = service.last_result
+    if result:
+        for detail in result.details:
+            print(json.dumps(detail.to_dict()), flush=True)
+        print(json.dumps(result.to_dict()), flush=True)
+
+
+def _ops_output_pretty(service, progress_iter, options, title, repo_count,
+                       success_label="Successful",
+                       success_msg=None,
+                       extra_headers=None):
+    """Rich formatted output for any operation that yields progress and produces OperationSummary.
+
+    Args:
+        service: Service with .last_result attribute
+        progress_iter: Iterator yielding progress message strings
+        options: Options object with .dry_run attribute
+        title: Display title (e.g. "Git Push", "Generate codemeta.json")
+        repo_count: Number of repos being processed
+        success_label: Label for the success metric row (default "Successful")
+        success_msg: Success message template with {count} placeholder, shown on completion
+        extra_headers: List of (label, value) tuples for header section
+    """
+    from rich.console import Console
+    from rich.progress import Progress, SpinnerColumn, TextColumn
+    from rich.table import Table
+
+    console = Console()
+    mode = "[bold yellow]DRY RUN[/bold yellow] " if options.dry_run else ""
+
+    console.print(f"\n{mode}[bold]{title}[/bold]")
+    if extra_headers:
+        for label, value in extra_headers:
+            console.print(f"[bold]{label}:[/bold] {value}")
+    console.print(f"[bold]Repositories:[/bold] {repo_count}")
+    console.print()
+
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console,
+    ) as progress:
+        task = progress.add_task("Processing...", total=None)
+
+        for message in progress_iter:
+            progress.update(task, description=message)
+
+    result = service.last_result
+    if not result:
+        console.print(f"[red]{title} failed - no result[/red]")
+        sys.exit(1)
+
+    # Summary table
+    table = Table(title=f"{mode}{title} Summary", show_header=True)
+    table.add_column("Metric", style="cyan")
+    table.add_column("Value", justify="right")
+
+    table.add_row(success_label, f"[green]{result.successful}[/green]")
+    if result.skipped > 0:
+        table.add_row("Skipped", f"[yellow]{result.skipped}[/yellow]")
+    if result.failed > 0:
+        table.add_row("Failed", f"[red]{result.failed}[/red]")
+
+    console.print(table)
+
+    if result.errors:
+        console.print(f"\n[red]Errors ({len(result.errors)}):[/red]")
+        for error in result.errors:
+            console.print(f"  [red]•[/red] {error}")
+        sys.exit(1)
+
+    if not options.dry_run and result.successful > 0 and success_msg:
+        console.print(f"\n[bold green]✓[/bold green] {success_msg.format(count=result.successful)}")
 
 
 # ============================================================================
@@ -826,26 +1126,16 @@ def generate_codemeta_handler(
         # Force overwrite existing files
         repoindex ops generate codemeta --force --dry-run
     """
-    if debug:
-        import logging
-        logging.basicConfig(level=logging.DEBUG)
-
-    config = load_config()
-
-    try:
-        repos = _get_repos_from_query(
-            config, query_string,
-            dirty, clean, language, recent, starred, tag,
-            no_license, no_readme, has_citation, has_doi,
-            archived, public, private, fork, no_fork, debug
-        )
-    except QueryCompileError as e:
-        _handle_query_error(e, query_string, output_json)
+    result = _resolve_repos(
+        output_json, pretty, debug, query_string,
+        dirty=dirty, clean=clean, language=language, recent=recent,
+        starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
+        has_citation=has_citation, has_doi=has_doi, archived=archived,
+        public=public, private=private, fork=fork, no_fork=no_fork,
+    )
+    if result is None:
         return
-
-    if not repos:
-        _no_repos_message(output_json, pretty)
-        return
+    config, repos = result
 
     author_info = _build_author_info(config, author, orcid, email, affiliation)
 
@@ -861,16 +1151,18 @@ def generate_codemeta_handler(
     if options.author:
         extra_headers.append(("Author", options.author.name))
 
+    progress_iter = service.generate_codemeta(repos, options)
     if pretty:
-        _generate_pretty(
-            service, service.generate_codemeta(repos, options), options,
-            file_label, "Generate codemeta.json", len(repos),
-            extra_headers=extra_headers or None,
-        )
+        _ops_output_pretty(service, progress_iter, options,
+                           "Generate codemeta.json", len(repos),
+                           success_label="Generated",
+                           success_msg="Generated {count} " + file_label,
+                           extra_headers=extra_headers or None)
     elif output_json:
-        _generate_json(service, service.generate_codemeta(repos, options), options, file_label)
+        _ops_output_json(service, progress_iter, options)
     else:
-        _generate_simple(service, service.generate_codemeta(repos, options), options, file_label)
+        _ops_output_simple(service, progress_iter, options, "Generation complete",
+                           success_label="Generated")
 
 
 # ============================================================================
@@ -932,26 +1224,16 @@ def generate_license_handler(
         # Force overwrite existing licenses
         repoindex ops generate license --force --license gpl-3.0 --dry-run
     """
-    if debug:
-        import logging
-        logging.basicConfig(level=logging.DEBUG)
-
-    config = load_config()
-
-    try:
-        repos = _get_repos_from_query(
-            config, query_string,
-            dirty, clean, language, recent, starred, tag,
-            no_license, no_readme, has_citation, has_doi,
-            archived, public, private, fork, no_fork, debug
-        )
-    except QueryCompileError as e:
-        _handle_query_error(e, query_string, output_json)
+    result = _resolve_repos(
+        output_json, pretty, debug, query_string,
+        dirty=dirty, clean=clean, language=language, recent=recent,
+        starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
+        has_citation=has_citation, has_doi=has_doi, archived=archived,
+        public=public, private=private, fork=fork, no_fork=no_fork,
+    )
+    if result is None:
         return
-
-    if not repos:
-        _no_repos_message(output_json, pretty)
-        return
+    config, repos = result
 
     author_info = _build_author_info(config, author, None, None, None)
 
@@ -970,16 +1252,18 @@ def generate_license_handler(
     if options.author:
         extra_headers.append(("Copyright holder", options.author.name))
 
+    progress_iter = service.generate_license(repos, options, license_type)
     if pretty:
-        _generate_pretty(
-            service, service.generate_license(repos, options, license_type), options,
-            file_label, "Generate LICENSE", len(repos),
-            extra_headers=extra_headers,
-        )
+        _ops_output_pretty(service, progress_iter, options,
+                           "Generate LICENSE", len(repos),
+                           success_label="Generated",
+                           success_msg="Generated {count} " + file_label,
+                           extra_headers=extra_headers)
     elif output_json:
-        _generate_json(service, service.generate_license(repos, options, license_type), options, file_label)
+        _ops_output_json(service, progress_iter, options)
     else:
-        _generate_simple(service, service.generate_license(repos, options, license_type), options, file_label)
+        _ops_output_simple(service, progress_iter, options, "Generation complete",
+                           success_label="Generated")
 
 
 # ============================================================================
@@ -1022,96 +1306,6 @@ def _build_author_info(
 
     return base_author
 
-
-def _generate_simple(service: BoilerplateService, progress_iter, options: GenerationOptions, file_label: str):
-    """Simple text output for any boilerplate generation."""
-    mode = "[dry run] " if options.dry_run else ""
-
-    for progress in progress_iter:
-        print(f"{mode}{progress}", file=sys.stderr)
-
-    result = service.last_result
-    if result:
-        print(f"\n{mode}Generation complete:", file=sys.stderr)
-        print(f"  Generated: {result.successful}", file=sys.stderr)
-        if result.skipped > 0:
-            print(f"  Skipped: {result.skipped}", file=sys.stderr)
-        if result.failed > 0:
-            print(f"  Failed: {result.failed}", file=sys.stderr)
-            sys.exit(1)
-
-
-def _generate_json(service: BoilerplateService, progress_iter, options: GenerationOptions, file_label: str):
-    """JSONL output for any boilerplate generation."""
-    for progress in progress_iter:
-        print(json.dumps({'progress': progress}), flush=True)
-
-    result = service.last_result
-    if result:
-        for detail in result.details:
-            print(json.dumps(detail.to_dict()), flush=True)
-        print(json.dumps(result.to_dict()), flush=True)
-
-
-def _generate_pretty(
-    service: BoilerplateService,
-    progress_iter,
-    options: GenerationOptions,
-    file_label: str,
-    title: str,
-    repo_count: int,
-    extra_headers: Optional[list] = None,
-):
-    """Rich formatted output for any boilerplate generation."""
-    from rich.console import Console
-    from rich.progress import Progress, SpinnerColumn, TextColumn
-    from rich.table import Table
-
-    console = Console()
-    mode = "[bold yellow]DRY RUN[/bold yellow] " if options.dry_run else ""
-
-    console.print(f"\n{mode}[bold]{title}[/bold]")
-    if extra_headers:
-        for label, value in extra_headers:
-            console.print(f"[bold]{label}:[/bold] {value}")
-    console.print(f"[bold]Repositories:[/bold] {repo_count}")
-    console.print()
-
-    with Progress(
-        SpinnerColumn(),
-        TextColumn("[progress.description]{task.description}"),
-        console=console,
-    ) as progress:
-        task = progress.add_task("Generating...", total=None)
-
-        for message in progress_iter:
-            progress.update(task, description=message)
-
-    result = service.last_result
-    if not result:
-        console.print("[red]Generation failed - no result[/red]")
-        sys.exit(1)
-
-    table = Table(title=f"{mode}Generation Summary", show_header=True)
-    table.add_column("Metric", style="cyan")
-    table.add_column("Value", justify="right")
-
-    table.add_row("Generated", f"[green]{result.successful}[/green]")
-    if result.skipped > 0:
-        table.add_row("Skipped", f"[yellow]{result.skipped}[/yellow]")
-    if result.failed > 0:
-        table.add_row("Failed", f"[red]{result.failed}[/red]")
-
-    console.print(table)
-
-    if result.errors:
-        console.print(f"\n[red]Errors ({len(result.errors)}):[/red]")
-        for error in result.errors:
-            console.print(f"  [red]•[/red] {error}")
-        sys.exit(1)
-
-    if not options.dry_run and result.successful > 0:
-        console.print(f"\n[bold green]✓[/bold green] Generated {result.successful} {file_label}")
 
 
 # ============================================================================
@@ -1171,26 +1365,16 @@ def generate_gitignore_handler(
         # Force overwrite existing files
         repoindex ops generate gitignore --force --dry-run
     """
-    if debug:
-        import logging
-        logging.basicConfig(level=logging.DEBUG)
-
-    config = load_config()
-
-    try:
-        repos = _get_repos_from_query(
-            config, query_string,
-            dirty, clean, language, recent, starred, tag,
-            no_license, no_readme, has_citation, has_doi,
-            archived, public, private, fork, no_fork, debug
-        )
-    except QueryCompileError as e:
-        _handle_query_error(e, query_string, output_json)
+    result = _resolve_repos(
+        output_json, pretty, debug, query_string,
+        dirty=dirty, clean=clean, language=language, recent=recent,
+        starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
+        has_citation=has_citation, has_doi=has_doi, archived=archived,
+        public=public, private=private, fork=fork, no_fork=no_fork,
+    )
+    if result is None:
         return
-
-    if not repos:
-        _no_repos_message(output_json, pretty)
-        return
+    config, repos = result
 
     options = GenerationOptions(
         dry_run=dry_run,
@@ -1201,16 +1385,18 @@ def generate_gitignore_handler(
     file_label = ".gitignore files"
     extra_headers = [("Language", language_template)]
 
+    progress_iter = service.generate_gitignore(repos, options, language_template)
     if pretty:
-        _generate_pretty(
-            service, service.generate_gitignore(repos, options, language_template), options,
-            file_label, "Generate .gitignore", len(repos),
-            extra_headers=extra_headers,
-        )
+        _ops_output_pretty(service, progress_iter, options,
+                           "Generate .gitignore", len(repos),
+                           success_label="Generated",
+                           success_msg="Generated {count} " + file_label,
+                           extra_headers=extra_headers)
     elif output_json:
-        _generate_json(service, service.generate_gitignore(repos, options, language_template), options, file_label)
+        _ops_output_json(service, progress_iter, options)
     else:
-        _generate_simple(service, service.generate_gitignore(repos, options, language_template), options, file_label)
+        _ops_output_simple(service, progress_iter, options, "Generation complete",
+                           success_label="Generated")
 
 
 # ============================================================================
@@ -1268,26 +1454,16 @@ def generate_code_of_conduct_handler(
         # Force overwrite existing files
         repoindex ops generate code-of-conduct --force --dry-run
     """
-    if debug:
-        import logging
-        logging.basicConfig(level=logging.DEBUG)
-
-    config = load_config()
-
-    try:
-        repos = _get_repos_from_query(
-            config, query_string,
-            dirty, clean, language, recent, starred, tag,
-            no_license, no_readme, has_citation, has_doi,
-            archived, public, private, fork, no_fork, debug
-        )
-    except QueryCompileError as e:
-        _handle_query_error(e, query_string, output_json)
+    result = _resolve_repos(
+        output_json, pretty, debug, query_string,
+        dirty=dirty, clean=clean, language=language, recent=recent,
+        starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
+        has_citation=has_citation, has_doi=has_doi, archived=archived,
+        public=public, private=private, fork=fork, no_fork=no_fork,
+    )
+    if result is None:
         return
-
-    if not repos:
-        _no_repos_message(output_json, pretty)
-        return
+    config, repos = result
 
     # Build author info with optional email override
     author_info = _build_author_info(config, None, None, email, None)
@@ -1304,16 +1480,18 @@ def generate_code_of_conduct_handler(
     if options.author and options.author.email:
         extra_headers.append(("Contact", options.author.email))
 
+    progress_iter = service.generate_code_of_conduct(repos, options)
     if pretty:
-        _generate_pretty(
-            service, service.generate_code_of_conduct(repos, options), options,
-            file_label, "Generate CODE_OF_CONDUCT.md", len(repos),
-            extra_headers=extra_headers or None,
-        )
+        _ops_output_pretty(service, progress_iter, options,
+                           "Generate CODE_OF_CONDUCT.md", len(repos),
+                           success_label="Generated",
+                           success_msg="Generated {count} " + file_label,
+                           extra_headers=extra_headers or None)
     elif output_json:
-        _generate_json(service, service.generate_code_of_conduct(repos, options), options, file_label)
+        _ops_output_json(service, progress_iter, options)
     else:
-        _generate_simple(service, service.generate_code_of_conduct(repos, options), options, file_label)
+        _ops_output_simple(service, progress_iter, options, "Generation complete",
+                           success_label="Generated")
 
 
 # ============================================================================
@@ -1367,26 +1545,16 @@ def generate_contributing_handler(
         # Force overwrite existing files
         repoindex ops generate contributing --force --dry-run
     """
-    if debug:
-        import logging
-        logging.basicConfig(level=logging.DEBUG)
-
-    config = load_config()
-
-    try:
-        repos = _get_repos_from_query(
-            config, query_string,
-            dirty, clean, language, recent, starred, tag,
-            no_license, no_readme, has_citation, has_doi,
-            archived, public, private, fork, no_fork, debug
-        )
-    except QueryCompileError as e:
-        _handle_query_error(e, query_string, output_json)
+    result = _resolve_repos(
+        output_json, pretty, debug, query_string,
+        dirty=dirty, clean=clean, language=language, recent=recent,
+        starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
+        has_citation=has_citation, has_doi=has_doi, archived=archived,
+        public=public, private=private, fork=fork, no_fork=no_fork,
+    )
+    if result is None:
         return
-
-    if not repos:
-        _no_repos_message(output_json, pretty)
-        return
+    config, repos = result
 
     options = GenerationOptions(
         dry_run=dry_run,
@@ -1396,12 +1564,382 @@ def generate_contributing_handler(
     service = BoilerplateService(config=config)
     file_label = "CONTRIBUTING.md files"
 
+    progress_iter = service.generate_contributing(repos, options)
     if pretty:
-        _generate_pretty(
-            service, service.generate_contributing(repos, options), options,
-            file_label, "Generate CONTRIBUTING.md", len(repos),
-        )
+        _ops_output_pretty(service, progress_iter, options,
+                           "Generate CONTRIBUTING.md", len(repos),
+                           success_label="Generated",
+                           success_msg="Generated {count} " + file_label)
     elif output_json:
-        _generate_json(service, service.generate_contributing(repos, options), options, file_label)
+        _ops_output_json(service, progress_iter, options)
     else:
-        _generate_simple(service, service.generate_contributing(repos, options), options, file_label)
+        _ops_output_simple(service, progress_iter, options, "Generation complete",
+                           success_label="Generated")
+
+
+# ============================================================================
+# Generate citation command
+# ============================================================================
+
+@generate_cmd.command('citation')
+@click.argument('query_string', required=False, default='')
+@click.option('--json', 'output_json', is_flag=True, help='Output as JSONL')
+@click.option('--pretty', is_flag=True, help='Display with rich formatting')
+@click.option('--dry-run', is_flag=True, help='Preview without writing files')
+@click.option('--force', is_flag=True, help='Overwrite existing CITATION.cff files')
+@click.option('--author', help='Author name (overrides config)')
+@click.option('--orcid', help='ORCID identifier (overrides config)')
+@click.option('--email', help='Author email (overrides config)')
+@click.option('--affiliation', help='Author affiliation (overrides config)')
+@click.option('--debug', is_flag=True, help='Enable debug logging')
+@query_options
+def generate_citation_handler(
+    query_string: str,
+    output_json: bool,
+    pretty: bool,
+    dry_run: bool,
+    force: bool,
+    author: Optional[str],
+    orcid: Optional[str],
+    email: Optional[str],
+    affiliation: Optional[str],
+    debug: bool,
+    # Query flags
+    dirty: bool,
+    clean: bool,
+    language: Optional[str],
+    recent: Optional[str],
+    starred: bool,
+    tag: tuple,
+    no_license: bool,
+    no_readme: bool,
+    has_citation: bool,
+    has_doi: bool,
+    archived: bool,
+    public: bool,
+    private: bool,
+    fork: bool,
+    no_fork: bool,
+):
+    """
+    Generate CITATION.cff files for repositories.
+
+    Creates CITATION.cff metadata files following the CFF 1.2.0 standard.
+    Reads pyproject.toml for project metadata (name, version, description,
+    license, keywords). Uses author information from config or CLI options.
+
+    When regenerating with --force, preserves any existing DOI.
+
+    \b
+    Examples:
+        # Generate for Python repos
+        repoindex ops generate citation --language python --dry-run
+        # Generate with author info
+        repoindex ops generate citation --author "Jane Doe" --orcid "0000-0001-2345-6789" --dry-run
+        # Force overwrite existing files (preserves DOI)
+        repoindex ops generate citation --force --dry-run
+    """
+    result = _resolve_repos(
+        output_json, pretty, debug, query_string,
+        dirty=dirty, clean=clean, language=language, recent=recent,
+        starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
+        has_citation=has_citation, has_doi=has_doi, archived=archived,
+        public=public, private=private, fork=fork, no_fork=no_fork,
+    )
+    if result is None:
+        return
+    config, repos = result
+
+    author_info = _build_author_info(config, author, orcid, email, affiliation)
+
+    options = GenerationOptions(
+        dry_run=dry_run,
+        force=force,
+        author=author_info,
+    )
+
+    service = BoilerplateService(config=config)
+    file_label = "CITATION.cff files"
+    extra_headers = []
+    if options.author:
+        extra_headers.append(("Author", options.author.name))
+    if options.author and options.author.orcid:
+        extra_headers.append(("ORCID", options.author.orcid))
+
+    progress_iter = service.generate_citation_cff(repos, options)
+    if pretty:
+        _ops_output_pretty(service, progress_iter, options,
+                           "Generate CITATION.cff", len(repos),
+                           success_label="Generated",
+                           success_msg="Generated {count} " + file_label,
+                           extra_headers=extra_headers or None)
+    elif output_json:
+        _ops_output_json(service, progress_iter, options)
+    else:
+        _ops_output_simple(service, progress_iter, options, "Generation complete",
+                           success_label="Generated")
+
+
+# ============================================================================
+# Generate zenodo command
+# ============================================================================
+
+@generate_cmd.command('zenodo')
+@click.argument('query_string', required=False, default='')
+@click.option('--json', 'output_json', is_flag=True, help='Output as JSONL')
+@click.option('--pretty', is_flag=True, help='Display with rich formatting')
+@click.option('--dry-run', is_flag=True, help='Preview without writing files')
+@click.option('--force', is_flag=True, help='Overwrite existing .zenodo.json files')
+@click.option('--author', help='Author name (overrides config)')
+@click.option('--orcid', help='ORCID identifier (overrides config)')
+@click.option('--email', help='Author email (overrides config)')
+@click.option('--affiliation', help='Author affiliation (overrides config)')
+@click.option('--debug', is_flag=True, help='Enable debug logging')
+@query_options
+def generate_zenodo_handler(
+    query_string: str,
+    output_json: bool,
+    pretty: bool,
+    dry_run: bool,
+    force: bool,
+    author: Optional[str],
+    orcid: Optional[str],
+    email: Optional[str],
+    affiliation: Optional[str],
+    debug: bool,
+    # Query flags
+    dirty: bool,
+    clean: bool,
+    language: Optional[str],
+    recent: Optional[str],
+    starred: bool,
+    tag: tuple,
+    no_license: bool,
+    no_readme: bool,
+    has_citation: bool,
+    has_doi: bool,
+    archived: bool,
+    public: bool,
+    private: bool,
+    fork: bool,
+    no_fork: bool,
+):
+    """
+    Generate .zenodo.json files for repositories.
+
+    Creates .zenodo.json metadata files for Zenodo DOI minting.
+    Reads pyproject.toml for project metadata (name, version, description,
+    license, keywords). Uses author information from config or CLI options.
+
+    When regenerating with --force, preserves any existing DOI.
+
+    \b
+    Examples:
+        # Generate for Python repos
+        repoindex ops generate zenodo --language python --dry-run
+        # Generate with author info
+        repoindex ops generate zenodo --author "Jane Doe" --orcid "0000-0001-2345-6789" --dry-run
+        # Force overwrite existing files (preserves DOI)
+        repoindex ops generate zenodo --force --dry-run
+    """
+    result = _resolve_repos(
+        output_json, pretty, debug, query_string,
+        dirty=dirty, clean=clean, language=language, recent=recent,
+        starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
+        has_citation=has_citation, has_doi=has_doi, archived=archived,
+        public=public, private=private, fork=fork, no_fork=no_fork,
+    )
+    if result is None:
+        return
+    config, repos = result
+
+    author_info = _build_author_info(config, author, orcid, email, affiliation)
+
+    options = GenerationOptions(
+        dry_run=dry_run,
+        force=force,
+        author=author_info,
+    )
+
+    service = BoilerplateService(config=config)
+    file_label = ".zenodo.json files"
+    extra_headers = []
+    if options.author:
+        extra_headers.append(("Author", options.author.name))
+    if options.author and options.author.orcid:
+        extra_headers.append(("ORCID", options.author.orcid))
+
+    progress_iter = service.generate_zenodo_json(repos, options)
+    if pretty:
+        _ops_output_pretty(service, progress_iter, options,
+                           "Generate .zenodo.json", len(repos),
+                           success_label="Generated",
+                           success_msg="Generated {count} " + file_label,
+                           extra_headers=extra_headers or None)
+    elif output_json:
+        _ops_output_json(service, progress_iter, options)
+    else:
+        _ops_output_simple(service, progress_iter, options, "Generation complete",
+                           success_label="Generated")
+
+
+# ============================================================================
+# Generate mkdocs command
+# ============================================================================
+
+@generate_cmd.command('mkdocs')
+@click.argument('query_string', required=False, default='')
+@click.option('--json', 'output_json', is_flag=True, help='Output as JSONL')
+@click.option('--pretty', is_flag=True, help='Display with rich formatting')
+@click.option('--dry-run', is_flag=True, help='Preview without writing files')
+@click.option('--force', is_flag=True, help='Overwrite existing mkdocs.yml files')
+@click.option('--debug', is_flag=True, help='Enable debug logging')
+@query_options
+def generate_mkdocs_handler(
+    query_string: str,
+    output_json: bool,
+    pretty: bool,
+    dry_run: bool,
+    force: bool,
+    debug: bool,
+    # Query flags
+    dirty: bool,
+    clean: bool,
+    language: Optional[str],
+    recent: Optional[str],
+    starred: bool,
+    tag: tuple,
+    no_license: bool,
+    no_readme: bool,
+    has_citation: bool,
+    has_doi: bool,
+    archived: bool,
+    public: bool,
+    private: bool,
+    fork: bool,
+    no_fork: bool,
+):
+    """
+    Generate mkdocs.yml files for repositories.
+
+    Scaffolds mkdocs.yml with Material theme, dark/light toggle,
+    standard markdown extensions, and auto-detected nav from docs/.
+
+    \b
+    Examples:
+        # Generate for Python repos
+        repoindex ops generate mkdocs --language python --dry-run
+        # Force overwrite existing files
+        repoindex ops generate mkdocs --force --dry-run
+    """
+    result = _resolve_repos(
+        output_json, pretty, debug, query_string,
+        dirty=dirty, clean=clean, language=language, recent=recent,
+        starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
+        has_citation=has_citation, has_doi=has_doi, archived=archived,
+        public=public, private=private, fork=fork, no_fork=no_fork,
+    )
+    if result is None:
+        return
+    config, repos = result
+
+    options = GenerationOptions(
+        dry_run=dry_run,
+        force=force,
+    )
+
+    service = BoilerplateService(config=config)
+    file_label = "mkdocs.yml files"
+
+    progress_iter = service.generate_mkdocs(repos, options)
+    if pretty:
+        _ops_output_pretty(service, progress_iter, options,
+                           "Generate mkdocs.yml", len(repos),
+                           success_label="Generated",
+                           success_msg="Generated {count} " + file_label)
+    elif output_json:
+        _ops_output_json(service, progress_iter, options)
+    else:
+        _ops_output_simple(service, progress_iter, options, "Generation complete",
+                           success_label="Generated")
+
+
+# ============================================================================
+# Generate gh-pages command
+# ============================================================================
+
+@generate_cmd.command('gh-pages')
+@click.argument('query_string', required=False, default='')
+@click.option('--json', 'output_json', is_flag=True, help='Output as JSONL')
+@click.option('--pretty', is_flag=True, help='Display with rich formatting')
+@click.option('--dry-run', is_flag=True, help='Preview without writing files')
+@click.option('--force', is_flag=True, help='Overwrite existing workflow files')
+@click.option('--debug', is_flag=True, help='Enable debug logging')
+@query_options
+def generate_gh_pages_handler(
+    query_string: str,
+    output_json: bool,
+    pretty: bool,
+    dry_run: bool,
+    force: bool,
+    debug: bool,
+    # Query flags
+    dirty: bool,
+    clean: bool,
+    language: Optional[str],
+    recent: Optional[str],
+    starred: bool,
+    tag: tuple,
+    no_license: bool,
+    no_readme: bool,
+    has_citation: bool,
+    has_doi: bool,
+    archived: bool,
+    public: bool,
+    private: bool,
+    fork: bool,
+    no_fork: bool,
+):
+    """
+    Generate GitHub Pages deployment workflow for repositories.
+
+    Creates .github/workflows/deploy-docs.yml for deploying
+    MkDocs sites to GitHub Pages via GitHub Actions.
+
+    \b
+    Examples:
+        # Generate for Python repos
+        repoindex ops generate gh-pages --language python --dry-run
+        # Force overwrite existing workflow
+        repoindex ops generate gh-pages --force --dry-run
+    """
+    result = _resolve_repos(
+        output_json, pretty, debug, query_string,
+        dirty=dirty, clean=clean, language=language, recent=recent,
+        starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
+        has_citation=has_citation, has_doi=has_doi, archived=archived,
+        public=public, private=private, fork=fork, no_fork=no_fork,
+    )
+    if result is None:
+        return
+    config, repos = result
+
+    options = GenerationOptions(
+        dry_run=dry_run,
+        force=force,
+    )
+
+    service = BoilerplateService(config=config)
+    file_label = "deploy-docs.yml files"
+
+    progress_iter = service.generate_gh_pages_workflow(repos, options)
+    if pretty:
+        _ops_output_pretty(service, progress_iter, options,
+                           "Generate deploy-docs.yml", len(repos),
+                           success_label="Generated",
+                           success_msg="Generated {count} " + file_label)
+    elif output_json:
+        _ops_output_json(service, progress_iter, options)
+    else:
+        _ops_output_simple(service, progress_iter, options, "Generation complete",
+                           success_label="Generated")
