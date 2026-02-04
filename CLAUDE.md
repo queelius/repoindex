@@ -494,11 +494,13 @@ repo_id (FK→repos), tag, source ('user'|'implicit'|'github'), created_at
 -- Primary key: (repo_id, tag)
 ```
 
-**publications table** (package registries):
+**publications table** (package registries — source of truth for published packages):
 ```
-repo_id (FK→repos), registry ('pypi'|'npm'|'cran'|'cargo'|'docker'),
-package_name, current_version, published, url, downloads_total, downloads_30d
+id, repo_id (FK→repos, CASCADE), registry ('pypi'|'cran'|'zenodo'|'npm'|'cargo'|'docker'),
+package_name, current_version, published (0=detected, 1=confirmed on registry),
+url, doi (Zenodo only), downloads_total, downloads_30d, last_published, scanned_at
 -- Unique: (repo_id, registry)
+-- package_name may differ from repo name (e.g., repo 'btk' → pypi 'bookmark-tk')
 ```
 
 **Example SQL queries**:
