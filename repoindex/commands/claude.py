@@ -314,6 +314,80 @@ repoindex copy ~/backup --dirty --dry-run          # Preview dirty repos
 repoindex copy ~/backup --exclude-git              # Skip .git directories
 ```
 
+## Audit (metadata completeness)
+
+```bash
+# Audit all repos (pretty output with category tables)
+repoindex ops audit --pretty
+
+# Machine-readable output for automation
+repoindex ops audit --json
+
+# Filter by category (essentials, development, discoverability, documentation)
+repoindex ops audit --category essentials --pretty
+
+# Filter by severity threshold (critical, recommended, suggested)
+repoindex ops audit --severity critical --pretty
+
+# Combine with query flags
+repoindex ops audit --language python --pretty
+repoindex ops audit --json --severity recommended
+```
+
+**JSON output** (JSONL — one line per repo, then summary):
+- Each repo line: `name`, `path`, `score`, `passed`, `total`, `categories`, `failed`, `fix_commands`
+- `fix_commands` lists actionable repoindex commands to fix failures
+- Summary line: `type: "summary"`, `overall_score`, per-check and per-category stats
+
+**19 checks across 4 categories:**
+- **Essentials** (critical): README, LICENSE, .gitignore, Remote URL
+- **Development** (recommended/suggested): CI/CD, Tests, Build config, Clean tree, Synced
+- **Discoverability** (recommended/suggested): Description, Topics, Citation, DOI, Published
+- **Documentation** (recommended/suggested): Changelog, Docs site, Contributing, Code of Conduct, CLAUDE.md
+
+## Generate (boilerplate files)
+
+```bash
+# Generate CITATION.cff from pyproject.toml + config author
+repoindex ops generate citation --language python --dry-run
+
+# Generate .zenodo.json for DOI minting
+repoindex ops generate zenodo --language python --dry-run
+
+# Generate mkdocs.yml with Material theme
+repoindex ops generate mkdocs --dry-run
+
+# Generate GitHub Pages deployment workflow
+repoindex ops generate gh-pages --dry-run
+
+# Other generators
+repoindex ops generate codemeta --dry-run
+repoindex ops generate license --license mit --no-license --dry-run
+repoindex ops generate gitignore --lang python --dry-run
+repoindex ops generate code-of-conduct --dry-run
+repoindex ops generate contributing --dry-run
+```
+
+All generate commands support: `--dry-run`, `--force`, `--json`, `--pretty`, plus query flags.
+
+## GitHub Operations
+
+```bash
+# Sync pyproject.toml keywords as GitHub topics
+repoindex ops github set-topics --from-pyproject --language python --dry-run
+
+# Set explicit topics
+repoindex ops github set-topics --topics python,cli,tools --dry-run
+
+# Set description from pyproject.toml
+repoindex ops github set-description --from-pyproject --dry-run
+
+# Set explicit description
+repoindex ops github set-description --text "My project" "name == 'my-repo'" --dry-run
+```
+
+Requires `gh` CLI installed and authenticated.
+
 ## Export (ECHO format)
 
 ```bash
