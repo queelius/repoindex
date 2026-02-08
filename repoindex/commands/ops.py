@@ -187,12 +187,20 @@ def _resolve_repos(output_json, pretty, debug, query_string, **query_flags):
 @click.argument('query_string', required=False, default='')
 @click.option('--json', 'output_json', is_flag=True, help='Output as JSONL')
 @click.option('--pretty', is_flag=True, help='Display with rich formatting')
+@click.option('--category', 'audit_category',
+              type=click.Choice(['essentials', 'development', 'discoverability', 'documentation']),
+              help='Filter to one category')
+@click.option('--severity', 'audit_severity',
+              type=click.Choice(['critical', 'recommended', 'suggested']),
+              help='Minimum severity threshold (critical=only critical, recommended=critical+recommended, suggested=all)')
 @click.option('--debug', is_flag=True, help='Enable debug logging')
 @query_options
 def ops_audit_handler(
     query_string: str,
     output_json: bool,
     pretty: bool,
+    audit_category: Optional[str],
+    audit_severity: Optional[str],
     debug: bool,
     # Query flags
     dirty: bool,
@@ -214,19 +222,27 @@ def ops_audit_handler(
     """
     Audit metadata completeness for repositories.
 
-    Checks each repository for common metadata items: README, LICENSE,
-    CI, citation, DOI, GitHub description, topics, pages, pyproject.toml,
-    and mkdocs.yml. Reports what's missing per-repo and collection-wide.
+    Checks repositories across 4 categories (essentials, development,
+    discoverability, documentation) with severity levels (critical,
+    recommended, suggested). Reports scores, missing items, and
+    actionable fix commands.
 
     \b
     Examples:
-        # Audit all repos
+        # Audit all repos (pretty output)
         repoindex ops audit --pretty
         # Audit Python repos only
         repoindex ops audit --language python --pretty
-        # Machine-readable output
+        # Only essential checks
+        repoindex ops audit --category essentials --pretty
+        # Only critical issues
+        repoindex ops audit --severity critical --pretty
+        # Machine-readable output for Claude Code
         repoindex ops audit --json
     """
+    from ..domain.audit import Category as AuditCategory, Severity as AuditSeverity
+    from ..services.audit_service import AuditService, CHECKS, _CHECKS_BY_ID
+
     result = _resolve_repos(
         output_json, pretty, debug, query_string,
         dirty=dirty, clean=clean, language=language, recent=recent,
@@ -238,128 +254,199 @@ def ops_audit_handler(
         return
     config, repos = result
 
-    # Run audit checks
-    checks = [
-        ('has_readme', 'README', lambda r: bool(r.get('has_readme'))),
-        ('has_license', 'LICENSE', lambda r: bool(r.get('has_license'))),
-        ('has_ci', 'CI', lambda r: bool(r.get('has_ci'))),
-        ('has_citation', 'Citation file', lambda r: bool(r.get('has_citation'))),
-        ('has_doi', 'DOI', lambda r: bool(r.get('citation_doi'))),
-        ('has_description', 'GitHub description', lambda r: bool(r.get('github_description'))),
-        ('has_topics', 'GitHub topics', lambda r: bool(r.get('github_topics') and r.get('github_topics') != '[]')),
-        ('has_pages', 'GitHub Pages', lambda r: bool(r.get('github_has_pages'))),
-        ('has_pyproject', 'pyproject.toml', lambda r: Path(r.get('path', '')).joinpath('pyproject.toml').exists() if r.get('path') else False),
-        ('has_mkdocs', 'mkdocs.yml', lambda r: Path(r.get('path', '')).joinpath('mkdocs.yml').exists() if r.get('path') else False),
-    ]
+    # Convert string options to enums
+    cat_enum = AuditCategory(audit_category) if audit_category else None
+    sev_enum = AuditSeverity(audit_severity) if audit_severity else None
 
-    audit_results = []
-    summary_counts = {check_id: 0 for check_id, _, _ in checks}
+    service = AuditService(config=config)
 
-    for repo in repos:
-        repo_audit = {
-            'name': repo.get('name', ''),
-            'path': repo.get('path', ''),
-            'missing': [],
-            'present': [],
-        }
-        for check_id, _label, check_fn in checks:
-            if check_fn(repo):
-                repo_audit['present'].append(check_id)
-                summary_counts[check_id] += 1
-            else:
-                repo_audit['missing'].append(check_id)
-        repo_audit['score'] = len(repo_audit['present'])
-        repo_audit['total'] = len(checks)
-        audit_results.append(repo_audit)
-
-    total_repos = len(repos)
-
-    if output_json:
-        for result in audit_results:
-            print(json.dumps(result), flush=True)
-        summary = {
-            'type': 'summary',
-            'total_repos': total_repos,
-            'checks': {check_id: {'label': label, 'count': summary_counts[check_id], 'missing': total_repos - summary_counts[check_id]}
-                       for check_id, label, _ in checks},
-        }
-        print(json.dumps(summary), flush=True)
-
-    elif pretty:
-        from rich.console import Console
-        from rich.table import Table
-
-        console = Console()
-        console.print("\n[bold]Metadata Audit[/bold]")
-        console.print(f"[bold]Repositories:[/bold] {total_repos}\n")
-
-        # Repos missing items (sorted by score ascending = worst first)
-        incomplete = [r for r in audit_results if r['missing']]
-        incomplete.sort(key=lambda r: r['score'])
-
-        if incomplete:
-            table = Table(title="Repos with Missing Metadata", show_header=True, show_lines=False)
-            table.add_column("Repo", style="cyan")
-            table.add_column("Score", justify="center")
-            table.add_column("Missing", style="yellow")
-
-            for r in incomplete:
-                missing_labels = []
-                for check_id, label, _ in checks:
-                    if check_id in r['missing']:
-                        missing_labels.append(label)
-                score_str = f"{r['score']}/{r['total']}"
-                table.add_row(r['name'], score_str, ', '.join(missing_labels))
-
-            console.print(table)
+    # Open DB for publications check
+    with Database(config=config, read_only=True) as db:
+        progress_iter = service.audit_repos(
+            repos, db=db, category=cat_enum, severity=sev_enum
+        )
+        # Consume progress
+        if pretty:
+            _audit_output_pretty(service, progress_iter, _CHECKS_BY_ID)
+        elif output_json:
+            _audit_output_json(service, progress_iter)
         else:
-            console.print("[green]All repositories have complete metadata![/green]")
+            _audit_output_simple(service, progress_iter, _CHECKS_BY_ID)
 
-        # Summary table
+
+def _audit_output_json(service, progress_iter):
+    """JSONL output for audit: one line per repo, then summary."""
+    # Consume progress (discard messages)
+    for _ in progress_iter:
+        pass
+
+    results = service.last_results or []
+    summary = service.last_summary
+
+    for repo_result in results:
+        print(json.dumps(repo_result.to_dict()), flush=True)
+
+    if summary:
+        print(json.dumps(summary.to_dict()), flush=True)
+
+
+def _audit_output_simple(service, progress_iter, checks_by_id):
+    """Simple text output for audit."""
+    for progress in progress_iter:
+        print(progress, file=sys.stderr)
+
+    results = service.last_results or []
+    summary = service.last_summary
+
+    # Per-repo failures
+    for r in results:
+        failed = r.failed_checks
+        if failed:
+            labels = [checks_by_id[f.check_id].label for f in failed if f.check_id in checks_by_id]
+            print(f"{r.name}: missing {', '.join(labels)}", file=sys.stderr)
+
+    if summary:
+        print(f"\nSummary ({summary.total_repos} repos, score {summary.overall_score:.0%}):", file=sys.stderr)
+        for cat in ['essentials', 'development', 'discoverability', 'documentation']:
+            cat_data = summary.categories.get(cat)
+            if cat_data:
+                pct = cat_data['score']
+                print(f"  {cat}: {cat_data['passed']}/{cat_data['total']} ({pct:.0%})", file=sys.stderr)
+
+
+def _audit_output_pretty(service, progress_iter, checks_by_id):
+    """Rich formatted output for audit."""
+    from rich.console import Console
+    from rich.progress import Progress, SpinnerColumn, TextColumn
+    from rich.table import Table
+
+    console = Console()
+
+    # Progress spinner
+    with Progress(
+        SpinnerColumn(),
+        TextColumn("[progress.description]{task.description}"),
+        console=console,
+    ) as progress:
+        task = progress.add_task("Auditing...", total=None)
+        for message in progress_iter:
+            progress.update(task, description=message)
+
+    results = service.last_results or []
+    summary = service.last_summary
+    if not summary:
+        console.print("[red]Audit failed - no summary[/red]")
+        return
+
+    total_repos = summary.total_repos
+    console.print(f"\n[bold]Metadata Audit[/bold]")
+    console.print(f"[bold]Repositories:[/bold] {total_repos}")
+    console.print(f"[bold]Overall Score:[/bold] {summary.overall_score:.0%}\n")
+
+    # --- Repos needing attention (sorted worst-first) ---
+    incomplete = [r for r in results if r.failed_checks]
+    incomplete.sort(key=lambda r: r.score)
+
+    if incomplete:
+        table = Table(title="Repos Needing Attention", show_header=True, show_lines=False)
+        table.add_column("Repo", style="cyan")
+        table.add_column("Score", justify="center")
+        table.add_column("Critical/Recommended Missing", style="yellow")
+
+        from ..domain.audit import Severity as _Sev
+        for r in incomplete:
+            # Show critical and recommended failures
+            important_fails = [
+                f for f in r.failed_checks
+                if f.check_id in checks_by_id
+                and checks_by_id[f.check_id].severity in (_Sev.CRITICAL, _Sev.RECOMMENDED)
+            ]
+            if not important_fails:
+                # Only suggested failures — still show but dim
+                labels = [checks_by_id[f.check_id].label for f in r.failed_checks
+                          if f.check_id in checks_by_id]
+                label_str = f"[dim]{', '.join(labels)}[/dim]"
+            else:
+                labels = [checks_by_id[f.check_id].label for f in important_fails]
+                label_str = ', '.join(labels)
+
+            score_pct = f"{r.score:.0%}"
+            if r.score < 0.5:
+                score_str = f"[red]{score_pct}[/red]"
+            elif r.score < 0.8:
+                score_str = f"[yellow]{score_pct}[/yellow]"
+            else:
+                score_str = f"[green]{score_pct}[/green]"
+
+            table.add_row(r.name, score_str, label_str)
+
+        console.print(table)
+    else:
+        console.print("[green]All repositories have complete metadata![/green]")
+
+    # --- Coverage by Category ---
+    from ..domain.audit import Severity as AuditSeverity
+    severity_icon = {
+        AuditSeverity.CRITICAL: "[red]*[/red]",
+        AuditSeverity.RECOMMENDED: "[yellow]+[/yellow]",
+        AuditSeverity.SUGGESTED: "[dim]·[/dim]",
+    }
+
+    # Group checks by category
+    from ..domain.audit import Category as AuditCategory
+    for cat in AuditCategory:
+        cat_checks = [c for c in checks_by_id.values() if c.category == cat]
+        if not cat_checks:
+            continue
+
+        cat_data = summary.categories.get(cat.value)
+        if not cat_data:
+            continue
+
+        cat_pct = cat_data['score']
         console.print()
-        summary_table = Table(title="Collection Summary", show_header=True)
-        summary_table.add_column("Check", style="cyan")
-        summary_table.add_column("Present", justify="right")
-        summary_table.add_column("Missing", justify="right")
-        summary_table.add_column("Coverage", justify="right")
+        cat_table = Table(
+            title=f"{cat.value.title()} ({cat_pct:.0%})",
+            show_header=True,
+        )
+        cat_table.add_column("", width=1)  # severity icon
+        cat_table.add_column("Check", style="cyan")
+        cat_table.add_column("Present", justify="right")
+        cat_table.add_column("Missing", justify="right")
+        cat_table.add_column("Coverage", justify="right")
 
-        for check_id, label, _ in checks:
-            count = summary_counts[check_id]
-            missing = total_repos - count
-            pct = (count / total_repos * 100) if total_repos > 0 else 0
+        for check in cat_checks:
+            stats = summary.checks.get(check.id, {})
+            passed = stats.get('passed', 0)
+            missing = total_repos - passed
+            pct = (passed / total_repos * 100) if total_repos > 0 else 0
+
             if pct == 100:
                 pct_str = f"[green]{pct:.0f}%[/green]"
             elif pct >= 80:
                 pct_str = f"[yellow]{pct:.0f}%[/yellow]"
             else:
                 pct_str = f"[red]{pct:.0f}%[/red]"
-            summary_table.add_row(
-                label,
-                f"[green]{count}[/green]",
+
+            icon = severity_icon.get(check.severity, "")
+            cat_table.add_row(
+                icon,
+                check.label,
+                f"[green]{passed}[/green]",
                 f"[red]{missing}[/red]" if missing > 0 else "[dim]0[/dim]",
                 pct_str,
             )
 
-        console.print(summary_table)
+        console.print(cat_table)
 
+    # Overall score line
+    console.print()
+    if summary.overall_score >= 0.9:
+        console.print(f"[bold green]Overall: {summary.overall_score:.0%}[/bold green]")
+    elif summary.overall_score >= 0.7:
+        console.print(f"[bold yellow]Overall: {summary.overall_score:.0%}[/bold yellow]")
     else:
-        # Simple text output
-        for r in audit_results:
-            if r['missing']:
-                missing_labels = []
-                for check_id, label, _ in checks:
-                    if check_id in r['missing']:
-                        missing_labels.append(label)
-                print(f"{r['name']}: missing {', '.join(missing_labels)}", file=sys.stderr)
-
-        print(f"\nSummary ({total_repos} repos):", file=sys.stderr)
-        for check_id, label, _ in checks:
-            count = summary_counts[check_id]
-            missing = total_repos - count
-            if missing > 0:
-                print(f"  {label}: {count}/{total_repos} ({missing} missing)", file=sys.stderr)
-            else:
-                print(f"  {label}: {count}/{total_repos}", file=sys.stderr)
+        console.print(f"[bold red]Overall: {summary.overall_score:.0%}[/bold red]")
 
 
 # ============================================================================

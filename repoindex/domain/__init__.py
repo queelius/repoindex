@@ -28,6 +28,15 @@ from .operation import (
     GitPullResult,
     FileGenerationResult,
 )
+from .audit import (
+    Severity,
+    Category,
+    AuditCheck,
+    CheckResult,
+    CategoryScore,
+    RepoAuditResult,
+    AuditSummary,
+)
 
 __all__ = [
     'Repository',
@@ -55,4 +64,12 @@ __all__ = [
     'GitPushResult',
     'GitPullResult',
     'FileGenerationResult',
+    # Audit
+    'Severity',
+    'Category',
+    'AuditCheck',
+    'CheckResult',
+    'CategoryScore',
+    'RepoAuditResult',
+    'AuditSummary',
 ]
