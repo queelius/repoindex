@@ -1,7 +1,8 @@
 """
 Boilerplate file generator service for repoindex.
 
-Generates boilerplate files: LICENSE, codemeta.json, .gitignore,
+Generates boilerplate files: LICENSE, codemeta.json, CITATION.cff,
+.zenodo.json, mkdocs.yml, deploy-docs.yml, .gitignore,
 CODE_OF_CONDUCT.md, and CONTRIBUTING.md for repositories.
 Used by the `repoindex ops generate` command group.
 """
@@ -11,14 +12,16 @@ import logging
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
-from typing import Dict, Any, Generator, List, Optional
+from typing import Any, Dict, Generator, List, Optional
 
+from ..citation import parse_citation_file
 from ..config import load_config
 from ..domain.operation import (
+    FileGenerationResult,
     OperationStatus,
     OperationSummary,
-    FileGenerationResult,
 )
+from ..pypi import extract_project_metadata
 
 logger = logging.getLogger(__name__)
 
@@ -141,7 +144,7 @@ class AuthorInfo:
 
     def to_codemeta_dict(self) -> Dict[str, Any]:
         """Convert to codemeta.json Person format."""
-        result = {
+        result: Dict[str, Any] = {
             '@type': 'Person',
             'name': self.name,
         }
@@ -161,6 +164,41 @@ class AuthorInfo:
                 '@type': 'Organization',
                 'name': self.affiliation,
             }
+        return result
+
+    def to_cff_dict(self) -> Dict[str, Any]:
+        """Convert to CITATION.cff author format."""
+        result: Dict[str, Any] = {}
+        if self.family_names:
+            result['family-names'] = self.family_names
+        if self.given_names:
+            result['given-names'] = self.given_names
+        if self.email:
+            result['email'] = self.email
+        if self.orcid:
+            orcid = self.orcid
+            if not orcid.startswith('https://'):
+                orcid = f'https://orcid.org/{orcid}'
+            result['orcid'] = orcid
+        if self.affiliation:
+            result['affiliation'] = self.affiliation
+        return result
+
+    def to_zenodo_dict(self) -> Dict[str, Any]:
+        """Convert to .zenodo.json creator format."""
+        # Zenodo expects "Family, Given" format for name
+        if self.family_names and self.given_names:
+            name = f'{self.family_names}, {self.given_names}'
+        else:
+            name = self.name
+        result: Dict[str, Any] = {'name': name}
+        if self.orcid:
+            orcid = self.orcid
+            if orcid.startswith('https://orcid.org/'):
+                orcid = orcid[len('https://orcid.org/'):]
+            result['orcid'] = orcid
+        if self.affiliation:
+            result['affiliation'] = self.affiliation
         return result
 
 
@@ -282,6 +320,7 @@ class BoilerplateService:
                         file_type=file_type,
                     )
                 else:
+                    target_file.parent.mkdir(parents=True, exist_ok=True)
                     target_file.write_text(content)
                     yield f"Generated {display_name} for {name}"
                     detail = FileGenerationResult(
@@ -291,7 +330,7 @@ class BoilerplateService:
                         action="generated",
                         file_path=str(target_file),
                         file_type=file_type,
-                        overwritten=target_file.exists(),
+                        overwritten=options.force,
                     )
 
                 result.add_detail(detail)
@@ -387,6 +426,392 @@ class BoilerplateService:
         codemeta['dateModified'] = date.today().isoformat()
 
         return json.dumps(codemeta, indent=2) + '\n'
+
+    # ========================================================================
+    # CITATION.cff generation
+    # ========================================================================
+
+    def generate_citation_cff(
+        self,
+        repos: List[Dict[str, Any]],
+        options: GenerationOptions
+    ) -> Generator[str, None, OperationSummary]:
+        """
+        Generate CITATION.cff files for repositories.
+
+        Args:
+            repos: List of repository dicts (from query)
+            options: Generation options
+
+        Yields:
+            Progress messages
+
+        Returns:
+            OperationSummary with results
+        """
+        author = options.author or AuthorInfo.from_config(self.config)
+
+        return (yield from self._generate_files(
+            repos, options,
+            operation_name="generate_citation_cff",
+            filename="CITATION.cff",
+            file_type="citation_cff",
+            display_name="CITATION.cff",
+            content_fn=lambda repo, name: self._generate_citation_cff_content(repo, author),
+        ))
+
+    def _normalize_remote_url(self, remote_url: str) -> str:
+        """Normalize git remote URL to HTTPS format."""
+        url = remote_url
+        if url.startswith('git@github.com:'):
+            url = url.replace('git@github.com:', 'https://github.com/')
+        if url.endswith('.git'):
+            url = url[:-4]
+        return url
+
+    def _generate_citation_cff_content(
+        self,
+        repo: Dict[str, Any],
+        author: Optional[AuthorInfo],
+    ) -> str:
+        """Generate CITATION.cff content (CFF 1.2.0 format).
+
+        Reads pyproject.toml for enriched metadata. Preserves existing DOI
+        if regenerating with --force.
+        """
+        try:
+            import yaml
+        except ImportError as err:
+            raise ImportError("PyYAML is required for CITATION.cff generation: pip install pyyaml") from err
+
+        repo_path = repo.get('path', '')
+        name = repo.get('name', 'Unknown')
+
+        # Read pyproject.toml for richer metadata
+        proj = extract_project_metadata(repo_path) if repo_path else {}
+        proj_name = proj.get('name') or name
+        version = proj.get('version') or repo.get('version') or repo.get('pypi_version', '')
+        description = proj.get('description') or repo.get('description') or repo.get('github_description', '')
+        license_id = proj.get('license') or repo.get('license') or repo.get('license_key', '')
+        keywords = proj.get('keywords', [])
+        remote_url = repo.get('remote_url', '')
+        homepage = proj.get('homepage', '')
+
+        # Preserve existing DOI if file exists
+        existing_doi = None
+        if repo_path:
+            existing = parse_citation_file(repo_path, 'CITATION.cff')
+            if existing and existing.get('doi'):
+                existing_doi = existing['doi']
+
+        # Build CFF structure
+        cff: Dict[str, Any] = {
+            'cff-version': '1.2.0',
+            'message': 'If you use this software, please cite it as below.',
+            'type': 'software',
+            'title': proj_name,
+        }
+
+        if version:
+            cff['version'] = version
+
+        if description:
+            cff['abstract'] = description
+
+        if license_id:
+            cff['license'] = license_id
+
+        cff['date-released'] = date.today().isoformat()
+
+        if remote_url:
+            cff['repository-code'] = self._normalize_remote_url(remote_url)
+
+        if homepage:
+            cff['url'] = homepage
+
+        if keywords:
+            cff['keywords'] = keywords
+
+        if author:
+            cff['authors'] = [author.to_cff_dict()]
+
+        if existing_doi:
+            cff['identifiers'] = [{'type': 'doi', 'value': existing_doi}]
+
+        return yaml.dump(cff, default_flow_style=False, sort_keys=False, allow_unicode=True)
+
+    # ========================================================================
+    # .zenodo.json generation
+    # ========================================================================
+
+    def generate_zenodo_json(
+        self,
+        repos: List[Dict[str, Any]],
+        options: GenerationOptions
+    ) -> Generator[str, None, OperationSummary]:
+        """
+        Generate .zenodo.json files for repositories.
+
+        Args:
+            repos: List of repository dicts (from query)
+            options: Generation options
+
+        Yields:
+            Progress messages
+
+        Returns:
+            OperationSummary with results
+        """
+        author = options.author or AuthorInfo.from_config(self.config)
+
+        return (yield from self._generate_files(
+            repos, options,
+            operation_name="generate_zenodo_json",
+            filename=".zenodo.json",
+            file_type="zenodo_json",
+            display_name=".zenodo.json",
+            content_fn=lambda repo, name: self._generate_zenodo_json_content(repo, author),
+        ))
+
+    def _generate_zenodo_json_content(
+        self,
+        repo: Dict[str, Any],
+        author: Optional[AuthorInfo],
+    ) -> str:
+        """Generate .zenodo.json content.
+
+        Reads pyproject.toml for enriched metadata. Preserves existing DOI
+        if regenerating with --force.
+        """
+        repo_path = repo.get('path', '')
+        name = repo.get('name', 'Unknown')
+
+        # Read pyproject.toml for richer metadata
+        proj = extract_project_metadata(repo_path) if repo_path else {}
+        proj_name = proj.get('name') or name
+        description = proj.get('description') or repo.get('description') or repo.get('github_description', '')
+        version = proj.get('version') or repo.get('version') or repo.get('pypi_version', '')
+        license_id = proj.get('license') or repo.get('license') or repo.get('license_key', '')
+        keywords = proj.get('keywords', [])
+        remote_url = repo.get('remote_url', '')
+
+        # Preserve existing DOI if file exists
+        existing_doi = None
+        if repo_path:
+            existing = parse_citation_file(repo_path, '.zenodo.json')
+            if existing and existing.get('doi'):
+                existing_doi = existing['doi']
+
+        # Build Zenodo metadata
+        title = f'{proj_name}: {description}' if description else proj_name
+        # Zenodo title should be concise
+        if len(title) > 200:
+            title = proj_name
+
+        zenodo: Dict[str, Any] = {
+            'title': title,
+            'upload_type': 'software',
+        }
+
+        if description:
+            zenodo['description'] = description
+
+        if version:
+            zenodo['version'] = version
+
+        if license_id:
+            zenodo['license'] = {'id': license_id}
+
+        if keywords:
+            zenodo['keywords'] = keywords
+
+        if author:
+            zenodo['creators'] = [author.to_zenodo_dict()]
+
+        if remote_url:
+            zenodo['related_identifiers'] = [{
+                'identifier': self._normalize_remote_url(remote_url),
+                'relation': 'isSupplementTo',
+                'scheme': 'url',
+            }]
+
+        if existing_doi:
+            zenodo['doi'] = existing_doi
+
+        return json.dumps(zenodo, indent=2) + '\n'
+
+    # ========================================================================
+    # mkdocs.yml generation
+    # ========================================================================
+
+    def generate_mkdocs(
+        self,
+        repos: List[Dict[str, Any]],
+        options: GenerationOptions
+    ) -> Generator[str, None, OperationSummary]:
+        """
+        Generate mkdocs.yml files for repositories.
+
+        Scaffolds mkdocs.yml with Material theme, standard extensions,
+        and nav from docs/ if it exists.
+
+        Yields:
+            Progress messages
+
+        Returns:
+            OperationSummary with results
+        """
+        return (yield from self._generate_files(
+            repos, options,
+            operation_name="generate_mkdocs",
+            filename="mkdocs.yml",
+            file_type="mkdocs",
+            display_name="mkdocs.yml",
+            content_fn=lambda repo, name: self._generate_mkdocs_content(repo),
+        ))
+
+    def _generate_mkdocs_content(self, repo: Dict[str, Any]) -> str:
+        """Generate mkdocs.yml content with Material theme."""
+        try:
+            import yaml
+        except ImportError as err:
+            raise ImportError("PyYAML is required for mkdocs.yml generation: pip install pyyaml") from err
+
+        repo_path = repo.get('path', '')
+        name = repo.get('name', 'Unknown')
+        description = repo.get('description') or repo.get('github_description', '')
+        remote_url = repo.get('remote_url', '')
+
+        proj = extract_project_metadata(repo_path) if repo_path else {}
+        site_name = proj.get('name') or name
+
+        repo_url = ''
+        if remote_url:
+            repo_url = self._normalize_remote_url(remote_url)
+
+        mkdocs: Dict[str, Any] = {
+            'site_name': site_name,
+        }
+
+        if description:
+            mkdocs['site_description'] = description
+
+        if repo_url:
+            mkdocs['repo_url'] = repo_url
+            mkdocs['repo_name'] = name
+
+        mkdocs['theme'] = {
+            'name': 'material',
+            'palette': [
+                {
+                    'scheme': 'default',
+                    'primary': 'indigo',
+                    'accent': 'indigo',
+                    'toggle': {
+                        'icon': 'material/brightness-7',
+                        'name': 'Switch to dark mode',
+                    },
+                },
+                {
+                    'scheme': 'slate',
+                    'primary': 'indigo',
+                    'accent': 'indigo',
+                    'toggle': {
+                        'icon': 'material/brightness-4',
+                        'name': 'Switch to light mode',
+                    },
+                },
+            ],
+        }
+
+        mkdocs['markdown_extensions'] = [
+            'pymdownx.highlight',
+            'pymdownx.superfences',
+            'pymdownx.tabbed',
+            'admonition',
+            'pymdownx.details',
+            'toc',
+        ]
+
+        # Build nav from docs/ if it exists
+        nav = [{'Home': 'index.md'}]
+        docs_dir = Path(repo_path) / 'docs' if repo_path else None
+        if docs_dir and docs_dir.exists():
+            for md_file in sorted(docs_dir.glob('*.md')):
+                if md_file.name != 'index.md':
+                    title = md_file.stem.replace('-', ' ').replace('_', ' ').title()
+                    nav.append({title: md_file.name})
+
+        mkdocs['nav'] = nav
+
+        return yaml.dump(mkdocs, default_flow_style=False, sort_keys=False, allow_unicode=True)
+
+    # ========================================================================
+    # GitHub Pages workflow generation
+    # ========================================================================
+
+    def generate_gh_pages_workflow(
+        self,
+        repos: List[Dict[str, Any]],
+        options: GenerationOptions
+    ) -> Generator[str, None, OperationSummary]:
+        """
+        Generate .github/workflows/deploy-docs.yml for repositories.
+
+        Scaffolds a GitHub Actions workflow for deploying MkDocs to GitHub Pages.
+
+        Yields:
+            Progress messages
+
+        Returns:
+            OperationSummary with results
+        """
+        return (yield from self._generate_files(
+            repos, options,
+            operation_name="generate_gh_pages",
+            filename=".github/workflows/deploy-docs.yml",
+            file_type="gh_pages_workflow",
+            display_name="deploy-docs.yml",
+            content_fn=lambda repo, name: self._generate_gh_pages_content(),
+        ))
+
+    def _generate_gh_pages_content(self) -> str:
+        """Generate GitHub Actions workflow for MkDocs deployment."""
+        return """name: Deploy docs
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - run: pip install mkdocs-material
+      - run: mkdocs build
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@v4
+"""
 
     def generate_license(
         self,
@@ -596,7 +1021,7 @@ file, You can obtain one at https://mozilla.org/MPL/2.0/.
             OperationSummary with results
         """
         author = options.author or AuthorInfo.from_config(self.config)
-        contact_email = author.email if author else "maintainer@example.com"
+        contact_email = (author.email or "maintainer@example.com") if author else "maintainer@example.com"
 
         return (yield from self._generate_files(
             repos, options,

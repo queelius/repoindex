@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 
-import requests
-import tomllib
-from pathlib import Path
-from typing import Dict, Optional, List
 import re
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+import requests
+import toml
+import tomllib
 
 from .config import logger
-from .config import load_config
+
 
 def find_packaging_files(repo_path: str) -> List[str]:
     """Find Python packaging files in a repository."""
@@ -23,6 +25,80 @@ def find_packaging_files(repo_path: str) -> List[str]:
             packaging_files.append(str(file_path))
 
     return packaging_files
+
+def extract_project_metadata(repo_path: str) -> Dict[str, Any]:
+    """Extract full [project] section from pyproject.toml in one pass.
+
+    Returns a dict with keys:
+        name, version, description, license, keywords, authors, urls,
+        homepage, repository
+    All values default to empty string/list if not present.
+    """
+    result: Dict[str, Any] = {
+        'name': '',
+        'version': '',
+        'description': '',
+        'license': '',
+        'keywords': [],
+        'authors': [],
+        'urls': {},
+        'homepage': '',
+        'repository': '',
+    }
+
+    pyproject_path = Path(repo_path) / 'pyproject.toml'
+    if not pyproject_path.exists():
+        return result
+
+    try:
+        with open(pyproject_path, 'rb') as f:
+            data = tomllib.load(f)
+
+        project = data.get('project', {})
+        if not project:
+            return result
+
+        result['name'] = project.get('name', '')
+        result['version'] = project.get('version', '')
+        result['description'] = project.get('description', '')
+
+        # License can be a string or a table with {text = "..."} or {file = "..."}
+        license_val = project.get('license', '')
+        if isinstance(license_val, dict):
+            result['license'] = license_val.get('text', license_val.get('file', ''))
+        else:
+            result['license'] = str(license_val) if license_val else ''
+
+        result['keywords'] = project.get('keywords', [])
+
+        # Authors: list of {name, email} tables
+        raw_authors = project.get('authors', [])
+        authors = []
+        for a in raw_authors:
+            if isinstance(a, dict):
+                authors.append({
+                    'name': a.get('name', ''),
+                    'email': a.get('email', ''),
+                })
+        result['authors'] = authors
+
+        # URLs
+        urls = project.get('urls', {})
+        result['urls'] = dict(urls) if urls else {}
+
+        # Convenience: extract homepage and repository from urls
+        for key, val in urls.items():
+            lower_key = key.lower()
+            if lower_key in ('homepage', 'home'):
+                result['homepage'] = val
+            elif lower_key in ('repository', 'source', 'source code'):
+                result['repository'] = val
+
+    except Exception as e:
+        logger.debug(f"Error extracting project metadata from {repo_path}: {e}")
+
+    return result
+
 
 def extract_package_name_from_pyproject(file_path: str) -> Optional[str]:
     """Extract package name from pyproject.toml."""
@@ -117,11 +193,9 @@ def extract_package_name(file_path: str) -> Optional[str]:
 
     return None
 
-def check_pypi_package(package_name: str) -> Optional[Dict]:
+def check_pypi_package(package_name: str, timeout: int = 10) -> Optional[Dict]:
     """Check if a package exists on PyPI and get its info."""
     try:
-        config = load_config()
-        timeout = config.get('pypi', {}).get('timeout_seconds', 10)
         
         # Check main PyPI
         url = f"https://pypi.org/pypi/{package_name}/json"
@@ -558,7 +632,6 @@ def update_pypi_classifier(repo_path: str, classifier_prefix: str, new_classifie
                     data['tool']['setuptools']['classifiers'] = classifiers
                 
                 # Write back
-                import toml
                 with open(file_path, 'w') as f:
                     toml.dump(data, f)
                 
