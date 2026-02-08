@@ -11,8 +11,8 @@ Public API — no authentication needed for open-access records.
 
 import logging
 import re
-from dataclasses import dataclass, field
-from typing import Optional, List, Dict, Any
+from dataclasses import dataclass
+from typing import Any, Dict, List, Optional
 
 import requests
 

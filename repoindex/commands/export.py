@@ -5,15 +5,15 @@ Exports repository index in ECHO-compliant format:
 durable, self-describing, and works offline.
 """
 
-import click
 import sys
 from pathlib import Path
 from typing import Optional
 
+import click
+
 from ..config import load_config
-from ..services.export_service import ExportService, ExportOptions
-from ..database import compile_query, QueryCompileError
-from .ops import query_options, _get_repos_from_query
+from ..services.export_service import ExportOptions, ExportService
+from .ops import query_options
 from .query import _build_query_from_flags
 
 
