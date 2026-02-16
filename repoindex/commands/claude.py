@@ -49,10 +49,14 @@ repoindex refresh
 repoindex status
 
 # Query with convenience flags (pretty table by default)
+repoindex query --name dapple              # Filter by name
 repoindex query --dirty                    # Repos with uncommitted changes
 repoindex query --language python          # Python repos
 repoindex query --recent 7d                # Repos with recent commits
-repoindex query --tag "work/*"             # Repos by tag
+repoindex query --language python --sort stars  # Sort by stars
+
+# Raw SQL (--json, --table, --csv output)
+repoindex sql "SELECT name, github_stars FROM repos WHERE language = 'Python' ORDER BY github_stars DESC LIMIT 10" --table
 
 # Events from last week (pretty table by default)
 repoindex events --since 7d
@@ -61,54 +65,58 @@ repoindex events --since 7d
 ## Query Convenience Flags
 
 ```bash
-# Local flags (no external API required)
+# Name and language
+repoindex query --name dapple        # Filter by name (substring match)
+repoindex query --name "repo*"       # Filter by name (wildcard)
+repoindex query --language python    # Filter by language (py, js, ts, rust, go, cpp)
+
+# Git status
 repoindex query --dirty              # Repos with uncommitted changes
 repoindex query --clean              # Clean repos
-repoindex query --language python    # Filter by language (py, js, ts, rust, go, cpp)
 repoindex query --recent 7d          # Recent activity
+repoindex query --has-remote         # Repos with remote URL
+
+# Organization
 repoindex query --tag "work/*"       # Filter by tag (wildcards supported)
+
+# Audit
 repoindex query --no-license         # Repos without license
 repoindex query --no-readme          # Repos without README
-repoindex query --has-citation       # Repos with citation files (CITATION.cff, .zenodo.json)
-repoindex query --has-doi            # Repos with DOI in citation metadata
-repoindex query --has-remote         # Repos with remote URL
+repoindex query --has-citation       # Repos with citation files
+repoindex query --has-doi            # Repos with DOI
 
 # GitHub flags (requires --github during refresh)
 repoindex query --starred            # Repos with GitHub stars
 repoindex query --public             # Public repos only
 repoindex query --private            # Private repos only
-repoindex query --fork               # Forked repos only
-repoindex query --no-fork            # Non-forked repos only
+repoindex query --fork / --no-fork   # Fork filtering
 repoindex query --archived           # Archived repos only
 
+# Result modifiers
+repoindex query --sort stars         # Sort by stars (desc)
+repoindex query --sort name          # Sort by name (asc)
+repoindex query --count              # Just output the count
+repoindex query --limit 10           # Limit results
+
 # Combine flags
-repoindex query --language python --recent 7d --dirty
-```
-
-## Query DSL
-
-The query DSL compiles to SQL:
-- **Comparisons**: `==`, `!=`, `>`, `<`, `>=`, `<=`, `~=` (fuzzy)
-- **Boolean**: `and`, `or`, `not`
-- **Functions**: `has_event('type', since='30d')`, `tagged('pattern/*')`, `updated_since('7d')`
-- **Ordering**: `order by field [asc|desc]`
-- **Limiting**: `limit N`
-
-```bash
-repoindex query "language == 'Python' and stars > 0 order by stars desc limit 10"
-repoindex query "has_event('commit', since='7d') and is_clean"
-repoindex query "tagged('work/*')"
+repoindex query --language python --sort stars --limit 10
 ```
 
 ## Raw SQL Access
 
 ```bash
-# Direct SQL queries
+# Direct SQL queries (JSON output by default)
 repoindex sql "SELECT name, language, github_stars FROM repos ORDER BY github_stars DESC LIMIT 10"
+
+# Output format flags
+repoindex sql "SELECT ..." --json    # JSON (default)
+repoindex sql "SELECT ..." --table   # Rich table
+repoindex sql "SELECT ..." --csv     # CSV
 
 # Database info
 repoindex sql --info
 repoindex sql --schema
+repoindex sql --stats
 
 # Interactive SQL shell
 repoindex sql -i

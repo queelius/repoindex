@@ -138,6 +138,9 @@ def _get_repos_from_query(config, query_string: str, debug: bool = False, **quer
 
     repos = []
     with Database(config=config, read_only=True) as db:
+        from . import warn_if_stale
+        warn_if_stale(db)
+
         if debug:
             print(f"DEBUG: SQL: {compiled.sql}", file=sys.stderr)
             print(f"DEBUG: Params: {compiled.params}", file=sys.stderr)

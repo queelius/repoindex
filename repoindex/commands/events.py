@@ -141,10 +141,12 @@ def _show_events(config: dict, event_types: tuple, repo: Optional[str],
                  since_dt: datetime, until_dt: Optional[datetime],
                  limit: int, as_array: bool = False):
     """Output events as JSONL (default) or JSON array."""
+    from . import warn_if_stale
     sql, params = _build_query(event_types, repo, since_dt, until_dt, limit)
 
     try:
         with Database(config=config, read_only=True) as db:
+            warn_if_stale(db)
             db.execute(sql, params)
             rows = db.fetchall()
 
@@ -168,11 +170,13 @@ def _show_pretty(config: dict, event_types: tuple, repo: Optional[str],
     from rich.console import Console
     from rich.table import Table
     from rich import box
+    from . import warn_if_stale
 
     sql, params = _build_query(event_types, repo, since_dt, until_dt, limit)
 
     try:
         with Database(config=config, read_only=True) as db:
+            warn_if_stale(db)
             db.execute(sql, params)
             rows = db.fetchall()
 
@@ -246,6 +250,7 @@ def _show_pretty(config: dict, event_types: tuple, repo: Optional[str],
 def _show_stats(config: dict, event_types: tuple, repo: Optional[str],
                 since_dt: datetime, until_dt: Optional[datetime]):
     """Show summary statistics for events."""
+    from . import warn_if_stale
     from rich.console import Console
 
     console = Console()
@@ -271,6 +276,7 @@ def _show_stats(config: dict, event_types: tuple, repo: Optional[str],
 
     try:
         with Database(config=config, read_only=True) as db:
+            warn_if_stale(db)
             # Total events
             db.execute(f"SELECT COUNT(*) as count FROM events e LEFT JOIN repos r ON e.repo_id = r.id WHERE {where_clause}", tuple(params))
             row = db.fetchone()

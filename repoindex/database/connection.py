@@ -241,6 +241,27 @@ def reset_database(config: Optional[dict] = None) -> None:
         pass  # Schema is applied on connection
 
 
+def get_cache_age_days(db: 'Database') -> Optional[float]:
+    """
+    Get the age of the most recent scan in the database.
+
+    Returns:
+        Number of days since the most recent scanned_at timestamp,
+        or None if the database has no repos.
+    """
+    from datetime import datetime, timezone
+    db.execute("SELECT MAX(scanned_at) as latest FROM repos")
+    row = db.fetchone()
+    if not row or not row['latest']:
+        return None
+    try:
+        latest = datetime.fromisoformat(row['latest'])
+        now = datetime.now()
+        return (now - latest).total_seconds() / 86400
+    except (ValueError, TypeError):
+        return None
+
+
 def get_database_info(config: Optional[dict] = None) -> dict:
     """
     Get information about the database.

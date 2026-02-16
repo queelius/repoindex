@@ -459,6 +459,9 @@ def db_handler(show_info: bool, show_path: bool, reset: bool):
               help='Read SQL from file')
 @click.option('--format', 'output_format', type=click.Choice(['json', 'csv', 'table']),
               default='json', help='Output format')
+@click.option('--json', 'force_json', is_flag=True, help='Output as JSON (alias for --format json)')
+@click.option('--csv', 'force_csv', is_flag=True, help='Output as CSV (alias for --format csv)')
+@click.option('--table', 'force_table', is_flag=True, help='Output as table (alias for --format table)')
 @click.option('--interactive', '-i', is_flag=True, help='Interactive SQL shell')
 @click.option('--info', 'show_info', is_flag=True, help='Show database info')
 @click.option('--path', 'show_path', is_flag=True, help='Show database path')
@@ -471,6 +474,9 @@ def sql_handler(
     query: Optional[str],
     sql_file: Optional[str],
     output_format: str,
+    force_json: bool,
+    force_csv: bool,
+    force_table: bool,
     interactive: bool,
     show_info: bool,
     show_path: bool,
@@ -506,6 +512,14 @@ def sql_handler(
         repoindex sql --reset
     """
     config = load_config()
+
+    # Resolve format aliases
+    if force_table:
+        output_format = 'table'
+    elif force_csv:
+        output_format = 'csv'
+    elif force_json:
+        output_format = 'json'
 
     # Database management operations
     if show_path:

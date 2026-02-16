@@ -73,21 +73,25 @@ def _is_simple_text_query(query_string: str) -> bool:
 
 def _build_query_from_flags(
     query_string: Optional[str],
-    dirty: bool,
-    clean: bool,
-    language: Optional[str],
-    recent: Optional[str],
-    starred: bool,
-    tag: Optional[List[str]],
-    no_license: bool,
-    no_readme: bool,
-    has_citation: bool,
-    has_doi: bool,
-    archived: bool,
-    public: bool,
-    private: bool,
-    fork: bool,
-    no_fork: bool,
+    dirty: bool = False,
+    clean: bool = False,
+    language: Optional[str] = None,
+    recent: Optional[str] = None,
+    starred: bool = False,
+    tag: Optional[List[str]] = None,
+    no_license: bool = False,
+    no_readme: bool = False,
+    has_citation: bool = False,
+    has_doi: bool = False,
+    archived: bool = False,
+    public: bool = False,
+    private: bool = False,
+    fork: bool = False,
+    no_fork: bool = False,
+    *,
+    name: Optional[str] = None,
+    has_remote: bool = False,
+    sort: Optional[str] = None,
 ) -> str:
     """Build a DSL query string from convenience flags."""
     predicates = []
@@ -95,6 +99,16 @@ def _build_query_from_flags(
     # Start with user's query if provided
     if query_string:
         predicates.append(f"({query_string})")
+
+    # Name filter (supports wildcards: * → SQL LIKE %)
+    if name:
+        if '*' in name or '?' in name:
+            # User used wildcards — translate to SQL LIKE pattern
+            pattern = name.replace('*', '%').replace('?', '_')
+            predicates.append(f"name like '{pattern}'")
+        else:
+            # Simple substring match
+            predicates.append(f"name contains '{name}'")
 
     # Dirty/clean status
     if dirty:
@@ -151,6 +165,10 @@ def _build_query_from_flags(
     if has_doi:
         predicates.append("has_doi()")
 
+    # Has remote URL
+    if has_remote:
+        predicates.append("remote_url != ''")
+
     # GitHub archive status
     if archived:
         predicates.append("github_is_archived")
@@ -169,8 +187,27 @@ def _build_query_from_flags(
 
     # Join predicates with 'and'
     if not predicates:
-        return ""
-    return " and ".join(predicates)
+        query = ""
+    else:
+        query = " and ".join(predicates)
+
+    # Append sort clause
+    if sort:
+        sort = sort.strip()
+        # Allow shorthand: "stars" → "github_stars desc", "name" → "name asc"
+        sort_aliases = {
+            'stars': 'github_stars desc',
+            'name': 'name asc',
+            'language': 'language asc',
+            'updated': 'scanned_at desc',
+        }
+        resolved = sort_aliases.get(sort.lower(), sort)
+        if query:
+            query += f" order by {resolved}"
+        else:
+            query = f"1 == 1 order by {resolved}"
+
+    return query
 
 
 @click.command()
@@ -183,6 +220,7 @@ def _build_query_from_flags(
 @click.option('--fts', is_flag=True, help='Use full-text search instead of DSL query')
 @click.option('--debug', is_flag=True, help='Enable debug logging')
 # Convenience flags
+@click.option('--name', '-n', help='Filter by repo name (supports wildcards: dapple, *api*)')
 @click.option('--dirty', is_flag=True, help='Repos with uncommitted changes')
 @click.option('--clean', is_flag=True, help='Repos with no uncommitted changes')
 @click.option('--language', '-l', help='Filter by language (e.g., python, js, rust)')
@@ -198,6 +236,9 @@ def _build_query_from_flags(
 @click.option('--private', is_flag=True, help='Private repos only')
 @click.option('--fork', is_flag=True, help='Forked repos only')
 @click.option('--no-fork', is_flag=True, help='Non-forked repos only (original repos)')
+@click.option('--has-remote', is_flag=True, help='Repos with a remote URL')
+@click.option('--sort', '-s', help='Sort results (e.g., stars, name, language, or field [asc|desc])')
+@click.option('--count', is_flag=True, help='Output only the count of matching repos')
 def query_handler(
     query_string: str,
     output_json: bool,
@@ -208,6 +249,7 @@ def query_handler(
     fts: bool,
     debug: bool,
     # Convenience flags
+    name: Optional[str],
     dirty: bool,
     clean: bool,
     language: Optional[str],
@@ -223,6 +265,9 @@ def query_handler(
     private: bool,
     fork: bool,
     no_fork: bool,
+    has_remote: bool,
+    sort: Optional[str],
+    count: bool,
 ):
     """
     Query repositories using a powerful query language.
@@ -238,11 +283,19 @@ def query_handler(
         repoindex query
         # Simple text search (auto-detected)
         repoindex query "bayes"
+        # Filter by name (supports wildcards)
+        repoindex query --name dapple
+        repoindex query --name "*api*"
         # Convenience flags
         repoindex query --dirty
         repoindex query --language python
         repoindex query --recent 7d
         repoindex query --tag "work/*"
+        # Sorting
+        repoindex query --language python --sort stars
+        repoindex query --sort "name asc"
+        # Count matching repos
+        repoindex query --language python --count
         # Combine flags with DSL
         repoindex query "stars > 10" --language python
         # JSONL output for piping
@@ -270,13 +323,15 @@ def query_handler(
         )
 
     # Build query from flags
-    has_flags = any([dirty, clean, language, recent, starred, tag, no_license, no_readme,
-                     has_citation, has_doi, archived, public, private, fork, no_fork])
+    has_flags = any([name, dirty, clean, language, recent, starred, tag, no_license, no_readme,
+                     has_citation, has_doi, has_remote, archived, public, private, fork, no_fork, sort])
     if has_flags:
         query_string = _build_query_from_flags(
             query_string if query_string else None,
             dirty, clean, language, recent, starred, list(tag),
-            no_license, no_readme, has_citation, has_doi, archived, public, private, fork, no_fork
+            no_license, no_readme, has_citation, has_doi,
+            archived, public, private, fork, no_fork,
+            name=name, has_remote=has_remote, sort=sort
         )
 
     # If no query and no flags, show all repos
@@ -284,11 +339,14 @@ def query_handler(
         query_string = "1 == 1"  # Match all
 
     # Determine output mode: pretty is default, --json switches to JSONL
-    pretty = not output_json and not brief
+    pretty = not output_json and not brief and not count
 
     # Full-text search mode (explicit or auto-detected)
     if fts or (_is_simple_text_query(query_string) and query_string != "1 == 1"):
-        _execute_fts_query(config, query_string, pretty, brief, fields, limit, debug)
+        if count:
+            _execute_fts_count(config, query_string, limit, debug)
+        else:
+            _execute_fts_query(config, query_string, pretty, brief, fields, limit, debug)
         return
 
     # Compile to SQL
@@ -309,7 +367,10 @@ def query_handler(
                 click.echo(f"Limit: {compiled.limit}", err=False)
             return
 
-        _execute_sql_query(config, compiled, pretty, brief, fields, debug)
+        if count:
+            _execute_sql_count(config, compiled, debug)
+        else:
+            _execute_sql_query(config, compiled, pretty, brief, fields, debug)
 
     except QueryCompileError as e:
         print(json.dumps({
@@ -322,9 +383,11 @@ def query_handler(
 
 def _execute_sql_query(config, compiled, pretty, brief, fields, debug):
     """Execute a compiled SQL query."""
+    from . import warn_if_stale
     results = []
 
     with Database(config=config, read_only=True) as db:
+        warn_if_stale(db)
         if debug:
             print(f"DEBUG: SQL: {compiled.sql}", file=sys.stderr)
             print(f"DEBUG: Params: {compiled.params}", file=sys.stderr)
@@ -348,9 +411,11 @@ def _execute_sql_query(config, compiled, pretty, brief, fields, debug):
 
 def _execute_fts_query(config, query_string, pretty, brief, fields, limit, debug):
     """Execute a full-text search query."""
+    from . import warn_if_stale
     results = []
 
     with Database(config=config, read_only=True) as db:
+        warn_if_stale(db)
         sql = """
             SELECT r.*, GROUP_CONCAT(t.tag) as tags_csv
             FROM repos r
@@ -380,6 +445,39 @@ def _execute_fts_query(config, query_string, pretty, brief, fields, limit, debug
 
     if pretty:
         _display_pretty_results(results, fields)
+
+
+def _execute_sql_count(config, compiled, debug):
+    """Execute a compiled SQL query and output just the count."""
+    from . import warn_if_stale
+
+    with Database(config=config, read_only=True) as db:
+        warn_if_stale(db)
+        if debug:
+            print(f"DEBUG: SQL: {compiled.sql}", file=sys.stderr)
+        db.execute(compiled.sql, compiled.params)
+        rows = db.fetchall()
+        print(len(rows))
+
+
+def _execute_fts_count(config, query_string, limit, debug):
+    """Execute a full-text search query and output just the count."""
+    from . import warn_if_stale
+
+    with Database(config=config, read_only=True) as db:
+        warn_if_stale(db)
+        sql = """
+            SELECT COUNT(*) as cnt
+            FROM repos r
+            JOIN repos_fts fts ON fts.rowid = r.id
+            WHERE repos_fts MATCH ?
+        """
+        if debug:
+            print(f"DEBUG: FTS count: {query_string}", file=sys.stderr)
+        db.execute(sql, (query_string,))
+        row = db.fetchone()
+        count = min(row['cnt'], limit) if limit else row['cnt']
+        print(count)
 
 
 def _output_result(result: dict, fields: Optional[str], brief: bool = False):

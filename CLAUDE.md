@@ -73,14 +73,17 @@ repoindex events --type git_tag --since 7d
 # JSONL output for piping/scripting
 repoindex query --json --language python | jq '.name'
 
-# Raw SQL access
+# Raw SQL access (--json, --table, --csv for format)
 repoindex sql "SELECT name, github_stars FROM repos ORDER BY github_stars DESC LIMIT 10"
+repoindex sql "SELECT name FROM repos WHERE language = 'Python'" --table
 ```
 
 ### Query Convenience Flags
 
 **Local flags** (no prefix - these are about the local git directory):
 ```bash
+repoindex query --name dapple        # Filter by name (substring match)
+repoindex query --name "*api*"       # Filter by name (wildcard)
 repoindex query --dirty              # Uncommitted changes
 repoindex query --clean              # No uncommitted changes
 repoindex query --language python    # Python repos (detected locally)
@@ -115,6 +118,15 @@ repoindex events --type commit --since 30d
 repoindex events --repo myproject
 repoindex events --stats
 repoindex events --json --since 7d       # JSONL for piping
+```
+
+**Result modifiers:**
+```bash
+repoindex query --sort stars          # Sort by stars (desc)
+repoindex query --sort name           # Sort by name (asc)
+repoindex query --sort "language asc" # Custom sort
+repoindex query --count               # Just output the count
+repoindex query --limit 10            # Limit results
 ```
 
 ### Output Formats
