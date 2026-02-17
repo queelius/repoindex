@@ -4,7 +4,7 @@ Arkiv exporter for repoindex.
 Exports repository and event data as arkiv universal records (JSONL).
 
 Repos become inode/directory records with metadata.
-Events become text/plain records (commit/tag messages) with fragment URLs.
+Events become text/plain records (commit/tag messages) with fragment URIs.
 
 See: arkiv SPEC.md for the universal record format.
 """
@@ -22,7 +22,7 @@ def _repo_to_arkiv(repo: dict) -> dict:
     path = repo.get('path', '')
     record = {
         'mimetype': 'inode/directory',
-        'url': f'file://{path}',
+        'uri': f'file://{path}',
         'content': None,
         'timestamp': repo.get('scanned_at'),
         'metadata': {},
@@ -125,12 +125,12 @@ def _event_to_arkiv(event: dict) -> dict:
 
     # Fragment identifies the specific object within the repo
     fragment = ref if ref else ''
-    url = f'file://{repo_path}'
+    uri = f'file://{repo_path}'
     if fragment:
-        url = f'{url}#{fragment}'
+        uri = f'{uri}#{fragment}'
 
     record = {
-        'url': url,
+        'uri': uri,
         'timestamp': event.get('timestamp'),
         'metadata': {
             'type': event.get('type'),

@@ -95,9 +95,9 @@ class TestRepoToArkiv:
         record = _repo_to_arkiv(SAMPLE_REPO)
         assert record['mimetype'] == 'inode/directory'
 
-    def test_url_is_file_path(self):
+    def test_uri_is_file_path(self):
         record = _repo_to_arkiv(SAMPLE_REPO)
-        assert record['url'] == 'file:///home/user/alpha-lib'
+        assert record['uri'] == 'file:///home/user/alpha-lib'
 
     def test_content_is_null(self):
         record = _repo_to_arkiv(SAMPLE_REPO)
@@ -157,7 +157,7 @@ class TestRepoToArkiv:
     def test_minimal_repo(self):
         record = _repo_to_arkiv(MINIMAL_REPO)
         assert record['mimetype'] == 'inode/directory'
-        assert record['url'] == 'file:///home/user/bare-repo'
+        assert record['uri'] == 'file:///home/user/bare-repo'
         assert record['content'] is None
         assert record['metadata']['name'] == 'bare-repo'
         # No github, citation, etc.
@@ -207,9 +207,9 @@ class TestEventToArkiv:
         record = _event_to_arkiv(SAMPLE_COMMIT_EVENT)
         assert record['content'] == 'feat: Add new feature'
 
-    def test_commit_url_with_fragment(self):
+    def test_commit_uri_with_fragment(self):
         record = _event_to_arkiv(SAMPLE_COMMIT_EVENT)
-        assert record['url'] == 'file:///home/user/alpha-lib#abc1234'
+        assert record['uri'] == 'file:///home/user/alpha-lib#abc1234'
 
     def test_commit_timestamp(self):
         record = _event_to_arkiv(SAMPLE_COMMIT_EVENT)
@@ -228,7 +228,7 @@ class TestEventToArkiv:
         record = _event_to_arkiv(SAMPLE_TAG_EVENT)
         assert record['mimetype'] == 'text/plain'
         assert record['content'] == 'Release 2.0.0'
-        assert record['url'] == 'file:///home/user/alpha-lib#v2.0.0'
+        assert record['uri'] == 'file:///home/user/alpha-lib#v2.0.0'
         assert record['metadata']['type'] == 'git_tag'
         assert record['metadata']['ref'] == 'v2.0.0'
 
@@ -237,9 +237,9 @@ class TestEventToArkiv:
         assert record['mimetype'] is None
         assert record['content'] is None
 
-    def test_unannotated_tag_url(self):
+    def test_unannotated_tag_uri(self):
         record = _event_to_arkiv(UNANNOTATED_TAG_EVENT)
-        assert record['url'] == 'file:///home/user/alpha-lib#v1.0.0'
+        assert record['uri'] == 'file:///home/user/alpha-lib#v1.0.0'
 
     def test_event_no_ref(self):
         event = {
@@ -251,7 +251,7 @@ class TestEventToArkiv:
             'data': {},
         }
         record = _event_to_arkiv(event)
-        assert record['url'] == 'file:///home/user/repo'
+        assert record['uri'] == 'file:///home/user/repo'
         assert 'ref' not in record['metadata']
 
     def test_event_no_author(self):
@@ -289,8 +289,8 @@ class TestArkivExporter:
         lines = [json.loads(line) for line in out if line.strip()]
         assert len(lines) == 2
         assert lines[0]['mimetype'] == 'inode/directory'
-        assert lines[0]['url'] == 'file:///home/user/alpha-lib'
-        assert lines[1]['url'] == 'file:///home/user/bare-repo'
+        assert lines[0]['uri'] == 'file:///home/user/alpha-lib'
+        assert lines[1]['uri'] == 'file:///home/user/bare-repo'
 
     def test_export_empty(self):
         e = ArkivExporter()
@@ -308,17 +308,17 @@ class TestArkivExporter:
         for line in out:
             if line.strip():
                 record = json.loads(line)
-                assert 'url' in record
+                assert 'uri' in record
                 assert 'mimetype' in record
 
     def test_export_preserves_all_arkiv_fields(self):
-        """Verify the arkiv invariant: mimetype, url, content, timestamp, metadata."""
+        """Verify the arkiv invariant: mimetype, uri, content, timestamp, metadata."""
         e = ArkivExporter()
         out = io.StringIO()
         e.export([SAMPLE_REPO], out)
         out.seek(0)
         record = json.loads(out.readline())
-        assert set(record.keys()) == {'mimetype', 'url', 'content', 'timestamp', 'metadata'}
+        assert set(record.keys()) == {'mimetype', 'uri', 'content', 'timestamp', 'metadata'}
 
     def test_export_no_config_skips_events(self):
         """Without config=None, no events are fetched."""

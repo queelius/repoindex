@@ -18,7 +18,7 @@ from .ops import query_options, _get_repos_from_query
 
 
 @click.command('render')
-@click.argument('format_id')
+@click.argument('format_id', required=False, default=None)
 @click.argument('query_string', required=False, default='')
 @click.option('--output', '-o', 'output_file', type=click.Path(),
               help='Write to file instead of stdout')
@@ -87,6 +87,12 @@ def render_handler(
         for fmt_id, exp in sorted(exporters.items()):
             click.echo(f"  {fmt_id:<12} {exp.name} ({exp.extension})")
         return
+
+    # Require format_id when not listing
+    if not format_id:
+        available = ', '.join(sorted(exporters.keys()))
+        click.echo(f"Error: Missing FORMAT_ID. Available: {available}", err=True)
+        sys.exit(1)
 
     # Find the requested exporter
     if format_id not in exporters:
