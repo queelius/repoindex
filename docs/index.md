@@ -67,7 +67,7 @@ See [Ops & Audit](ops.md).
 
 ## Render
 
-Export as BibTeX, CSV, Markdown, OPML, JSON-LD. Stdout by default.
+Export as BibTeX, CSV, Markdown, OPML, JSON-LD, Arkiv. Stdout by default.
 
 ```bash
 repoindex render bibtex --language python > refs.bib

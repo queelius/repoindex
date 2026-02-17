@@ -40,7 +40,7 @@ Claude Code (deep work on ONE repo)
 - **Query Language** - Filter and search with expressions
 - **Collection Operations** - Multi-repo git push/pull, file generation, GitHub ops
 - **Metadata Audit** - Check repos across essentials, development, discoverability, documentation
-- **Render/Export Formats** - BibTeX, CSV, Markdown, OPML, JSON-LD via extensible exporter system
+- **Render/Export Formats** - BibTeX, CSV, Markdown, OPML, JSON-LD, Arkiv via extensible exporter system
 
 ## Installation
 
@@ -202,14 +202,6 @@ repoindex sql --reset              # Reset database (then refresh --full)
 
 ## Additional Commands
 
-### Export (ECHO format)
-```bash
-repoindex export ~/backup                        # Database + JSONL + READMEs + site
-repoindex export ~/backup --include-events       # Include event history
-repoindex export ~/backup --language python      # Export subset
-repoindex export ~/backup --dry-run              # Preview
-```
-
 ### Copy (backup/redundancy)
 ```bash
 repoindex copy ~/backup --language python      # Copy Python repos
@@ -260,6 +252,9 @@ repoindex render opml > repos.opml
 
 # JSON-LD for linked data
 repoindex render jsonld --has-doi > repos.jsonld
+
+# Arkiv universal records (repos + events as JSONL)
+repoindex render arkiv --language python > repos.arkiv.jsonl
 
 # List available formats
 repoindex render --list-formats
@@ -337,8 +332,8 @@ repoindex
 ├── events              # Query events from database
 ├── sql                 # Raw SQL queries + database management
 ├── refresh             # Database sync (repos + events + providers)
-├── render              # Export as BibTeX, CSV, Markdown, OPML, JSON-LD
-├── export              # ECHO format export (durable, self-describing)
+├── render              # Export as BibTeX, CSV, Markdown, OPML, JSON-LD, Arkiv
+
 ├── copy                # Copy repositories with filtering (backup)
 ├── link                # Symlink tree management
 │   ├── tree            # Create symlink trees organized by metadata

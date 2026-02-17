@@ -311,7 +311,7 @@ mock_run_command.side_effect = [("output1", 0), ("output2", 0)]  # Multiple call
 - `repository_service.py` - Repository discovery and metadata
 - `tag_service.py` - Tag management
 - `event_service.py` - Event scanning
-- `export_service.py` - ECHO format export
+
 
 **Command Layer** (`repoindex/commands/`):
 - Individual CLI command implementations
@@ -354,7 +354,7 @@ repoindex
 ├── events              # Query events from database
 ├── sql                 # Raw SQL queries + database management
 ├── refresh             # Database sync (repos + events)
-├── export              # ECHO format export (durable, self-describing)
+
 ├── copy                # Copy repositories with filtering (backup/redundancy)
 ├── link                # Symlink tree management
 │   ├── tree            # Create symlink trees organized by metadata
@@ -531,60 +531,6 @@ repoindex sql "SELECT r.name, p.registry, p.package_name FROM publications p JOI
 
 # Repos by language
 repoindex sql "SELECT language, COUNT(*) as n FROM repos GROUP BY language ORDER BY n DESC"
-```
-
-### Export Command
-Export repository index in ECHO-compliant format (durable, self-describing, offline-capable).
-READMEs and a browsable site/ directory are always included (they are metadata).
-Supports the same query flags as `query` to export a subset.
-```bash
-# Basic export (database + JSONL + READMEs + site + manifest)
-repoindex export ~/backups/repos-2026-01
-
-# Include full event history
-repoindex export ~/backups/repos --include-events
-
-# Export subset using query flags
-repoindex export ~/backups/python-repos --language python
-repoindex export ~/backups/starred --starred
-repoindex export ~/backups/work --tag "work/*"
-
-# DSL query expression
-repoindex export ~/backups/popular "language == 'Python' and github_stars > 10"
-
-# Preview without writing
-repoindex export ~/backups/test --dry-run
-```
-
-Output structure:
-```
-output-dir/
-├── README.md           # Human-readable documentation
-├── manifest.json       # ECHO manifest (standard schema)
-├── index.db            # SQLite database copy (full snapshot)
-├── repos.jsonl         # Repository records (with publications)
-├── readmes/            # README from each repo (always included)
-│   ├── my-project.md
-│   └── other-repo.md
-├── site/               # Browsable HTML dashboard (always included)
-│   └── index.html
-└── events.jsonl        # Optional: --include-events
-```
-
-ECHO manifest schema (`manifest.json`):
-```json
-{
-  "version": "1.0",
-  "name": "Repository Index",
-  "description": "Git repository collection (N repos, top languages: ...)",
-  "type": "database",
-  "icon": "code",
-  "_repoindex": {
-    "toolkit_version": "0.10.0",
-    "exported_at": "2026-01-28T...",
-    "stats": {"total_repos": 120, "languages": {...}}
-  }
-}
 ```
 
 ### Copy Command

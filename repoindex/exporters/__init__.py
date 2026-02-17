@@ -59,6 +59,7 @@ BUILTIN_EXPORTERS = [
     'markdown',
     'opml',
     'jsonld',
+    'arkiv',
 ]
 
 

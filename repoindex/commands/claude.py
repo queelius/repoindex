@@ -397,14 +397,6 @@ repoindex ops github set-description --text "My project" "name == 'my-repo'" --d
 
 Requires `gh` CLI installed and authenticated.
 
-## Export (ECHO format)
-
-```bash
-repoindex export ~/backup --include-readmes        # Export with READMEs
-repoindex export ~/backup --include-events         # Include event history
-repoindex export ~/backup --dry-run                 # Preview
-```
-
 ## Output Formats
 
 Commands output pretty tables by default. Use `--json` for JSONL (for piping):
