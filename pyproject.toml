@@ -33,12 +33,13 @@ all = [ "numpy>=1.20.0", "scikit-learn>=1.0.0", "scipy>=1.7.0", "weasyprint>=54.
 repoindex = "repoindex.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/queelius/repoindex"
+Homepage = "https://queelius.github.io/repoindex"
+Documentation = "https://queelius.github.io/repoindex"
 Source = "https://github.com/queelius/repoindex"
 Issues = "https://github.com/queelius/repoindex/issues"
 
 [tool.setuptools]
-packages = [ "repoindex", "repoindex.commands", "repoindex.integrations",]
+packages = [ "repoindex", "repoindex.commands", "repoindex.integrations", "repoindex.providers", "repoindex.exporters",]
 
 [tool.setuptools.package-data]
 repoindex = [ "py.typed",]

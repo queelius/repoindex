@@ -1,5 +1,7 @@
 site_name: repoindex
-site_description: Collection-aware metadata index for git repositories
+site_description: A filesystem git catalog — collection-aware metadata index for local git repositories
+site_author: Alexander Towell
+site_url: https://queelius.github.io/repoindex
 repo_url: https://github.com/queelius/repoindex
 repo_name: queelius/repoindex
 docs_dir: docs
@@ -31,23 +33,25 @@ theme:
 
 nav:
   - Home: index.md
-  - Getting Started: getting-started.md
-  - Core:
-    - Usage Guide: usage.md
-    - Query Language: catalog-query.md
-    - Query Cookbook: query-cookbook.md
-  - Events:
-    - Overview: events/overview.md
-    - Event Types Reference: events/event-types.md
-  - Interactive:
-    - Shell & VFS: shell-vfs.md
-  - Reference:
-    - Architecture: architecture-vision.md
-    - Design Decisions: design/CLI_DESIGN_DECISIONS.md
-    - Git Commands Design: design/GIT_COMMANDS_DESIGN.md
-    - Version Management: design/VERSION_MANAGEMENT_IMPLEMENTATION.md
-  - Changelog: changelog.md
-  - Contributing: contributing.md
+  - Tags & Queries: catalog-query.md
+  - Events: events.md
+  - Ops & Audit: ops.md
+  - Render Formats: render.md
+  - Shell: shell-vfs.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/queelius
+      name: Alexander Towell on GitHub
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/user/queelius
+      name: queelius on PyPI
+    - icon: fontawesome/brands/orcid
+      link: https://orcid.org/0000-0001-6443-9897
+      name: ORCID 0000-0001-6443-9897
+
+copyright: Copyright &copy; 2025-2026 Alexander Towell (Alex Towell)
 
 markdown_extensions:
   - pymdownx.highlight:

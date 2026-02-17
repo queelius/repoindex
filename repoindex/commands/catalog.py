@@ -575,8 +575,8 @@ def catalog_import_github(tag_filters, match_all, dry_run, quiet, progress, **kw
 @click.option("--all", "match_all", is_flag=True, help="Match all filters (default: match any)")
 @click.option("--sync-pypi", is_flag=True, help="Sync applicable tags to PyPI metadata")
 @click.option("--dry-run", is_flag=True, help="Preview changes without saving")
-@click.option("--pretty", is_flag=True, help="Display results in formatted output")
-def catalog_tag(new_tags, remove_tags, directory, tag_filters, match_all, sync_pypi, dry_run, pretty):
+@click.option("--json", "output_json", is_flag=True, help="Output as JSONL")
+def catalog_tag(new_tags, remove_tags, directory, tag_filters, match_all, sync_pypi, dry_run, output_json):
     """
     Add or remove tags from repositories.
     
@@ -605,7 +605,7 @@ def catalog_tag(new_tags, remove_tags, directory, tag_filters, match_all, sync_p
         expanded_dir = os.path.expanduser(directory)
         if not os.path.exists(expanded_dir):
             error_msg = {"error": f"Directory not found: {directory}"}
-            if pretty:
+            if not output_json:
                 console.print(f"[red]✗[/red] {error_msg['error']}")
             else:
                 print(json.dumps(error_msg), flush=True)
@@ -626,7 +626,7 @@ def catalog_tag(new_tags, remove_tags, directory, tag_filters, match_all, sync_p
     
     if not repos_to_tag:
         error_msg = {"error": "No repositories found to tag"}
-        if pretty:
+        if not output_json:
             console.print(f"[red]✗[/red] {error_msg['error']}")
         else:
             print(json.dumps(error_msg), flush=True)
@@ -639,7 +639,7 @@ def catalog_tag(new_tags, remove_tags, directory, tag_filters, match_all, sync_p
             "error": f"Cannot manually assign protected tags: {', '.join(protected_tags_to_add)}",
             "protected_tags": protected_tags_to_add
         }
-        if pretty:
+        if not output_json:
             console.print(f"[red]✗[/red] {error_msg['error']}")
             console.print("\n[yellow]Protected tags are automatically assigned based on repository attributes.[/yellow]")
         else:
@@ -714,30 +714,33 @@ def catalog_tag(new_tags, remove_tags, directory, tag_filters, match_all, sync_p
         save_config(config)
     
     # Output results
-    if pretty:
+    if output_json:
+        for result in results:
+            print(json.dumps(result, ensure_ascii=False), flush=True)
+    else:
         # Show what we're doing
         action_desc = []
         if new_tags:
             action_desc.append(f"Adding: {', '.join(new_tags)}")
         if remove_tags:
             action_desc.append(f"Removing: {', '.join(remove_tags)}")
-        
+
         console.print(f"[bold]{' | '.join(action_desc)}[/bold]")
-        
+
         if directory:
             console.print(f"Directory: {directory}")
         elif tag_filters:
             filter_desc = " AND ".join(tag_filters) if match_all else " OR ".join(tag_filters)
             console.print(f"Filters: {filter_desc}")
-        
+
         console.print("\n[bold]Results:[/bold]")
         console.print(f"  Total repositories: {len(repos_to_tag)}")
         console.print(f"  [green]Updated: {updated_count}[/green]")
         console.print(f"  Unchanged: {len(repos_to_tag) - updated_count}")
-        
+
         if dry_run:
             console.print("\n[yellow]DRY RUN - no changes were saved[/yellow]")
-        
+
         # Show updated repos
         updated_results = [r for r in results if r.get("updated")]
         if updated_results and len(updated_results) <= 10:
@@ -763,12 +766,6 @@ def catalog_tag(new_tags, remove_tags, directory, tag_filters, match_all, sync_p
                     console.print(f"    [green]Added:[/green] {', '.join(result['added'])}")
                 if result.get("removed"):
                     console.print(f"    [red]Removed:[/red] {', '.join(result['removed'])}")
-        elif updated_results:
-            console.print(f"\n[dim]Updated {len(updated_results)} repositories (too many to show individually)[/dim]")
-    else:
-        # Output as JSONL
-        for result in results:
-            print(json.dumps(result, ensure_ascii=False), flush=True)
 
 
 @catalog_cmd.command("link")
@@ -776,8 +773,8 @@ def catalog_tag(new_tags, remove_tags, directory, tag_filters, match_all, sync_p
 @click.option("--all", "match_all", is_flag=True, help="Match all tags (default: match any)")
 @click.argument("target_dir")
 @click.option("--dry-run", is_flag=True, help="Preview without creating links")
-@click.option("--pretty", is_flag=True, help="Display results in formatted table")
-def catalog_link(tag_filters, match_all, target_dir, dry_run, pretty):
+@click.option("--json", "output_json", is_flag=True, help="Output as JSONL")
+def catalog_link(tag_filters, match_all, target_dir, dry_run, output_json):
     """
     Create directory with symlinks to repositories matching tag filters.
     
@@ -799,7 +796,7 @@ def catalog_link(tag_filters, match_all, target_dir, dry_run, pretty):
             "error": f"No repositories found matching: {filter_desc}",
             "type": "catalog_error"
         }
-        if pretty:
+        if not output_json:
             console.print(f"[red]✗[/red] {error_msg['error']}")
         else:
             print(json.dumps(error_msg), flush=True)
@@ -813,27 +810,26 @@ def catalog_link(tag_filters, match_all, target_dir, dry_run, pretty):
     result["match_all"] = match_all
     result["total_repos"] = len(repo_paths)
     
-    if pretty:
-        # Display formatted output
+    if output_json:
+        print(json.dumps(result, ensure_ascii=False), flush=True)
+    else:
         if result.get("created"):
             console.print(f"[green]✓[/green] Created catalog link directory: {target_dir}")
             filter_desc = " AND ".join(tag_filters) if match_all else " OR ".join(tag_filters)
             console.print(f"  Filters: {filter_desc}")
             console.print(f"  Linked repositories: {result['linked_count']}/{result['total_repos']}")
-            
+
             if result.get("errors"):
                 console.print("\n[red]Errors:[/red]")
                 for error in result["errors"]:
                     console.print(f"  [red]✗[/red] {error}")
         else:
             console.print(f"[red]✗[/red] Failed to create directory: {result.get('error', 'Unknown error')}")
-    else:
-        print(json.dumps(result, ensure_ascii=False), flush=True)
 
 
 @catalog_cmd.command("list")
-@click.option("--pretty", is_flag=True, help="Display as formatted table")
-def catalog_list(pretty):
+@click.option("--json", "output_json", is_flag=True, help="Output as JSONL")
+def catalog_list(output_json):
     """
     List all unique tags and their statistics.
     
@@ -846,7 +842,7 @@ def catalog_list(pretty):
     repo_tags = config.get("repository_tags", {})
     
     if not repo_tags:
-        if pretty:
+        if not output_json:
             console.print("[yellow]No repositories have tags. Use 'repoindex get --tag' or 'repoindex catalog tag' to add tags.[/yellow]")
         else:
             print(json.dumps({"tags": {}}), flush=True)
@@ -877,8 +873,10 @@ def catalog_list(pretty):
             "repositories": count
         })
     
-    if pretty:
-        # Create a custom table for tags
+    if output_json:
+        for stat in catalog_stats:
+            print(json.dumps(stat, ensure_ascii=False), flush=True)
+    else:
         from rich.table import Table
         table = Table(
             title="Repository Tags",
@@ -886,38 +884,32 @@ def catalog_list(pretty):
             show_header=True,
             header_style="bold magenta"
         )
-        
+
         table.add_column("Tag", style="cyan")
         table.add_column("Repositories", style="magenta", justify="right")
-        
+
         # Group by key for better display
         by_key = defaultdict(list)
         for stat in catalog_stats:
             by_key[stat["key"]].append(stat)
-        
+
         for key in sorted(by_key.keys()):
-            # Add entries for this key
             for stat in sorted(by_key[key], key=lambda x: x["tag"]):
                 table.add_row(stat["tag"], str(stat["repositories"]))
-        
+
         console.print(table)
-        
-        # Print summary
+
         console.print("\n[bold]Summary:[/bold]")
         console.print(f"  Total tags: {len(tag_counts)}")
         console.print(f"  Total repositories with tags: {len(repo_tags)}")
         console.print(f"  Tag keys: {', '.join(sorted(tag_key_counts.keys()))}")
-    else:
-        # Output as JSONL
-        for stat in catalog_stats:
-            print(json.dumps(stat, ensure_ascii=False), flush=True)
 
 
 @catalog_cmd.command("show")
 @click.option("-t", "--tag", "tag_filters", multiple=True, help="Tag filters (e.g., org:torvalds, lang:python)")
 @click.option("--all", "match_all", is_flag=True, help="Match all tags (default: match any)")
-@click.option("--pretty", is_flag=True, help="Display as formatted table")
-def catalog_show(tag_filters, match_all, pretty):
+@click.option("--json", "output_json", is_flag=True, help="Output as JSONL")
+def catalog_show(tag_filters, match_all, output_json):
     """
     Show repositories matching tag filters.
     
@@ -942,14 +934,16 @@ def catalog_show(tag_filters, match_all, pretty):
             "error": f"No repositories found matching: {filter_desc}",
             "type": "catalog_error"
         }
-        if pretty:
+        if not output_json:
             console.print(f"[red]✗[/red] {error_msg['error']}")
         else:
             print(json.dumps(error_msg), flush=True)
         return
     
-    if pretty:
-        # Create table
+    if output_json:
+        for repo in repos:
+            print(json.dumps(repo, ensure_ascii=False), flush=True)
+    else:
         from rich.table import Table
         table = Table(
             title=f"Repositories matching: {' AND '.join(tag_filters) if match_all else ' OR '.join(tag_filters)}",
@@ -957,32 +951,27 @@ def catalog_show(tag_filters, match_all, pretty):
             show_header=True,
             header_style="bold magenta"
         )
-        
+
         table.add_column("Repository", style="cyan")
         table.add_column("Path", style="dim")
         table.add_column("Tags", style="green")
-        
-        # Sort by name
+
         for repo in sorted(repos, key=lambda x: x["name"]):
             table.add_row(
                 repo["name"],
                 repo["path"],
                 ", ".join(repo["tags"]) if repo["tags"] else ""
             )
-        
+
         console.print(table)
         console.print(f"\n[bold]Total repositories:[/bold] {len(repos)}")
-    else:
-        # Output as JSONL
-        for repo in repos:
-            print(json.dumps(repo, ensure_ascii=False), flush=True)
 
 
 @catalog_cmd.command("search")
 @click.option("-t", "--tag", "tag_filters", multiple=True, help="Tag filters to search (wildcards supported)")
 @click.option("--all", "match_all", is_flag=True, help="Match all tags (default: match any)")
-@click.option("--pretty", is_flag=True, help="Display as formatted table")
-def catalog_search(tag_filters, match_all, pretty):
+@click.option("--json", "output_json", is_flag=True, help="Output as JSONL")
+def catalog_search(tag_filters, match_all, output_json):
     """
     Search for repositories using complex tag queries.
     
@@ -996,7 +985,7 @@ def catalog_search(tag_filters, match_all, pretty):
     # Just delegate to catalog show
     from click import Context
     ctx = Context(catalog_show)
-    ctx.invoke(catalog_show, tag_filters=tag_filters, match_all=match_all, pretty=pretty, full=False)
+    ctx.invoke(catalog_show, tag_filters=tag_filters, match_all=match_all, output_json=output_json)
 
 
 @catalog_cmd.command("purge")
@@ -1004,8 +993,8 @@ def catalog_search(tag_filters, match_all, pretty):
 @click.option("--yes", is_flag=True, help="Automatically confirm all removals")
 @click.option("-t", "--tag", "tag_filters", multiple=True, help="Only purge entries matching these tags")
 @click.option("--older-than", type=str, help="Only purge entries older than specified time (e.g., 30d, 1w)")
-@click.option("--pretty", is_flag=True, help="Display results in a formatted table")
-def catalog_purge(dry_run, yes, tag_filters, older_than, pretty):
+@click.option("--json", "output_json", is_flag=True, help="Output as JSONL")
+def catalog_purge(dry_run, yes, tag_filters, older_than, output_json):
     """
     Remove tags for repositories that no longer exist.
     
@@ -1026,7 +1015,7 @@ def catalog_purge(dry_run, yes, tag_filters, older_than, pretty):
     repo_tags = config.get("repository_tags", {})
     
     if not repo_tags:
-        if pretty:
+        if not output_json:
             console.print("[yellow]No tagged repositories found.[/yellow]")
         else:
             print(json.dumps({"status": "no_tags", "message": "No tagged repositories found"}), flush=True)
@@ -1070,7 +1059,7 @@ def catalog_purge(dry_run, yes, tag_filters, older_than, pretty):
             orphaned.append(orphaned_entry)
     
     if not orphaned:
-        if pretty:
+        if not output_json:
             console.print("[green]✓[/green] All tagged repositories exist. Nothing to purge.")
         else:
             print(json.dumps({
@@ -1081,50 +1070,50 @@ def catalog_purge(dry_run, yes, tag_filters, older_than, pretty):
         return
     
     # Display orphaned entries
-    if pretty:
+    if not output_json:
         console.print(f"\n[bold]Found {len(orphaned)} orphaned entries:[/bold]\n")
-        
+
         for entry in orphaned:
             status = "[red]Missing[/red]" if not entry["exists"] else "[yellow]Not a git repo[/yellow]"
             console.print(f"{status} {entry['path']}")
             if entry["tags"]:
                 console.print(f"  Tags: {', '.join(entry['tags'])}")
             console.print()
-    
+
     if dry_run:
-        if pretty:
-            console.print(f"[yellow]Dry run:[/yellow] Would remove {len(orphaned)} entries")
-        else:
+        if output_json:
             print(json.dumps({
                 "status": "dry_run",
                 "would_remove": len(orphaned),
                 "entries": [{"path": e["path"], "tags": e["tags"]} for e in orphaned]
             }), flush=True)
+        else:
+            console.print(f"[yellow]Dry run:[/yellow] Would remove {len(orphaned)} entries")
         return
-    
+
     # Process removals
     removed_count = 0
     skipped_count = 0
-    
+
     for entry in orphaned:
         path = entry["path"]
-        
+
         # Prompt for confirmation unless --yes is specified
         if not yes:
-            if pretty:
+            if not output_json:
                 response = click.confirm(f"Remove tags for {path}?", default=True)
             else:
-                # In non-pretty mode, skip interactive prompts
+                # In JSON mode, skip interactive prompts
                 response = True
         else:
             response = True
-        
+
         if response:
             # Remove from config
             del repo_tags[path]
             removed_count += 1
-            
-            if not pretty:
+
+            if output_json:
                 print(json.dumps({
                     "action": "removed",
                     "path": path,
@@ -1132,33 +1121,33 @@ def catalog_purge(dry_run, yes, tag_filters, older_than, pretty):
                 }), flush=True)
         else:
             skipped_count += 1
-            if not pretty:
+            if output_json:
                 print(json.dumps({
                     "action": "skipped",
                     "path": path,
                     "tags": entry["tags"]
                 }), flush=True)
-    
+
     # Save config if changes were made
     if removed_count > 0:
         config["repository_tags"] = repo_tags
         save_config(config)
-    
+
     # Summary
-    if pretty:
-        console.print("\n[bold]Summary:[/bold]")
-        console.print(f"  Checked: {checked_count}")
-        console.print(f"  [green]Removed: {removed_count}[/green]")
-        console.print(f"  Skipped: {skipped_count}")
-        if removed_count > 0:
-            console.print("\n[green]✓[/green] Configuration updated")
-    else:
+    if output_json:
         print(json.dumps({
             "status": "complete",
             "checked": checked_count,
             "removed": removed_count,
             "skipped": skipped_count
         }), flush=True)
+    else:
+        console.print("\n[bold]Summary:[/bold]")
+        console.print(f"  Checked: {checked_count}")
+        console.print(f"  [green]Removed: {removed_count}[/green]")
+        console.print(f"  Skipped: {skipped_count}")
+        if removed_count > 0:
+            console.print("\n[green]✓[/green] Configuration updated")
 
 
 @catalog_cmd.command("explain")

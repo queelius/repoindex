@@ -877,57 +877,6 @@ class TestHasDoi:
 
 
 # ──────────────────────────────────────────────
-# Refresh --zenodo flag tests
-# ──────────────────────────────────────────────
-
-class TestRefreshZenodoFlag:
-    """Tests for the --zenodo refresh flag."""
-
-    def test_help_shows_zenodo_flag(self):
-        """Help output should show the --zenodo flag."""
-        from click.testing import CliRunner
-        from repoindex.commands.refresh import refresh_handler
-
-        runner = CliRunner()
-        result = runner.invoke(refresh_handler, ['--help'])
-
-        assert result.exit_code == 0
-        assert '--zenodo / --no-zenodo' in result.output
-
-    def test_help_mentions_orcid(self):
-        """Help should mention ORCID requirement."""
-        from click.testing import CliRunner
-        from repoindex.commands.refresh import refresh_handler
-
-        runner = CliRunner()
-        result = runner.invoke(refresh_handler, ['--help'])
-
-        assert 'orcid' in result.output.lower()
-
-    def test_external_flag_includes_zenodo(self):
-        """--external should include zenodo in its description."""
-        from click.testing import CliRunner
-        from repoindex.commands.refresh import refresh_handler
-
-        runner = CliRunner()
-        result = runner.invoke(refresh_handler, ['--help'])
-
-        # The --external description should mention zenodo
-        assert 'zenodo' in result.output.lower()
-
-    def test_zenodo_resolve_flag_with_external(self):
-        """Test that --external enables zenodo."""
-        from repoindex.commands.refresh import _resolve_external_flag
-        assert _resolve_external_flag(None, True, False) is True
-
-    def test_zenodo_config_default(self):
-        """Test zenodo appears in default config."""
-        from repoindex.config import get_default_config
-        config = get_default_config()
-        assert config['refresh']['external_sources']['zenodo'] is False
-
-
-# ──────────────────────────────────────────────
 # Query --has-doi flag tests
 # ──────────────────────────────────────────────
 

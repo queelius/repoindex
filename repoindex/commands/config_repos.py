@@ -8,8 +8,7 @@ import click
 from rich.console import Console
 from rich.table import Table
 
-from ..config import load_config, save_config
-from ..metadata import get_metadata_store
+from ..config import load_config, load_raw_config, save_config
 
 console = Console()
 
@@ -26,20 +25,19 @@ def config_repos():
 
 @config_repos.command("add")
 @click.argument("path")
-@click.option("--refresh", is_flag=True, help="Refresh metadata for repositories in the new path")
-def repos_add(path, refresh):
+def repos_add(path):
     """Add a repository directory to configuration.
 
     PATH: Directory path to add (supports ~/ and glob patterns like **)
 
-    Examples:
-
     \b
+    Examples:
         repoindex config repos add ~/github/**
-        repoindex config repos add ~/projects --refresh
         repoindex config repos add /absolute/path/to/repos
+
+    Run 'repoindex refresh' afterwards to populate the database.
     """
-    config = load_config()
+    config = load_raw_config()
 
     # Ensure repository_directories exists
     if 'repository_directories' not in config:
@@ -55,26 +53,7 @@ def repos_add(path, refresh):
 
     # Save configuration
     save_config(config)
-    console.print(f"[green]✓[/green] Added repository directory: [cyan]{path}[/cyan]")
-
-    # Optionally refresh metadata
-    if refresh:
-        from ..utils import find_git_repos_from_config
-        console.print(f"[yellow]Discovering repositories in {path}...[/yellow]")
-
-        # Find repos in the new path
-        repos = find_git_repos_from_config([path], recursive=False)
-
-        if repos:
-            console.print(f"[yellow]Refreshing metadata for {len(repos)} repositories...[/yellow]")
-            store = get_metadata_store()
-
-            for repo in repos:
-                store.refresh(repo, fetch_github=False)
-
-            console.print(f"[green]✓[/green] Refreshed metadata for {len(repos)} repositories")
-        else:
-            console.print("[dim]No repositories found in the specified path[/dim]")
+    console.print(f"[green]\u2713[/green] Added repository directory: [cyan]{path}[/cyan]")
 
 
 @config_repos.command("remove")
@@ -90,7 +69,7 @@ def repos_remove(path):
         repoindex config repos remove ~/github/**
         repoindex config repos remove ~/old-projects
     """
-    config = load_config()
+    config = load_raw_config()
 
     # Check if path exists in config
     repo_dirs = config.get('repository_directories', [])
@@ -112,7 +91,7 @@ def repos_remove(path):
 
     # Save configuration
     save_config(config)
-    console.print(f"[green]✓[/green] Removed repository directory: [cyan]{path}[/cyan]")
+    console.print(f"[green]\u2713[/green] Removed repository directory: [cyan]{path}[/cyan]")
 
 
 @config_repos.command("list")
@@ -186,7 +165,7 @@ def repos_clear(yes):
         repoindex config repos clear
         repoindex config repos clear --yes
     """
-    config = load_config()
+    config = load_raw_config()
 
     # Get current paths
     repo_dirs = config.get('repository_directories', [])
@@ -211,4 +190,4 @@ def repos_clear(yes):
 
     # Save configuration
     save_config(config)
-    console.print("[green]✓[/green] Cleared all repository directories")
+    console.print("[green]\u2713[/green] Cleared all repository directories")

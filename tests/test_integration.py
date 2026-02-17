@@ -106,14 +106,15 @@ description = "A test package"
 
         self.assertEqual(result.returncode, 0)
 
-        # Should output JSON configuration
+        # Default output is now YAML
+        import yaml
         try:
-            config_data = json.loads(result.stdout)
+            config_data = yaml.safe_load(result.stdout)
             self.assertIn('repository_directories', config_data)
             self.assertIn('github', config_data)
             self.assertIn('repository_tags', config_data)
-        except json.JSONDecodeError:
-            self.fail(f"Config show did not output valid JSON: {result.stdout}")
+        except yaml.YAMLError:
+            self.fail(f"Config show did not output valid YAML: {result.stdout}")
     
     def test_command_help(self):
         """Test that help is displayed for various commands"""

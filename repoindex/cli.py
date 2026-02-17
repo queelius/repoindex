@@ -15,6 +15,7 @@ from repoindex.commands.export import export_handler
 from repoindex.commands.copy import copy_handler
 from repoindex.commands.link import link_cmd
 from repoindex.commands.ops import ops_cmd
+from repoindex.commands.render import render_handler
 
 
 @click.group()
@@ -46,6 +47,7 @@ cli.add_command(sql_handler, name='sql')
 cli.add_command(refresh_handler, name='refresh')
 cli.add_command(export_handler, name='export')
 cli.add_command(copy_handler, name='copy')
+cli.add_command(render_handler, name='render')
 cli.add_command(shell_handler, name='shell')
 
 # Command groups

@@ -32,7 +32,7 @@ Database: `~/.repoindex/repoindex.db` (SQLite). Use `repoindex sql` for direct S
 ## CRITICAL: Publications Table is Source of Truth for Packages
 
 The `publications` table is the **canonical source** for which packages are published
-to PyPI, CRAN, Zenodo, etc. It is populated by `repoindex refresh --pypi --cran --zenodo`.
+to PyPI, CRAN, Zenodo, etc. It is populated by `repoindex refresh --provider pypi --provider cran --provider zenodo`.
 
 **ALWAYS query this table first** when:
 - Counting published packages
@@ -184,7 +184,7 @@ Main repository data. One row per local repo path.
 ### publications table
 
 **Source of truth for published packages.** One row per (repo, registry) pair.
-Populated by `repoindex refresh --pypi --cran --zenodo`.
+Populated by `repoindex refresh -p pypi -p cran -p zenodo` (or `--external` for all).
 
 | Column | Type | Notes |
 |--------|------|-------|
@@ -286,9 +286,10 @@ repoindex events --json                     # JSONL for piping
 repoindex refresh              # Smart refresh (changed repos only)
 repoindex refresh --full       # Force full refresh
 repoindex refresh --github     # Include GitHub metadata (stars, topics)
-repoindex refresh --pypi       # Probe PyPI for all Python repos
-repoindex refresh --cran       # Probe CRAN/Bioconductor for all R repos
-repoindex refresh --zenodo     # Batch fetch Zenodo records via ORCID
+repoindex refresh -p pypi      # Probe PyPI for all Python repos
+repoindex refresh -p cran      # Probe CRAN/Bioconductor for all R repos
+repoindex refresh -p zenodo    # Batch fetch Zenodo records via ORCID
+repoindex refresh -p npm -p cargo  # Multiple registry providers
 repoindex refresh --external   # All external sources at once
 repoindex refresh --since 30d  # Events from last 30 days
 repoindex sql --reset && repoindex refresh --full  # Full rebuild
@@ -325,20 +326,20 @@ repoindex copy ~/backup --exclude-git              # Skip .git directories
 ## Audit (metadata completeness)
 
 ```bash
-# Audit all repos (pretty output with category tables)
-repoindex ops audit --pretty
+# Audit all repos (category tables by default)
+repoindex ops audit
 
 # Machine-readable output for automation
 repoindex ops audit --json
 
 # Filter by category (essentials, development, discoverability, documentation)
-repoindex ops audit --category essentials --pretty
+repoindex ops audit --category essentials
 
 # Filter by severity threshold (critical, recommended, suggested)
-repoindex ops audit --severity critical --pretty
+repoindex ops audit --severity critical
 
 # Combine with query flags
-repoindex ops audit --language python --pretty
+repoindex ops audit --language python
 repoindex ops audit --json --severity recommended
 ```
 
@@ -376,7 +377,7 @@ repoindex ops generate code-of-conduct --dry-run
 repoindex ops generate contributing --dry-run
 ```
 
-All generate commands support: `--dry-run`, `--force`, `--json`, `--pretty`, plus query flags.
+All generate commands support: `--dry-run`, `--force`, `--json`, plus query flags.
 
 ## GitHub Operations
 
@@ -401,7 +402,7 @@ Requires `gh` CLI installed and authenticated.
 ```bash
 repoindex export ~/backup --include-readmes        # Export with READMEs
 repoindex export ~/backup --include-events         # Include event history
-repoindex export ~/backup --dry-run --pretty       # Preview
+repoindex export ~/backup --dry-run                 # Preview
 ```
 
 ## Output Formats

@@ -1,7 +1,7 @@
 """
 Tests for refresh command external source flags.
 
-Tests the --github, --pypi, --cran, and --external flags,
+Tests the --github and --external flags,
 including config defaults and flag precedence.
 """
 
@@ -51,10 +51,10 @@ class TestResolveExternalFlag:
 
 
 class TestRefreshHandlerExternalFlags:
-    """Test refresh handler with external source flags via CLI help."""
+    """Test refresh handler CLI flags."""
 
-    def test_help_shows_external_flags(self):
-        """Help output should show all external source flags."""
+    def test_help_shows_github_and_provider_flags(self):
+        """Help output should show --github and --provider flags."""
         from click.testing import CliRunner
         from repoindex.commands.refresh import refresh_handler
 
@@ -63,12 +63,11 @@ class TestRefreshHandlerExternalFlags:
 
         assert result.exit_code == 0
         assert '--github / --no-github' in result.output
-        assert '--pypi / --no-pypi' in result.output
-        assert '--cran / --no-cran' in result.output
+        assert '--provider' in result.output
         assert '--external' in result.output
 
-    def test_help_explains_external_sources(self):
-        """Help should explain external sources are opt-in."""
+    def test_help_does_not_show_legacy_flags(self):
+        """Help output should NOT show removed --pypi/--cran/--zenodo flags."""
         from click.testing import CliRunner
         from repoindex.commands.refresh import refresh_handler
 
@@ -76,5 +75,6 @@ class TestRefreshHandlerExternalFlags:
         result = runner.invoke(refresh_handler, ['--help'])
 
         assert result.exit_code == 0
-        assert 'External sources' in result.output
-        assert 'disabled by default' in result.output or 'enabled by default' in result.output
+        assert '--pypi' not in result.output
+        assert '--cran' not in result.output
+        assert '--zenodo / --no-zenodo' not in result.output

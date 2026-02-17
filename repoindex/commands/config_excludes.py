@@ -10,7 +10,7 @@ import click
 from rich.console import Console
 from rich.table import Table
 
-from ..config import load_config, save_config
+from ..config import load_raw_config, save_config
 
 console = Console()
 
@@ -39,7 +39,7 @@ def excludes_add(path):
         repoindex config excludes add ~/github/forks
         repoindex config excludes add /absolute/path/to/skip
     """
-    config = load_config()
+    config = load_raw_config()
 
     # Ensure exclude_directories exists
     if 'exclude_directories' not in config:
@@ -71,7 +71,7 @@ def excludes_remove(path):
         repoindex config excludes remove ~/github/archived
         repoindex config excludes remove ~/github/forks
     """
-    config = load_config()
+    config = load_raw_config()
 
     # Check if path exists in config
     exclude_dirs = config.get('exclude_directories', [])
@@ -109,7 +109,7 @@ def excludes_list(json_output):
         repoindex config excludes list
         repoindex config excludes list --json
     """
-    config = load_config()
+    config = load_raw_config()
 
     # Get exclude directories
     exclude_dirs = config.get('exclude_directories', [])
@@ -156,7 +156,7 @@ def excludes_clear(yes):
         repoindex config excludes clear
         repoindex config excludes clear --yes
     """
-    config = load_config()
+    config = load_raw_config()
 
     # Get current paths
     exclude_dirs = config.get('exclude_directories', [])

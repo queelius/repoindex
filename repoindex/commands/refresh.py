@@ -9,7 +9,7 @@ import json
 import os
 import sys
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional, Tuple
 
 import click
 
@@ -52,31 +52,62 @@ def _resolve_external_flag(explicit: Optional[bool], external: bool, config_defa
     return config_default
 
 
+def _resolve_provider_names(
+    provider_names: Tuple[str, ...],
+    external: bool,
+    provider_config: dict,
+) -> List[str]:
+    """
+    Build the list of active provider registry names.
+
+    Merges:
+    - Explicit --provider flags
+    - --external (all providers)
+    - Config defaults from refresh.providers
+
+    Args:
+        provider_names: Explicit --provider flag values
+        external: Whether --external was passed
+        provider_config: Dict from config['refresh']['providers'],
+            e.g. {'pypi': True, 'npm': False}
+
+    Returns:
+        Deduplicated list of provider registry identifiers
+    """
+    names: set = set(provider_names)
+
+    # --external enables all providers
+    if external:
+        names.add('__all__')
+
+    # Config defaults for providers
+    for name, enabled in provider_config.items():
+        if enabled:
+            names.add(name)
+
+    return list(names) if names else []
+
+
 @click.command('refresh')
 @click.option('--full', is_flag=True, help='Force full refresh of all repos')
 @click.option('--since', default='90d', help='How far back to scan for events (e.g., 7d, 30d, 90d)')
 @click.option('--github/--no-github', default=None, help='Fetch GitHub metadata (stars, topics)')
-@click.option('--pypi/--no-pypi', default=None, help='Fetch PyPI package status')
-@click.option('--cran/--no-cran', default=None, help='Fetch CRAN package status')
-@click.option('--zenodo/--no-zenodo', default=None, help='Fetch Zenodo DOI metadata (requires author.orcid in config)')
-@click.option('--external', is_flag=True, help='Enable all external sources (github, pypi, cran, zenodo)')
+@click.option('--provider', '-p', 'provider_names', multiple=True,
+              help='Enable specific providers (e.g., --provider pypi --provider npm)')
+@click.option('--external', is_flag=True, help='Enable all external sources (github + all registry providers)')
 @click.option('-d', '--dir', 'directory', type=click.Path(exists=True),
               help='Refresh specific directory instead of configured paths')
 @click.option('--dry-run', is_flag=True, help='Show what would be refreshed')
 @click.option('--quiet', '-q', is_flag=True, help='Minimal output')
-@click.option('--pretty', is_flag=True, help='Pretty output with progress')
 def refresh_handler(
     full: bool,
     since: str,
     github: Optional[bool],
-    pypi: Optional[bool],
-    cran: Optional[bool],
-    zenodo: Optional[bool],
+    provider_names: Tuple[str, ...],
     external: bool,
     directory: Optional[str],
     dry_run: bool,
     quiet: bool,
-    pretty: bool,
 ):
     """
     Refresh the repository index database.
@@ -88,9 +119,9 @@ def refresh_handler(
     By default, performs a smart refresh that only updates repos
     that have changed since the last scan.
 
-    External sources (GitHub, PyPI, CRAN, Zenodo) are disabled by default
-    but can be enabled via flags or config. These make API calls
-    and can be slow for large collections.
+    Registry providers (PyPI, CRAN, Zenodo, npm, cargo, etc.) are
+    enabled via --provider or --external. GitHub metadata is separate
+    and enabled via --github.
 
     \b
     Examples:
@@ -100,12 +131,11 @@ def refresh_handler(
         repoindex refresh --full
         # Include GitHub metadata
         repoindex refresh --github
+        # Include specific registry providers
+        repoindex refresh --provider pypi --provider cran
+        repoindex refresh -p npm -p cargo
         # Include all external sources (slower)
         repoindex refresh --external
-        # Include PyPI and CRAN package status
-        repoindex refresh --pypi --cran
-        # Include Zenodo DOI metadata (requires author.orcid)
-        repoindex refresh --zenodo
         # Refresh specific directory
         repoindex refresh -d ~/projects
         # Scan events from last 30 days only
@@ -114,24 +144,46 @@ def refresh_handler(
         repoindex sql --reset && repoindex refresh --full
 
     \b
-    External source config defaults (in config.yaml):
+    Config defaults (in config.yaml):
         refresh:
           external_sources:
-            github: true   # Enable by default
-            pypi: false    # Disabled by default
-            cran: false    # Disabled by default
-            zenodo: false  # Disabled by default (requires author.orcid)
+            github: true    # GitHub metadata enabled by default
+          providers:
+            pypi: false     # Registry providers disabled by default
+            cran: false
+            zenodo: false
     """
     config = load_config()
 
-    # Resolve external source flags using config defaults
+    # Resolve GitHub flag using config defaults
     # Priority: explicit flag > --external flag > config default > false
     ext_config = config.get('refresh', {}).get('external_sources', {})
-
     fetch_github = _resolve_external_flag(github, external, ext_config.get('github', False))
-    fetch_pypi = _resolve_external_flag(pypi, external, ext_config.get('pypi', False))
-    fetch_cran = _resolve_external_flag(cran, external, ext_config.get('cran', False))
-    fetch_zenodo = _resolve_external_flag(zenodo, external, ext_config.get('zenodo', False))
+
+    # Build list of provider names from --provider + --external + config
+    # Provider config lives at refresh.providers (sibling to external_sources)
+    provider_config = config.get('refresh', {}).get('providers', {})
+    active_provider_names = _resolve_provider_names(
+        provider_names=provider_names,
+        external=external, provider_config=provider_config,
+    )
+
+    # Discover and initialize active providers
+    active_providers = []
+    if active_provider_names:
+        from ..providers import discover_providers
+        only = None if '__all__' in active_provider_names else active_provider_names
+        active_providers = discover_providers(only=only)
+        # Prefetch batch providers
+        for p in active_providers:
+            if p.batch:
+                try:
+                    p.prefetch(config)
+                    if not quiet:
+                        click.echo(f"Provider {p.name}: prefetch complete", err=True)
+                except Exception as e:
+                    if not quiet:
+                        click.echo(f"Warning: {p.name} prefetch failed: {e}", err=True)
 
     # Get paths to scan
     if directory:
@@ -164,24 +216,6 @@ def refresh_handler(
     # Initialize service
     service = RepositoryService(config=config)
 
-    # Batch-fetch Zenodo records (single API call for all repos)
-    zenodo_records = []
-    if fetch_zenodo:
-        orcid = config.get('author', {}).get('orcid', '')
-        if orcid:
-            from ..infra.zenodo_client import ZenodoClient
-            try:
-                zenodo_client = ZenodoClient()
-                zenodo_records = zenodo_client.search_by_orcid(orcid)
-                if not quiet:
-                    click.echo(f"Zenodo: fetched {len(zenodo_records)} records for ORCID {orcid}", err=True)
-            except Exception as e:
-                if not quiet:
-                    click.echo(f"Warning: Zenodo fetch failed: {e}", err=True)
-        else:
-            if not quiet:
-                click.echo("Warning: --zenodo requires author.orcid in config (skipping)", err=True)
-
     # Stats tracking
     stats = {
         'scanned': 0,
@@ -209,42 +243,27 @@ def refresh_handler(
             click.echo("Use 'repoindex config repos add <path>' to configure paths.", err=True)
             click.echo("", err=True)
 
-        if pretty:
-            from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
-            with Progress(
-                SpinnerColumn(),
-                TextColumn("[progress.description]{task.description}"),
-                BarColumn(),
-                TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-            ) as progress:
-                task = progress.add_task("Refreshing repos...", total=len(repos))
+        from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+        ) as progress:
+            task = progress.add_task("Refreshing repos...", total=len(repos))
 
-                for repo in repos:
-                    _process_repo(
-                        db, service, repo, stats,
-                        full=full,
-                        since=since_datetime,
-                        fetch_github=fetch_github,
-                        fetch_pypi=fetch_pypi,
-                        fetch_cran=fetch_cran,
-                        zenodo_records=zenodo_records,
-                        dry_run=dry_run,
-                        quiet=quiet
-                    )
-                    progress.update(task, advance=1)
-        else:
             for repo in repos:
                 _process_repo(
                     db, service, repo, stats,
                     full=full,
                     since=since_datetime,
                     fetch_github=fetch_github,
-                    fetch_pypi=fetch_pypi,
-                    fetch_cran=fetch_cran,
-                    zenodo_records=zenodo_records,
+                    providers=active_providers,
+                    config=config,
                     dry_run=dry_run,
                     quiet=quiet
                 )
+                progress.update(task, advance=1)
 
         # Cleanup repos that no longer exist
         if not dry_run:
@@ -258,10 +277,8 @@ def refresh_handler(
     # Output results
     if quiet:
         pass
-    elif pretty:
-        _print_summary_pretty(stats)
     else:
-        print(json.dumps(stats))
+        _print_summary_pretty(stats)
 
 
 def _process_repo(
@@ -272,9 +289,8 @@ def _process_repo(
     full: bool,
     since: datetime,
     fetch_github: bool,
-    fetch_pypi: bool,
-    fetch_cran: bool,
-    zenodo_records: list,
+    providers: list,
+    config: dict,
     dry_run: bool,
     quiet: bool,
 ):
@@ -296,8 +312,6 @@ def _process_repo(
         enriched = service.get_status(
             repo,
             fetch_github=fetch_github,
-            fetch_pypi=fetch_pypi,
-            fetch_cran=fetch_cran
         )
 
         # Load tags from config
@@ -308,13 +322,18 @@ def _process_repo(
         # Upsert to database
         repo_id = upsert_repo(db, enriched)
 
-        # Handle Zenodo publication (separate from main package field)
-        # Zenodo uses batch-fetch, so we match pre-fetched records here
-        if zenodo_records and repo_id:
-            zenodo_package = service.match_zenodo_record(enriched, zenodo_records)
-            if zenodo_package:
-                from ..database.repository import _upsert_publication
-                _upsert_publication(db, repo_id, zenodo_package)
+        # Run registry providers (new extension system)
+        if providers and repo_id:
+            from ..database.repository import _upsert_publication
+            repo_dict = {'remote_url': enriched.remote_url, 'name': enriched.name}
+            for p in providers:
+                try:
+                    metadata = p.match(repo.path, repo_record=repo_dict, config=config)
+                    if metadata:
+                        _upsert_publication(db, repo_id, metadata)
+                except Exception as e:
+                    if not quiet:
+                        click.echo(f"  Warning: {p.registry} provider failed for {repo.name}: {e}", err=True)
         stats['updated'] += 1
 
         # Clear any previous scan errors for this path

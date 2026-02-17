@@ -47,7 +47,6 @@ def link_cmd():
 @click.argument('query_string', required=False, default='')
 # Output options
 @click.option('--json', 'output_json', is_flag=True, help='Output as JSONL')
-@click.option('--pretty', is_flag=True, help='Display progress with rich formatting')
 @click.option('--dry-run', is_flag=True, help='Preview without creating links')
 # Tree options
 @click.option('--max-depth', type=int, default=10, help='Maximum directory depth (default: 10)')
@@ -75,7 +74,6 @@ def tree_handler(
     organize_by: str,
     query_string: str,
     output_json: bool,
-    pretty: bool,
     dry_run: bool,
     max_depth: int,
     collision: str,
@@ -116,7 +114,7 @@ def tree_handler(
         # Filter to only Python repos
         repoindex link tree ~/links/python-by-tag --by tag --language python
         # Preview without creating
-        repoindex link tree ~/links/test --by tag --dry-run --pretty
+        repoindex link tree ~/links/test --by tag --dry-run
     """
     if debug:
         import logging
@@ -181,11 +179,9 @@ def tree_handler(
     if not repos:
         if output_json:
             print(json.dumps({'warning': 'No repositories found matching query'}))
-        elif pretty:
+        else:
             from rich.console import Console
             Console().print("[yellow]No repositories found matching query.[/yellow]")
-        else:
-            print("No repositories found matching query.", file=sys.stderr)
         return
 
     # Set up link service
@@ -200,12 +196,10 @@ def tree_handler(
 
     service = LinkService(config=config)
 
-    if pretty:
-        _tree_pretty(service, repos, options)
-    elif output_json:
+    if output_json:
         _tree_json(service, repos, options)
     else:
-        _tree_simple(service, repos, options)
+        _tree_pretty(service, repos, options)
 
 
 def _tree_simple(service: LinkService, repos: list, options: LinkTreeOptions):
@@ -316,13 +310,11 @@ def _tree_pretty(service: LinkService, repos: list, options: LinkTreeOptions):
 @click.option('--prune', is_flag=True, help='Remove broken symlinks')
 @click.option('--dry-run', is_flag=True, help='Preview without making changes')
 @click.option('--json', 'output_json', is_flag=True, help='Output as JSONL')
-@click.option('--pretty', is_flag=True, help='Display with rich formatting')
 def refresh_handler(
     tree_path: str,
     prune: bool,
     dry_run: bool,
     output_json: bool,
-    pretty: bool,
 ):
     """
     Refresh an existing symlink tree.
@@ -343,12 +335,10 @@ def refresh_handler(
 
     tree_dir = Path(tree_path)
 
-    if pretty:
-        _refresh_pretty(service, tree_dir, prune, dry_run)
-    elif output_json:
+    if output_json:
         _refresh_json(service, tree_dir, prune, dry_run)
     else:
-        _refresh_simple(service, tree_dir, prune, dry_run)
+        _refresh_pretty(service, tree_dir, prune, dry_run)
 
 
 def _refresh_simple(service: LinkService, tree_path: Path, prune: bool, dry_run: bool):
@@ -451,11 +441,9 @@ def _refresh_pretty(service: LinkService, tree_path: Path, prune: bool, dry_run:
 @link_cmd.command('status')
 @click.argument('tree_path', type=click.Path(exists=True))
 @click.option('--json', 'output_json', is_flag=True, help='Output as JSONL')
-@click.option('--pretty', is_flag=True, help='Display with rich formatting')
 def status_handler(
     tree_path: str,
     output_json: bool,
-    pretty: bool,
 ):
     """
     Show status of an existing symlink tree.
@@ -465,7 +453,7 @@ def status_handler(
     \b
     Examples:
         repoindex link status ~/links/by-tag
-        repoindex link status ~/links/by-tag --pretty
+        repoindex link status ~/links/by-tag
     """
     config = load_config()
     service = LinkService(config=config)
@@ -481,12 +469,10 @@ def status_handler(
         except json.JSONDecodeError:
             pass
 
-    if pretty:
-        _status_pretty(service, tree_dir, manifest)
-    elif output_json:
+    if output_json:
         _status_json(service, tree_dir, manifest)
     else:
-        _status_simple(service, tree_dir, manifest)
+        _status_pretty(service, tree_dir, manifest)
 
 
 def _status_simple(service: LinkService, tree_path: Path, manifest: Optional[dict]):

@@ -18,13 +18,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger("repoindex")
 
-# Global stats dictionary (minimal - most operations are read-only)
-stats = {
-    "repos_scanned": 0,
-    "repos_with_docs": 0,
-    "repos_with_packages": 0,
-}
-
 def get_config_path():
     """Get the path to the configuration file.
 
@@ -192,6 +185,112 @@ def save_config(config):
     except Exception as e:
         logger.error(f"Error saving config to {config_path}: {e}")
 
+
+def load_raw_config() -> dict:
+    """Load config from file without merging defaults.
+
+    Returns only what the user has explicitly set in their config file.
+    Use this for modification commands (set/unset/add/remove) to avoid
+    persisting default values back to the file.
+    """
+    config_path = get_config_path()
+    if not config_path.exists():
+        return {}
+    try:
+        if config_path.suffix.lower() in ['.yaml', '.yml']:
+            import yaml
+            with open(config_path, 'r') as f:
+                return yaml.safe_load(f) or {}
+        elif config_path.suffix.lower() == '.toml':
+            with open(config_path, 'rb') as f:
+                return tomllib.load(f)
+        else:
+            with open(config_path, 'r') as f:
+                return json.load(f)
+    except Exception as e:
+        logger.error(f"Error reading config from {config_path}: {e}")
+        return {}
+
+
+def config_get_path(config: dict, dotted_key: str):
+    """Navigate a dotted key path into a nested config dict.
+
+    Args:
+        config: Configuration dictionary
+        dotted_key: Dotted path like "author.name" or "github.rate_limit.max_retries"
+
+    Returns:
+        Tuple of (value, found) where found is True if the key exists.
+    """
+    parts = dotted_key.split(".")
+    current = config
+    for part in parts:
+        if not isinstance(current, dict) or part not in current:
+            return None, False
+        current = current[part]
+    return current, True
+
+
+def config_set_path(config: dict, dotted_key: str, value):
+    """Set a value at a dotted key path, creating intermediate dicts as needed.
+
+    Args:
+        config: Configuration dictionary (modified in place)
+        dotted_key: Dotted path like "author.name"
+        value: Value to set
+    """
+    parts = dotted_key.split(".")
+    current = config
+    for part in parts[:-1]:
+        if part not in current or not isinstance(current[part], dict):
+            current[part] = {}
+        current = current[part]
+    current[parts[-1]] = value
+
+
+def config_unset_path(config: dict, dotted_key: str) -> bool:
+    """Remove a key at a dotted path.
+
+    Args:
+        config: Configuration dictionary (modified in place)
+        dotted_key: Dotted path like "refresh.providers.npm"
+
+    Returns:
+        True if the key was found and removed, False otherwise.
+    """
+    parts = dotted_key.split(".")
+    current = config
+    for part in parts[:-1]:
+        if not isinstance(current, dict) or part not in current:
+            return False
+        current = current[part]
+    if not isinstance(current, dict) or parts[-1] not in current:
+        return False
+    del current[parts[-1]]
+    return True
+
+
+def coerce_value(raw: str):
+    """Coerce a CLI string value to the appropriate Python type.
+
+    Converts: "true"/"false" → bool, numeric strings → int/float, else str.
+    """
+    lower = raw.lower()
+    if lower == "true":
+        return True
+    if lower == "false":
+        return False
+    try:
+        return int(raw)
+    except ValueError:
+        pass
+    try:
+        return float(raw)
+    except ValueError:
+        pass
+    return raw
+
+
 def get_default_config():
     """
     Get default configuration.
@@ -246,10 +345,15 @@ def get_default_config():
         "refresh": {
             "external_sources": {
                 "github": False,   # GitHub API (stars, topics) - moderate speed
-                "pypi": False,     # PyPI package status - slow
-                "cran": False,     # CRAN package status - slow
-                "zenodo": False,   # Zenodo DOI enrichment (requires author.orcid)
-            }
+            },
+            # Registry providers — enable with --provider or set to true here
+            "providers": {
+                # "pypi": False,
+                # "cran": False,
+                # "zenodo": False,
+                # "npm": False,
+                # "cargo": False,
+            },
         },
 
         # NOTE: Legacy keys (registries, cache) are ignored if present in old configs
@@ -306,13 +410,15 @@ github:
 #   /path/to/repo: [tag1, tag2]
 
 # Refresh command defaults for external sources
-# These slow operations are opt-in by default
 # Use --external flag to enable all, or individual flags
 refresh:
   external_sources:
     github: false   # GitHub API (stars, topics) - moderate speed
-    pypi: false     # PyPI package status - slow
-    cran: false     # CRAN package status - slow
+  # Registry providers — enable with --provider or set to true here
+  providers:
+    # pypi: false
+    # cran: false
+    # npm: false
 """
     config_path.write_text(example_content)
     logger.info(f"Example configuration saved to {config_path}")

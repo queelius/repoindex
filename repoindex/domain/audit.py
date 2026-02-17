@@ -28,6 +28,7 @@ class Category(Enum):
     DEVELOPMENT = "development"
     DISCOVERABILITY = "discoverability"
     DOCUMENTATION = "documentation"
+    IDENTITY = "identity"
 
 
 @dataclass(frozen=True)

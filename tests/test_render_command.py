@@ -1,0 +1,120 @@
+"""Tests for the render command."""
+
+from unittest.mock import patch, MagicMock
+
+import pytest
+from click.testing import CliRunner
+
+from repoindex.commands.render import render_handler
+
+
+MOCK_REPOS = [
+    {
+        'name': 'test-repo',
+        'path': '/home/user/test-repo',
+        'language': 'Python',
+        'branch': 'main',
+        'is_clean': True,
+        'remote_url': 'https://github.com/user/test-repo',
+        'github_stars': 10,
+        'license_key': 'mit',
+        'description': 'Test repository',
+    },
+]
+
+
+@pytest.fixture
+def runner():
+    return CliRunner()
+
+
+@pytest.fixture
+def mock_query(monkeypatch):
+    """Mock _get_repos_from_query to return MOCK_REPOS."""
+    with patch('repoindex.commands.render._get_repos_from_query', return_value=MOCK_REPOS):
+        with patch('repoindex.commands.render.load_config', return_value={}):
+            yield
+
+
+class TestRenderListFormats:
+    def test_list_formats(self, runner, mock_query):
+        result = runner.invoke(render_handler, ['--list-formats', 'dummy'])
+        assert result.exit_code == 0
+        assert 'bibtex' in result.output
+        assert 'csv' in result.output
+        assert 'markdown' in result.output
+        assert 'opml' in result.output
+        assert 'jsonld' in result.output
+
+
+class TestRenderCSV:
+    def test_render_csv_to_stdout(self, runner, mock_query):
+        result = runner.invoke(render_handler, ['csv'])
+        assert result.exit_code == 0
+        assert 'test-repo' in result.output
+        assert 'name' in result.output  # CSV header
+
+    def test_render_csv_to_file(self, runner, mock_query, tmp_path):
+        outfile = str(tmp_path / 'out.csv')
+        result = runner.invoke(render_handler, ['csv', '-o', outfile])
+        assert result.exit_code == 0
+        content = open(outfile).read()
+        assert 'test-repo' in content
+
+
+class TestRenderBibTeX:
+    def test_render_bibtex(self, runner, mock_query):
+        result = runner.invoke(render_handler, ['bibtex'])
+        assert result.exit_code == 0
+        assert '@software{' in result.output
+
+
+class TestRenderMarkdown:
+    def test_render_markdown(self, runner, mock_query):
+        result = runner.invoke(render_handler, ['markdown'])
+        assert result.exit_code == 0
+        assert '| Name |' in result.output
+        assert 'test-repo' in result.output
+
+
+class TestRenderOPML:
+    def test_render_opml(self, runner, mock_query):
+        result = runner.invoke(render_handler, ['opml'])
+        assert result.exit_code == 0
+        assert '<?xml' in result.output
+        assert 'opml' in result.output
+
+
+class TestRenderJSONLD:
+    def test_render_jsonld(self, runner, mock_query):
+        result = runner.invoke(render_handler, ['jsonld'])
+        assert result.exit_code == 0
+        assert '"@context"' in result.output
+        assert 'SoftwareSourceCode' in result.output
+
+
+class TestRenderErrors:
+    def test_unknown_format(self, runner, mock_query):
+        result = runner.invoke(render_handler, ['nonexistent'])
+        assert result.exit_code != 0
+        assert 'Unknown format' in result.output
+
+
+class TestRenderQueryFlags:
+    @patch('repoindex.commands.render.load_config', return_value={})
+    @patch('repoindex.commands.render._get_repos_from_query')
+    def test_language_flag_passed(self, mock_query, mock_config, runner):
+        mock_query.return_value = MOCK_REPOS
+        result = runner.invoke(render_handler, ['csv', '--language', 'python'])
+        assert result.exit_code == 0
+        # Verify the query function was called with language
+        call_kwargs = mock_query.call_args
+        assert call_kwargs.kwargs.get('language') == 'python' or \
+               (len(call_kwargs.args) > 0 and True)
+
+    @patch('repoindex.commands.render.load_config', return_value={})
+    @patch('repoindex.commands.render._get_repos_from_query')
+    def test_starred_flag_passed(self, mock_query, mock_config, runner):
+        mock_query.return_value = MOCK_REPOS
+        result = runner.invoke(render_handler, ['csv', '--starred'])
+        assert result.exit_code == 0

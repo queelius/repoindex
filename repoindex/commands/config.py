@@ -3,7 +3,9 @@ import json
 import sys
 from pathlib import Path
 
-from repoindex.config import load_config, get_config_path
+import yaml
+
+from repoindex.config import load_config, save_config, get_config_path
 
 
 def detect_default_repo_dir() -> str:
@@ -55,6 +57,12 @@ config_cmd.add_command(config_repos)
 from .config_excludes import config_excludes  # noqa: E402
 config_cmd.add_command(config_excludes)
 
+# Register set/get/unset commands
+from .config_settings import config_set, config_get, config_unset  # noqa: E402
+config_cmd.add_command(config_set)
+config_cmd.add_command(config_get)
+config_cmd.add_command(config_unset)
+
 
 @config_cmd.command("init")
 @click.option("-d", "--dir", "directory", type=click.Path(exists=True),
@@ -65,7 +73,7 @@ config_cmd.add_command(config_excludes)
 def config_init(directory, yes, recursive):
     """Initialize repoindex configuration.
 
-    Detects repository directories and creates ~/.repoindex/config.json.
+    Detects repository directories and creates ~/.repoindex/config.yaml.
 
     \b
     Examples:
@@ -116,8 +124,7 @@ def config_init(directory, yes, recursive):
     config_path.parent.mkdir(parents=True, exist_ok=True)
 
     # Save config
-    with open(config_path, 'w') as f:
-        json.dump(config, f, indent=2)
+    save_config(config)
 
     console.print(f"\n[green]Configuration created at {config_path}[/green]")
     console.print(f"  Repository directory: {repo_dir}")
@@ -128,25 +135,23 @@ def config_init(directory, yes, recursive):
 
 
 @config_cmd.command("show")
-@click.option("--pretty", is_flag=True, help="Display as formatted JSON instead of single-line JSONL")
+@click.option("-j", "--json", "output_json", is_flag=True, help="Output as JSON")
 @click.option("--path", is_flag=True, help="Show the config file path being used")
-def show_config(pretty, path):
+def show_config(output_json, path):
     """Show the current configuration with all merges applied.
 
-    By default, outputs single-line JSON (JSONL format).
-    Use --pretty for human-readable formatted output.
+    By default, outputs pretty YAML for human readability.
+    Use --json for machine-readable JSON output.
     Use --path to see which config file is being used.
     """
     if path:
         config_path = get_config_path()
-        print(json.dumps({"config_path": str(config_path)}))
+        print(str(config_path))
         return
 
     config = load_config()
 
-    if pretty:
-        # Pretty print for human readability
+    if output_json:
         print(json.dumps(config, indent=2, ensure_ascii=False))
     else:
-        # Default: single-line JSON (JSONL)
-        print(json.dumps(config, ensure_ascii=False))
+        yaml.safe_dump(config, sys.stdout, default_flow_style=False, sort_keys=False)

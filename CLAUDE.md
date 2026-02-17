@@ -154,7 +154,7 @@ repoindex query --brief --dirty
 
 ### 2. Output Format Rules
 - **Read commands** (`query`, `events`): Pretty tables by default, `--json` for JSONL
-- **Write/ops commands** (`export`, `copy`, `link`, `ops`): Simple text to stderr, `--pretty` for rich formatting, `--json` for JSONL
+- **Write/ops commands** (`export`, `copy`, `link`, `ops`): Pretty output by default, `--json` for JSONL
 - **Stream, don't collect**: Output each object as it's processed
 - **Errors go to stderr**: Keep stdout clean for piping
 - **Brief mode**: Use `--brief` for just repo names (one per line)
@@ -553,7 +553,7 @@ repoindex export ~/backups/work --tag "work/*"
 repoindex export ~/backups/popular "language == 'Python' and github_stars > 10"
 
 # Preview without writing
-repoindex export ~/backups/test --dry-run --pretty
+repoindex export ~/backups/test --dry-run
 ```
 
 Output structure:
@@ -603,7 +603,7 @@ repoindex copy ~/backups/popular "language == 'Python' and github_stars > 10"
 repoindex copy ~/backups --exclude-git          # Skip .git directories
 repoindex copy ~/backups --preserve-structure   # Keep parent dir hierarchy
 repoindex copy ~/backups --collision rename     # rename/skip/overwrite
-repoindex copy ~/backups --dry-run --pretty     # Preview
+repoindex copy ~/backups --dry-run               # Preview
 ```
 
 ### Link Command
@@ -623,7 +623,7 @@ repoindex link tree ~/links/by-owner --by owner
 repoindex link tree ~/links/python --by tag --language python
 
 # Preview without creating
-repoindex link tree ~/links/test --by tag --dry-run --pretty
+repoindex link tree ~/links/test --by tag --dry-run
 
 # Check tree status
 repoindex link status ~/links/by-tag

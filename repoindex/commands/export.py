@@ -22,7 +22,6 @@ from .query import _build_query_from_flags
 @click.argument('query_string', required=False, default='')
 @click.option('--include-events', is_flag=True, help='Include git event history (commits, tags)')
 @click.option('--dry-run', is_flag=True, help='Preview export without writing files')
-@click.option('--pretty', is_flag=True, help='Show progress with rich formatting')
 @click.option('--debug', is_flag=True, help='Enable debug logging')
 @query_options
 def export_handler(
@@ -30,7 +29,6 @@ def export_handler(
     query_string: str,
     include_events: bool,
     dry_run: bool,
-    pretty: bool,
     debug: bool,
     # Query flags
     dirty: bool,
@@ -74,7 +72,7 @@ def export_handler(
         # DSL query expression
         repoindex export ~/backups/popular "language == 'Python' and github_stars > 10"
         # Preview without writing
-        repoindex export ~/backups/test --dry-run --pretty
+        repoindex export ~/backups/test --dry-run
     """
     if debug:
         import logging
@@ -107,10 +105,7 @@ def export_handler(
         query_filter=query_filter,
     )
 
-    if pretty:
-        _export_pretty(service, options)
-    else:
-        _export_simple(service, options, dry_run)
+    _export_pretty(service, options)
 
 
 def _export_simple(service: ExportService, options: ExportOptions, dry_run: bool):

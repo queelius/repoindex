@@ -6,11 +6,13 @@ Evaluates repository metadata completeness across categories:
 - Development: CI, tests, build config, clean tree, synced
 - Discoverability: description, topics, citation, DOI, published
 - Documentation: changelog, docs, contributing, code of conduct, CLAUDE.md
+- Identity: author name/email in pyproject, author in citation/readme, ORCID
 
 Each check has a severity (critical/recommended/suggested) and optional
 fix hints pointing to repoindex generate commands.
 """
 
+import json
 import logging
 from pathlib import Path
 from typing import Any, Dict, Generator, List, Optional, Set, Tuple
@@ -29,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 
 # ============================================================================
-# Check registry — 19 checks across 4 categories
+# Check registry — 24 checks across 5 categories
 # ============================================================================
 
 CHECKS: List[AuditCheck] = [
@@ -86,6 +88,18 @@ CHECKS: List[AuditCheck] = [
                fix_command='repoindex ops generate code-of-conduct'),
     AuditCheck('claude_md', 'CLAUDE.md', Category.DOCUMENTATION, Severity.SUGGESTED,
                fix_hint='Add CLAUDE.md for Claude Code context'),
+
+    # --- Identity (requires author config) ---
+    AuditCheck('author_in_pyproject', 'Author in pyproject', Category.IDENTITY, Severity.RECOMMENDED,
+               fix_hint='Add author name to pyproject.toml [project.authors]'),
+    AuditCheck('author_email_in_pyproject', 'Email in pyproject', Category.IDENTITY, Severity.SUGGESTED,
+               fix_hint='Add author email to pyproject.toml [project.authors]'),
+    AuditCheck('author_in_citation', 'Author in citation', Category.IDENTITY, Severity.SUGGESTED,
+               fix_hint='Add author name to CITATION.cff'),
+    AuditCheck('orcid_in_citation', 'ORCID in citation', Category.IDENTITY, Severity.SUGGESTED,
+               fix_hint='Add ORCID to CITATION.cff'),
+    AuditCheck('author_in_readme', 'Author in README', Category.IDENTITY, Severity.SUGGESTED,
+               fix_hint='Mention author name in README.md'),
 ]
 
 # Index for fast lookup
@@ -312,6 +326,50 @@ class AuditService:
         if cid == 'claude_md':
             return repo_path.joinpath('CLAUDE.md').exists()
 
+        # --- Identity checks ---
+        author_names = self._get_author_names()
+
+        if cid == 'author_in_pyproject':
+            if not author_names:
+                return True  # No author configured — skip
+            if not path_exists:
+                return True
+            return self._check_author_in_pyproject(repo_path, author_names)
+
+        if cid == 'author_email_in_pyproject':
+            email = self.config.get('author', {}).get('email', '')
+            if not email:
+                return True
+            if not path_exists:
+                return True
+            return self._check_email_in_pyproject(repo_path, email)
+
+        if cid == 'author_in_citation':
+            if not author_names:
+                return True
+            if not repo.get('has_citation'):
+                return True  # No citation file — skip
+            authors_json = repo.get('citation_authors', '')
+            return self._check_name_in_citation_authors(authors_json, author_names)
+
+        if cid == 'orcid_in_citation':
+            orcid = self.config.get('author', {}).get('orcid', '')
+            if not orcid:
+                return True
+            if not repo.get('has_citation'):
+                return True
+            authors_json = repo.get('citation_authors', '')
+            return self._check_orcid_in_citation_authors(authors_json, orcid)
+
+        if cid == 'author_in_readme':
+            if not author_names:
+                return True
+            readme = repo.get('readme_content', '') or ''
+            if not readme:
+                return True  # No README content — skip
+            readme_lower = readme.lower()
+            return any(n.lower() in readme_lower for n in author_names)
+
         # Unknown check — default to pass
         logger.warning("Unknown check ID: %s", cid)
         return True
@@ -341,6 +399,101 @@ class AuditService:
         return [
             cat_data[c] for c in Category if c in cat_data
         ]
+
+    def _get_author_names(self) -> List[str]:
+        """Return list of author names/aliases from config. Empty if not configured."""
+        author = self.config.get('author', {})
+        names = []
+        name = author.get('name', '')
+        if name:
+            names.append(name)
+        alias = author.get('alias', '')
+        if alias and alias != name:
+            names.append(alias)
+        return names
+
+    def _check_author_in_pyproject(self, repo_path: Path, names: List[str]) -> bool:
+        """Check if any author name appears in pyproject.toml authors."""
+        pyproject = repo_path / 'pyproject.toml'
+        if not pyproject.exists():
+            return True  # No pyproject.toml — skip
+        try:
+            import tomllib
+            with open(pyproject, 'rb') as f:
+                data = tomllib.load(f)
+            authors = data.get('project', {}).get('authors', [])
+            for author in authors:
+                author_name = author.get('name', '')
+                if any(n.lower() == author_name.lower() for n in names):
+                    return True
+            # If no [project.authors], skip
+            return len(authors) == 0
+        except Exception:
+            logger.debug("Could not parse pyproject.toml at %s", repo_path, exc_info=True)
+            return True  # Parse error — skip
+
+    def _check_email_in_pyproject(self, repo_path: Path, email: str) -> bool:
+        """Check if email appears in pyproject.toml authors."""
+        pyproject = repo_path / 'pyproject.toml'
+        if not pyproject.exists():
+            return True
+        try:
+            import tomllib
+            with open(pyproject, 'rb') as f:
+                data = tomllib.load(f)
+            authors = data.get('project', {}).get('authors', [])
+            for author in authors:
+                if author.get('email', '').lower() == email.lower():
+                    return True
+            return len(authors) == 0
+        except Exception:
+            logger.debug("Could not parse pyproject.toml at %s", repo_path, exc_info=True)
+            return True
+
+    @staticmethod
+    def _check_name_in_citation_authors(authors_json: str, names: List[str]) -> bool:
+        """Check if any name appears in citation authors JSON."""
+        if not authors_json:
+            return True
+        try:
+            authors = json.loads(authors_json) if isinstance(authors_json, str) else authors_json
+            if not isinstance(authors, list):
+                return True
+            for author in authors:
+                # CITATION.cff uses family-names/given-names or name
+                full_name = ''
+                if isinstance(author, dict):
+                    given = author.get('given-names', '')
+                    family = author.get('family-names', '')
+                    if given and family:
+                        full_name = f"{given} {family}"
+                    elif author.get('name'):
+                        full_name = author['name']
+                elif isinstance(author, str):
+                    full_name = author
+                if full_name and any(n.lower() == full_name.lower() for n in names):
+                    return True
+            return False
+        except (json.JSONDecodeError, TypeError):
+            return True
+
+    @staticmethod
+    def _check_orcid_in_citation_authors(authors_json: str, orcid: str) -> bool:
+        """Check if ORCID appears in citation authors JSON."""
+        if not authors_json:
+            return True
+        try:
+            authors = json.loads(authors_json) if isinstance(authors_json, str) else authors_json
+            if not isinstance(authors, list):
+                return True
+            for author in authors:
+                if isinstance(author, dict):
+                    author_orcid = author.get('orcid', '')
+                    if author_orcid and orcid in author_orcid:
+                        return True
+            return False
+        except (json.JSONDecodeError, TypeError):
+            return True
 
     def _load_published_ids(self, db) -> Set[int]:
         """Load repo IDs that have confirmed publications."""

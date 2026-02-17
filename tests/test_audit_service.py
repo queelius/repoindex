@@ -48,6 +48,7 @@ class TestCategoryEnum:
         assert Category.DEVELOPMENT.value == "development"
         assert Category.DISCOVERABILITY.value == "discoverability"
         assert Category.DOCUMENTATION.value == "documentation"
+        assert Category.IDENTITY.value == "identity"
 
 
 class TestAuditCheck:
@@ -210,17 +211,17 @@ class TestAuditSummary:
 
 class TestAuditServiceCheckRegistry:
     def test_all_checks_count(self):
-        assert len(CHECKS) == 19
+        assert len(CHECKS) == 24
 
     def test_checks_by_id_complete(self):
-        assert len(_CHECKS_BY_ID) == 19
+        assert len(_CHECKS_BY_ID) == 24
         for check in CHECKS:
             assert check.id in _CHECKS_BY_ID
 
     def test_get_checks_all(self):
         service = AuditService()
         all_checks = service.get_checks()
-        assert len(all_checks) == 19
+        assert len(all_checks) == 24
 
     def test_get_checks_by_category(self):
         service = AuditService()
@@ -246,7 +247,7 @@ class TestAuditServiceCheckRegistry:
     def test_get_checks_by_severity_suggested(self):
         service = AuditService()
         sug = service.get_checks(severity=Severity.SUGGESTED)
-        assert len(sug) == 19  # all checks
+        assert len(sug) == 24  # all checks
 
     def test_get_checks_category_and_severity(self):
         service = AuditService()
@@ -781,6 +782,295 @@ class TestAuditServiceFullAudit:
 
 
 # ============================================================================
+# Identity Check Tests
+# ============================================================================
+
+class TestAuditServiceIdentityChecks:
+    """Test identity-category check evaluation."""
+
+    AUTHOR_CONFIG = {
+        'author': {
+            'name': 'Alexander Towell',
+            'alias': 'Alex Towell',
+            'email': 'lex@metafunctor.com',
+            'orcid': '0000-0001-6443-9897',
+            'github': 'queelius',
+        }
+    }
+
+    def _make_repo(self, tmp_path, **overrides):
+        base = {
+            'id': 1, 'name': 'testrepo', 'path': str(tmp_path),
+            'has_readme': 1, 'has_license': 1, 'has_ci': 0,
+            'has_citation': 0, 'citation_doi': None, 'citation_authors': None,
+            'remote_url': 'https://example.com', 'is_clean': 1, 'ahead': 0,
+            'github_description': 'desc', 'description': None,
+            'github_topics': '["test"]', 'readme_content': '',
+        }
+        base.update(overrides)
+        return base
+
+    def _get_identity_checks(self):
+        return [c for c in CHECKS if c.category == Category.IDENTITY]
+
+    def _audit_identity(self, repo, config=None):
+        service = AuditService(config=self.AUTHOR_CONFIG if config is None else config)
+        checks = self._get_identity_checks()
+        return service._audit_single_repo(repo, checks, set())
+
+    # --- author_in_pyproject ---
+
+    def test_author_in_pyproject_pass(self, tmp_path):
+        pyproject = tmp_path / 'pyproject.toml'
+        pyproject.write_text(
+            '[project]\n'
+            '[[project.authors]]\n'
+            'name = "Alexander Towell"\n'
+            'email = "lex@metafunctor.com"\n'
+        )
+        repo = self._make_repo(tmp_path)
+        result = self._audit_identity(repo)
+        check = next(r for r in result.results if r.check_id == 'author_in_pyproject')
+        assert check.passed is True
+
+    def test_author_in_pyproject_alias_pass(self, tmp_path):
+        pyproject = tmp_path / 'pyproject.toml'
+        pyproject.write_text(
+            '[project]\n'
+            '[[project.authors]]\n'
+            'name = "Alex Towell"\n'
+        )
+        repo = self._make_repo(tmp_path)
+        result = self._audit_identity(repo)
+        check = next(r for r in result.results if r.check_id == 'author_in_pyproject')
+        assert check.passed is True
+
+    def test_author_in_pyproject_case_insensitive(self, tmp_path):
+        pyproject = tmp_path / 'pyproject.toml'
+        pyproject.write_text(
+            '[project]\n'
+            '[[project.authors]]\n'
+            'name = "alexander towell"\n'
+        )
+        repo = self._make_repo(tmp_path)
+        result = self._audit_identity(repo)
+        check = next(r for r in result.results if r.check_id == 'author_in_pyproject')
+        assert check.passed is True
+
+    def test_author_in_pyproject_fail(self, tmp_path):
+        pyproject = tmp_path / 'pyproject.toml'
+        pyproject.write_text(
+            '[project]\n'
+            '[[project.authors]]\n'
+            'name = "Someone Else"\n'
+        )
+        repo = self._make_repo(tmp_path)
+        result = self._audit_identity(repo)
+        check = next(r for r in result.results if r.check_id == 'author_in_pyproject')
+        assert check.passed is False
+
+    def test_author_in_pyproject_no_file(self, tmp_path):
+        repo = self._make_repo(tmp_path)
+        result = self._audit_identity(repo)
+        check = next(r for r in result.results if r.check_id == 'author_in_pyproject')
+        assert check.passed is True  # skip
+
+    def test_author_in_pyproject_no_config(self, tmp_path):
+        pyproject = tmp_path / 'pyproject.toml'
+        pyproject.write_text('[project]\nname = "test"\n')
+        repo = self._make_repo(tmp_path)
+        result = self._audit_identity(repo, config={})
+        check = next(r for r in result.results if r.check_id == 'author_in_pyproject')
+        assert check.passed is True  # skip — no author configured
+
+    def test_author_in_pyproject_no_authors_section(self, tmp_path):
+        pyproject = tmp_path / 'pyproject.toml'
+        pyproject.write_text('[project]\nname = "test"\n')
+        repo = self._make_repo(tmp_path)
+        result = self._audit_identity(repo)
+        check = next(r for r in result.results if r.check_id == 'author_in_pyproject')
+        assert check.passed is True  # skip — no authors section
+
+    # --- author_email_in_pyproject ---
+
+    def test_email_in_pyproject_pass(self, tmp_path):
+        pyproject = tmp_path / 'pyproject.toml'
+        pyproject.write_text(
+            '[project]\n'
+            '[[project.authors]]\n'
+            'name = "Alexander Towell"\n'
+            'email = "lex@metafunctor.com"\n'
+        )
+        repo = self._make_repo(tmp_path)
+        result = self._audit_identity(repo)
+        check = next(r for r in result.results if r.check_id == 'author_email_in_pyproject')
+        assert check.passed is True
+
+    def test_email_in_pyproject_fail(self, tmp_path):
+        pyproject = tmp_path / 'pyproject.toml'
+        pyproject.write_text(
+            '[project]\n'
+            '[[project.authors]]\n'
+            'name = "Alexander Towell"\n'
+            'email = "other@example.com"\n'
+        )
+        repo = self._make_repo(tmp_path)
+        result = self._audit_identity(repo)
+        check = next(r for r in result.results if r.check_id == 'author_email_in_pyproject')
+        assert check.passed is False
+
+    def test_email_in_pyproject_no_config(self, tmp_path):
+        repo = self._make_repo(tmp_path)
+        result = self._audit_identity(repo, config={'author': {'name': 'Test'}})
+        check = next(r for r in result.results if r.check_id == 'author_email_in_pyproject')
+        assert check.passed is True  # skip — no email configured
+
+    # --- author_in_citation ---
+
+    def test_author_in_citation_pass(self, tmp_path):
+        authors = json.dumps([{'given-names': 'Alexander', 'family-names': 'Towell'}])
+        repo = self._make_repo(tmp_path, has_citation=1, citation_authors=authors)
+        result = self._audit_identity(repo)
+        check = next(r for r in result.results if r.check_id == 'author_in_citation')
+        assert check.passed is True
+
+    def test_author_in_citation_alias(self, tmp_path):
+        authors = json.dumps([{'given-names': 'Alex', 'family-names': 'Towell'}])
+        repo = self._make_repo(tmp_path, has_citation=1, citation_authors=authors)
+        result = self._audit_identity(repo)
+        check = next(r for r in result.results if r.check_id == 'author_in_citation')
+        assert check.passed is True
+
+    def test_author_in_citation_name_field(self, tmp_path):
+        authors = json.dumps([{'name': 'Alexander Towell'}])
+        repo = self._make_repo(tmp_path, has_citation=1, citation_authors=authors)
+        result = self._audit_identity(repo)
+        check = next(r for r in result.results if r.check_id == 'author_in_citation')
+        assert check.passed is True
+
+    def test_author_in_citation_fail(self, tmp_path):
+        authors = json.dumps([{'given-names': 'John', 'family-names': 'Doe'}])
+        repo = self._make_repo(tmp_path, has_citation=1, citation_authors=authors)
+        result = self._audit_identity(repo)
+        check = next(r for r in result.results if r.check_id == 'author_in_citation')
+        assert check.passed is False
+
+    def test_author_in_citation_no_citation(self, tmp_path):
+        repo = self._make_repo(tmp_path, has_citation=0)
+        result = self._audit_identity(repo)
+        check = next(r for r in result.results if r.check_id == 'author_in_citation')
+        assert check.passed is True  # skip
+
+    # --- orcid_in_citation ---
+
+    def test_orcid_in_citation_pass(self, tmp_path):
+        authors = json.dumps([{
+            'given-names': 'Alexander', 'family-names': 'Towell',
+            'orcid': 'https://orcid.org/0000-0001-6443-9897',
+        }])
+        repo = self._make_repo(tmp_path, has_citation=1, citation_authors=authors)
+        result = self._audit_identity(repo)
+        check = next(r for r in result.results if r.check_id == 'orcid_in_citation')
+        assert check.passed is True
+
+    def test_orcid_in_citation_bare_id(self, tmp_path):
+        authors = json.dumps([{
+            'given-names': 'Alexander', 'family-names': 'Towell',
+            'orcid': '0000-0001-6443-9897',
+        }])
+        repo = self._make_repo(tmp_path, has_citation=1, citation_authors=authors)
+        result = self._audit_identity(repo)
+        check = next(r for r in result.results if r.check_id == 'orcid_in_citation')
+        assert check.passed is True
+
+    def test_orcid_in_citation_fail(self, tmp_path):
+        authors = json.dumps([{
+            'given-names': 'Alexander', 'family-names': 'Towell',
+        }])
+        repo = self._make_repo(tmp_path, has_citation=1, citation_authors=authors)
+        result = self._audit_identity(repo)
+        check = next(r for r in result.results if r.check_id == 'orcid_in_citation')
+        assert check.passed is False
+
+    def test_orcid_in_citation_no_config(self, tmp_path):
+        authors = json.dumps([{'given-names': 'X', 'family-names': 'Y'}])
+        repo = self._make_repo(tmp_path, has_citation=1, citation_authors=authors)
+        result = self._audit_identity(repo, config={'author': {'name': 'Test'}})
+        check = next(r for r in result.results if r.check_id == 'orcid_in_citation')
+        assert check.passed is True  # skip — no ORCID configured
+
+    def test_orcid_in_citation_no_citation(self, tmp_path):
+        repo = self._make_repo(tmp_path, has_citation=0)
+        result = self._audit_identity(repo)
+        check = next(r for r in result.results if r.check_id == 'orcid_in_citation')
+        assert check.passed is True  # skip
+
+    # --- author_in_readme ---
+
+    def test_author_in_readme_pass_name(self, tmp_path):
+        repo = self._make_repo(tmp_path, readme_content='Created by Alexander Towell.')
+        result = self._audit_identity(repo)
+        check = next(r for r in result.results if r.check_id == 'author_in_readme')
+        assert check.passed is True
+
+    def test_author_in_readme_pass_alias(self, tmp_path):
+        repo = self._make_repo(tmp_path, readme_content='Author: Alex Towell')
+        result = self._audit_identity(repo)
+        check = next(r for r in result.results if r.check_id == 'author_in_readme')
+        assert check.passed is True
+
+    def test_author_in_readme_case_insensitive(self, tmp_path):
+        repo = self._make_repo(tmp_path, readme_content='by alexander towell')
+        result = self._audit_identity(repo)
+        check = next(r for r in result.results if r.check_id == 'author_in_readme')
+        assert check.passed is True
+
+    def test_author_in_readme_fail(self, tmp_path):
+        repo = self._make_repo(tmp_path, readme_content='A tool for testing.')
+        result = self._audit_identity(repo)
+        check = next(r for r in result.results if r.check_id == 'author_in_readme')
+        assert check.passed is False
+
+    def test_author_in_readme_empty(self, tmp_path):
+        repo = self._make_repo(tmp_path, readme_content='')
+        result = self._audit_identity(repo)
+        check = next(r for r in result.results if r.check_id == 'author_in_readme')
+        assert check.passed is True  # skip — no content
+
+    def test_author_in_readme_no_config(self, tmp_path):
+        repo = self._make_repo(tmp_path, readme_content='Some README content.')
+        result = self._audit_identity(repo, config={})
+        check = next(r for r in result.results if r.check_id == 'author_in_readme')
+        assert check.passed is True  # skip — no author configured
+
+    # --- Category filter ---
+
+    def test_identity_category_filter(self):
+        service = AuditService(config=self.AUTHOR_CONFIG)
+        checks = service.get_checks(category=Category.IDENTITY)
+        assert len(checks) == 5
+        assert all(c.category == Category.IDENTITY for c in checks)
+
+    # --- Missing path ---
+
+    def test_identity_checks_skip_on_missing_path(self):
+        repo = {
+            'id': 1, 'name': 'ghost', 'path': '/nonexistent/path',
+            'has_readme': 0, 'has_license': 0, 'has_ci': 0,
+            'has_citation': 0, 'citation_doi': None, 'citation_authors': None,
+            'remote_url': None, 'is_clean': 1, 'ahead': 0,
+            'github_description': None, 'description': None,
+            'github_topics': None, 'readme_content': '',
+        }
+        service = AuditService(config=self.AUTHOR_CONFIG)
+        checks = [c for c in CHECKS if c.category == Category.IDENTITY]
+        result = service._audit_single_repo(repo, checks, set())
+        # All should pass (skip) when path doesn't exist
+        for cr in result.results:
+            assert cr.passed is True, f"{cr.check_id} should skip on missing path"
+
+
+# ============================================================================
 # CLI Integration Tests
 # ============================================================================
 
@@ -843,7 +1133,7 @@ class TestAuditCLI:
         assert 'fix_commands' in repo_data
 
     def test_pretty_output_has_category_headers(self):
-        result = self._run_audit(['--pretty'])
+        result = self._run_audit([])
         assert result.exit_code == 0
         output = result.output
         assert 'Metadata Audit' in output

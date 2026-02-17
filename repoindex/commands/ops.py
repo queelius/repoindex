@@ -158,7 +158,7 @@ def _get_repos_from_query(config, query_string: str, debug: bool = False, **quer
     return repos
 
 
-def _resolve_repos(output_json, pretty, debug, query_string, **query_flags):
+def _resolve_repos(output_json, debug, query_string, **query_flags):
     """Load config, resolve repos from query, handle errors.
 
     Returns (config, repos) on success, None on failure (after printing error).
@@ -176,7 +176,7 @@ def _resolve_repos(output_json, pretty, debug, query_string, **query_flags):
         return None
 
     if not repos:
-        _no_repos_message(output_json, pretty)
+        _no_repos_message(output_json)
         return None
 
     return config, repos
@@ -189,7 +189,6 @@ def _resolve_repos(output_json, pretty, debug, query_string, **query_flags):
 @ops_cmd.command('audit')
 @click.argument('query_string', required=False, default='')
 @click.option('--json', 'output_json', is_flag=True, help='Output as JSONL')
-@click.option('--pretty', is_flag=True, help='Display with rich formatting')
 @click.option('--category', 'audit_category',
               type=click.Choice(['essentials', 'development', 'discoverability', 'documentation']),
               help='Filter to one category')
@@ -201,7 +200,6 @@ def _resolve_repos(output_json, pretty, debug, query_string, **query_flags):
 def ops_audit_handler(
     query_string: str,
     output_json: bool,
-    pretty: bool,
     audit_category: Optional[str],
     audit_severity: Optional[str],
     debug: bool,
@@ -232,14 +230,14 @@ def ops_audit_handler(
 
     \b
     Examples:
-        # Audit all repos (pretty output)
-        repoindex ops audit --pretty
+        # Audit all repos
+        repoindex ops audit
         # Audit Python repos only
-        repoindex ops audit --language python --pretty
+        repoindex ops audit --language python
         # Only essential checks
-        repoindex ops audit --category essentials --pretty
+        repoindex ops audit --category essentials
         # Only critical issues
-        repoindex ops audit --severity critical --pretty
+        repoindex ops audit --severity critical
         # Machine-readable output for Claude Code
         repoindex ops audit --json
     """
@@ -247,7 +245,7 @@ def ops_audit_handler(
     from ..services.audit_service import AuditService, CHECKS, _CHECKS_BY_ID
 
     result = _resolve_repos(
-        output_json, pretty, debug, query_string,
+        output_json, debug, query_string,
         dirty=dirty, clean=clean, language=language, recent=recent,
         starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
         has_citation=has_citation, has_doi=has_doi, archived=archived,
@@ -269,12 +267,10 @@ def ops_audit_handler(
             repos, db=db, category=cat_enum, severity=sev_enum
         )
         # Consume progress
-        if pretty:
-            _audit_output_pretty(service, progress_iter, _CHECKS_BY_ID)
-        elif output_json:
+        if output_json:
             _audit_output_json(service, progress_iter)
         else:
-            _audit_output_simple(service, progress_iter, _CHECKS_BY_ID)
+            _audit_output_pretty(service, progress_iter, _CHECKS_BY_ID)
 
 
 def _audit_output_json(service, progress_iter):
@@ -459,7 +455,6 @@ def _audit_output_pretty(service, progress_iter, checks_by_id):
 @git_cmd.command('push')
 @click.argument('query_string', required=False, default='')
 @click.option('--json', 'output_json', is_flag=True, help='Output as JSONL')
-@click.option('--pretty', is_flag=True, help='Display with rich formatting')
 @click.option('--dry-run', is_flag=True, help='Preview without pushing')
 @click.option('--yes', '-y', is_flag=True, help='Skip confirmation prompt')
 @click.option('--parallel', '-p', type=int, default=1, help='Number of parallel operations')
@@ -470,7 +465,6 @@ def _audit_output_pretty(service, progress_iter, checks_by_id):
 def git_push_handler(
     query_string: str,
     output_json: bool,
-    pretty: bool,
     dry_run: bool,
     yes: bool,
     parallel: int,
@@ -516,7 +510,7 @@ def git_push_handler(
         repoindex ops git push --parallel 4 --yes
     """
     result = _resolve_repos(
-        output_json, pretty, debug, query_string,
+        output_json, debug, query_string,
         dirty=dirty, clean=clean, language=language, recent=recent,
         starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
         has_citation=has_citation, has_doi=has_doi, archived=archived,
@@ -540,11 +534,9 @@ def git_push_handler(
         # Count repos with commits to push
         pushable = service.get_repos_needing_push(repos, remote)
         if not pushable:
-            if pretty:
+            if not output_json:
                 from rich.console import Console
                 Console().print("[yellow]No repositories have unpushed commits.[/yellow]")
-            else:
-                print("No repositories have unpushed commits.", file=sys.stderr)
             return
 
         if not click.confirm(f"Push {len(pushable)} repositories to {remote}?"):
@@ -553,14 +545,12 @@ def git_push_handler(
 
     # Execute
     progress_iter = service.push_repos(repos, options)
-    if pretty:
+    if output_json:
+        _ops_output_json(service, progress_iter, options)
+    else:
         _ops_output_pretty(service, progress_iter, options, "Git Push", len(repos),
                            extra_headers=[("Remote", options.remote)],
                            success_msg="Pushed {count} repositories")
-    elif output_json:
-        _ops_output_json(service, progress_iter, options)
-    else:
-        _ops_output_simple(service, progress_iter, options, "Push complete")
 
 
 
@@ -571,7 +561,6 @@ def git_push_handler(
 @git_cmd.command('pull')
 @click.argument('query_string', required=False, default='')
 @click.option('--json', 'output_json', is_flag=True, help='Output as JSONL')
-@click.option('--pretty', is_flag=True, help='Display with rich formatting')
 @click.option('--dry-run', is_flag=True, help='Preview without pulling (fetches first)')
 @click.option('--yes', '-y', is_flag=True, help='Skip confirmation prompt')
 @click.option('--remote', default='origin', help='Remote to pull from (default: origin)')
@@ -580,7 +569,6 @@ def git_push_handler(
 def git_pull_handler(
     query_string: str,
     output_json: bool,
-    pretty: bool,
     dry_run: bool,
     yes: bool,
     remote: str,
@@ -619,7 +607,7 @@ def git_pull_handler(
         repoindex ops git pull --language python --yes
     """
     result = _resolve_repos(
-        output_json, pretty, debug, query_string,
+        output_json, debug, query_string,
         dirty=dirty, clean=clean, language=language, recent=recent,
         starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
         has_citation=has_citation, has_doi=has_doi, archived=archived,
@@ -639,14 +627,12 @@ def git_pull_handler(
     service = GitOpsService(config=config)
 
     progress_iter = service.pull_repos(repos, options)
-    if pretty:
+    if output_json:
+        _ops_output_json(service, progress_iter, options)
+    else:
         _ops_output_pretty(service, progress_iter, options, "Git Pull", len(repos),
                            extra_headers=[("Remote", options.remote)],
                            success_msg="Pulled {count} repositories")
-    elif output_json:
-        _ops_output_json(service, progress_iter, options)
-    else:
-        _ops_output_simple(service, progress_iter, options, "Pull complete")
 
 
 # ============================================================================
@@ -656,14 +642,12 @@ def git_pull_handler(
 @git_cmd.command('status')
 @click.argument('query_string', required=False, default='')
 @click.option('--json', 'output_json', is_flag=True, help='Output as JSONL')
-@click.option('--pretty', is_flag=True, help='Display with rich formatting')
 @click.option('--remote', default='origin', help='Remote to check against (default: origin)')
 @click.option('--debug', is_flag=True, help='Enable debug logging')
 @query_options
 def git_status_handler(
     query_string: str,
     output_json: bool,
-    pretty: bool,
     remote: str,
     debug: bool,
     # Query flags
@@ -700,7 +684,7 @@ def git_status_handler(
         repoindex ops git status --json | jq 'select(.ahead > 0)'
     """
     result = _resolve_repos(
-        output_json, pretty, debug, query_string,
+        output_json, debug, query_string,
         dirty=dirty, clean=clean, language=language, recent=recent,
         starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
         has_citation=has_citation, has_doi=has_doi, archived=archived,
@@ -713,12 +697,10 @@ def git_status_handler(
     options = GitOpsOptions(remote=remote)
     service = GitOpsService(config=config)
 
-    if pretty:
-        _git_status_pretty(service, repos, options)
-    elif output_json:
+    if output_json:
         _git_status_json(service, repos, options)
     else:
-        _git_status_simple(service, repos, options)
+        _git_status_pretty(service, repos, options)
 
 
 def _git_status_simple(service: GitOpsService, repos: list, options: GitOpsOptions):
@@ -847,7 +829,6 @@ def github_cmd():
 @github_cmd.command('set-topics')
 @click.argument('query_string', required=False, default='')
 @click.option('--json', 'output_json', is_flag=True, help='Output as JSONL')
-@click.option('--pretty', is_flag=True, help='Display with rich formatting')
 @click.option('--dry-run', is_flag=True, help='Preview without setting topics')
 @click.option('--topics', help='Comma-separated list of topics to set')
 @click.option('--from-pyproject', is_flag=True, help='Read keywords from pyproject.toml')
@@ -856,7 +837,6 @@ def github_cmd():
 def github_set_topics_handler(
     query_string: str,
     output_json: bool,
-    pretty: bool,
     dry_run: bool,
     topics: Optional[str],
     from_pyproject: bool,
@@ -898,7 +878,7 @@ def github_set_topics_handler(
         return
 
     result = _resolve_repos(
-        output_json, pretty, debug, query_string,
+        output_json, debug, query_string,
         dirty=dirty, clean=clean, language=language, recent=recent,
         starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
         has_citation=has_citation, has_doi=has_doi, archived=archived,
@@ -913,18 +893,15 @@ def github_set_topics_handler(
     service = GitHubOpsService(config=config)
 
     progress_iter = service.set_topics(repos, options, topics=topic_list, from_pyproject=from_pyproject)
-    if pretty:
-        _ops_output_pretty(service, progress_iter, options, "Set GitHub Topics", len(repos))
-    elif output_json:
+    if output_json:
         _ops_output_json(service, progress_iter, options)
     else:
-        _ops_output_simple(service, progress_iter, options)
+        _ops_output_pretty(service, progress_iter, options, "Set GitHub Topics", len(repos))
 
 
 @github_cmd.command('set-description')
 @click.argument('query_string', required=False, default='')
 @click.option('--json', 'output_json', is_flag=True, help='Output as JSONL')
-@click.option('--pretty', is_flag=True, help='Display with rich formatting')
 @click.option('--dry-run', is_flag=True, help='Preview without setting description')
 @click.option('--text', help='Description text to set')
 @click.option('--from-pyproject', is_flag=True, help='Read description from pyproject.toml')
@@ -933,7 +910,6 @@ def github_set_topics_handler(
 def github_set_description_handler(
     query_string: str,
     output_json: bool,
-    pretty: bool,
     dry_run: bool,
     text: Optional[str],
     from_pyproject: bool,
@@ -973,7 +949,7 @@ def github_set_description_handler(
         return
 
     result = _resolve_repos(
-        output_json, pretty, debug, query_string,
+        output_json, debug, query_string,
         dirty=dirty, clean=clean, language=language, recent=recent,
         starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
         has_citation=has_citation, has_doi=has_doi, archived=archived,
@@ -987,12 +963,10 @@ def github_set_description_handler(
     service = GitHubOpsService(config=config)
 
     progress_iter = service.set_description(repos, options, text=text, from_pyproject=from_pyproject)
-    if pretty:
-        _ops_output_pretty(service, progress_iter, options, "Set GitHub Description", len(repos))
-    elif output_json:
+    if output_json:
         _ops_output_json(service, progress_iter, options)
     else:
-        _ops_output_simple(service, progress_iter, options)
+        _ops_output_pretty(service, progress_iter, options, "Set GitHub Description", len(repos))
 
 
 
@@ -1014,15 +988,13 @@ def _handle_query_error(e, query_string, output_json):
     sys.exit(1)
 
 
-def _no_repos_message(output_json, pretty):
+def _no_repos_message(output_json):
     """Show message when no repos match."""
     if output_json:
         print(json.dumps({'warning': 'No repositories found matching query'}), file=sys.stderr)
-    elif pretty:
+    else:
         from rich.console import Console
         Console().print("[yellow]No repositories found matching query.[/yellow]")
-    else:
-        print("No repositories found matching query.", file=sys.stderr)
 
 
 # ============================================================================
@@ -1164,7 +1136,6 @@ def generate_cmd():
 @generate_cmd.command('codemeta')
 @click.argument('query_string', required=False, default='')
 @click.option('--json', 'output_json', is_flag=True, help='Output as JSONL')
-@click.option('--pretty', is_flag=True, help='Display with rich formatting')
 @click.option('--dry-run', is_flag=True, help='Preview without writing files')
 @click.option('--force', is_flag=True, help='Overwrite existing codemeta.json files')
 @click.option('--author', help='Author name (overrides config)')
@@ -1176,7 +1147,6 @@ def generate_cmd():
 def generate_codemeta_handler(
     query_string: str,
     output_json: bool,
-    pretty: bool,
     dry_run: bool,
     force: bool,
     author: Optional[str],
@@ -1217,7 +1187,7 @@ def generate_codemeta_handler(
         repoindex ops generate codemeta --force --dry-run
     """
     result = _resolve_repos(
-        output_json, pretty, debug, query_string,
+        output_json, debug, query_string,
         dirty=dirty, clean=clean, language=language, recent=recent,
         starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
         has_citation=has_citation, has_doi=has_doi, archived=archived,
@@ -1242,17 +1212,14 @@ def generate_codemeta_handler(
         extra_headers.append(("Author", options.author.name))
 
     progress_iter = service.generate_codemeta(repos, options)
-    if pretty:
+    if output_json:
+        _ops_output_json(service, progress_iter, options)
+    else:
         _ops_output_pretty(service, progress_iter, options,
                            "Generate codemeta.json", len(repos),
                            success_label="Generated",
                            success_msg="Generated {count} " + file_label,
                            extra_headers=extra_headers or None)
-    elif output_json:
-        _ops_output_json(service, progress_iter, options)
-    else:
-        _ops_output_simple(service, progress_iter, options, "Generation complete",
-                           success_label="Generated")
 
 
 # ============================================================================
@@ -1262,7 +1229,6 @@ def generate_codemeta_handler(
 @generate_cmd.command('license')
 @click.argument('query_string', required=False, default='')
 @click.option('--json', 'output_json', is_flag=True, help='Output as JSONL')
-@click.option('--pretty', is_flag=True, help='Display with rich formatting')
 @click.option('--dry-run', is_flag=True, help='Preview without writing files')
 @click.option('--force', is_flag=True, help='Overwrite existing LICENSE files')
 @click.option('--license', 'license_type', default='mit',
@@ -1274,7 +1240,6 @@ def generate_codemeta_handler(
 def generate_license_handler(
     query_string: str,
     output_json: bool,
-    pretty: bool,
     dry_run: bool,
     force: bool,
     license_type: str,
@@ -1315,7 +1280,7 @@ def generate_license_handler(
         repoindex ops generate license --force --license gpl-3.0 --dry-run
     """
     result = _resolve_repos(
-        output_json, pretty, debug, query_string,
+        output_json, debug, query_string,
         dirty=dirty, clean=clean, language=language, recent=recent,
         starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
         has_citation=has_citation, has_doi=has_doi, archived=archived,
@@ -1343,17 +1308,14 @@ def generate_license_handler(
         extra_headers.append(("Copyright holder", options.author.name))
 
     progress_iter = service.generate_license(repos, options, license_type)
-    if pretty:
+    if output_json:
+        _ops_output_json(service, progress_iter, options)
+    else:
         _ops_output_pretty(service, progress_iter, options,
                            "Generate LICENSE", len(repos),
                            success_label="Generated",
                            success_msg="Generated {count} " + file_label,
                            extra_headers=extra_headers)
-    elif output_json:
-        _ops_output_json(service, progress_iter, options)
-    else:
-        _ops_output_simple(service, progress_iter, options, "Generation complete",
-                           success_label="Generated")
 
 
 # ============================================================================
@@ -1405,7 +1367,6 @@ def _build_author_info(
 @generate_cmd.command('gitignore')
 @click.argument('query_string', required=False, default='')
 @click.option('--json', 'output_json', is_flag=True, help='Output as JSONL')
-@click.option('--pretty', is_flag=True, help='Display with rich formatting')
 @click.option('--dry-run', is_flag=True, help='Preview without writing files')
 @click.option('--force', is_flag=True, help='Overwrite existing .gitignore files')
 @click.option('--lang', 'language_template', default='python',
@@ -1416,7 +1377,6 @@ def _build_author_info(
 def generate_gitignore_handler(
     query_string: str,
     output_json: bool,
-    pretty: bool,
     dry_run: bool,
     force: bool,
     language_template: str,
@@ -1456,7 +1416,7 @@ def generate_gitignore_handler(
         repoindex ops generate gitignore --force --dry-run
     """
     result = _resolve_repos(
-        output_json, pretty, debug, query_string,
+        output_json, debug, query_string,
         dirty=dirty, clean=clean, language=language, recent=recent,
         starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
         has_citation=has_citation, has_doi=has_doi, archived=archived,
@@ -1476,17 +1436,14 @@ def generate_gitignore_handler(
     extra_headers = [("Language", language_template)]
 
     progress_iter = service.generate_gitignore(repos, options, language_template)
-    if pretty:
+    if output_json:
+        _ops_output_json(service, progress_iter, options)
+    else:
         _ops_output_pretty(service, progress_iter, options,
                            "Generate .gitignore", len(repos),
                            success_label="Generated",
                            success_msg="Generated {count} " + file_label,
                            extra_headers=extra_headers)
-    elif output_json:
-        _ops_output_json(service, progress_iter, options)
-    else:
-        _ops_output_simple(service, progress_iter, options, "Generation complete",
-                           success_label="Generated")
 
 
 # ============================================================================
@@ -1496,7 +1453,6 @@ def generate_gitignore_handler(
 @generate_cmd.command('code-of-conduct')
 @click.argument('query_string', required=False, default='')
 @click.option('--json', 'output_json', is_flag=True, help='Output as JSONL')
-@click.option('--pretty', is_flag=True, help='Display with rich formatting')
 @click.option('--dry-run', is_flag=True, help='Preview without writing files')
 @click.option('--force', is_flag=True, help='Overwrite existing CODE_OF_CONDUCT.md files')
 @click.option('--email', help='Contact email (overrides config)')
@@ -1505,7 +1461,6 @@ def generate_gitignore_handler(
 def generate_code_of_conduct_handler(
     query_string: str,
     output_json: bool,
-    pretty: bool,
     dry_run: bool,
     force: bool,
     email: Optional[str],
@@ -1545,7 +1500,7 @@ def generate_code_of_conduct_handler(
         repoindex ops generate code-of-conduct --force --dry-run
     """
     result = _resolve_repos(
-        output_json, pretty, debug, query_string,
+        output_json, debug, query_string,
         dirty=dirty, clean=clean, language=language, recent=recent,
         starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
         has_citation=has_citation, has_doi=has_doi, archived=archived,
@@ -1571,17 +1526,14 @@ def generate_code_of_conduct_handler(
         extra_headers.append(("Contact", options.author.email))
 
     progress_iter = service.generate_code_of_conduct(repos, options)
-    if pretty:
+    if output_json:
+        _ops_output_json(service, progress_iter, options)
+    else:
         _ops_output_pretty(service, progress_iter, options,
                            "Generate CODE_OF_CONDUCT.md", len(repos),
                            success_label="Generated",
                            success_msg="Generated {count} " + file_label,
                            extra_headers=extra_headers or None)
-    elif output_json:
-        _ops_output_json(service, progress_iter, options)
-    else:
-        _ops_output_simple(service, progress_iter, options, "Generation complete",
-                           success_label="Generated")
 
 
 # ============================================================================
@@ -1591,7 +1543,6 @@ def generate_code_of_conduct_handler(
 @generate_cmd.command('contributing')
 @click.argument('query_string', required=False, default='')
 @click.option('--json', 'output_json', is_flag=True, help='Output as JSONL')
-@click.option('--pretty', is_flag=True, help='Display with rich formatting')
 @click.option('--dry-run', is_flag=True, help='Preview without writing files')
 @click.option('--force', is_flag=True, help='Overwrite existing CONTRIBUTING.md files')
 @click.option('--debug', is_flag=True, help='Enable debug logging')
@@ -1599,7 +1550,6 @@ def generate_code_of_conduct_handler(
 def generate_contributing_handler(
     query_string: str,
     output_json: bool,
-    pretty: bool,
     dry_run: bool,
     force: bool,
     debug: bool,
@@ -1636,7 +1586,7 @@ def generate_contributing_handler(
         repoindex ops generate contributing --force --dry-run
     """
     result = _resolve_repos(
-        output_json, pretty, debug, query_string,
+        output_json, debug, query_string,
         dirty=dirty, clean=clean, language=language, recent=recent,
         starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
         has_citation=has_citation, has_doi=has_doi, archived=archived,
@@ -1655,16 +1605,13 @@ def generate_contributing_handler(
     file_label = "CONTRIBUTING.md files"
 
     progress_iter = service.generate_contributing(repos, options)
-    if pretty:
+    if output_json:
+        _ops_output_json(service, progress_iter, options)
+    else:
         _ops_output_pretty(service, progress_iter, options,
                            "Generate CONTRIBUTING.md", len(repos),
                            success_label="Generated",
                            success_msg="Generated {count} " + file_label)
-    elif output_json:
-        _ops_output_json(service, progress_iter, options)
-    else:
-        _ops_output_simple(service, progress_iter, options, "Generation complete",
-                           success_label="Generated")
 
 
 # ============================================================================
@@ -1674,7 +1621,6 @@ def generate_contributing_handler(
 @generate_cmd.command('citation')
 @click.argument('query_string', required=False, default='')
 @click.option('--json', 'output_json', is_flag=True, help='Output as JSONL')
-@click.option('--pretty', is_flag=True, help='Display with rich formatting')
 @click.option('--dry-run', is_flag=True, help='Preview without writing files')
 @click.option('--force', is_flag=True, help='Overwrite existing CITATION.cff files')
 @click.option('--author', help='Author name (overrides config)')
@@ -1686,7 +1632,6 @@ def generate_contributing_handler(
 def generate_citation_handler(
     query_string: str,
     output_json: bool,
-    pretty: bool,
     dry_run: bool,
     force: bool,
     author: Optional[str],
@@ -1730,7 +1675,7 @@ def generate_citation_handler(
         repoindex ops generate citation --force --dry-run
     """
     result = _resolve_repos(
-        output_json, pretty, debug, query_string,
+        output_json, debug, query_string,
         dirty=dirty, clean=clean, language=language, recent=recent,
         starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
         has_citation=has_citation, has_doi=has_doi, archived=archived,
@@ -1757,17 +1702,14 @@ def generate_citation_handler(
         extra_headers.append(("ORCID", options.author.orcid))
 
     progress_iter = service.generate_citation_cff(repos, options)
-    if pretty:
+    if output_json:
+        _ops_output_json(service, progress_iter, options)
+    else:
         _ops_output_pretty(service, progress_iter, options,
                            "Generate CITATION.cff", len(repos),
                            success_label="Generated",
                            success_msg="Generated {count} " + file_label,
                            extra_headers=extra_headers or None)
-    elif output_json:
-        _ops_output_json(service, progress_iter, options)
-    else:
-        _ops_output_simple(service, progress_iter, options, "Generation complete",
-                           success_label="Generated")
 
 
 # ============================================================================
@@ -1777,7 +1719,6 @@ def generate_citation_handler(
 @generate_cmd.command('zenodo')
 @click.argument('query_string', required=False, default='')
 @click.option('--json', 'output_json', is_flag=True, help='Output as JSONL')
-@click.option('--pretty', is_flag=True, help='Display with rich formatting')
 @click.option('--dry-run', is_flag=True, help='Preview without writing files')
 @click.option('--force', is_flag=True, help='Overwrite existing .zenodo.json files')
 @click.option('--author', help='Author name (overrides config)')
@@ -1789,7 +1730,6 @@ def generate_citation_handler(
 def generate_zenodo_handler(
     query_string: str,
     output_json: bool,
-    pretty: bool,
     dry_run: bool,
     force: bool,
     author: Optional[str],
@@ -1833,7 +1773,7 @@ def generate_zenodo_handler(
         repoindex ops generate zenodo --force --dry-run
     """
     result = _resolve_repos(
-        output_json, pretty, debug, query_string,
+        output_json, debug, query_string,
         dirty=dirty, clean=clean, language=language, recent=recent,
         starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
         has_citation=has_citation, has_doi=has_doi, archived=archived,
@@ -1860,17 +1800,14 @@ def generate_zenodo_handler(
         extra_headers.append(("ORCID", options.author.orcid))
 
     progress_iter = service.generate_zenodo_json(repos, options)
-    if pretty:
+    if output_json:
+        _ops_output_json(service, progress_iter, options)
+    else:
         _ops_output_pretty(service, progress_iter, options,
                            "Generate .zenodo.json", len(repos),
                            success_label="Generated",
                            success_msg="Generated {count} " + file_label,
                            extra_headers=extra_headers or None)
-    elif output_json:
-        _ops_output_json(service, progress_iter, options)
-    else:
-        _ops_output_simple(service, progress_iter, options, "Generation complete",
-                           success_label="Generated")
 
 
 # ============================================================================
@@ -1880,7 +1817,6 @@ def generate_zenodo_handler(
 @generate_cmd.command('mkdocs')
 @click.argument('query_string', required=False, default='')
 @click.option('--json', 'output_json', is_flag=True, help='Output as JSONL')
-@click.option('--pretty', is_flag=True, help='Display with rich formatting')
 @click.option('--dry-run', is_flag=True, help='Preview without writing files')
 @click.option('--force', is_flag=True, help='Overwrite existing mkdocs.yml files')
 @click.option('--debug', is_flag=True, help='Enable debug logging')
@@ -1888,7 +1824,6 @@ def generate_zenodo_handler(
 def generate_mkdocs_handler(
     query_string: str,
     output_json: bool,
-    pretty: bool,
     dry_run: bool,
     force: bool,
     debug: bool,
@@ -1923,7 +1858,7 @@ def generate_mkdocs_handler(
         repoindex ops generate mkdocs --force --dry-run
     """
     result = _resolve_repos(
-        output_json, pretty, debug, query_string,
+        output_json, debug, query_string,
         dirty=dirty, clean=clean, language=language, recent=recent,
         starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
         has_citation=has_citation, has_doi=has_doi, archived=archived,
@@ -1942,16 +1877,13 @@ def generate_mkdocs_handler(
     file_label = "mkdocs.yml files"
 
     progress_iter = service.generate_mkdocs(repos, options)
-    if pretty:
+    if output_json:
+        _ops_output_json(service, progress_iter, options)
+    else:
         _ops_output_pretty(service, progress_iter, options,
                            "Generate mkdocs.yml", len(repos),
                            success_label="Generated",
                            success_msg="Generated {count} " + file_label)
-    elif output_json:
-        _ops_output_json(service, progress_iter, options)
-    else:
-        _ops_output_simple(service, progress_iter, options, "Generation complete",
-                           success_label="Generated")
 
 
 # ============================================================================
@@ -1961,7 +1893,6 @@ def generate_mkdocs_handler(
 @generate_cmd.command('gh-pages')
 @click.argument('query_string', required=False, default='')
 @click.option('--json', 'output_json', is_flag=True, help='Output as JSONL')
-@click.option('--pretty', is_flag=True, help='Display with rich formatting')
 @click.option('--dry-run', is_flag=True, help='Preview without writing files')
 @click.option('--force', is_flag=True, help='Overwrite existing workflow files')
 @click.option('--debug', is_flag=True, help='Enable debug logging')
@@ -1969,7 +1900,6 @@ def generate_mkdocs_handler(
 def generate_gh_pages_handler(
     query_string: str,
     output_json: bool,
-    pretty: bool,
     dry_run: bool,
     force: bool,
     debug: bool,
@@ -2004,7 +1934,7 @@ def generate_gh_pages_handler(
         repoindex ops generate gh-pages --force --dry-run
     """
     result = _resolve_repos(
-        output_json, pretty, debug, query_string,
+        output_json, debug, query_string,
         dirty=dirty, clean=clean, language=language, recent=recent,
         starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
         has_citation=has_citation, has_doi=has_doi, archived=archived,
@@ -2023,13 +1953,10 @@ def generate_gh_pages_handler(
     file_label = "deploy-docs.yml files"
 
     progress_iter = service.generate_gh_pages_workflow(repos, options)
-    if pretty:
+    if output_json:
+        _ops_output_json(service, progress_iter, options)
+    else:
         _ops_output_pretty(service, progress_iter, options,
                            "Generate deploy-docs.yml", len(repos),
                            success_label="Generated",
                            success_msg="Generated {count} " + file_label)
-    elif output_json:
-        _ops_output_json(service, progress_iter, options)
-    else:
-        _ops_output_simple(service, progress_iter, options, "Generation complete",
-                           success_label="Generated")

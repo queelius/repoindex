@@ -32,7 +32,6 @@ def _format_bytes(bytes_val: int) -> str:
 @click.argument('query_string', required=False, default='')
 # Output options
 @click.option('--json', 'output_json', is_flag=True, help='Output as JSONL')
-@click.option('--pretty', is_flag=True, help='Display progress with rich formatting')
 @click.option('--dry-run', is_flag=True, help='Preview copy without writing files')
 # Copy options
 @click.option('--exclude-git', is_flag=True, help='Skip .git directories')
@@ -60,7 +59,6 @@ def copy_handler(
     destination: str,
     query_string: str,
     output_json: bool,
-    pretty: bool,
     dry_run: bool,
     exclude_git: bool,
     preserve_structure: bool,
@@ -105,7 +103,7 @@ def copy_handler(
         repoindex copy ~/backups --exclude-git          # Skip .git directories
         repoindex copy ~/backups --preserve-structure   # Keep parent dir hierarchy
         repoindex copy ~/backups --collision skip       # Skip on name collision
-        repoindex copy ~/backups --dry-run --pretty     # Preview
+        repoindex copy ~/backups --dry-run               # Preview
     """
     if debug:
         import logging
@@ -160,11 +158,9 @@ def copy_handler(
     if not repos:
         if output_json:
             print(json.dumps({'warning': 'No repositories found matching query'}))
-        elif pretty:
+        else:
             from rich.console import Console
             Console().print("[yellow]No repositories found matching query.[/yellow]")
-        else:
-            print("No repositories found matching query.", file=sys.stderr)
         return
 
     # Set up copy service
@@ -179,12 +175,10 @@ def copy_handler(
 
     service = CopyService(config=config)
 
-    if pretty:
-        _copy_pretty(service, repos, options)
-    elif output_json:
+    if output_json:
         _copy_json(service, repos, options)
     else:
-        _copy_simple(service, repos, options)
+        _copy_pretty(service, repos, options)
 
 
 def _copy_simple(service: CopyService, repos: list, options: CopyOptions):

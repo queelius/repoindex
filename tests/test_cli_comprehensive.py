@@ -168,8 +168,8 @@ class TestConfigOption(CLITestBase):
             "repository_tags": {}
         })
 
-        # When: We run 'config show' with --config
-        result = self.run_cli("config", "show")
+        # When: We run 'config show --json' with --config
+        result = self.run_cli("config", "show", "--json")
 
         # Then: The output should match our config file
         config = json.loads(result.stdout)
@@ -184,9 +184,8 @@ class TestConfigOption(CLITestBase):
 
         result = self.run_cli("config", "show", "--path")
 
-        output = json.loads(result.stdout)
-        self.assertIn("config_path", output)
-        self.assertEqual(output["config_path"], str(self.config_path))
+        output = result.stdout.strip()
+        self.assertEqual(output, str(self.config_path))
 
 
 class TestInitCommand(CLITestBase):
@@ -265,8 +264,8 @@ class TestInitCommand(CLITestBase):
 class TestConfigShowCommand(CLITestBase):
     """Test the 'repoindex config show' command."""
 
-    def test_config_show_outputs_json(self):
-        """Test config show outputs valid JSON with all sections."""
+    def test_config_show_outputs_yaml(self):
+        """Test config show outputs valid YAML with all sections."""
         # Given: A valid config file
         self.write_config({
             "repository_directories": ["~/github/**"],
@@ -276,29 +275,28 @@ class TestConfigShowCommand(CLITestBase):
             "repository_tags": {"project-a": ["work", "python"]}
         })
 
-        # When: We run config show
+        # When: We run config show (default is YAML)
         result = self.run_cli("config", "show")
 
-        # Then: Output is valid JSON with expected structure
-        config = json.loads(result.stdout)
+        # Then: Output is valid YAML with expected structure
+        import yaml
+        config = yaml.safe_load(result.stdout)
         self.assertIn("repository_directories", config)
         self.assertIn("github", config)
         self.assertIn("registries", config)
         self.assertIn("cache", config)
         self.assertIn("repository_tags", config)
 
-    def test_config_show_pretty_format(self):
-        """Test config show --pretty outputs indented JSON."""
+    def test_config_show_json_format(self):
+        """Test config show --json outputs valid JSON."""
         self.write_config({
             "repository_directories": ["~/projects"],
             "repository_tags": {}
         })
 
-        result = self.run_cli("config", "show", "--pretty")
+        result = self.run_cli("config", "show", "--json")
 
-        # Pretty output should have newlines and indentation
-        self.assertIn("\n", result.stdout)
-        # Should still be valid JSON
+        # Should be valid JSON
         config = json.loads(result.stdout)
         self.assertEqual(config["repository_directories"], ["~/projects"])
 
@@ -690,11 +688,11 @@ class TestConfigIsolation(CLITestBase):
         env["PYTHONPATH"] = str(self.project_root) + os.pathsep + env.get("PYTHONPATH", "")
 
         result_a = subprocess.run(
-            cmd_base + ["--config", str(config_a_path), "config", "show"],
+            cmd_base + ["--config", str(config_a_path), "config", "show", "--json"],
             capture_output=True, text=True, env=env
         )
         result_b = subprocess.run(
-            cmd_base + ["--config", str(config_b_path), "config", "show"],
+            cmd_base + ["--config", str(config_b_path), "config", "show", "--json"],
             capture_output=True, text=True, env=env
         )
 

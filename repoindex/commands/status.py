@@ -18,8 +18,7 @@ from ..database import Database, get_database_info, get_scan_error_count
 @click.command(name='status')
 @click.option('--json', 'output_json', is_flag=True, help='Output as JSON for scripting')
 @click.option('--repos', is_flag=True, help='List individual repositories')
-@click.option('--pretty/--no-pretty', default=True, help='Pretty format (default: auto-detect)')
-def status_handler(output_json: bool, repos: bool, pretty: bool):
+def status_handler(output_json: bool, repos: bool):
     """
     Show repository collection status dashboard.
 
@@ -44,7 +43,7 @@ def status_handler(output_json: bool, repos: bool, pretty: bool):
         sys.exit(1)
 
     if repos:
-        _list_repos(config, output_json, pretty)
+        _list_repos(config, output_json)
         return
 
     if output_json:
@@ -261,7 +260,7 @@ def _gather_dashboard_data(config: dict, db_info: dict) -> Dict[str, Any]:
     return data
 
 
-def _list_repos(config: dict, output_json: bool, pretty: bool):
+def _list_repos(config: dict, output_json: bool):
     """List individual repositories."""
     try:
         with Database(config=config, read_only=True) as db:
@@ -275,11 +274,8 @@ def _list_repos(config: dict, output_json: bool, pretty: bool):
             if output_json:
                 repos = [dict(row) for row in rows]
                 print(json.dumps(repos, indent=2))
-            elif pretty and sys.stdout.isatty():
-                _print_repos_table(rows)
             else:
-                for row in rows:
-                    print(json.dumps(dict(row), default=str))
+                _print_repos_table(rows)
 
     except Exception as e:
         click.echo(f"Error: {e}", err=True)
