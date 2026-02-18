@@ -557,8 +557,9 @@ repository_tags:
 
 ## Claude Code Integration
 
-Claude Code integration is provided via the **repoindex plugin** (`claude-plugin/`).
-Install it as a Claude Code plugin directory or via the marketplace.
+Claude Code integration is provided via the **repoindex plugin** from the
+[queelius-plugins marketplace](https://github.com/queelius/alex-claude-plugins).
+Install with `/plugin install repoindex@queelius-plugins`.
 
 The plugin provides:
 - **repoindex skill**: CLI reference and query patterns

@@ -110,8 +110,10 @@ Env vars: `REPOINDEX_GITHUB_TOKEN`, `REPOINDEX_CONFIG`
 
 ## Claude Code
 
-Install the `claude-plugin/` directory as a Claude Code plugin for
-collection-aware repository intelligence.
+```bash
+/plugin marketplace add queelius/alex-claude-plugins
+/plugin install repoindex@queelius-plugins
+```
 
 ## Author
 
