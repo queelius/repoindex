@@ -557,21 +557,14 @@ repository_tags:
 
 ## Claude Code Integration
 
-### Skill Management
+Claude Code integration is provided via the **repoindex plugin** (`claude-plugin/`).
+Install it as a Claude Code plugin directory or via the marketplace.
 
-```bash
-repoindex claude install [--global]   # Install skill
-repoindex claude uninstall [--global] # Remove skill
-repoindex claude show                 # Show status
-repoindex claude content              # Print skill content
-```
-
-### Skill Generation
-
-Skill content should be **generated from CLI introspection**:
-
-- Extract commands and options from Click
-- Build examples dynamically
+The plugin provides:
+- **repoindex skill**: CLI reference and query patterns
+- **repo-polish skill**: Audit-driven release preparation workflow
+- **Commands**: Quick dashboard and repo exploration
+- **Agents**: Collection analysis automation
 - Include version number
 - Warn and confirm before overwriting existing skill
 

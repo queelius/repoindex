@@ -10,12 +10,12 @@ from repoindex.commands.query import query_handler
 from repoindex.commands.shell import shell_handler
 from repoindex.commands.events import events_handler
 from repoindex.commands.refresh import refresh_handler, db_handler, sql_handler
-from repoindex.commands.claude import claude_handler
 
 from repoindex.commands.copy import copy_handler
 from repoindex.commands.link import link_cmd
 from repoindex.commands.ops import ops_cmd
 from repoindex.commands.render import render_handler
+from repoindex.commands.show import show_handler
 
 
 @click.group()
@@ -46,6 +46,7 @@ cli.add_command(events_handler, name='events')
 cli.add_command(sql_handler, name='sql')
 cli.add_command(refresh_handler, name='refresh')
 
+cli.add_command(show_handler, name='show')
 cli.add_command(copy_handler, name='copy')
 cli.add_command(render_handler, name='render')
 cli.add_command(shell_handler, name='shell')
@@ -56,7 +57,6 @@ cli.add_command(view_cmd)
 cli.add_command(link_cmd)
 cli.add_command(ops_cmd)
 cli.add_command(config_cmd)
-cli.add_command(claude_handler, name='claude')
 
 # Deprecated: db is now absorbed into sql command (--info, --path, --reset, --schema)
 # Keep as hidden for backward compatibility

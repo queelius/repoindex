@@ -345,7 +345,7 @@ mock_run_command.side_effect = [("output1", 0), ("output2", 0)]  # Multiple call
 - `rapidfuzz` - Fuzzy string matching for query language
 - `pyyaml` - YAML configuration files
 
-### Commands Implemented (14 commands)
+### Commands Implemented (13 commands)
 
 ```
 repoindex
@@ -374,7 +374,6 @@ repoindex
 ├── tag                 # Organization (add/remove/list/tree)
 ├── view                # Curated views (list/show/create/delete)
 ├── config              # Settings (show/repos/init)
-├── claude              # Skill management (install/uninstall/show)
 └── shell               # Interactive mode
 ```
 

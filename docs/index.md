@@ -110,11 +110,8 @@ Env vars: `REPOINDEX_GITHUB_TOKEN`, `REPOINDEX_CONFIG`
 
 ## Claude Code
 
-```bash
-repoindex claude install --global
-```
-
-Then use `/repoindex` in Claude Code conversations.
+Install the `claude-plugin/` directory as a Claude Code plugin for
+collection-aware repository intelligence.
 
 ## Author
 

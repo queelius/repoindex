@@ -1,0 +1,13 @@
+{
+  "name": "repoindex",
+  "version": "0.10.0",
+  "description": "Collection-aware repository intelligence for Claude Code. Query, analyze, and maintain your git repository collection.",
+  "author": {
+    "name": "Alexander Towell",
+    "email": "lex@metafunctor.com",
+    "url": "https://metafunctor.com"
+  },
+  "repository": "https://github.com/queelius/repoindex",
+  "license": "MIT",
+  "keywords": ["git", "repositories", "metadata", "collection", "catalog", "audit"]
+}

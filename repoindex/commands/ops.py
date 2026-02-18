@@ -81,6 +81,7 @@ def git_cmd():
 # Shared query flags decorator
 def query_options(f):
     """Decorator to add query convenience flags."""
+    f = click.option('--name', '-n', help='Filter by repo name (supports wildcards: dapple, *api*)')(f)
     f = click.option('--dirty', is_flag=True, help='Repos with uncommitted changes')(f)
     f = click.option('--clean', is_flag=True, help='Repos with no uncommitted changes')(f)
     f = click.option('--language', '-l', help='Filter by language (e.g., python, js, rust)')(f)
@@ -91,6 +92,7 @@ def query_options(f):
     f = click.option('--no-readme', is_flag=True, help='Repos without a README')(f)
     f = click.option('--has-citation', is_flag=True, help='Repos with citation files')(f)
     f = click.option('--has-doi', is_flag=True, help='Repos with DOI in citation metadata')(f)
+    f = click.option('--has-remote', is_flag=True, help='Repos with a remote URL')(f)
     f = click.option('--archived', is_flag=True, help='Archived repos only')(f)
     f = click.option('--public', is_flag=True, help='Public repos only')(f)
     f = click.option('--private', is_flag=True, help='Private repos only')(f)
@@ -102,6 +104,7 @@ def query_options(f):
 def _get_repos_from_query(config, query_string: str, debug: bool = False, **query_flags):
     """Get repos matching query and flags."""
     # Extract flags with defaults
+    name = query_flags.get('name', None)
     dirty = query_flags.get('dirty', False)
     clean = query_flags.get('clean', False)
     language = query_flags.get('language', None)
@@ -112,6 +115,7 @@ def _get_repos_from_query(config, query_string: str, debug: bool = False, **quer
     no_readme = query_flags.get('no_readme', False)
     has_citation = query_flags.get('has_citation', False)
     has_doi = query_flags.get('has_doi', False)
+    has_remote = query_flags.get('has_remote', False)
     archived = query_flags.get('archived', False)
     public = query_flags.get('public', False)
     private = query_flags.get('private', False)
@@ -119,13 +123,14 @@ def _get_repos_from_query(config, query_string: str, debug: bool = False, **quer
     no_fork = query_flags.get('no_fork', False)
 
     # Build query from flags
-    has_flags = any([dirty, clean, language, recent, starred, tag, no_license, no_readme,
-                     has_citation, has_doi, archived, public, private, fork, no_fork])
+    has_flags = any([name, dirty, clean, language, recent, starred, tag, no_license, no_readme,
+                     has_citation, has_doi, has_remote, archived, public, private, fork, no_fork])
     if has_flags:
         query_string = _build_query_from_flags(
             query_string if query_string else None,
             dirty, clean, language, recent, starred, list(tag),
-            no_license, no_readme, has_citation, has_doi, archived, public, private, fork, no_fork
+            no_license, no_readme, has_citation, has_doi, archived, public, private, fork, no_fork,
+            name=name, has_remote=has_remote,
         )
 
     # If no query and no flags, match all repos
@@ -204,6 +209,7 @@ def ops_audit_handler(
     audit_severity: Optional[str],
     debug: bool,
     # Query flags
+    name: Optional[str],
     dirty: bool,
     clean: bool,
     language: Optional[str],
@@ -214,6 +220,7 @@ def ops_audit_handler(
     no_readme: bool,
     has_citation: bool,
     has_doi: bool,
+    has_remote: bool,
     archived: bool,
     public: bool,
     private: bool,
@@ -246,10 +253,10 @@ def ops_audit_handler(
 
     result = _resolve_repos(
         output_json, debug, query_string,
-        dirty=dirty, clean=clean, language=language, recent=recent,
+        name=name, dirty=dirty, clean=clean, language=language, recent=recent,
         starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
-        has_citation=has_citation, has_doi=has_doi, archived=archived,
-        public=public, private=private, fork=fork, no_fork=no_fork,
+        has_citation=has_citation, has_doi=has_doi, has_remote=has_remote,
+        archived=archived, public=public, private=private, fork=fork, no_fork=no_fork,
     )
     if result is None:
         return
@@ -472,6 +479,7 @@ def git_push_handler(
     set_upstream: bool,
     debug: bool,
     # Query flags
+    name: Optional[str],
     dirty: bool,
     clean: bool,
     language: Optional[str],
@@ -482,6 +490,7 @@ def git_push_handler(
     no_readme: bool,
     has_citation: bool,
     has_doi: bool,
+    has_remote: bool,
     archived: bool,
     public: bool,
     private: bool,
@@ -511,10 +520,10 @@ def git_push_handler(
     """
     result = _resolve_repos(
         output_json, debug, query_string,
-        dirty=dirty, clean=clean, language=language, recent=recent,
+        name=name, dirty=dirty, clean=clean, language=language, recent=recent,
         starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
-        has_citation=has_citation, has_doi=has_doi, archived=archived,
-        public=public, private=private, fork=fork, no_fork=no_fork,
+        has_citation=has_citation, has_doi=has_doi, has_remote=has_remote,
+        archived=archived, public=public, private=private, fork=fork, no_fork=no_fork,
     )
     if result is None:
         return
@@ -574,6 +583,7 @@ def git_pull_handler(
     remote: str,
     debug: bool,
     # Query flags
+    name: Optional[str],
     dirty: bool,
     clean: bool,
     language: Optional[str],
@@ -584,6 +594,7 @@ def git_pull_handler(
     no_readme: bool,
     has_citation: bool,
     has_doi: bool,
+    has_remote: bool,
     archived: bool,
     public: bool,
     private: bool,
@@ -608,10 +619,10 @@ def git_pull_handler(
     """
     result = _resolve_repos(
         output_json, debug, query_string,
-        dirty=dirty, clean=clean, language=language, recent=recent,
+        name=name, dirty=dirty, clean=clean, language=language, recent=recent,
         starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
-        has_citation=has_citation, has_doi=has_doi, archived=archived,
-        public=public, private=private, fork=fork, no_fork=no_fork,
+        has_citation=has_citation, has_doi=has_doi, has_remote=has_remote,
+        archived=archived, public=public, private=private, fork=fork, no_fork=no_fork,
     )
     if result is None:
         return
@@ -651,6 +662,7 @@ def git_status_handler(
     remote: str,
     debug: bool,
     # Query flags
+    name: Optional[str],
     dirty: bool,
     clean: bool,
     language: Optional[str],
@@ -661,6 +673,7 @@ def git_status_handler(
     no_readme: bool,
     has_citation: bool,
     has_doi: bool,
+    has_remote: bool,
     archived: bool,
     public: bool,
     private: bool,
@@ -685,10 +698,10 @@ def git_status_handler(
     """
     result = _resolve_repos(
         output_json, debug, query_string,
-        dirty=dirty, clean=clean, language=language, recent=recent,
+        name=name, dirty=dirty, clean=clean, language=language, recent=recent,
         starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
-        has_citation=has_citation, has_doi=has_doi, archived=archived,
-        public=public, private=private, fork=fork, no_fork=no_fork,
+        has_citation=has_citation, has_doi=has_doi, has_remote=has_remote,
+        archived=archived, public=public, private=private, fork=fork, no_fork=no_fork,
     )
     if result is None:
         return
@@ -842,6 +855,7 @@ def github_set_topics_handler(
     from_pyproject: bool,
     debug: bool,
     # Query flags
+    name: Optional[str],
     dirty: bool,
     clean: bool,
     language: Optional[str],
@@ -852,6 +866,7 @@ def github_set_topics_handler(
     no_readme: bool,
     has_citation: bool,
     has_doi: bool,
+    has_remote: bool,
     archived: bool,
     public: bool,
     private: bool,
@@ -879,10 +894,10 @@ def github_set_topics_handler(
 
     result = _resolve_repos(
         output_json, debug, query_string,
-        dirty=dirty, clean=clean, language=language, recent=recent,
+        name=name, dirty=dirty, clean=clean, language=language, recent=recent,
         starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
-        has_citation=has_citation, has_doi=has_doi, archived=archived,
-        public=public, private=private, fork=fork, no_fork=no_fork,
+        has_citation=has_citation, has_doi=has_doi, has_remote=has_remote,
+        archived=archived, public=public, private=private, fork=fork, no_fork=no_fork,
     )
     if result is None:
         return
@@ -915,6 +930,7 @@ def github_set_description_handler(
     from_pyproject: bool,
     debug: bool,
     # Query flags
+    name: Optional[str],
     dirty: bool,
     clean: bool,
     language: Optional[str],
@@ -925,6 +941,7 @@ def github_set_description_handler(
     no_readme: bool,
     has_citation: bool,
     has_doi: bool,
+    has_remote: bool,
     archived: bool,
     public: bool,
     private: bool,
@@ -950,10 +967,10 @@ def github_set_description_handler(
 
     result = _resolve_repos(
         output_json, debug, query_string,
-        dirty=dirty, clean=clean, language=language, recent=recent,
+        name=name, dirty=dirty, clean=clean, language=language, recent=recent,
         starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
-        has_citation=has_citation, has_doi=has_doi, archived=archived,
-        public=public, private=private, fork=fork, no_fork=no_fork,
+        has_citation=has_citation, has_doi=has_doi, has_remote=has_remote,
+        archived=archived, public=public, private=private, fork=fork, no_fork=no_fork,
     )
     if result is None:
         return
@@ -1155,6 +1172,7 @@ def generate_codemeta_handler(
     affiliation: Optional[str],
     debug: bool,
     # Query flags
+    name: Optional[str],
     dirty: bool,
     clean: bool,
     language: Optional[str],
@@ -1165,6 +1183,7 @@ def generate_codemeta_handler(
     no_readme: bool,
     has_citation: bool,
     has_doi: bool,
+    has_remote: bool,
     archived: bool,
     public: bool,
     private: bool,
@@ -1188,10 +1207,10 @@ def generate_codemeta_handler(
     """
     result = _resolve_repos(
         output_json, debug, query_string,
-        dirty=dirty, clean=clean, language=language, recent=recent,
+        name=name, dirty=dirty, clean=clean, language=language, recent=recent,
         starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
-        has_citation=has_citation, has_doi=has_doi, archived=archived,
-        public=public, private=private, fork=fork, no_fork=no_fork,
+        has_citation=has_citation, has_doi=has_doi, has_remote=has_remote,
+        archived=archived, public=public, private=private, fork=fork, no_fork=no_fork,
     )
     if result is None:
         return
@@ -1246,6 +1265,7 @@ def generate_license_handler(
     author: Optional[str],
     debug: bool,
     # Query flags
+    name: Optional[str],
     dirty: bool,
     clean: bool,
     language: Optional[str],
@@ -1256,6 +1276,7 @@ def generate_license_handler(
     no_readme: bool,
     has_citation: bool,
     has_doi: bool,
+    has_remote: bool,
     archived: bool,
     public: bool,
     private: bool,
@@ -1281,10 +1302,10 @@ def generate_license_handler(
     """
     result = _resolve_repos(
         output_json, debug, query_string,
-        dirty=dirty, clean=clean, language=language, recent=recent,
+        name=name, dirty=dirty, clean=clean, language=language, recent=recent,
         starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
-        has_citation=has_citation, has_doi=has_doi, archived=archived,
-        public=public, private=private, fork=fork, no_fork=no_fork,
+        has_citation=has_citation, has_doi=has_doi, has_remote=has_remote,
+        archived=archived, public=public, private=private, fork=fork, no_fork=no_fork,
     )
     if result is None:
         return
@@ -1382,6 +1403,7 @@ def generate_gitignore_handler(
     language_template: str,
     debug: bool,
     # Query flags
+    name: Optional[str],
     dirty: bool,
     clean: bool,
     language: Optional[str],
@@ -1392,6 +1414,7 @@ def generate_gitignore_handler(
     no_readme: bool,
     has_citation: bool,
     has_doi: bool,
+    has_remote: bool,
     archived: bool,
     public: bool,
     private: bool,
@@ -1417,10 +1440,10 @@ def generate_gitignore_handler(
     """
     result = _resolve_repos(
         output_json, debug, query_string,
-        dirty=dirty, clean=clean, language=language, recent=recent,
+        name=name, dirty=dirty, clean=clean, language=language, recent=recent,
         starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
-        has_citation=has_citation, has_doi=has_doi, archived=archived,
-        public=public, private=private, fork=fork, no_fork=no_fork,
+        has_citation=has_citation, has_doi=has_doi, has_remote=has_remote,
+        archived=archived, public=public, private=private, fork=fork, no_fork=no_fork,
     )
     if result is None:
         return
@@ -1466,6 +1489,7 @@ def generate_code_of_conduct_handler(
     email: Optional[str],
     debug: bool,
     # Query flags
+    name: Optional[str],
     dirty: bool,
     clean: bool,
     language: Optional[str],
@@ -1476,6 +1500,7 @@ def generate_code_of_conduct_handler(
     no_readme: bool,
     has_citation: bool,
     has_doi: bool,
+    has_remote: bool,
     archived: bool,
     public: bool,
     private: bool,
@@ -1501,10 +1526,10 @@ def generate_code_of_conduct_handler(
     """
     result = _resolve_repos(
         output_json, debug, query_string,
-        dirty=dirty, clean=clean, language=language, recent=recent,
+        name=name, dirty=dirty, clean=clean, language=language, recent=recent,
         starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
-        has_citation=has_citation, has_doi=has_doi, archived=archived,
-        public=public, private=private, fork=fork, no_fork=no_fork,
+        has_citation=has_citation, has_doi=has_doi, has_remote=has_remote,
+        archived=archived, public=public, private=private, fork=fork, no_fork=no_fork,
     )
     if result is None:
         return
@@ -1554,6 +1579,7 @@ def generate_contributing_handler(
     force: bool,
     debug: bool,
     # Query flags
+    name: Optional[str],
     dirty: bool,
     clean: bool,
     language: Optional[str],
@@ -1564,6 +1590,7 @@ def generate_contributing_handler(
     no_readme: bool,
     has_citation: bool,
     has_doi: bool,
+    has_remote: bool,
     archived: bool,
     public: bool,
     private: bool,
@@ -1587,10 +1614,10 @@ def generate_contributing_handler(
     """
     result = _resolve_repos(
         output_json, debug, query_string,
-        dirty=dirty, clean=clean, language=language, recent=recent,
+        name=name, dirty=dirty, clean=clean, language=language, recent=recent,
         starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
-        has_citation=has_citation, has_doi=has_doi, archived=archived,
-        public=public, private=private, fork=fork, no_fork=no_fork,
+        has_citation=has_citation, has_doi=has_doi, has_remote=has_remote,
+        archived=archived, public=public, private=private, fork=fork, no_fork=no_fork,
     )
     if result is None:
         return
@@ -1640,6 +1667,7 @@ def generate_citation_handler(
     affiliation: Optional[str],
     debug: bool,
     # Query flags
+    name: Optional[str],
     dirty: bool,
     clean: bool,
     language: Optional[str],
@@ -1650,6 +1678,7 @@ def generate_citation_handler(
     no_readme: bool,
     has_citation: bool,
     has_doi: bool,
+    has_remote: bool,
     archived: bool,
     public: bool,
     private: bool,
@@ -1676,10 +1705,10 @@ def generate_citation_handler(
     """
     result = _resolve_repos(
         output_json, debug, query_string,
-        dirty=dirty, clean=clean, language=language, recent=recent,
+        name=name, dirty=dirty, clean=clean, language=language, recent=recent,
         starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
-        has_citation=has_citation, has_doi=has_doi, archived=archived,
-        public=public, private=private, fork=fork, no_fork=no_fork,
+        has_citation=has_citation, has_doi=has_doi, has_remote=has_remote,
+        archived=archived, public=public, private=private, fork=fork, no_fork=no_fork,
     )
     if result is None:
         return
@@ -1738,6 +1767,7 @@ def generate_zenodo_handler(
     affiliation: Optional[str],
     debug: bool,
     # Query flags
+    name: Optional[str],
     dirty: bool,
     clean: bool,
     language: Optional[str],
@@ -1748,6 +1778,7 @@ def generate_zenodo_handler(
     no_readme: bool,
     has_citation: bool,
     has_doi: bool,
+    has_remote: bool,
     archived: bool,
     public: bool,
     private: bool,
@@ -1774,10 +1805,10 @@ def generate_zenodo_handler(
     """
     result = _resolve_repos(
         output_json, debug, query_string,
-        dirty=dirty, clean=clean, language=language, recent=recent,
+        name=name, dirty=dirty, clean=clean, language=language, recent=recent,
         starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
-        has_citation=has_citation, has_doi=has_doi, archived=archived,
-        public=public, private=private, fork=fork, no_fork=no_fork,
+        has_citation=has_citation, has_doi=has_doi, has_remote=has_remote,
+        archived=archived, public=public, private=private, fork=fork, no_fork=no_fork,
     )
     if result is None:
         return
@@ -1828,6 +1859,7 @@ def generate_mkdocs_handler(
     force: bool,
     debug: bool,
     # Query flags
+    name: Optional[str],
     dirty: bool,
     clean: bool,
     language: Optional[str],
@@ -1838,6 +1870,7 @@ def generate_mkdocs_handler(
     no_readme: bool,
     has_citation: bool,
     has_doi: bool,
+    has_remote: bool,
     archived: bool,
     public: bool,
     private: bool,
@@ -1859,10 +1892,10 @@ def generate_mkdocs_handler(
     """
     result = _resolve_repos(
         output_json, debug, query_string,
-        dirty=dirty, clean=clean, language=language, recent=recent,
+        name=name, dirty=dirty, clean=clean, language=language, recent=recent,
         starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
-        has_citation=has_citation, has_doi=has_doi, archived=archived,
-        public=public, private=private, fork=fork, no_fork=no_fork,
+        has_citation=has_citation, has_doi=has_doi, has_remote=has_remote,
+        archived=archived, public=public, private=private, fork=fork, no_fork=no_fork,
     )
     if result is None:
         return
@@ -1904,6 +1937,7 @@ def generate_gh_pages_handler(
     force: bool,
     debug: bool,
     # Query flags
+    name: Optional[str],
     dirty: bool,
     clean: bool,
     language: Optional[str],
@@ -1914,6 +1948,7 @@ def generate_gh_pages_handler(
     no_readme: bool,
     has_citation: bool,
     has_doi: bool,
+    has_remote: bool,
     archived: bool,
     public: bool,
     private: bool,
@@ -1935,10 +1970,10 @@ def generate_gh_pages_handler(
     """
     result = _resolve_repos(
         output_json, debug, query_string,
-        dirty=dirty, clean=clean, language=language, recent=recent,
+        name=name, dirty=dirty, clean=clean, language=language, recent=recent,
         starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
-        has_citation=has_citation, has_doi=has_doi, archived=archived,
-        public=public, private=private, fork=fork, no_fork=no_fork,
+        has_citation=has_citation, has_doi=has_doi, has_remote=has_remote,
+        archived=archived, public=public, private=private, fork=fork, no_fork=no_fork,
     )
     if result is None:
         return

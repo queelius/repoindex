@@ -32,6 +32,7 @@ def render_handler(
     list_formats: bool,
     debug: bool,
     # Query flags from decorator
+    name: Optional[str],
     dirty: bool,
     clean: bool,
     language: Optional[str],
@@ -42,6 +43,7 @@ def render_handler(
     no_readme: bool,
     has_citation: bool,
     has_doi: bool,
+    has_remote: bool,
     archived: bool,
     public: bool,
     private: bool,
@@ -106,10 +108,11 @@ def render_handler(
     # Query repos from database using the standard helper
     repos = _get_repos_from_query(
         config, query_string, debug=debug,
-        dirty=dirty, clean=clean, language=language,
+        name=name, dirty=dirty, clean=clean, language=language,
         recent=recent, starred=starred, tag=tag,
         no_license=no_license, no_readme=no_readme,
         has_citation=has_citation, has_doi=has_doi,
+        has_remote=has_remote,
         archived=archived, public=public, private=private,
         fork=fork, no_fork=no_fork,
     )

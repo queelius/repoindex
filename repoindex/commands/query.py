@@ -214,7 +214,7 @@ def _build_query_from_flags(
 @click.argument('query_string', required=False, default='')
 @click.option('--json', 'output_json', is_flag=True, help='Output as JSONL (default: pretty table)')
 @click.option('--brief', is_flag=True, help='Compact output: just repo names (one per line)')
-@click.option('--fields', help='Comma-separated list of fields to display')
+@click.option('--fields', '--columns', help='Comma-separated list of fields to display')
 @click.option('--limit', type=int, help='Limit number of results')
 @click.option('--explain', 'show_explain', is_flag=True, help='Show compiled SQL and params without executing')
 @click.option('--fts', is_flag=True, help='Use full-text search instead of DSL query')
@@ -515,10 +515,20 @@ def _output_result(result: dict, fields: Optional[str], brief: bool = False):
     print(json.dumps(output, ensure_ascii=False, default=str), flush=True)
 
 
+def _shorten_path(path: str) -> str:
+    """Shorten a filesystem path for display (replace $HOME with ~)."""
+    from pathlib import Path
+    home = str(Path.home())
+    if path.startswith(home):
+        return '~' + path[len(home):]
+    return path
+
+
 def _display_pretty_results(results: list, fields: Optional[str]):
     """Display results in a pretty table."""
     from rich.console import Console
     from rich.table import Table
+    from rich.text import Text
     from rich import box
 
     console = Console()
@@ -537,19 +547,41 @@ def _display_pretty_results(results: list, fields: Optional[str]):
     if fields:
         columns = ['name'] + [f.strip() for f in fields.split(',')]
     else:
-        columns = ['name', 'language', 'branch']
+        columns = ['name', 'path', 'language', 'is_clean']
         if any(r.get('github_stars') for r in results):
-            columns.insert(2, 'github_stars')
-        columns.append('tags')
+            columns.append('github_stars')
+        columns.append('description')
 
     for col in columns:
-        table.add_column(col.title().replace('_', ' '))
+        if col == 'is_clean':
+            table.add_column('Clean', justify='center')
+        elif col == 'description':
+            table.add_column('Description', max_width=40, no_wrap=True)
+        elif col == 'path':
+            table.add_column('Path', style='dim')
+        else:
+            table.add_column(col.title().replace('_', ' '))
 
     for result in results:
         row = []
         for col in columns:
             if col == 'name':
                 row.append(result.get('name', result.get('path', '').split('/')[-1]))
+            elif col == 'path':
+                row.append(_shorten_path(result.get('path', '')))
+            elif col == 'is_clean':
+                clean = result.get('is_clean')
+                if clean is None:
+                    row.append('[dim]?[/dim]')
+                elif clean:
+                    row.append('[green]yes[/green]')
+                else:
+                    row.append('[yellow]no[/yellow]')
+            elif col == 'description':
+                desc = result.get('description', '') or ''
+                if len(desc) > 40:
+                    desc = desc[:37] + '...'
+                row.append(desc)
             elif col == 'tags':
                 tags = result.get('tags', [])
                 if isinstance(tags, str):
