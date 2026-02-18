@@ -111,8 +111,8 @@ Env vars: `REPOINDEX_GITHUB_TOKEN`, `REPOINDEX_CONFIG`
 ## Claude Code
 
 ```bash
-/plugin marketplace add queelius/alex-claude-plugins
-/plugin install repoindex@queelius-plugins
+/plugin marketplace add queelius/claude-code-marketplace
+/plugin install repoindex@queelius
 ```
 
 ## Author
