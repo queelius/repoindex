@@ -1,6 +1,7 @@
 ---
 name: repo-status
 description: Quick repository collection dashboard — shows dirty repos, recent activity, and collection stats
+argument-hint: ""
 allowed-tools:
   - Bash
   - Read

@@ -6,6 +6,20 @@ description: >-
   generating reports, or answering complex questions that require multiple queries.
   Triggers on: "analyze my repos", "compare repos", "which repos need attention",
   "collection report", "find repos that", "repo statistics".
+
+  <example>
+  Context: User wants to understand their repository collection.
+  user: "Which of my Python repos are published on PyPI?"
+  assistant: "I'll use the repo-explorer agent to cross-reference your Python repos with publication data."
+  <commentary>Requires joining repos and publications tables — multi-query analysis task.</commentary>
+  </example>
+
+  <example>
+  Context: User wants to find repos needing maintenance.
+  user: "Which repos need the most attention?"
+  assistant: "I'll use the repo-explorer agent to audit your collection and identify gaps."
+  <commentary>Requires running audit, analyzing patterns across repos, and prioritizing findings.</commentary>
+  </example>
 tools:
   - Bash
   - Read
