@@ -354,6 +354,10 @@ def get_default_config():
                 # "npm": False,
                 # "cargo": False,
             },
+            # Refresh log settings
+            "log": {
+                "max_rows": 100,
+            },
         },
 
         # NOTE: Legacy keys (registries, cache) are ignored if present in old configs

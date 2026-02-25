@@ -65,6 +65,13 @@ from .errors import (
     clear_scan_errors,
     clear_scan_error_for_path,
 )
+from .refresh_log import (
+    ensure_refresh_log_table,
+    record_refresh,
+    get_latest_refresh,
+    get_refresh_log,
+    prune_refresh_log,
+)
 
 __all__ = [
     # Connection
@@ -117,4 +124,10 @@ __all__ = [
     'get_scan_error_count',
     'clear_scan_errors',
     'clear_scan_error_for_path',
+    # Refresh log
+    'ensure_refresh_log_table',
+    'record_refresh',
+    'get_latest_refresh',
+    'get_refresh_log',
+    'prune_refresh_log',
 ]

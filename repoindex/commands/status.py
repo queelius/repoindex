@@ -13,12 +13,15 @@ import click
 
 from ..config import load_config
 from ..database import Database, get_database_info, get_scan_error_count
+from ..database.refresh_log import ensure_refresh_log_table, get_latest_refresh, get_refresh_log
 
 
 @click.command(name='status')
 @click.option('--json', 'output_json', is_flag=True, help='Output as JSON for scripting')
 @click.option('--repos', is_flag=True, help='List individual repositories')
-def status_handler(output_json: bool, repos: bool):
+@click.option('--refresh-log', 'show_refresh_log', is_flag=True, help='Show refresh history')
+@click.option('--limit', default=10, type=int, help='Number of refresh log entries to show (default: 10)')
+def status_handler(output_json: bool, repos: bool, show_refresh_log: bool, limit: int):
     """
     Show repository collection status dashboard.
 
@@ -32,6 +35,10 @@ def status_handler(output_json: bool, repos: bool):
         repoindex status --json
         # List all repos
         repoindex status --repos
+        # Show refresh history
+        repoindex status --refresh-log
+        # Show last 5 refreshes as JSON
+        repoindex status --refresh-log --limit 5 --json
     """
     config = load_config()
 
@@ -41,6 +48,10 @@ def status_handler(output_json: bool, repos: bool):
     except Exception:
         click.echo("Database not found. Run 'repoindex refresh' first.", err=True)
         sys.exit(1)
+
+    if show_refresh_log:
+        _show_refresh_log(config, output_json, limit)
+        return
 
     if repos:
         _list_repos(config, output_json)
@@ -171,11 +182,17 @@ def _gather_dashboard_data(config: dict, db_info: dict) -> Dict[str, Any]:
 
     try:
         with Database(config=config, read_only=True) as db:
-            # Get last refresh time
-            db.execute("SELECT MAX(scanned_at) as scanned_at FROM repos")
-            row = db.fetchone()
-            if row and row['scanned_at']:
-                data['database']['last_refresh'] = row['scanned_at']
+            # Get last refresh time — prefer refresh_log, fall back to MAX(scanned_at)
+            latest = get_latest_refresh(db)
+            if latest:
+                data['database']['last_refresh'] = latest['finished_at']
+                data['database']['last_refresh_sources'] = latest.get('sources', [])
+                data['database']['last_refresh_duration'] = latest.get('duration_seconds')
+            else:
+                db.execute("SELECT MAX(scanned_at) as scanned_at FROM repos")
+                row = db.fetchone()
+                if row and row['scanned_at']:
+                    data['database']['last_refresh'] = row['scanned_at']
 
             # Get health stats
             db.execute("SELECT COUNT(*) as count FROM repos WHERE is_clean = 1")
@@ -258,6 +275,92 @@ def _gather_dashboard_data(config: dict, db_info: dict) -> Dict[str, Any]:
         pass  # Database might not exist yet
 
     return data
+
+
+def _show_refresh_log(config: dict, output_json: bool, limit: int):
+    """Display the refresh log."""
+    try:
+        with Database(config=config, read_only=True) as db:
+            entries = get_refresh_log(db, limit=limit)
+
+            if not entries:
+                click.echo("No refresh log entries found. Run 'repoindex refresh' first.", err=True)
+                return
+
+            if output_json:
+                print(json.dumps(entries, indent=2, default=str))
+            else:
+                _print_refresh_log_table(entries)
+
+    except Exception as e:
+        click.echo(f"Error reading refresh log: {e}", err=True)
+        sys.exit(1)
+
+
+def _print_refresh_log_table(entries):
+    """Print refresh log entries as a Rich table."""
+    from rich.console import Console
+    from rich.table import Table
+    from rich import box
+
+    console = Console()
+    table = Table(title=f"Refresh Log ({len(entries)} entries)", box=box.ROUNDED)
+
+    table.add_column("Date", style="cyan")
+    table.add_column("Type")
+    table.add_column("Sources")
+    table.add_column("Repos", justify="right")
+    table.add_column("Duration", justify="right")
+    table.add_column("Errors", justify="right")
+
+    for entry in entries:
+        # Format date
+        date_str = entry.get('started_at', '')
+        if date_str:
+            try:
+                dt = datetime.fromisoformat(date_str)
+                date_str = dt.strftime('%Y-%m-%d %H:%M')
+            except (ValueError, TypeError):
+                pass
+
+        # Format type
+        scan_type = "full" if entry.get('full_scan') else "smart"
+
+        # Format sources
+        sources = entry.get('sources', [])
+        if isinstance(sources, list):
+            sources_str = ', '.join(sources)
+        else:
+            sources_str = str(sources)
+
+        # Format repos
+        scanned = entry.get('repos_scanned', 0)
+        skipped = entry.get('repos_skipped', 0)
+        repos_str = f"{scanned} scanned"
+        if skipped:
+            repos_str += f", {skipped} skipped"
+
+        # Format duration
+        duration = entry.get('duration_seconds')
+        if duration is not None:
+            if duration < 60:
+                duration_str = f"{duration:.1f}s"
+            else:
+                mins = int(duration // 60)
+                secs = duration % 60
+                duration_str = f"{mins}m {secs:.0f}s"
+        else:
+            duration_str = "-"
+
+        # Format errors
+        errors = entry.get('errors', 0)
+        error_str = str(errors)
+        if errors > 0:
+            error_str = f"[red]{errors}[/red]"
+
+        table.add_row(date_str, scan_type, sources_str, repos_str, duration_str, error_str)
+
+    console.print(table)
 
 
 def _list_repos(config: dict, output_json: bool):

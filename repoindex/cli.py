@@ -11,6 +11,7 @@ from repoindex.commands.shell import shell_handler
 from repoindex.commands.events import events_handler
 from repoindex.commands.refresh import refresh_handler, db_handler, sql_handler
 
+from repoindex.commands.digest import digest_handler
 from repoindex.commands.copy import copy_handler
 from repoindex.commands.link import link_cmd
 from repoindex.commands.ops import ops_cmd
@@ -46,6 +47,7 @@ cli.add_command(events_handler, name='events')
 cli.add_command(sql_handler, name='sql')
 cli.add_command(refresh_handler, name='refresh')
 
+cli.add_command(digest_handler, name='digest')
 cli.add_command(show_handler, name='show')
 cli.add_command(copy_handler, name='copy')
 cli.add_command(render_handler, name='render')

@@ -18,6 +18,7 @@ from typing import List, Tuple
 # v3: Added citation detection (has_citation, citation_file)
 # v4: Added citation metadata parsing (citation_doi, citation_title, etc.)
 # v5: Added doi column to publications table (for Zenodo DOIs, etc.)
+# v5+: Added refresh_log table (non-breaking, uses CREATE IF NOT EXISTS)
 CURRENT_VERSION = 5
 
 # Schema definition as SQL statements
@@ -181,6 +182,26 @@ CREATE INDEX IF NOT EXISTS idx_publications_doi ON publications(doi);
 
 CREATE INDEX IF NOT EXISTS idx_scan_errors_path ON scan_errors(path);
 
+-- Refresh log (tracks when refreshes happened and what they did)
+CREATE TABLE IF NOT EXISTS refresh_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    started_at TEXT NOT NULL,
+    finished_at TEXT NOT NULL,
+    full_scan BOOLEAN NOT NULL DEFAULT 0,
+    sources TEXT NOT NULL,             -- JSON array: ["git","github","pypi"]
+    scan_roots TEXT,                   -- JSON array: ["/home/user/github"]
+    repos_total INTEGER,
+    repos_scanned INTEGER,
+    repos_skipped INTEGER,
+    repos_added INTEGER DEFAULT 0,
+    repos_removed INTEGER DEFAULT 0,
+    errors INTEGER DEFAULT 0,
+    duration_seconds REAL,
+    cli_version TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_refresh_log_started ON refresh_log(started_at);
+
 -- Full-text search on repos (name, description, readme)
 CREATE VIRTUAL TABLE IF NOT EXISTS repos_fts USING fts5(
     name,
@@ -311,6 +332,7 @@ def apply_schema(conn: sqlite3.Connection, version: int = CURRENT_VERSION) -> No
             DROP TABLE IF EXISTS events;
             DROP TABLE IF EXISTS publications;
             DROP TABLE IF EXISTS scan_errors;
+            DROP TABLE IF EXISTS refresh_log;
             DROP TABLE IF EXISTS repos;
             DROP TABLE IF EXISTS _schema_info;
         """)

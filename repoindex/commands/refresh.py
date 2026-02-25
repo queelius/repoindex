@@ -25,6 +25,7 @@ from ..database import (
     record_scan_error,
     clear_scan_error_for_path,
     get_scan_error_count,
+    record_refresh,
 )
 from ..database.events import insert_events
 from ..services.repository_service import RepositoryService
@@ -273,6 +274,52 @@ def refresh_handler(
         stats['end_time'] = datetime.now().isoformat()
         stats['total_repos'] = get_repo_count(db)
         stats['total_scan_errors'] = get_scan_error_count(db)
+
+        # Write refresh log entry
+        if not dry_run:
+            try:
+                # Build sources list
+                sources = ["git"]
+                if fetch_github:
+                    sources.append("github")
+                for p in active_providers:
+                    if p.registry not in sources:
+                        sources.append(p.registry)
+
+                # Compute duration
+                start_dt = datetime.fromisoformat(stats['start_time'])
+                end_dt = datetime.fromisoformat(stats['end_time'])
+                duration = (end_dt - start_dt).total_seconds()
+
+                # Get CLI version
+                try:
+                    from .. import __version__
+                    cli_version = __version__
+                except Exception:
+                    cli_version = None
+
+                log_config = config.get('refresh', {}).get('log', {})
+                max_rows = log_config.get('max_rows', 100)
+
+                record_refresh(
+                    db,
+                    started_at=stats['start_time'],
+                    finished_at=stats['end_time'],
+                    sources=sources,
+                    full_scan=full,
+                    scan_roots=paths,
+                    repos_total=stats.get('total_repos', 0),
+                    repos_scanned=stats.get('scanned', 0),
+                    repos_skipped=stats.get('skipped', 0),
+                    repos_added=stats.get('updated', 0),
+                    repos_removed=stats.get('removed', 0),
+                    errors=stats.get('errors', 0),
+                    duration_seconds=duration,
+                    cli_version=cli_version,
+                    max_rows=max_rows,
+                )
+            except Exception:
+                pass  # Non-critical: don't fail refresh over logging
 
     # Output results
     if quiet:
