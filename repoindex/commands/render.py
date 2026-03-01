@@ -14,6 +14,7 @@ from typing import Optional
 import click
 
 from ..config import load_config
+from ..database.connection import Database
 from ..exporters import discover_exporters
 from .ops import query_options, _get_repos_from_query
 
@@ -117,9 +118,30 @@ def export_handler(
 
     # Write output
     if output_file:
-        with open(output_file, 'w') as f:
-            count = exporter.export(repos, f, config=config)
-        click.echo(f"Wrote {count} repos to {output_file} ({exporter.name})", err=True)
+        # Directory-based export for arkiv format
+        if format_id == 'arkiv':
+            from ..exporters.arkiv import export_archive
+            from ..database.events import get_events
+
+            events = []
+            repo_paths = {r.get('path') for r in repos}
+            try:
+                with Database(config=config, read_only=True) as db:
+                    for event in get_events(db):
+                        if event.get('repo_path') in repo_paths:
+                            events.append(event)
+            except Exception:
+                pass
+
+            counts = export_archive(output_file, repos, events)
+            click.echo(
+                f"Exported {counts['repos']} repos and {counts['events']} events to {output_file}/",
+                err=True,
+            )
+        else:
+            with open(output_file, 'w') as f:
+                count = exporter.export(repos, f, config=config)
+            click.echo(f"Wrote {count} repos to {output_file} ({exporter.name})", err=True)
     else:
         count = exporter.export(repos, sys.stdout, config=config)
-        click.echo(f"{count} repos rendered ({exporter.name})", err=True)
+        click.echo(f"{count} records exported ({exporter.name})", err=True)

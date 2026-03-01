@@ -160,6 +160,103 @@ def _event_to_arkiv(event: dict) -> dict:
     return record
 
 
+def _collect_meta_keys(d: dict, prefix: str = '') -> list:
+    """Collect all keys from a nested dict for schema discovery."""
+    keys = []
+    for k, v in d.items():
+        full_key = f"{prefix}.{k}" if prefix else k
+        keys.append(full_key)
+        if isinstance(v, dict):
+            keys.extend(_collect_meta_keys(v, full_key))
+    return keys
+
+
+def export_archive(
+    output_dir,
+    repos: list,
+    events: list,
+    version: str = None,
+) -> dict:
+    """Write full arkiv archive to output_dir.
+
+    Creates: repos.jsonl, events.jsonl, README.md, schema.yaml.
+    Returns dict with counts.
+    """
+    import yaml
+    from datetime import datetime
+    from pathlib import Path
+
+    if version is None:
+        from repoindex import __version__
+        version = __version__
+
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # repos.jsonl
+    repo_count = 0
+    repo_keys = set()
+    with open(output_dir / "repos.jsonl", "w", encoding="utf-8") as f:
+        for repo in repos:
+            record = _repo_to_arkiv(repo)
+            f.write(json.dumps(record, default=str) + "\n")
+            repo_count += 1
+            if record.get('metadata'):
+                repo_keys.update(_collect_meta_keys(record['metadata']))
+
+    # events.jsonl
+    event_count = 0
+    event_keys = set()
+    with open(output_dir / "events.jsonl", "w", encoding="utf-8") as f:
+        for event in events:
+            record = _event_to_arkiv(event)
+            f.write(json.dumps(record, default=str) + "\n")
+            event_count += 1
+            if record.get('metadata'):
+                event_keys.update(_collect_meta_keys(record['metadata']))
+
+    # README.md
+    now = datetime.now().strftime("%Y-%m-%d")
+    frontmatter = {
+        'name': 'repoindex export',
+        'description': 'Git repository metadata from repoindex',
+        'datetime': now,
+        'generator': f'repoindex v{version}',
+        'contents': [
+            {'path': 'repos.jsonl', 'description': 'Repository metadata (inode/directory records)'},
+            {'path': 'events.jsonl', 'description': 'Git events (text/plain records)'},
+        ],
+    }
+    with open(output_dir / "README.md", "w", encoding="utf-8") as f:
+        f.write("---\n")
+        yaml.dump(frontmatter, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+        f.write("---\n\n")
+        f.write(
+            "# repoindex Export\n\n"
+            "This archive contains git repository metadata exported from repoindex.\n\n"
+            "## Collections\n\n"
+            f"- **repos.jsonl** - {repo_count} repository records\n"
+            f"- **events.jsonl** - {event_count} event records\n"
+        )
+
+    # schema.yaml
+    schema = {}
+    if repo_keys:
+        schema['repos'] = {
+            'record_count': repo_count,
+            'metadata_keys': {k: {'type': 'string'} for k in sorted(repo_keys)},
+        }
+    if event_keys:
+        schema['events'] = {
+            'record_count': event_count,
+            'metadata_keys': {k: {'type': 'string'} for k in sorted(event_keys)},
+        }
+    with open(output_dir / "schema.yaml", "w", encoding="utf-8") as f:
+        yaml.dump(schema, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+
+    return {'repos': repo_count, 'events': event_count}
+
+
 class ArkivExporter(Exporter):
     """Arkiv universal record format exporter."""
     format_id = "arkiv"
