@@ -15,7 +15,7 @@ from repoindex.commands.digest import digest_handler
 from repoindex.commands.copy import copy_handler
 from repoindex.commands.link import link_cmd
 from repoindex.commands.ops import ops_cmd
-from repoindex.commands.render import render_handler
+from repoindex.commands.render import export_handler
 from repoindex.commands.show import show_handler
 from repoindex.commands.mcp_cmd import mcp_handler
 
@@ -51,7 +51,7 @@ cli.add_command(refresh_handler, name='refresh')
 cli.add_command(digest_handler, name='digest')
 cli.add_command(show_handler, name='show')
 cli.add_command(copy_handler, name='copy')
-cli.add_command(render_handler, name='render')
+cli.add_command(export_handler, name='export')
 cli.add_command(shell_handler, name='shell')
 
 # Command groups
@@ -62,13 +62,18 @@ cli.add_command(ops_cmd)
 cli.add_command(config_cmd)
 cli.add_command(mcp_handler, name='mcp')
 
-# Deprecated: db is now absorbed into sql command (--info, --path, --reset, --schema)
-# Keep as hidden for backward compatibility
+# Deprecated aliases for backward compatibility
 import copy  # noqa: E402
+
 _db_deprecated = copy.copy(db_handler)
 _db_deprecated.hidden = True
 _db_deprecated.deprecated = True
 cli.add_command(_db_deprecated, name='db')
+
+_render_deprecated = copy.copy(export_handler)
+_render_deprecated.hidden = True
+_render_deprecated.deprecated = True
+cli.add_command(_render_deprecated, name='render')
 
 
 def main():

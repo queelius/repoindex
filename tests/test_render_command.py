@@ -5,7 +5,7 @@ from unittest.mock import patch, MagicMock
 import pytest
 from click.testing import CliRunner
 
-from repoindex.commands.render import render_handler
+from repoindex.commands.render import export_handler
 
 
 MOCK_REPOS = [
@@ -38,7 +38,7 @@ def mock_query(monkeypatch):
 
 class TestRenderListFormats:
     def test_list_formats(self, runner, mock_query):
-        result = runner.invoke(render_handler, ['--list-formats', 'dummy'])
+        result = runner.invoke(export_handler, ['--list-formats', 'dummy'])
         assert result.exit_code == 0
         assert 'bibtex' in result.output
         assert 'csv' in result.output
@@ -49,14 +49,14 @@ class TestRenderListFormats:
 
 class TestRenderCSV:
     def test_render_csv_to_stdout(self, runner, mock_query):
-        result = runner.invoke(render_handler, ['csv'])
+        result = runner.invoke(export_handler, ['csv'])
         assert result.exit_code == 0
         assert 'test-repo' in result.output
         assert 'name' in result.output  # CSV header
 
     def test_render_csv_to_file(self, runner, mock_query, tmp_path):
         outfile = str(tmp_path / 'out.csv')
-        result = runner.invoke(render_handler, ['csv', '-o', outfile])
+        result = runner.invoke(export_handler, ['csv', '-o', outfile])
         assert result.exit_code == 0
         content = open(outfile).read()
         assert 'test-repo' in content
@@ -64,14 +64,14 @@ class TestRenderCSV:
 
 class TestRenderBibTeX:
     def test_render_bibtex(self, runner, mock_query):
-        result = runner.invoke(render_handler, ['bibtex'])
+        result = runner.invoke(export_handler, ['bibtex'])
         assert result.exit_code == 0
         assert '@software{' in result.output
 
 
 class TestRenderMarkdown:
     def test_render_markdown(self, runner, mock_query):
-        result = runner.invoke(render_handler, ['markdown'])
+        result = runner.invoke(export_handler, ['markdown'])
         assert result.exit_code == 0
         assert '| Name |' in result.output
         assert 'test-repo' in result.output
@@ -79,7 +79,7 @@ class TestRenderMarkdown:
 
 class TestRenderOPML:
     def test_render_opml(self, runner, mock_query):
-        result = runner.invoke(render_handler, ['opml'])
+        result = runner.invoke(export_handler, ['opml'])
         assert result.exit_code == 0
         assert '<?xml' in result.output
         assert 'opml' in result.output
@@ -87,7 +87,7 @@ class TestRenderOPML:
 
 class TestRenderJSONLD:
     def test_render_jsonld(self, runner, mock_query):
-        result = runner.invoke(render_handler, ['jsonld'])
+        result = runner.invoke(export_handler, ['jsonld'])
         assert result.exit_code == 0
         assert '"@context"' in result.output
         assert 'SoftwareSourceCode' in result.output
@@ -95,7 +95,7 @@ class TestRenderJSONLD:
 
 class TestRenderErrors:
     def test_unknown_format(self, runner, mock_query):
-        result = runner.invoke(render_handler, ['nonexistent'])
+        result = runner.invoke(export_handler, ['nonexistent'])
         assert result.exit_code != 0
         assert 'Unknown format' in result.output
 
@@ -105,7 +105,7 @@ class TestRenderQueryFlags:
     @patch('repoindex.commands.render._get_repos_from_query')
     def test_language_flag_passed(self, mock_query, mock_config, runner):
         mock_query.return_value = MOCK_REPOS
-        result = runner.invoke(render_handler, ['csv', '--language', 'python'])
+        result = runner.invoke(export_handler, ['csv', '--language', 'python'])
         assert result.exit_code == 0
         # Verify the query function was called with language
         call_kwargs = mock_query.call_args
@@ -116,5 +116,26 @@ class TestRenderQueryFlags:
     @patch('repoindex.commands.render._get_repos_from_query')
     def test_starred_flag_passed(self, mock_query, mock_config, runner):
         mock_query.return_value = MOCK_REPOS
-        result = runner.invoke(render_handler, ['csv', '--starred'])
+        result = runner.invoke(export_handler, ['csv', '--starred'])
+        assert result.exit_code == 0
+
+
+class TestExportAlias:
+    @patch('repoindex.commands.render.load_config', return_value={})
+    @patch('repoindex.commands.render._get_repos_from_query')
+    def test_export_command_works(self, mock_query, mock_config, runner):
+        """The 'export' command name is registered."""
+        from repoindex.cli import cli
+        mock_query.return_value = MOCK_REPOS
+        result = runner.invoke(cli, ['export', 'csv'])
+        assert result.exit_code == 0
+        assert 'test-repo' in result.output
+
+    @patch('repoindex.commands.render.load_config', return_value={})
+    @patch('repoindex.commands.render._get_repos_from_query')
+    def test_render_deprecated_still_works(self, mock_query, mock_config, runner):
+        """The 'render' command still works as deprecated alias."""
+        from repoindex.cli import cli
+        mock_query.return_value = MOCK_REPOS
+        result = runner.invoke(cli, ['render', 'csv'])
         assert result.exit_code == 0

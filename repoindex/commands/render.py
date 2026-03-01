@@ -1,8 +1,9 @@
 """
-Render command for repoindex.
+Export command for repoindex.
 
-Renders repository data to various output formats (BibTeX, CSV,
-Markdown, OPML, JSON-LD, etc.) using the exporter extension system.
+Exports repository data to various output formats (BibTeX, CSV,
+Markdown, OPML, JSON-LD, arkiv, html, etc.) using the exporter
+extension system.
 
 Output goes to stdout by default for piping.
 """
@@ -17,7 +18,7 @@ from ..exporters import discover_exporters
 from .ops import query_options, _get_repos_from_query
 
 
-@click.command('render')
+@click.command('export')
 @click.argument('format_id', required=False, default=None)
 @click.argument('query_string', required=False, default='')
 @click.option('--output', '-o', 'output_file', type=click.Path(),
@@ -25,7 +26,7 @@ from .ops import query_options, _get_repos_from_query
 @click.option('--list-formats', is_flag=True, help='List available export formats')
 @click.option('--debug', is_flag=True, hidden=True, help='Debug mode')
 @query_options
-def render_handler(
+def export_handler(
     format_id: str,
     query_string: str,
     output_file: Optional[str],
@@ -51,10 +52,10 @@ def render_handler(
     no_fork: bool,
 ):
     """
-    Render repository data in various formats.
+    Export repository data in various formats.
 
     FORMAT_ID selects the output format (e.g., bibtex, csv, markdown,
-    opml, jsonld). Use --list-formats to see available formats.
+    opml, jsonld, arkiv, html). Use --list-formats to see available formats.
 
     Supports the same query flags as the query command for filtering.
     Output goes to stdout by default (pipe-friendly).
@@ -62,25 +63,22 @@ def render_handler(
     \b
     Examples:
         # List available formats
-        repoindex render --list-formats
+        repoindex export --list-formats
 
         # BibTeX for Python repos
-        repoindex render bibtex --language python > refs.bib
+        repoindex export bibtex --language python > refs.bib
 
         # CSV of starred repos
-        repoindex render csv --starred > repos.csv
+        repoindex export csv --starred > repos.csv
 
-        # Markdown table of recent repos
-        repoindex render markdown --recent 30d > recent.md
+        # Arkiv archive to directory
+        repoindex export arkiv -o ~/exports/repos/
 
-        # OPML outline
-        repoindex render opml > repos.opml
-
-        # JSON-LD for repos with DOI
-        repoindex render jsonld --has-doi > repos.jsonld
+        # HTML browser to directory
+        repoindex export html -o ~/exports/html/
 
         # Write to file
-        repoindex render csv --language python -o python_repos.csv
+        repoindex export csv --language python -o python_repos.csv
     """
     exporters = discover_exporters()
 
