@@ -120,6 +120,27 @@ class TestRenderQueryFlags:
         assert result.exit_code == 0
 
 
+class TestExportArkiv:
+    @patch('repoindex.commands.render.load_config', return_value={})
+    @patch('repoindex.commands.render._get_repos_from_query')
+    @patch('repoindex.commands.render.Database')
+    def test_arkiv_export_to_directory(self, mock_db_class, mock_query, mock_config, runner, tmp_path):
+        """Arkiv export with -o writes directory files."""
+        mock_query.return_value = MOCK_REPOS
+        # Mock the Database context manager for event fetching
+        mock_db = MagicMock()
+        mock_db_class.return_value.__enter__ = MagicMock(return_value=mock_db)
+        mock_db_class.return_value.__exit__ = MagicMock(return_value=False)
+
+        with patch('repoindex.database.events.get_events', return_value=[]):
+            with patch('repoindex.exporters.arkiv.export_archive', return_value={'repos': 1, 'events': 0}) as mock_archive:
+                outdir = str(tmp_path / 'arkiv_out')
+                result = runner.invoke(export_handler, ['arkiv', '-o', outdir])
+                assert result.exit_code == 0
+                mock_archive.assert_called_once()
+                assert 'Exported 1 repos' in result.output
+
+
 class TestExportAlias:
     @patch('repoindex.commands.render.load_config', return_value={})
     @patch('repoindex.commands.render._get_repos_from_query')

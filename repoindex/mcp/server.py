@@ -8,26 +8,25 @@ Provides LLM access to the repoindex database via tools:
 - refresh: Trigger a database refresh
 
 Requires: pip install repoindex[mcp]
+
+Security: run_sql relies on the read-only database connection mode for
+write protection. The prefix check is a courtesy guard for better error
+messages, not a security boundary.
 """
 
+import re
 import subprocess
 
 from ..config import load_config
 from ..database.connection import Database, get_db_path
 
-
-def _get_db():
-    """Get a read-only Database instance."""
-    config = load_config()
-    db = Database(config=config, read_only=True)
-    db.__enter__()
-    return db
+_TABLE_NAME_RE = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]*$')
 
 
 def _get_manifest_impl() -> dict:
     """Get overview of the repoindex database."""
-    db = _get_db()
-    try:
+    config = load_config()
+    with Database(config=config, read_only=True) as db:
         tables = {}
         for table_name, desc in [
             ('repos', 'Repository metadata'),
@@ -54,30 +53,31 @@ def _get_manifest_impl() -> dict:
         refresh_rows = db.fetchall()
         last_refresh = refresh_rows[0]['started_at'] if refresh_rows else None
 
-        config = load_config()
-        return {
-            'description': 'repoindex filesystem git catalog',
-            'database': str(get_db_path(config)),
-            'tables': tables,
-            'summary': {
-                'languages': languages,
-                'last_refresh': last_refresh,
-            },
-        }
-    finally:
-        db.__exit__(None, None, None)
+    return {
+        'description': 'repoindex filesystem git catalog',
+        'database': str(get_db_path(config)),
+        'tables': tables,
+        'summary': {
+            'languages': languages,
+            'last_refresh': last_refresh,
+        },
+    }
 
 
 def _get_schema_impl(table=None) -> dict:
     """Get SQL DDL schema for one or all tables."""
-    db = _get_db()
-    try:
+    config = load_config()
+    with Database(config=config, read_only=True) as db:
         if table:
+            if not _TABLE_NAME_RE.match(table):
+                return {'error': f'Invalid table name: {table}'}
             db.execute(
                 "SELECT sql FROM sqlite_master WHERE type='table' AND name=?",
                 (table,)
             )
             ddl_rows = db.fetchall()
+            if not ddl_rows:
+                return {'table': table, 'ddl': [], 'columns': []}
             db.execute(f"PRAGMA table_info({table})")
             columns = [dict(r) for r in db.fetchall()]
             return {
@@ -91,8 +91,6 @@ def _get_schema_impl(table=None) -> dict:
                 "AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '%_fts%' ORDER BY name"
             )
             return {'ddl': [r['sql'] for r in db.fetchall() if r['sql']]}
-    finally:
-        db.__exit__(None, None, None)
 
 
 MAX_ROWS = 500
@@ -104,18 +102,23 @@ def _run_sql_impl(query: str) -> dict:
     if not (normalized.startswith('SELECT') or normalized.startswith('WITH')):
         return {'error': 'Only SELECT and WITH (CTE) queries are allowed.'}
 
-    db = _get_db()
+    config = load_config()
     try:
-        db.execute(query)
-        rows = [dict(r) for r in db.fetchall()]
-        truncated = len(rows) > MAX_ROWS
-        if truncated:
-            rows = rows[:MAX_ROWS]
-        return {'rows': rows, 'row_count': len(rows), 'truncated': truncated}
+        with Database(config=config, read_only=True) as db:
+            db.execute(query)
+            rows = [dict(r) for r in db.fetchall()]
+            total_count = len(rows)
+            truncated = total_count > MAX_ROWS
+            if truncated:
+                rows = rows[:MAX_ROWS]
+            return {
+                'rows': rows,
+                'row_count': len(rows),
+                'total_count': total_count,
+                'truncated': truncated,
+            }
     except Exception as e:
         return {'error': str(e)}
-    finally:
-        db.__exit__(None, None, None)
 
 
 def _refresh_impl(github: bool = False, full: bool = False) -> dict:

@@ -135,6 +135,15 @@ class TestHtmlExport:
         assert 'attachFilter' in content
         assert 'class="filter"' in content
 
+    def test_has_xss_escape_function(self, tmp_path, sample_db):
+        """Verify the esc() XSS prevention function is present."""
+        from repoindex.exporters.html import export_html
+        output_dir = tmp_path / "html_out"
+        export_html(output_dir, sample_db)
+        content = (output_dir / "index.html").read_text()
+        assert 'function esc(s)' in content
+        assert 'createTextNode' in content
+
 
 class TestRenderCommandHtml:
     """Test the render/export CLI command with html format."""

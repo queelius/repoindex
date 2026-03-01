@@ -197,12 +197,19 @@ function loadTab(name) {
   const res = query(TAB_QUERIES[name]);
   const panel = document.getElementById('panel-' + name);
   if (res.error) {
-    panel.innerHTML = `<div class="error">${res.error}</div>`;
+    // Error text is escaped via esc() to prevent XSS
+    panel.innerHTML = `<div class="error">${esc(res.error)}</div>`;
     return;
   }
   panel.innerHTML = buildFilter(name) + buildTable(res.columns, res.rows);
   attachFilter(name);
   attachSort(panel);
+}
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.appendChild(document.createTextNode(s));
+  return d.innerHTML;
 }
 
 function formatCell(col, val) {
@@ -211,7 +218,7 @@ function formatCell(col, val) {
     const b = Number(val) ? 'true' : 'false';
     return `<span class="badge badge-${b}">${b}</span>`;
   }
-  return String(val);
+  return esc(String(val));
 }
 
 function buildFilter(name) {
@@ -220,7 +227,7 @@ function buildFilter(name) {
 
 function buildTable(columns, rows) {
   let h = '<table><thead><tr>';
-  for (const c of columns) h += `<th data-col="${c}">${c}</th>`;
+  for (const c of columns) h += `<th data-col="${esc(c)}">${esc(c)}</th>`;
   h += '</tr></thead><tbody>';
   for (const row of rows) {
     h += '<tr>';
@@ -286,7 +293,8 @@ document.getElementById('sql-run').addEventListener('click', () => {
   const res = query(sql);
   const el = document.getElementById('sql-result');
   if (res.error) {
-    el.innerHTML = `<div class="error">${res.error}</div>`;
+    // Error text is escaped via esc() to prevent XSS
+    el.innerHTML = `<div class="error">${esc(res.error)}</div>`;
   } else {
     el.innerHTML = buildTable(res.columns, res.rows);
   }

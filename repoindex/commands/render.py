@@ -147,8 +147,8 @@ def export_handler(
                     for event in get_events(db):
                         if event.get('repo_path') in repo_paths:
                             events.append(event)
-            except Exception:
-                pass
+            except Exception as e:
+                click.echo(f"Warning: could not fetch events: {e}", err=True)
 
             counts = export_archive(output_file, repos, events)
             click.echo(
