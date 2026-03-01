@@ -162,3 +162,13 @@ class TestRefresh:
             result = _refresh_impl()
         assert result['status'] == 'error'
         assert 'timed out' in result['error'].lower()
+
+
+class TestMcpCli:
+    def test_mcp_command_registered(self):
+        from click.testing import CliRunner
+        from repoindex.cli import cli
+        runner = CliRunner()
+        result = runner.invoke(cli, ['mcp', '--help'])
+        assert result.exit_code == 0
+        assert 'MCP server' in result.output

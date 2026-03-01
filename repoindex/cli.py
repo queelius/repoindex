@@ -17,6 +17,7 @@ from repoindex.commands.link import link_cmd
 from repoindex.commands.ops import ops_cmd
 from repoindex.commands.render import render_handler
 from repoindex.commands.show import show_handler
+from repoindex.commands.mcp_cmd import mcp_handler
 
 
 @click.group()
@@ -59,6 +60,7 @@ cli.add_command(view_cmd)
 cli.add_command(link_cmd)
 cli.add_command(ops_cmd)
 cli.add_command(config_cmd)
+cli.add_command(mcp_handler, name='mcp')
 
 # Deprecated: db is now absorbed into sql command (--info, --path, --reset, --schema)
 # Keep as hidden for backward compatibility
