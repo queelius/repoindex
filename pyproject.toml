@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "repoindex"
-version = "0.11.0"
+version = "0.12.0"
 description = "A collection-aware metadata index for git repositories"
 readme = "README.md"
 license-files = [ "LICEN[CS]E.*",]
@@ -40,7 +40,7 @@ Source = "https://github.com/queelius/repoindex"
 Issues = "https://github.com/queelius/repoindex/issues"
 
 [tool.setuptools]
-packages = [ "repoindex", "repoindex.commands", "repoindex.integrations", "repoindex.providers", "repoindex.exporters",]
+packages = [ "repoindex", "repoindex.commands", "repoindex.integrations", "repoindex.providers", "repoindex.exporters", "repoindex.mcp",]
 
 [tool.setuptools.package-data]
 repoindex = [ "py.typed",]
