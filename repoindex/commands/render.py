@@ -87,17 +87,34 @@ def export_handler(
     if list_formats:
         for fmt_id, exp in sorted(exporters.items()):
             click.echo(f"  {fmt_id:<12} {exp.name} ({exp.extension})")
+        click.echo(f"  {'html':<12} HTML Browser (.html)")
         return
 
     # Require format_id when not listing
     if not format_id:
-        available = ', '.join(sorted(exporters.keys()))
+        available = ', '.join(sorted(list(exporters.keys()) + ['html']))
         click.echo(f"Error: Missing FORMAT_ID. Available: {available}", err=True)
         sys.exit(1)
 
+    # HTML export — special case (needs raw DB, not Exporter ABC)
+    if format_id == 'html':
+        if not output_file:
+            click.echo("Error: HTML export requires -o <directory>", err=True)
+            sys.exit(1)
+        from ..exporters.html import export_html
+        from ..database.connection import get_db_path
+        config = load_config()
+        db_path = get_db_path(config)
+        if not db_path.exists():
+            click.echo(f"Error: Database not found at {db_path}", err=True)
+            sys.exit(1)
+        export_html(output_file, db_path)
+        click.echo(f"Exported HTML browser to {output_file}/index.html", err=True)
+        return
+
     # Find the requested exporter
     if format_id not in exporters:
-        available = ', '.join(sorted(exporters.keys()))
+        available = ', '.join(sorted(list(exporters.keys()) + ['html']))
         click.echo(f"Error: Unknown format '{format_id}'. Available: {available}", err=True)
         sys.exit(1)
 
