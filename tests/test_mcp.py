@@ -1,5 +1,6 @@
 """Tests for the MCP server tools."""
 import subprocess
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
@@ -8,22 +9,22 @@ from unittest.mock import MagicMock, patch
 
 @pytest.fixture
 def mock_db():
-    """Mock Database that works as context manager."""
-    db = MagicMock()
-    return db
+    """Mock database connection."""
+    return MagicMock()
 
 
 @pytest.fixture
 def patch_db(mock_db):
-    """Patch Database class and load_config for MCP server tests.
+    """Patch _open_db to yield a mock db and empty config.
 
-    Yields the mock_db so tests can configure fetchone/fetchall etc.
+    Yields the mock_db so tests can configure fetchone/fetchall/fetchmany etc.
     """
-    with patch('repoindex.mcp.server.Database') as MockDB:
-        MockDB.return_value.__enter__ = MagicMock(return_value=mock_db)
-        MockDB.return_value.__exit__ = MagicMock(return_value=False)
-        with patch('repoindex.mcp.server.load_config', return_value={}):
-            yield mock_db
+    @contextmanager
+    def _fake_open_db():
+        yield mock_db, {}
+
+    with patch('repoindex.mcp.server._open_db', _fake_open_db):
+        yield mock_db
 
 
 class TestGetManifest:
@@ -79,10 +80,11 @@ class TestGetSchema:
         assert result['columns'][0]['name'] == 'id'
 
     def test_unknown_table(self, patch_db):
-        patch_db.fetchall.side_effect = [[], []]
+        patch_db.fetchall.return_value = []
         from repoindex.mcp.server import _get_schema_impl
         result = _get_schema_impl(table='nonexistent')
-        assert result['ddl'] == []
+        assert 'error' in result
+        assert 'not found' in result['error'].lower()
 
     def test_invalid_table_name_rejected(self, patch_db):
         """SQL injection via crafted table name is rejected."""
@@ -90,7 +92,6 @@ class TestGetSchema:
         result = _get_schema_impl(table="repos; DROP TABLE repos")
         assert 'error' in result
         assert 'Invalid table name' in result['error']
-        # DB should never be queried
         patch_db.execute.assert_not_called()
 
     def test_invalid_table_name_with_parens(self, patch_db):
@@ -102,13 +103,13 @@ class TestGetSchema:
 
 class TestRunSql:
     def test_select(self, patch_db):
-        patch_db.fetchall.return_value = [{'name': 'repoindex', 'language': 'Python'}]
+        patch_db.fetchmany.return_value = [{'name': 'repoindex', 'language': 'Python'}]
         from repoindex.mcp.server import _run_sql_impl
         result = _run_sql_impl("SELECT name, language FROM repos")
         assert result['rows'] == [{'name': 'repoindex', 'language': 'Python'}]
 
     def test_cte(self, patch_db):
-        patch_db.fetchall.return_value = [{'cnt': 5}]
+        patch_db.fetchmany.return_value = [{'cnt': 5}]
         from repoindex.mcp.server import _run_sql_impl
         result = _run_sql_impl("WITH x AS (SELECT 1) SELECT COUNT(*) as cnt FROM repos")
         assert 'rows' in result
@@ -136,20 +137,18 @@ class TestRunSql:
         assert 'error' in result
 
     def test_row_limit(self, patch_db):
-        patch_db.fetchall.return_value = [{'id': i} for i in range(600)]
+        patch_db.fetchmany.return_value = [{'id': i} for i in range(501)]
         from repoindex.mcp.server import _run_sql_impl
         result = _run_sql_impl("SELECT id FROM repos")
         assert len(result['rows']) == 500
         assert result['truncated'] is True
-        assert result['total_count'] == 600
         assert result['row_count'] == 500
 
-    def test_total_count_when_not_truncated(self, patch_db):
-        patch_db.fetchall.return_value = [{'id': i} for i in range(10)]
+    def test_not_truncated(self, patch_db):
+        patch_db.fetchmany.return_value = [{'id': i} for i in range(10)]
         from repoindex.mcp.server import _run_sql_impl
         result = _run_sql_impl("SELECT id FROM repos")
         assert result['truncated'] is False
-        assert result['total_count'] == 10
         assert result['row_count'] == 10
 
     def test_rejects_update(self):
@@ -159,14 +158,14 @@ class TestRunSql:
 
     def test_case_insensitive_select(self, patch_db):
         """SELECT keyword is case-insensitive."""
-        patch_db.fetchall.return_value = [{'cnt': 1}]
+        patch_db.fetchmany.return_value = [{'cnt': 1}]
         from repoindex.mcp.server import _run_sql_impl
         result = _run_sql_impl("select count(*) as cnt from repos")
         assert 'rows' in result
 
     def test_leading_whitespace(self, patch_db):
         """Leading whitespace before SELECT is accepted."""
-        patch_db.fetchall.return_value = [{'cnt': 1}]
+        patch_db.fetchmany.return_value = [{'cnt': 1}]
         from repoindex.mcp.server import _run_sql_impl
         result = _run_sql_impl("  SELECT count(*) as cnt FROM repos")
         assert 'rows' in result

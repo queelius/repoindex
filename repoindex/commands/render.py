@@ -141,12 +141,12 @@ def export_handler(
             from ..database.events import get_events
 
             events = []
-            repo_paths = {r.get('path') for r in repos}
             try:
                 with Database(config=config, read_only=True) as db:
-                    for event in get_events(db):
-                        if event.get('repo_path') in repo_paths:
-                            events.append(event)
+                    for repo in repos:
+                        repo_id = repo.get('id')
+                        if repo_id is not None:
+                            events.extend(get_events(db, repo_id=repo_id))
             except Exception as e:
                 click.echo(f"Warning: could not fetch events: {e}", err=True)
 

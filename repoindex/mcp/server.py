@@ -16,6 +16,7 @@ messages, not a security boundary.
 
 import re
 import subprocess
+from contextlib import contextmanager
 
 from ..config import load_config
 from ..database.connection import Database, get_db_path
@@ -23,10 +24,17 @@ from ..database.connection import Database, get_db_path
 _TABLE_NAME_RE = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]*$')
 
 
-def _get_manifest_impl() -> dict:
-    """Get overview of the repoindex database."""
+@contextmanager
+def _open_db():
+    """Open a read-only database connection with loaded config."""
     config = load_config()
     with Database(config=config, read_only=True) as db:
+        yield db, config
+
+
+def _get_manifest_impl() -> dict:
+    """Get overview of the repoindex database."""
+    with _open_db() as (db, config):
         tables = {}
         for table_name, desc in [
             ('repos', 'Repository metadata'),
@@ -66,8 +74,7 @@ def _get_manifest_impl() -> dict:
 
 def _get_schema_impl(table=None) -> dict:
     """Get SQL DDL schema for one or all tables."""
-    config = load_config()
-    with Database(config=config, read_only=True) as db:
+    with _open_db() as (db, _config):
         if table:
             if not _TABLE_NAME_RE.match(table):
                 return {'error': f'Invalid table name: {table}'}
@@ -77,7 +84,7 @@ def _get_schema_impl(table=None) -> dict:
             )
             ddl_rows = db.fetchall()
             if not ddl_rows:
-                return {'table': table, 'ddl': [], 'columns': []}
+                return {'error': f'Table not found: {table}'}
             db.execute(f"PRAGMA table_info({table})")
             columns = [dict(r) for r in db.fetchall()]
             return {
@@ -102,19 +109,16 @@ def _run_sql_impl(query: str) -> dict:
     if not (normalized.startswith('SELECT') or normalized.startswith('WITH')):
         return {'error': 'Only SELECT and WITH (CTE) queries are allowed.'}
 
-    config = load_config()
     try:
-        with Database(config=config, read_only=True) as db:
+        with _open_db() as (db, _config):
             db.execute(query)
-            rows = [dict(r) for r in db.fetchall()]
-            total_count = len(rows)
-            truncated = total_count > MAX_ROWS
+            rows = [dict(r) for r in db.fetchmany(MAX_ROWS + 1)]
+            truncated = len(rows) > MAX_ROWS
             if truncated:
                 rows = rows[:MAX_ROWS]
             return {
                 'rows': rows,
                 'row_count': len(rows),
-                'total_count': total_count,
                 'truncated': truncated,
             }
     except Exception as e:
