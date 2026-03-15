@@ -1,11 +1,11 @@
 """
 Export command for repoindex.
 
-Exports repository data to various output formats (BibTeX, CSV,
-Markdown, OPML, JSON-LD, arkiv, html, etc.) using the exporter
-extension system.
+Default: produces a longecho-compliant arkiv archive with an embedded
+HTML browser (site/index.html). Format-based exports (bibtex, csv, etc.)
+are available via the exporter plugin system.
 
-Output goes to stdout by default for piping.
+Use 'repoindex query' to preview which repos will be exported.
 """
 
 import sys
@@ -15,7 +15,6 @@ import click
 
 from ..config import load_config
 from ..database.connection import Database
-from ..exporters import discover_exporters
 from .ops import query_options, _get_repos_from_query
 
 
@@ -23,7 +22,7 @@ from .ops import query_options, _get_repos_from_query
 @click.argument('format_id', required=False, default=None)
 @click.argument('query_string', required=False, default='')
 @click.option('--output', '-o', 'output_file', type=click.Path(),
-              help='Write to file instead of stdout')
+              help='Output directory (arkiv archive) or file (format export)')
 @click.option('--list-formats', is_flag=True, help='List available export formats')
 @click.option('--debug', is_flag=True, hidden=True, help='Debug mode')
 @query_options
@@ -40,119 +39,136 @@ def export_handler(
     recent: Optional[str],
 ):
     """
-    Export repository data in various formats.
+    Export repository data as a longecho-compliant archive.
 
-    FORMAT_ID selects the output format (e.g., bibtex, csv, markdown,
-    opml, jsonld, arkiv, html). Use --list-formats to see available formats.
+    Without FORMAT_ID, produces an arkiv archive directory containing
+    JSONL data, schema, SQLite database, and an interactive HTML browser.
+    Use 'repoindex query' to preview which repos will be exported.
 
-    Supports the same query flags as the query command for filtering.
-    Output goes to stdout by default (pipe-friendly).
+    With FORMAT_ID, uses the exporter plugin system (bibtex, csv, etc.).
+    Use --list-formats to see available format plugins.
 
     \b
     Examples:
-        # List available formats
-        repoindex export --list-formats
+        # Arkiv archive (default) — longecho-compliant with HTML browser
+        repoindex export -o ~/archives/repos/
 
-        # BibTeX for Python repos
+        # Filtered archive
+        repoindex export -o ~/archives/python/ --language python
+
+        # With DSL query
+        repoindex export -o ~/archives/starred/ "github_stars > 0"
+
+        # Format-based exports (via exporter plugins)
         repoindex export bibtex --language python > refs.bib
+        repoindex export csv -o repos.csv
 
-        # CSV of starred repos
-        repoindex export csv "github_stars > 0" > repos.csv
-
-        # Arkiv archive to directory
-        repoindex export arkiv -o ~/exports/repos/
-
-        # HTML browser to directory
-        repoindex export html -o ~/exports/html/
-
-        # Write to file
-        repoindex export csv --language python -o python_repos.csv
+        # List available format plugins
+        repoindex export --list-formats
     """
-    exporters = discover_exporters()
+    from ..exporters import discover_exporters
 
     # List formats
     if list_formats:
+        exporters = discover_exporters()
         for fmt_id, exp in sorted(exporters.items()):
             click.echo(f"  {fmt_id:<12} {exp.name} ({exp.extension})")
-        click.echo(f"  {'html':<12} HTML Browser (.html)")
         return
 
-    # Require format_id when not listing
+    # No format specified + -o given → arkiv archive (the default)
     if not format_id:
-        available = ', '.join(sorted(list(exporters.keys()) + ['html']))
-        click.echo(f"Error: Missing FORMAT_ID. Available: {available}", err=True)
-        sys.exit(1)
-
-    # HTML export — special case (needs raw DB, not Exporter ABC)
-    if format_id == 'html':
         if not output_file:
-            click.echo("Error: HTML export requires -o <directory>", err=True)
+            click.echo(
+                "Usage: repoindex export -o <directory> [QUERY]\n"
+                "       repoindex export FORMAT [QUERY] [-o FILE]\n\n"
+                "Use --list-formats for format plugins, or -o for arkiv archive.",
+                err=True,
+            )
             sys.exit(1)
-        from ..exporters.html import export_html
-        from ..database.connection import get_db_path
-        config = load_config()
-        db_path = get_db_path(config)
-        if not db_path.exists():
-            click.echo(f"Error: Database not found at {db_path}", err=True)
-            sys.exit(1)
-        export_html(output_file, db_path)
-        click.echo(f"Exported HTML browser to {output_file}/index.html", err=True)
+        _export_archive(output_file, query_string, debug, language, dirty, tag, recent)
         return
 
-    # Find the requested exporter
+    # Explicit "arkiv" format → same as default archive
+    if format_id == 'arkiv':
+        if not output_file:
+            click.echo("Error: arkiv export requires -o <directory>", err=True)
+            sys.exit(1)
+        _export_archive(output_file, query_string, debug, language, dirty, tag, recent)
+        return
+
+    # Format-based export via exporter plugins
+    exporters = discover_exporters()
     if format_id not in exporters:
-        available = ', '.join(sorted(list(exporters.keys()) + ['html']))
+        available = ', '.join(sorted(exporters.keys()))
         click.echo(f"Error: Unknown format '{format_id}'. Available: {available}", err=True)
         sys.exit(1)
 
     exporter = exporters[format_id]
     config = load_config()
-
-    # Query repos from database using the standard helper
     repos = _get_repos_from_query(
         config, query_string, debug=debug,
         language=language, dirty=dirty, tag=tag, recent=recent,
     )
 
-    # Write output
     if output_file:
-        # Directory-based export for arkiv format
-        if format_id == 'arkiv':
-            from ..exporters.arkiv import export_archive
-            from ..database.events import get_events
-
-            events = []
-            publications = []
-            try:
-                with Database(config=config, read_only=True) as db:
-                    for repo in repos:
-                        repo_id = repo.get('id')
-                        if repo_id is not None:
-                            events.extend(get_events(db, repo_id=repo_id))
-                    # Fetch publications for filtered repos
-                    repo_ids = [r['id'] for r in repos if r.get('id')]
-                    if repo_ids:
-                        placeholders = ','.join('?' * len(repo_ids))
-                        db.execute(
-                            f"SELECT p.*, r.name as repo_name, r.path as repo_path "
-                            f"FROM publications p JOIN repos r ON p.repo_id = r.id "
-                            f"WHERE p.repo_id IN ({placeholders})",
-                            tuple(repo_ids),
-                        )
-                        publications = [dict(row) for row in db.fetchall()]
-            except Exception as e:
-                click.echo(f"Warning: could not fetch data: {e}", err=True)
-
-            counts = export_archive(output_file, repos, events, publications=publications)
-            click.echo(
-                f"Exported {counts['repos']} repos, {counts['events']} events, "
-                f"{counts['publications']} publications to {output_file}/",
-                err=True,
-            )
-        else:
-            with open(output_file, 'w') as f:
-                count = exporter.export(repos, f, config=config)
-            click.echo(f"Wrote {count} repos to {output_file} ({exporter.name})", err=True)
+        with open(output_file, 'w') as f:
+            count = exporter.export(repos, f, config=config)
+        click.echo(f"Wrote {count} repos to {output_file} ({exporter.name})", err=True)
     else:
         count = exporter.export(repos, sys.stdout, config=config)
         click.echo(f"{count} records exported ({exporter.name})", err=True)
+
+
+def _export_archive(output_file, query_string, debug, language, dirty, tag, recent):
+    """Produce a longecho-compliant arkiv archive with embedded HTML browser."""
+    from ..database.connection import get_db_path
+    from ..database.events import get_events
+    from ..exporters.arkiv import export_archive
+    from ..exporters.html import export_html
+    from pathlib import Path
+
+    config = load_config()
+    repos = _get_repos_from_query(
+        config, query_string, debug=debug,
+        language=language, dirty=dirty, tag=tag, recent=recent,
+    )
+
+    events = []
+    publications = []
+    try:
+        with Database(config=config, read_only=True) as db:
+            for repo in repos:
+                repo_id = repo.get('id')
+                if repo_id is not None:
+                    events.extend(get_events(db, repo_id=repo_id))
+            # Fetch publications for filtered repos
+            repo_ids = [r['id'] for r in repos if r.get('id')]
+            if repo_ids:
+                placeholders = ','.join('?' * len(repo_ids))
+                db.execute(
+                    f"SELECT p.*, r.name as repo_name, r.path as repo_path "
+                    f"FROM publications p JOIN repos r ON p.repo_id = r.id "
+                    f"WHERE p.repo_id IN ({placeholders})",
+                    tuple(repo_ids),
+                )
+                publications = [dict(row) for row in db.fetchall()]
+    except Exception as e:
+        click.echo(f"Warning: could not fetch data: {e}", err=True)
+
+    counts = export_archive(output_file, repos, events, publications=publications)
+
+    # Bundle site/ with HTML browser (longecho site/ convention)
+    output_path = Path(output_file)
+    site_dir = output_path / "site"
+    db_path = get_db_path(config)
+    if db_path.exists():
+        try:
+            export_html(site_dir, db_path)
+        except Exception as e:
+            click.echo(f"Warning: could not generate site/: {e}", err=True)
+
+    click.echo(
+        f"Exported {counts['repos']} repos, {counts['events']} events, "
+        f"{counts['publications']} publications to {output_file}/",
+        err=True,
+    )

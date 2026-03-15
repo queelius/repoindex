@@ -70,10 +70,6 @@ _db_deprecated.hidden = True
 _db_deprecated.deprecated = True
 cli.add_command(_db_deprecated, name='db')
 
-_render_deprecated = copy.copy(export_handler)
-_render_deprecated.hidden = True
-_render_deprecated.deprecated = True
-cli.add_command(_render_deprecated, name='render')
 
 
 def main():

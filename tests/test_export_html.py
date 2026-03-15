@@ -145,60 +145,12 @@ class TestHtmlExport:
         assert 'createTextNode' in content
 
 
-class TestRenderCommandHtml:
-    """Test the render/export CLI command with html format."""
+class TestHtmlBundledInArchive:
+    """HTML browser is now bundled as site/ inside arkiv archives."""
 
-    def test_html_requires_output_flag(self):
-        """HTML export should error when no -o flag is given."""
-        from click.testing import CliRunner
-        from repoindex.commands.render import export_handler
-        runner = CliRunner()
-        result = runner.invoke(export_handler, ['html'])
-        assert result.exit_code != 0
-        assert 'requires -o' in result.output or 'requires -o' in (result.output + (result.stderr if hasattr(result, 'stderr') else ''))
-
-    def test_html_in_list_formats(self):
-        """HTML should appear in --list-formats output."""
-        from click.testing import CliRunner
-        from repoindex.commands.render import export_handler
-        runner = CliRunner()
-        result = runner.invoke(export_handler, ['--list-formats'])
-        assert 'html' in result.output
-        assert 'HTML Browser' in result.output
-
-    def test_html_in_missing_format_error(self):
-        """HTML should appear in available formats when no format given."""
-        from click.testing import CliRunner
-        from repoindex.commands.render import export_handler
-        runner = CliRunner()
-        result = runner.invoke(export_handler, [])
-        # The error message lists available formats including html
-        assert 'html' in (result.output + (result.stderr if hasattr(result, 'stderr') else ''))
-
-    def test_html_export_with_db(self, tmp_path, sample_db, monkeypatch):
-        """Full integration: HTML export produces index.html from DB."""
-        from click.testing import CliRunner
-        from repoindex.commands.render import export_handler
-
-        output_dir = tmp_path / "html_export"
-
-        # Monkeypatch get_db_path to return our sample db
-        monkeypatch.setattr(
-            'repoindex.commands.render.load_config',
-            lambda: {}
-        )
-        monkeypatch.setattr(
-            'repoindex.exporters.html.export_html',
-            lambda od, dp: Path(od).mkdir(parents=True, exist_ok=True) or
-                           (Path(od) / "index.html").write_text("<html></html>")
-        )
-
-        # We need to monkeypatch get_db_path too
-        monkeypatch.setattr(
-            'repoindex.database.connection.get_db_path',
-            lambda config=None: sample_db
-        )
-
-        runner = CliRunner()
-        result = runner.invoke(export_handler, ['html', '-o', str(output_dir)])
-        assert result.exit_code == 0
+    def test_export_html_function_still_works(self, tmp_path, sample_db):
+        """The export_html function is still usable standalone."""
+        from repoindex.exporters.html import export_html
+        output_dir = tmp_path / "site"
+        export_html(output_dir, sample_db)
+        assert (output_dir / "index.html").exists()
