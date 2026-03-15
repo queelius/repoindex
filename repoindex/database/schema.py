@@ -19,7 +19,8 @@ from typing import List, Tuple
 # v4: Added citation metadata parsing (citation_doi, citation_title, etc.)
 # v5: Added doi column to publications table (for Zenodo DOIs, etc.)
 # v5+: Added refresh_log table (non-breaking, uses CREATE IF NOT EXISTS)
-CURRENT_VERSION = 5
+# v6: Added keywords column (JSON array extracted from project manifests)
+CURRENT_VERSION = 6
 
 # Schema definition as SQL statements
 SCHEMA_V1 = """
@@ -77,6 +78,9 @@ CREATE TABLE IF NOT EXISTS repos (
     github_has_pages BOOLEAN DEFAULT 0,
     github_pages_url TEXT,
     github_topics TEXT,  -- JSON array
+
+    -- Project keywords (JSON array from pyproject.toml / Cargo.toml / package.json)
+    keywords TEXT,
 
     -- Flags (computed)
     has_readme BOOLEAN DEFAULT 0,
@@ -341,7 +345,7 @@ def apply_schema(conn: sqlite3.Connection, version: int = CURRENT_VERSION) -> No
     conn.executescript(SCHEMA_V1)
     conn.execute(
         "INSERT OR REPLACE INTO _schema_info (version, description) VALUES (?, ?)",
-        (CURRENT_VERSION, "v0.10.0: Added doi column to publications table (Zenodo, etc.)")
+        (CURRENT_VERSION, "v0.12.0: Added keywords column (JSON array from project manifests)")
     )
 
     conn.commit()

@@ -137,6 +137,11 @@ def _repo_to_record(repo: Repository) -> Dict[str, Any]:
             record['citation_file'] = citation_file
             break
 
+    # Extract keywords from project manifests (pyproject.toml, Cargo.toml, package.json)
+    from ..services.repository_service import _extract_keywords
+    kw = _extract_keywords(repo_path)
+    record['keywords'] = json.dumps(kw) if kw else None
+
     # Parse citation metadata if file found
     if record['has_citation'] and record['citation_file']:
         citation_data = parse_citation_file(str(repo_path), record['citation_file'])

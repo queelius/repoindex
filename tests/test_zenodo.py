@@ -570,12 +570,12 @@ class TestPackageMetadataDoi:
 # ──────────────────────────────────────────────
 
 class TestSchemaV5:
-    """Tests for schema version 5 (doi column in publications)."""
+    """Tests for schema version 5+ (doi column in publications, keywords column)."""
 
-    def test_current_version_is_5(self):
-        """Test that schema version was bumped to 5."""
+    def test_current_version_is_at_least_5(self):
+        """Test that schema version is at least 5 (doi column added in v5)."""
         from repoindex.database.schema import CURRENT_VERSION
-        assert CURRENT_VERSION == 5
+        assert CURRENT_VERSION >= 5
 
     def test_publications_table_has_doi_column(self):
         """Test that publications table includes doi column."""

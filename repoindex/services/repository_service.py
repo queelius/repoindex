@@ -26,6 +26,63 @@ EXCLUDE_DIRS = {
 }
 
 
+def _extract_keywords(repo_path) -> Optional[list]:
+    """
+    Extract keywords from project manifest files.
+
+    Checks in priority order: pyproject.toml > Cargo.toml > package.json.
+    Returns the first non-empty keyword list found, or None.
+
+    Args:
+        repo_path: Path to the repository root (str or Path).
+
+    Returns:
+        List of keyword strings, or None if no keywords found.
+    """
+    import json as _json
+    import tomllib
+
+    repo_path = Path(repo_path)
+
+    # pyproject.toml — [project].keywords
+    pyproject = repo_path / "pyproject.toml"
+    if pyproject.exists():
+        try:
+            with open(pyproject, "rb") as f:
+                data = tomllib.load(f)
+            kw = data.get("project", {}).get("keywords")
+            if isinstance(kw, list) and kw:
+                return kw
+        except Exception:
+            pass
+
+    # Cargo.toml — [package].keywords
+    cargo = repo_path / "Cargo.toml"
+    if cargo.exists():
+        try:
+            with open(cargo, "rb") as f:
+                data = tomllib.load(f)
+            kw = data.get("package", {}).get("keywords")
+            if isinstance(kw, list) and kw:
+                return kw
+        except Exception:
+            pass
+
+    # package.json — keywords
+    pkg_json = repo_path / "package.json"
+    if pkg_json.exists():
+        try:
+            with open(pkg_json, "r", encoding="utf-8") as f:
+                data = _json.load(f)
+            kw = data.get("keywords")
+            if isinstance(kw, list) and kw:
+                return kw
+        except Exception:
+            pass
+
+    return None
+
+
 class RepositoryService:
     """
     Service for discovering and querying repositories.
