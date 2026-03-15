@@ -10,6 +10,7 @@ See: arkiv SPEC.md for the universal record format.
 """
 
 import json
+from collections import Counter
 from typing import IO, List, Optional
 
 from . import Exporter
@@ -160,15 +161,78 @@ def _event_to_arkiv(event: dict) -> dict:
     return record
 
 
-def _collect_meta_keys(d: dict, prefix: str = '') -> list:
-    """Collect all keys from a nested dict for schema discovery."""
-    keys = []
-    for k, v in d.items():
+def _walk_metadata(obj: dict, prefix: str, stats: dict) -> None:
+    """Walk a metadata dict recursively, accumulating per-key statistics.
+
+    For each leaf key, tracks type occurrences, count, distinct values, and
+    an example. Dict values are recursed into (no entry for the parent key).
+    """
+    for k, v in obj.items():
         full_key = f"{prefix}.{k}" if prefix else k
-        keys.append(full_key)
         if isinstance(v, dict):
-            keys.extend(_collect_meta_keys(v, full_key))
-    return keys
+            _walk_metadata(v, full_key, stats)
+            continue
+        if full_key not in stats:
+            stats[full_key] = {
+                'types': Counter(),
+                'count': 0,
+                'values': set(),
+                'example': None,
+            }
+        entry = stats[full_key]
+        entry['count'] += 1
+        # bool must be checked before int/float (bool is subclass of int)
+        if isinstance(v, bool):
+            entry['types']['boolean'] += 1
+        elif isinstance(v, (int, float)):
+            entry['types']['number'] += 1
+        elif isinstance(v, list):
+            entry['types']['array'] += 1
+        else:
+            entry['types']['string'] += 1
+        # Track distinct values for cardinality decisions
+        try:
+            hashable = tuple(v) if isinstance(v, list) else v
+            entry['values'].add(hashable)
+        except TypeError:
+            pass
+        if entry['example'] is None:
+            entry['example'] = v
+
+
+def _discover_schema(records: list) -> dict:
+    """Discover schema from a list of arkiv records.
+
+    Returns dict of key_path -> {type, count, values|example}.
+    - type: most common type across all occurrences
+    - count: number of records containing this key
+    - values: sorted distinct values if cardinality <= 20
+    - example: one sample value if cardinality > 20
+    """
+    stats: dict = {}
+    for record in records:
+        meta = record.get('metadata')
+        if meta:
+            _walk_metadata(meta, '', stats)
+
+    schema = {}
+    for key, entry in sorted(stats.items()):
+        most_common_type = entry['types'].most_common(1)[0][0]
+        info: dict = {
+            'type': most_common_type,
+            'count': entry['count'],
+        }
+        distinct = entry['values']
+        if len(distinct) <= 20:
+            # Unpack tuples back to lists for array-type values
+            restored = []
+            for v in distinct:
+                restored.append(list(v) if isinstance(v, tuple) else v)
+            info['values'] = sorted(restored, key=lambda x: str(x))
+        else:
+            info['example'] = entry['example']
+        schema[key] = info
+    return schema
 
 
 def export_archive(
@@ -194,26 +258,20 @@ def export_archive(
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # repos.jsonl
-    repo_count = 0
-    repo_keys = set()
+    repo_records = []
     with open(output_dir / "repos.jsonl", "w", encoding="utf-8") as f:
         for repo in repos:
             record = _repo_to_arkiv(repo)
             f.write(json.dumps(record, default=str) + "\n")
-            repo_count += 1
-            if record.get('metadata'):
-                repo_keys.update(_collect_meta_keys(record['metadata']))
+            repo_records.append(record)
 
     # events.jsonl
-    event_count = 0
-    event_keys = set()
+    event_records = []
     with open(output_dir / "events.jsonl", "w", encoding="utf-8") as f:
         for event in events:
             record = _event_to_arkiv(event)
             f.write(json.dumps(record, default=str) + "\n")
-            event_count += 1
-            if record.get('metadata'):
-                event_keys.update(_collect_meta_keys(record['metadata']))
+            event_records.append(record)
 
     # README.md
     now = datetime.now().strftime("%Y-%m-%d")
@@ -235,26 +293,26 @@ def export_archive(
             "# repoindex Export\n\n"
             "This archive contains git repository metadata exported from repoindex.\n\n"
             "## Collections\n\n"
-            f"- **repos.jsonl** - {repo_count} repository records\n"
-            f"- **events.jsonl** - {event_count} event records\n"
+            f"- **repos.jsonl** - {len(repo_records)} repository records\n"
+            f"- **events.jsonl** - {len(event_records)} event records\n"
         )
 
     # schema.yaml
     schema = {}
-    if repo_keys:
+    if repo_records:
         schema['repos'] = {
-            'record_count': repo_count,
-            'metadata_keys': {k: {'type': 'string'} for k in sorted(repo_keys)},
+            'record_count': len(repo_records),
+            'metadata_keys': _discover_schema(repo_records),
         }
-    if event_keys:
+    if event_records:
         schema['events'] = {
-            'record_count': event_count,
-            'metadata_keys': {k: {'type': 'string'} for k in sorted(event_keys)},
+            'record_count': len(event_records),
+            'metadata_keys': _discover_schema(event_records),
         }
     with open(output_dir / "schema.yaml", "w", encoding="utf-8") as f:
         yaml.dump(schema, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
 
-    return {'repos': repo_count, 'events': event_count}
+    return {'repos': len(repo_records), 'events': len(event_records)}
 
 
 class ArkivExporter(Exporter):

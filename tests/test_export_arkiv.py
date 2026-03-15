@@ -81,6 +81,20 @@ class TestExportArchive:
             schema = yaml.safe_load(f)
         assert 'repos' in schema
         assert 'events' in schema
+        # Verify proper types and counts (not just key presence)
+        repo_keys = schema['repos']['metadata_keys']
+        assert repo_keys['name']['type'] == 'string'
+        assert repo_keys['name']['count'] == 1
+        assert repo_keys['github.stars']['type'] == 'number'
+        assert repo_keys['is_clean']['type'] == 'boolean'
+        assert repo_keys['languages']['type'] == 'array'
+        # Parent keys should not appear — only leaf keys
+        assert 'github' not in repo_keys
+        assert 'citation' not in repo_keys
+        # Event schema
+        event_keys = schema['events']['metadata_keys']
+        assert event_keys['type']['type'] == 'string'
+        assert event_keys['repo']['count'] == 1
 
     def test_empty_export(self, tmp_path):
         from repoindex.exporters.arkiv import export_archive
@@ -103,15 +117,80 @@ class TestExportArchive:
         assert (output / "repos.jsonl").exists()
 
 
-class TestCollectMetaKeys:
-    def test_flat_dict(self):
-        from repoindex.exporters.arkiv import _collect_meta_keys
-        keys = _collect_meta_keys({'name': 'foo', 'language': 'Python'})
-        assert set(keys) == {'name', 'language'}
+class TestDiscoverSchema:
+    def test_infers_string_type(self):
+        from repoindex.exporters.arkiv import _discover_schema
+        records = [{'metadata': {'name': 'alpha'}}, {'metadata': {'name': 'beta'}}]
+        schema = _discover_schema(records)
+        assert schema['name']['type'] == 'string'
+        assert schema['name']['count'] == 2
 
-    def test_nested_dict(self):
-        from repoindex.exporters.arkiv import _collect_meta_keys
-        keys = _collect_meta_keys({'github': {'stars': 5, 'forks': 1}})
-        assert 'github' in keys
-        assert 'github.stars' in keys
-        assert 'github.forks' in keys
+    def test_infers_number_type(self):
+        from repoindex.exporters.arkiv import _discover_schema
+        records = [{'metadata': {'stars': 42}}, {'metadata': {'stars': 10}}]
+        schema = _discover_schema(records)
+        assert schema['stars']['type'] == 'number'
+
+    def test_infers_boolean_type(self):
+        from repoindex.exporters.arkiv import _discover_schema
+        records = [{'metadata': {'is_clean': True}}, {'metadata': {'is_clean': False}}]
+        schema = _discover_schema(records)
+        assert schema['is_clean']['type'] == 'boolean'
+
+    def test_infers_array_type(self):
+        from repoindex.exporters.arkiv import _discover_schema
+        records = [{'metadata': {'langs': ['Python', 'Go']}}]
+        schema = _discover_schema(records)
+        assert schema['langs']['type'] == 'array'
+
+    def test_low_cardinality_emits_values(self):
+        from repoindex.exporters.arkiv import _discover_schema
+        records = [{'metadata': {'lang': v}} for v in ['Python', 'Go', 'Rust']]
+        schema = _discover_schema(records)
+        assert 'values' in schema['lang']
+        assert 'example' not in schema['lang']
+        assert schema['lang']['values'] == ['Go', 'Python', 'Rust']
+
+    def test_high_cardinality_emits_example(self):
+        from repoindex.exporters.arkiv import _discover_schema
+        records = [{'metadata': {'name': f'repo-{i}'}} for i in range(25)]
+        schema = _discover_schema(records)
+        assert 'example' in schema['name']
+        assert 'values' not in schema['name']
+        assert schema['name']['example'] == 'repo-0'
+
+    def test_nested_keys_use_dot_notation(self):
+        from repoindex.exporters.arkiv import _discover_schema
+        records = [{'metadata': {'github': {'stars': 5, 'forks': 1}}}]
+        schema = _discover_schema(records)
+        assert 'github.stars' in schema
+        assert 'github.forks' in schema
+        # Parent key should NOT be in schema
+        assert 'github' not in schema
+
+    def test_count_reflects_presence(self):
+        from repoindex.exporters.arkiv import _discover_schema
+        records = [
+            {'metadata': {'name': 'a', 'lang': 'Python'}},
+            {'metadata': {'name': 'b'}},
+            {'metadata': {'name': 'c', 'lang': 'Go'}},
+        ]
+        schema = _discover_schema(records)
+        assert schema['name']['count'] == 3
+        assert schema['lang']['count'] == 2
+
+    def test_empty_records(self):
+        from repoindex.exporters.arkiv import _discover_schema
+        schema = _discover_schema([])
+        assert schema == {}
+
+    def test_mixed_types_uses_most_common(self):
+        from repoindex.exporters.arkiv import _discover_schema
+        records = [
+            {'metadata': {'val': 'hello'}},
+            {'metadata': {'val': 'world'}},
+            {'metadata': {'val': 42}},
+        ]
+        schema = _discover_schema(records)
+        # string appears 2x, number 1x — string wins
+        assert schema['val']['type'] == 'string'
