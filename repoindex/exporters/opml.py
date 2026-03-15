@@ -7,7 +7,7 @@ Useful for importing into feed readers or outline processors.
 
 from collections import defaultdict
 from typing import IO, List, Optional
-from xml.sax.saxutils import escape
+from xml.sax.saxutils import escape, quoteattr
 
 from . import Exporter
 
@@ -41,17 +41,17 @@ class OPMLExporter(Exporter):
 
         count = 0
         for lang in sorted(by_lang.keys()):
-            output.write(f'    <outline text="{escape(lang)}">\n')
+            output.write(f'    <outline text={quoteattr(lang)}>\n')
             for repo in sorted(by_lang[lang], key=lambda r: r.get('name', '')):
-                name = escape(repo.get('name', ''))
-                url = escape(repo.get('remote_url') or '')
-                desc = escape(repo.get('description') or repo.get('github_description') or '')
+                name = repo.get('name', '')
+                url = repo.get('remote_url') or ''
+                desc = repo.get('description') or repo.get('github_description') or ''
 
-                attrs = f'text="{name}"'
+                attrs = f'text={quoteattr(name)}'
                 if url:
-                    attrs += f' htmlUrl="{url}"'
+                    attrs += f' htmlUrl={quoteattr(url)}'
                 if desc:
-                    attrs += f' description="{desc}"'
+                    attrs += f' description={quoteattr(desc)}'
 
                 output.write(f'      <outline {attrs}/>\n')
                 count += 1

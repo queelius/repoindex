@@ -32,13 +32,14 @@ def _repo_to_jsonld(repo: dict) -> dict:
 
     license_key = repo.get('license_key')
     if license_key:
-        # Map common SPDX identifiers to URLs
-        spdx_url = f"https://spdx.org/licenses/{license_key}"
-        obj["license"] = spdx_url
+        obj["license"] = f"https://spdx.org/licenses/{license_key.strip()}"
 
     doi = repo.get('citation_doi')
     if doi:
-        obj["identifier"] = f"https://doi.org/{doi}"
+        if doi.startswith('http'):
+            obj["identifier"] = doi
+        else:
+            obj["identifier"] = f"https://doi.org/{doi}"
 
     version = repo.get('citation_version')
     if version:

@@ -10,8 +10,12 @@ from . import Exporter
 
 
 def _md_escape(text: str) -> str:
-    """Escape pipe characters for Markdown table cells."""
-    return str(text).replace('|', '\\|') if text else ''
+    """Escape pipe and backslash characters for Markdown table cells."""
+    if not text:
+        return ''
+    text = str(text).replace('\\', '\\\\')
+    text = text.replace('|', '\\|')
+    return text
 
 
 class MarkdownExporter(Exporter):

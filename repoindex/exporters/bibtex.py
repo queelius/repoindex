@@ -23,8 +23,23 @@ def _make_bibtex_key(repo: dict) -> str:
 
 def _escape_bibtex(text: str) -> str:
     """Escape special BibTeX characters."""
-    for ch in ['&', '%', '#', '_', '$']:
-        text = text.replace(ch, '\\' + ch)
+    if not text:
+        return ''
+    # Use placeholders for commands that contain braces, to avoid
+    # those braces being re-escaped by the brace escaping step.
+    _BACKSLASH = '\x00BACKSLASH\x00'
+    _TILDE = '\x00TILDE\x00'
+    text = text.replace('\\', _BACKSLASH)
+    text = text.replace('~', _TILDE)
+    for char in ('&', '%', '#', '_', '$', '{', '}'):
+        if char == '{':
+            text = text.replace(char, '\\{')
+        elif char == '}':
+            text = text.replace(char, '\\}')
+        else:
+            text = text.replace(char, f'\\{char}')
+    text = text.replace(_BACKSLASH, '\\textbackslash{}')
+    text = text.replace(_TILDE, '\\textasciitilde{}')
     return text
 
 

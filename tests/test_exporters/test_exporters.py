@@ -7,7 +7,7 @@ import pytest
 
 from repoindex.exporters.bibtex import BibTeXExporter, _make_bibtex_key, _escape_bibtex, _format_authors
 from repoindex.exporters.csv_exporter import CSVExporter
-from repoindex.exporters.markdown import MarkdownExporter
+from repoindex.exporters.markdown import MarkdownExporter, _md_escape
 from repoindex.exporters.opml import OPMLExporter
 from repoindex.exporters.jsonld import JSONLDExporter
 
@@ -59,6 +59,18 @@ class TestBibTeXHelpers:
 
     def test_escape_bibtex(self):
         assert _escape_bibtex('10% done & more') == '10\\% done \\& more'
+
+    def test_escape_bibtex_braces(self):
+        assert _escape_bibtex('curly {braces}') == 'curly \\{braces\\}'
+
+    def test_escape_bibtex_backslash(self):
+        assert _escape_bibtex('back\\slash') == 'back\\textbackslash{}slash'
+
+    def test_escape_bibtex_tilde(self):
+        assert _escape_bibtex('tilde~char') == 'tilde\\textasciitilde{}char'
+
+    def test_escape_bibtex_empty(self):
+        assert _escape_bibtex('') == ''
 
     def test_format_authors_json(self):
         authors = json.dumps([
@@ -191,6 +203,18 @@ class TestMarkdownExporter:
         content = out.getvalue()
         assert '...' in content
 
+    def test_md_escape_backslash(self):
+        assert _md_escape('path\\to\\file') == 'path\\\\to\\\\file'
+
+    def test_md_escape_pipe(self):
+        assert _md_escape('a|b') == 'a\\|b'
+
+    def test_md_escape_empty(self):
+        assert _md_escape('') == ''
+
+    def test_md_escape_both(self):
+        assert _md_escape('a\\|b') == 'a\\\\\\|b'
+
     def test_attributes(self):
         e = MarkdownExporter()
         assert e.format_id == "markdown"
@@ -234,6 +258,16 @@ class TestOPMLExporter:
         e.export([repo], out)
         content = out.getvalue()
         assert 'a&amp;b&lt;c' in content
+
+    def test_escapes_quotes_in_attributes(self):
+        repo = {'name': 'has"quote', 'language': 'Python', 'description': 'a "desc"'}
+        e = OPMLExporter()
+        out = io.StringIO()
+        e.export([repo], out)
+        content = out.getvalue()
+        # quoteattr uses single quotes when value contains double quotes
+        assert "text='has\"quote'" in content
+        assert "description='a \"desc\"'" in content
 
     def test_attributes(self):
         e = OPMLExporter()
@@ -295,6 +329,50 @@ class TestJSONLDExporter:
         doc = json.loads(out.read())
         obj = doc['@graph'][0]
         assert 'spdx.org/licenses/mit' in obj.get('license', '')
+
+    def test_export_doi_full_url_not_doubled(self):
+        """DOI already a full URL should not get https://doi.org/ prepended."""
+        repo = {'name': 'test', 'citation_doi': 'https://doi.org/10.1234/test'}
+        e = JSONLDExporter()
+        out = io.StringIO()
+        e.export([repo], out)
+        out.seek(0)
+        doc = json.loads(out.read())
+        obj = doc['@graph'][0]
+        assert obj['identifier'] == 'https://doi.org/10.1234/test'
+
+    def test_export_doi_bare_gets_prefix(self):
+        """Bare DOI should get https://doi.org/ prepended."""
+        repo = {'name': 'test', 'citation_doi': '10.1234/test'}
+        e = JSONLDExporter()
+        out = io.StringIO()
+        e.export([repo], out)
+        out.seek(0)
+        doc = json.loads(out.read())
+        obj = doc['@graph'][0]
+        assert obj['identifier'] == 'https://doi.org/10.1234/test'
+
+    def test_export_license_preserves_case(self):
+        """SPDX license key casing should be preserved."""
+        repo = {'name': 'test', 'license_key': 'Apache-2.0'}
+        e = JSONLDExporter()
+        out = io.StringIO()
+        e.export([repo], out)
+        out.seek(0)
+        doc = json.loads(out.read())
+        obj = doc['@graph'][0]
+        assert obj['license'] == 'https://spdx.org/licenses/Apache-2.0'
+
+    def test_export_license_strips_whitespace(self):
+        """SPDX license key should have whitespace stripped."""
+        repo = {'name': 'test', 'license_key': ' MIT '}
+        e = JSONLDExporter()
+        out = io.StringIO()
+        e.export([repo], out)
+        out.seek(0)
+        doc = json.loads(out.read())
+        obj = doc['@graph'][0]
+        assert obj['license'] == 'https://spdx.org/licenses/MIT'
 
     def test_export_empty(self):
         e = JSONLDExporter()
