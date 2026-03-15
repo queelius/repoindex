@@ -8,9 +8,26 @@ API checks to the existing module.
 import logging
 from typing import Optional
 
+import requests
+
 from . import RegistryProvider, PackageMetadata
 
 logger = logging.getLogger(__name__)
+
+
+def _fetch_downloads(package_name: str) -> Optional[int]:
+    """Fetch recent download stats from PyPI Stats API."""
+    try:
+        resp = requests.get(
+            f'https://pypistats.org/api/packages/{package_name}/recent',
+            timeout=10,
+        )
+        if resp.status_code == 200:
+            data = resp.json()
+            return data.get('data', {}).get('last_month')
+    except Exception:
+        pass
+    return None
 
 
 class PyPIProvider(RegistryProvider):
@@ -41,12 +58,14 @@ class PyPIProvider(RegistryProvider):
             info = check_pypi_package(package_name)
             if not info:
                 return None
+            downloads = _fetch_downloads(package_name) if info.get('exists') else None
             return PackageMetadata(
                 registry='pypi',
                 name=package_name,
                 version=info.get('version'),
                 published=info.get('exists', False),
                 url=info.get('url'),
+                downloads=downloads,
                 last_updated=info.get('last_updated'),
             )
         except Exception as e:

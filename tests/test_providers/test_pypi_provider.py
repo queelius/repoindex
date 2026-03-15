@@ -4,7 +4,7 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from repoindex.providers.pypi import PyPIProvider, provider
+from repoindex.providers.pypi import PyPIProvider, provider, _fetch_downloads
 
 
 class TestPyPIProviderAttributes:
@@ -47,9 +47,61 @@ setup(name="legacy-pkg")
         assert p.detect(str(tmp_path)) == "legacy-pkg"
 
 
+class TestFetchDownloads:
+    def test_returns_monthly_downloads(self):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {
+            'data': {'last_day': 100, 'last_week': 700, 'last_month': 3000}
+        }
+        with patch('repoindex.providers.pypi.requests.get', return_value=mock_resp):
+            result = _fetch_downloads('repoindex')
+        assert result == 3000
+
+    def test_returns_none_on_404(self):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 404
+        with patch('repoindex.providers.pypi.requests.get', return_value=mock_resp):
+            result = _fetch_downloads('nonexistent')
+        assert result is None
+
+    def test_returns_none_on_error(self):
+        with patch('repoindex.providers.pypi.requests.get', side_effect=Exception("timeout")):
+            result = _fetch_downloads('anything')
+        assert result is None
+
+    def test_returns_none_on_missing_data_key(self):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {}
+        with patch('repoindex.providers.pypi.requests.get', return_value=mock_resp):
+            result = _fetch_downloads('some-pkg')
+        assert result is None
+
+    def test_returns_none_on_missing_last_month(self):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {'data': {'last_day': 100}}
+        with patch('repoindex.providers.pypi.requests.get', return_value=mock_resp):
+            result = _fetch_downloads('some-pkg')
+        assert result is None
+
+    def test_calls_correct_url(self):
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {'data': {'last_month': 500}}
+        with patch('repoindex.providers.pypi.requests.get', return_value=mock_resp) as mock_get:
+            _fetch_downloads('my-package')
+        mock_get.assert_called_once_with(
+            'https://pypistats.org/api/packages/my-package/recent',
+            timeout=10,
+        )
+
+
 class TestPyPICheck:
+    @patch('repoindex.providers.pypi._fetch_downloads', return_value=4200)
     @patch('repoindex.pypi.check_pypi_package')
-    def test_check_published(self, mock_check):
+    def test_check_published(self, mock_check, mock_downloads):
         mock_check.return_value = {
             'exists': True,
             'version': '2.0.0',
@@ -63,14 +115,19 @@ class TestPyPICheck:
         assert result.name == "my-package"
         assert result.version == "2.0.0"
         assert result.published is True
+        assert result.downloads == 4200
+        mock_downloads.assert_called_once_with("my-package")
 
+    @patch('repoindex.providers.pypi._fetch_downloads')
     @patch('repoindex.pypi.check_pypi_package')
-    def test_check_not_found(self, mock_check):
+    def test_check_not_found(self, mock_check, mock_downloads):
         mock_check.return_value = {'exists': False}
         p = PyPIProvider()
         result = p.check("nonexistent-pkg")
         assert result is not None
         assert result.published is False
+        assert result.downloads is None
+        mock_downloads.assert_not_called()
 
     @patch('repoindex.pypi.check_pypi_package')
     def test_check_api_error(self, mock_check):
@@ -85,6 +142,21 @@ class TestPyPICheck:
         p = PyPIProvider()
         result = p.check("broken-pkg")
         assert result is None
+
+    @patch('repoindex.providers.pypi._fetch_downloads', return_value=None)
+    @patch('repoindex.pypi.check_pypi_package')
+    def test_check_published_downloads_unavailable(self, mock_check, mock_downloads):
+        """Published package but pypistats returns None."""
+        mock_check.return_value = {
+            'exists': True,
+            'version': '1.0.0',
+            'url': 'https://pypi.org/project/pkg/',
+        }
+        p = PyPIProvider()
+        result = p.check("pkg")
+        assert result is not None
+        assert result.published is True
+        assert result.downloads is None
 
 
 class TestPyPIMatch:
