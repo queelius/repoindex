@@ -137,6 +137,10 @@ def _repo_to_record(repo: Repository) -> Dict[str, Any]:
             record['citation_file'] = citation_file
             break
 
+    # Detect local asset files (codemeta.json, FUNDING.yml, CONTRIBUTORS, CHANGELOG)
+    from ..services.repository_service import _detect_local_assets
+    record.update(_detect_local_assets(repo_path))
+
     # Extract keywords from project manifests (pyproject.toml, Cargo.toml, package.json)
     from ..services.repository_service import _extract_keywords
     kw = _extract_keywords(repo_path)

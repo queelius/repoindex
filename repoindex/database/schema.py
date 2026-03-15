@@ -20,7 +20,8 @@ from typing import List, Tuple
 # v5: Added doi column to publications table (for Zenodo DOIs, etc.)
 # v5+: Added refresh_log table (non-breaking, uses CREATE IF NOT EXISTS)
 # v6: Added keywords column (JSON array extracted from project manifests)
-CURRENT_VERSION = 6
+# v7: Added local asset detection columns (has_codemeta, has_funding, has_contributors, has_changelog)
+CURRENT_VERSION = 7
 
 # Schema definition as SQL statements
 SCHEMA_V1 = """
@@ -86,6 +87,12 @@ CREATE TABLE IF NOT EXISTS repos (
     has_readme BOOLEAN DEFAULT 0,
     has_license BOOLEAN DEFAULT 0,
     has_ci BOOLEAN DEFAULT 0,
+
+    -- Local asset detection
+    has_codemeta BOOLEAN DEFAULT 0,
+    has_funding BOOLEAN DEFAULT 0,
+    has_contributors BOOLEAN DEFAULT 0,
+    has_changelog BOOLEAN DEFAULT 0,
 
     -- Citation detection (local files: CITATION.cff, .zenodo.json, CITATION.bib)
     has_citation BOOLEAN DEFAULT 0,
@@ -345,7 +352,7 @@ def apply_schema(conn: sqlite3.Connection, version: int = CURRENT_VERSION) -> No
     conn.executescript(SCHEMA_V1)
     conn.execute(
         "INSERT OR REPLACE INTO _schema_info (version, description) VALUES (?, ?)",
-        (CURRENT_VERSION, "v0.12.0: Added keywords column (JSON array from project manifests)")
+        (CURRENT_VERSION, "v0.12.0: Added local asset detection columns")
     )
 
     conn.commit()

@@ -26,6 +26,23 @@ EXCLUDE_DIRS = {
 }
 
 
+def _detect_local_assets(repo_path) -> dict:
+    """Detect presence of common project asset files."""
+    p = Path(repo_path)
+    return {
+        'has_codemeta': (p / 'codemeta.json').exists(),
+        'has_funding': (p / '.github' / 'FUNDING.yml').exists(),
+        'has_contributors': any(
+            (p / name).exists()
+            for name in ('CONTRIBUTORS', 'CONTRIBUTORS.md', 'AUTHORS', 'AUTHORS.md')
+        ),
+        'has_changelog': any(
+            (p / name).exists()
+            for name in ('CHANGELOG.md', 'CHANGES.md', 'NEWS.md', 'HISTORY.md', 'CHANGELOG', 'CHANGES')
+        ),
+    }
+
+
 def _extract_keywords(repo_path) -> Optional[list]:
     """
     Extract keywords from project manifest files.

@@ -111,3 +111,104 @@ class TestKeywordExtraction:
             '[project]\nname = "pkg"\nkeywords = "not-a-list"\n'
         )
         assert _extract_keywords(tmp_path) is None
+
+
+class TestLocalAssetDetection:
+    def test_codemeta_detected(self, tmp_path):
+        from repoindex.services.repository_service import _detect_local_assets
+        (tmp_path / "codemeta.json").write_text("{}")
+        assets = _detect_local_assets(tmp_path)
+        assert assets['has_codemeta'] is True
+
+    def test_funding_detected(self, tmp_path):
+        from repoindex.services.repository_service import _detect_local_assets
+        (tmp_path / ".github").mkdir()
+        (tmp_path / ".github" / "FUNDING.yml").write_text("github: user")
+        assets = _detect_local_assets(tmp_path)
+        assert assets['has_funding'] is True
+
+    def test_contributors_md_detected(self, tmp_path):
+        from repoindex.services.repository_service import _detect_local_assets
+        (tmp_path / "CONTRIBUTORS.md").write_text("# Contributors")
+        assets = _detect_local_assets(tmp_path)
+        assert assets['has_contributors'] is True
+
+    def test_authors_detected(self, tmp_path):
+        from repoindex.services.repository_service import _detect_local_assets
+        (tmp_path / "AUTHORS").write_text("Alex Towell")
+        assets = _detect_local_assets(tmp_path)
+        assert assets['has_contributors'] is True
+
+    def test_changelog_detected(self, tmp_path):
+        from repoindex.services.repository_service import _detect_local_assets
+        (tmp_path / "CHANGELOG.md").write_text("# Changes")
+        assets = _detect_local_assets(tmp_path)
+        assert assets['has_changelog'] is True
+
+    def test_news_md_detected(self, tmp_path):
+        from repoindex.services.repository_service import _detect_local_assets
+        (tmp_path / "NEWS.md").write_text("# News")
+        assets = _detect_local_assets(tmp_path)
+        assert assets['has_changelog'] is True
+
+    def test_no_assets(self, tmp_path):
+        from repoindex.services.repository_service import _detect_local_assets
+        assets = _detect_local_assets(tmp_path)
+        assert not any(assets.values())
+
+    def test_all_assets(self, tmp_path):
+        from repoindex.services.repository_service import _detect_local_assets
+        (tmp_path / "codemeta.json").write_text("{}")
+        (tmp_path / ".github").mkdir()
+        (tmp_path / ".github" / "FUNDING.yml").write_text("github: user")
+        (tmp_path / "AUTHORS.md").write_text("Authors")
+        (tmp_path / "CHANGES.md").write_text("Changes")
+        assets = _detect_local_assets(tmp_path)
+        assert all(assets.values())
+
+    def test_contributors_plain_file(self, tmp_path):
+        from repoindex.services.repository_service import _detect_local_assets
+        (tmp_path / "CONTRIBUTORS").write_text("Alice\nBob")
+        assets = _detect_local_assets(tmp_path)
+        assert assets['has_contributors'] is True
+
+    def test_authors_md_detected(self, tmp_path):
+        from repoindex.services.repository_service import _detect_local_assets
+        (tmp_path / "AUTHORS.md").write_text("# Authors")
+        assets = _detect_local_assets(tmp_path)
+        assert assets['has_contributors'] is True
+
+    def test_changes_md_detected(self, tmp_path):
+        from repoindex.services.repository_service import _detect_local_assets
+        (tmp_path / "CHANGES.md").write_text("# Changes")
+        assets = _detect_local_assets(tmp_path)
+        assert assets['has_changelog'] is True
+
+    def test_history_md_detected(self, tmp_path):
+        from repoindex.services.repository_service import _detect_local_assets
+        (tmp_path / "HISTORY.md").write_text("# History")
+        assets = _detect_local_assets(tmp_path)
+        assert assets['has_changelog'] is True
+
+    def test_changelog_plain_file(self, tmp_path):
+        from repoindex.services.repository_service import _detect_local_assets
+        (tmp_path / "CHANGELOG").write_text("v1.0 - Initial release")
+        assets = _detect_local_assets(tmp_path)
+        assert assets['has_changelog'] is True
+
+    def test_changes_plain_file(self, tmp_path):
+        from repoindex.services.repository_service import _detect_local_assets
+        (tmp_path / "CHANGES").write_text("v1.0 - Initial release")
+        assets = _detect_local_assets(tmp_path)
+        assert assets['has_changelog'] is True
+
+    def test_string_path_accepted(self, tmp_path):
+        from repoindex.services.repository_service import _detect_local_assets
+        (tmp_path / "codemeta.json").write_text("{}")
+        assets = _detect_local_assets(str(tmp_path))
+        assert assets['has_codemeta'] is True
+
+    def test_returns_exactly_four_keys(self, tmp_path):
+        from repoindex.services.repository_service import _detect_local_assets
+        assets = _detect_local_assets(tmp_path)
+        assert set(assets.keys()) == {'has_codemeta', 'has_funding', 'has_contributors', 'has_changelog'}

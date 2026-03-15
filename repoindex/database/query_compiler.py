@@ -71,6 +71,12 @@ FIELD_MAPPINGS = {
     'has_license': 'has_license',
     'has_ci': 'has_ci',
 
+    # Local asset detection
+    'has_codemeta': 'has_codemeta',
+    'has_funding': 'has_funding',
+    'has_contributors': 'has_contributors',
+    'has_changelog': 'has_changelog',
+
     # Citation detection (local)
     'has_citation': 'has_citation',
     'citation_file': 'citation_file',
@@ -616,6 +622,7 @@ class QueryCompiler:
             'is_clean', 'clean', 'has_readme', 'has_license', 'has_ci',
             'has_upstream', 'uncommitted_changes', 'uncommitted',
             'has_citation',  # Citation detection
+            'has_codemeta', 'has_funding', 'has_contributors', 'has_changelog',
             # GitHub boolean fields (short aliases)
             'is_fork', 'is_archived', 'archived', 'is_private', 'private', 'has_pages',
             # GitHub boolean fields (explicit prefix)
