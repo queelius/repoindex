@@ -74,23 +74,10 @@ def _is_simple_text_query(query_string: str) -> bool:
 def _build_query_from_flags(
     query_string: Optional[str],
     dirty: bool = False,
-    clean: bool = False,
     language: Optional[str] = None,
     recent: Optional[str] = None,
-    starred: bool = False,
     tag: Optional[List[str]] = None,
-    no_license: bool = False,
-    no_readme: bool = False,
-    has_citation: bool = False,
-    has_doi: bool = False,
-    archived: bool = False,
-    public: bool = False,
-    private: bool = False,
-    fork: bool = False,
-    no_fork: bool = False,
     *,
-    name: Optional[str] = None,
-    has_remote: bool = False,
     sort: Optional[str] = None,
 ) -> str:
     """Build a DSL query string from convenience flags."""
@@ -100,21 +87,9 @@ def _build_query_from_flags(
     if query_string:
         predicates.append(f"({query_string})")
 
-    # Name filter (supports wildcards: * → SQL LIKE %)
-    if name:
-        if '*' in name or '?' in name:
-            # User used wildcards — translate to SQL LIKE pattern
-            pattern = name.replace('*', '%').replace('?', '_')
-            predicates.append(f"name like '{pattern}'")
-        else:
-            # Simple substring match
-            predicates.append(f"name contains '{name}'")
-
-    # Dirty/clean status
+    # Dirty status
     if dirty:
         predicates.append("not is_clean")
-    if clean:
-        predicates.append("is_clean")
 
     # Language filter
     if language:
@@ -142,48 +117,10 @@ def _build_query_from_flags(
     if recent:
         predicates.append(f"has_event('commit', since='{recent}')")
 
-    # Starred repos (GitHub stars)
-    if starred:
-        predicates.append("github_stars > 0")
-
     # Tag filters
     if tag:
         for t in tag:
             predicates.append(f"tagged('{t}')")
-
-    # Audit-style flags (use bare boolean predicates - local)
-    if no_license:
-        predicates.append("not has_license")
-    if no_readme:
-        predicates.append("not has_readme")
-
-    # Citation detection (CITATION.cff, .zenodo.json, etc.)
-    if has_citation:
-        predicates.append("has_citation")
-
-    # DOI detection (repos with DOI from citation files OR Zenodo/registry publications)
-    if has_doi:
-        predicates.append("has_doi()")
-
-    # Has remote URL
-    if has_remote:
-        predicates.append("remote_url != ''")
-
-    # GitHub archive status
-    if archived:
-        predicates.append("github_is_archived")
-
-    # GitHub visibility flags
-    if public:
-        predicates.append("not github_is_private")
-    if private:
-        predicates.append("github_is_private")
-
-    # GitHub fork flags
-    if fork:
-        predicates.append("github_is_fork")
-    if no_fork:
-        predicates.append("not github_is_fork")
 
     # Join predicates with 'and'
     if not predicates:
@@ -220,23 +157,10 @@ def _build_query_from_flags(
 @click.option('--fts', is_flag=True, help='Use full-text search instead of DSL query')
 @click.option('--debug', is_flag=True, help='Enable debug logging')
 # Convenience flags
-@click.option('--name', '-n', help='Filter by repo name (supports wildcards: dapple, *api*)')
+@click.option('--language', '-l', help='Filter by language (e.g., python, r, js)')
 @click.option('--dirty', is_flag=True, help='Repos with uncommitted changes')
-@click.option('--clean', is_flag=True, help='Repos with no uncommitted changes')
-@click.option('--language', '-l', help='Filter by language (e.g., python, js, rust)')
-@click.option('--recent', '-r', help='Repos with recent commits (e.g., 7d, 30d)')
-@click.option('--starred', is_flag=True, help='Repos with stars')
 @click.option('--tag', '-t', multiple=True, help='Filter by tag (supports wildcards)')
-@click.option('--no-license', is_flag=True, help='Repos without a license')
-@click.option('--no-readme', is_flag=True, help='Repos without a README')
-@click.option('--has-citation', is_flag=True, help='Repos with citation files (CITATION.cff, .zenodo.json)')
-@click.option('--has-doi', is_flag=True, help='Repos with DOI (citation files or Zenodo)')
-@click.option('--archived', is_flag=True, help='Archived repos only')
-@click.option('--public', is_flag=True, help='Public repos only')
-@click.option('--private', is_flag=True, help='Private repos only')
-@click.option('--fork', is_flag=True, help='Forked repos only')
-@click.option('--no-fork', is_flag=True, help='Non-forked repos only (original repos)')
-@click.option('--has-remote', is_flag=True, help='Repos with a remote URL')
+@click.option('--recent', '-r', help='Repos with recent commits (e.g., 7d, 30d)')
 @click.option('--sort', '-s', help='Sort results (e.g., stars, name, language, or field [asc|desc])')
 @click.option('--count', is_flag=True, help='Output only the count of matching repos')
 def query_handler(
@@ -249,23 +173,10 @@ def query_handler(
     fts: bool,
     debug: bool,
     # Convenience flags
-    name: Optional[str],
-    dirty: bool,
-    clean: bool,
     language: Optional[str],
-    recent: Optional[str],
-    starred: bool,
+    dirty: bool,
     tag: tuple,
-    no_license: bool,
-    no_readme: bool,
-    has_citation: bool,
-    has_doi: bool,
-    archived: bool,
-    public: bool,
-    private: bool,
-    fork: bool,
-    no_fork: bool,
-    has_remote: bool,
+    recent: Optional[str],
     sort: Optional[str],
     count: bool,
 ):
@@ -283,9 +194,6 @@ def query_handler(
         repoindex query
         # Simple text search (auto-detected)
         repoindex query "bayes"
-        # Filter by name (supports wildcards)
-        repoindex query --name dapple
-        repoindex query --name "*api*"
         # Convenience flags
         repoindex query --dirty
         repoindex query --language python
@@ -307,9 +215,6 @@ def query_handler(
         # Ordering and limiting
         repoindex query "language == 'Python' order by stars desc"
         repoindex query "stars > 0 order by stars desc limit 10"
-        # Audit queries
-        repoindex query --no-license
-        repoindex query --no-readme
         # Show compiled SQL and params
         repoindex query "language == 'Python'" --explain
     """
@@ -323,15 +228,12 @@ def query_handler(
         )
 
     # Build query from flags
-    has_flags = any([name, dirty, clean, language, recent, starred, tag, no_license, no_readme,
-                     has_citation, has_doi, has_remote, archived, public, private, fork, no_fork, sort])
+    has_flags = any([dirty, language, recent, tag, sort])
     if has_flags:
         query_string = _build_query_from_flags(
             query_string if query_string else None,
-            dirty, clean, language, recent, starred, list(tag),
-            no_license, no_readme, has_citation, has_doi,
-            archived, public, private, fork, no_fork,
-            name=name, has_remote=has_remote, sort=sort
+            dirty=dirty, language=language, recent=recent, tag=list(tag),
+            sort=sort,
         )
 
     # If no query and no flags, show all repos

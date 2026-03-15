@@ -114,9 +114,9 @@ class TestRenderQueryFlags:
 
     @patch('repoindex.commands.render.load_config', return_value={})
     @patch('repoindex.commands.render._get_repos_from_query')
-    def test_starred_flag_passed(self, mock_query, mock_config, runner):
+    def test_dirty_flag_passed(self, mock_query, mock_config, runner):
         mock_query.return_value = MOCK_REPOS
-        result = runner.invoke(export_handler, ['csv', '--starred'])
+        result = runner.invoke(export_handler, ['csv', '--dirty'])
         assert result.exit_code == 0
 
 

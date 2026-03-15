@@ -81,56 +81,26 @@ def git_cmd():
 # Shared query flags decorator
 def query_options(f):
     """Decorator to add query convenience flags."""
-    f = click.option('--name', '-n', help='Filter by repo name (supports wildcards: dapple, *api*)')(f)
+    f = click.option('--language', '-l', help='Filter by language (e.g., python, r, js)')(f)
     f = click.option('--dirty', is_flag=True, help='Repos with uncommitted changes')(f)
-    f = click.option('--clean', is_flag=True, help='Repos with no uncommitted changes')(f)
-    f = click.option('--language', '-l', help='Filter by language (e.g., python, js, rust)')(f)
-    f = click.option('--recent', '-r', help='Repos with recent commits (e.g., 7d, 30d)')(f)
-    f = click.option('--starred', is_flag=True, help='Repos with stars')(f)
     f = click.option('--tag', '-t', multiple=True, help='Filter by tag (supports wildcards)')(f)
-    f = click.option('--no-license', is_flag=True, help='Repos without a license')(f)
-    f = click.option('--no-readme', is_flag=True, help='Repos without a README')(f)
-    f = click.option('--has-citation', is_flag=True, help='Repos with citation files')(f)
-    f = click.option('--has-doi', is_flag=True, help='Repos with DOI in citation metadata')(f)
-    f = click.option('--has-remote', is_flag=True, help='Repos with a remote URL')(f)
-    f = click.option('--archived', is_flag=True, help='Archived repos only')(f)
-    f = click.option('--public', is_flag=True, help='Public repos only')(f)
-    f = click.option('--private', is_flag=True, help='Private repos only')(f)
-    f = click.option('--fork', is_flag=True, help='Forked repos only')(f)
-    f = click.option('--no-fork', is_flag=True, help='Non-forked repos only')(f)
+    f = click.option('--recent', '-r', help='Repos with recent commits (e.g., 7d, 30d)')(f)
     return f
 
 
 def _get_repos_from_query(config, query_string: str, debug: bool = False, **query_flags):
     """Get repos matching query and flags."""
-    # Extract flags with defaults
-    name = query_flags.get('name', None)
-    dirty = query_flags.get('dirty', False)
-    clean = query_flags.get('clean', False)
     language = query_flags.get('language', None)
-    recent = query_flags.get('recent', None)
-    starred = query_flags.get('starred', False)
+    dirty = query_flags.get('dirty', False)
     tag = query_flags.get('tag', ())
-    no_license = query_flags.get('no_license', False)
-    no_readme = query_flags.get('no_readme', False)
-    has_citation = query_flags.get('has_citation', False)
-    has_doi = query_flags.get('has_doi', False)
-    has_remote = query_flags.get('has_remote', False)
-    archived = query_flags.get('archived', False)
-    public = query_flags.get('public', False)
-    private = query_flags.get('private', False)
-    fork = query_flags.get('fork', False)
-    no_fork = query_flags.get('no_fork', False)
+    recent = query_flags.get('recent', None)
 
     # Build query from flags
-    has_flags = any([name, dirty, clean, language, recent, starred, tag, no_license, no_readme,
-                     has_citation, has_doi, has_remote, archived, public, private, fork, no_fork])
+    has_flags = any([dirty, language, recent, tag])
     if has_flags:
         query_string = _build_query_from_flags(
             query_string if query_string else None,
-            dirty, clean, language, recent, starred, list(tag),
-            no_license, no_readme, has_citation, has_doi, archived, public, private, fork, no_fork,
-            name=name, has_remote=has_remote,
+            dirty=dirty, language=language, recent=recent, tag=list(tag),
         )
 
     # If no query and no flags, match all repos
@@ -209,23 +179,10 @@ def ops_audit_handler(
     audit_severity: Optional[str],
     debug: bool,
     # Query flags
-    name: Optional[str],
-    dirty: bool,
-    clean: bool,
     language: Optional[str],
-    recent: Optional[str],
-    starred: bool,
+    dirty: bool,
     tag: tuple,
-    no_license: bool,
-    no_readme: bool,
-    has_citation: bool,
-    has_doi: bool,
-    has_remote: bool,
-    archived: bool,
-    public: bool,
-    private: bool,
-    fork: bool,
-    no_fork: bool,
+    recent: Optional[str],
 ):
     """
     Audit metadata completeness for repositories.
@@ -253,10 +210,7 @@ def ops_audit_handler(
 
     result = _resolve_repos(
         output_json, debug, query_string,
-        name=name, dirty=dirty, clean=clean, language=language, recent=recent,
-        starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
-        has_citation=has_citation, has_doi=has_doi, has_remote=has_remote,
-        archived=archived, public=public, private=private, fork=fork, no_fork=no_fork,
+        language=language, dirty=dirty, tag=tag, recent=recent,
     )
     if result is None:
         return
@@ -479,23 +433,10 @@ def git_push_handler(
     set_upstream: bool,
     debug: bool,
     # Query flags
-    name: Optional[str],
-    dirty: bool,
-    clean: bool,
     language: Optional[str],
-    recent: Optional[str],
-    starred: bool,
+    dirty: bool,
     tag: tuple,
-    no_license: bool,
-    no_readme: bool,
-    has_citation: bool,
-    has_doi: bool,
-    has_remote: bool,
-    archived: bool,
-    public: bool,
-    private: bool,
-    fork: bool,
-    no_fork: bool,
+    recent: Optional[str],
 ):
     """
     Push commits to remote for repositories with unpushed changes.
@@ -520,10 +461,7 @@ def git_push_handler(
     """
     result = _resolve_repos(
         output_json, debug, query_string,
-        name=name, dirty=dirty, clean=clean, language=language, recent=recent,
-        starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
-        has_citation=has_citation, has_doi=has_doi, has_remote=has_remote,
-        archived=archived, public=public, private=private, fork=fork, no_fork=no_fork,
+        language=language, dirty=dirty, tag=tag, recent=recent,
     )
     if result is None:
         return
@@ -583,23 +521,10 @@ def git_pull_handler(
     remote: str,
     debug: bool,
     # Query flags
-    name: Optional[str],
-    dirty: bool,
-    clean: bool,
     language: Optional[str],
-    recent: Optional[str],
-    starred: bool,
+    dirty: bool,
     tag: tuple,
-    no_license: bool,
-    no_readme: bool,
-    has_citation: bool,
-    has_doi: bool,
-    has_remote: bool,
-    archived: bool,
-    public: bool,
-    private: bool,
-    fork: bool,
-    no_fork: bool,
+    recent: Optional[str],
 ):
     """
     Pull updates from remote for repositories.
@@ -613,16 +538,13 @@ def git_pull_handler(
         # Pull all repos
         repoindex ops git pull --yes
         # Pull only clean repos (no uncommitted changes)
-        repoindex ops git pull --clean --yes
+        repoindex ops git pull "is_clean" --yes
         # Pull Python repos
         repoindex ops git pull --language python --yes
     """
     result = _resolve_repos(
         output_json, debug, query_string,
-        name=name, dirty=dirty, clean=clean, language=language, recent=recent,
-        starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
-        has_citation=has_citation, has_doi=has_doi, has_remote=has_remote,
-        archived=archived, public=public, private=private, fork=fork, no_fork=no_fork,
+        language=language, dirty=dirty, tag=tag, recent=recent,
     )
     if result is None:
         return
@@ -662,23 +584,10 @@ def git_status_handler(
     remote: str,
     debug: bool,
     # Query flags
-    name: Optional[str],
-    dirty: bool,
-    clean: bool,
     language: Optional[str],
-    recent: Optional[str],
-    starred: bool,
+    dirty: bool,
     tag: tuple,
-    no_license: bool,
-    no_readme: bool,
-    has_citation: bool,
-    has_doi: bool,
-    has_remote: bool,
-    archived: bool,
-    public: bool,
-    private: bool,
-    fork: bool,
-    no_fork: bool,
+    recent: Optional[str],
 ):
     """
     Show git status for multiple repositories.
@@ -698,10 +607,7 @@ def git_status_handler(
     """
     result = _resolve_repos(
         output_json, debug, query_string,
-        name=name, dirty=dirty, clean=clean, language=language, recent=recent,
-        starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
-        has_citation=has_citation, has_doi=has_doi, has_remote=has_remote,
-        archived=archived, public=public, private=private, fork=fork, no_fork=no_fork,
+        language=language, dirty=dirty, tag=tag, recent=recent,
     )
     if result is None:
         return
@@ -855,23 +761,10 @@ def github_set_topics_handler(
     from_pyproject: bool,
     debug: bool,
     # Query flags
-    name: Optional[str],
-    dirty: bool,
-    clean: bool,
     language: Optional[str],
-    recent: Optional[str],
-    starred: bool,
+    dirty: bool,
     tag: tuple,
-    no_license: bool,
-    no_readme: bool,
-    has_citation: bool,
-    has_doi: bool,
-    has_remote: bool,
-    archived: bool,
-    public: bool,
-    private: bool,
-    fork: bool,
-    no_fork: bool,
+    recent: Optional[str],
 ):
     """
     Set GitHub topics for repositories.
@@ -894,10 +787,7 @@ def github_set_topics_handler(
 
     result = _resolve_repos(
         output_json, debug, query_string,
-        name=name, dirty=dirty, clean=clean, language=language, recent=recent,
-        starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
-        has_citation=has_citation, has_doi=has_doi, has_remote=has_remote,
-        archived=archived, public=public, private=private, fork=fork, no_fork=no_fork,
+        language=language, dirty=dirty, tag=tag, recent=recent,
     )
     if result is None:
         return
@@ -930,23 +820,10 @@ def github_set_description_handler(
     from_pyproject: bool,
     debug: bool,
     # Query flags
-    name: Optional[str],
-    dirty: bool,
-    clean: bool,
     language: Optional[str],
-    recent: Optional[str],
-    starred: bool,
+    dirty: bool,
     tag: tuple,
-    no_license: bool,
-    no_readme: bool,
-    has_citation: bool,
-    has_doi: bool,
-    has_remote: bool,
-    archived: bool,
-    public: bool,
-    private: bool,
-    fork: bool,
-    no_fork: bool,
+    recent: Optional[str],
 ):
     """
     Set GitHub description for repositories.
@@ -967,10 +844,7 @@ def github_set_description_handler(
 
     result = _resolve_repos(
         output_json, debug, query_string,
-        name=name, dirty=dirty, clean=clean, language=language, recent=recent,
-        starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
-        has_citation=has_citation, has_doi=has_doi, has_remote=has_remote,
-        archived=archived, public=public, private=private, fork=fork, no_fork=no_fork,
+        language=language, dirty=dirty, tag=tag, recent=recent,
     )
     if result is None:
         return
@@ -1135,7 +1009,7 @@ def generate_cmd():
         # Generate codemeta.json for Python repos
         repoindex ops generate codemeta --language python --dry-run
         # Generate MIT license for repos without license
-        repoindex ops generate license --no-license --license mit --dry-run
+        repoindex ops generate license "not has_license" --license mit --dry-run
         # Generate .gitignore for Python repos
         repoindex ops generate gitignore --lang python --dry-run
         # Generate CODE_OF_CONDUCT.md
@@ -1172,23 +1046,10 @@ def generate_codemeta_handler(
     affiliation: Optional[str],
     debug: bool,
     # Query flags
-    name: Optional[str],
-    dirty: bool,
-    clean: bool,
     language: Optional[str],
-    recent: Optional[str],
-    starred: bool,
+    dirty: bool,
     tag: tuple,
-    no_license: bool,
-    no_readme: bool,
-    has_citation: bool,
-    has_doi: bool,
-    has_remote: bool,
-    archived: bool,
-    public: bool,
-    private: bool,
-    fork: bool,
-    no_fork: bool,
+    recent: Optional[str],
 ):
     """
     Generate codemeta.json files for repositories.
@@ -1207,10 +1068,7 @@ def generate_codemeta_handler(
     """
     result = _resolve_repos(
         output_json, debug, query_string,
-        name=name, dirty=dirty, clean=clean, language=language, recent=recent,
-        starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
-        has_citation=has_citation, has_doi=has_doi, has_remote=has_remote,
-        archived=archived, public=public, private=private, fork=fork, no_fork=no_fork,
+        language=language, dirty=dirty, tag=tag, recent=recent,
     )
     if result is None:
         return
@@ -1265,23 +1123,10 @@ def generate_license_handler(
     author: Optional[str],
     debug: bool,
     # Query flags
-    name: Optional[str],
-    dirty: bool,
-    clean: bool,
     language: Optional[str],
-    recent: Optional[str],
-    starred: bool,
+    dirty: bool,
     tag: tuple,
-    no_license: bool,
-    no_readme: bool,
-    has_citation: bool,
-    has_doi: bool,
-    has_remote: bool,
-    archived: bool,
-    public: bool,
-    private: bool,
-    fork: bool,
-    no_fork: bool,
+    recent: Optional[str],
 ):
     """
     Generate LICENSE files for repositories.
@@ -1292,9 +1137,9 @@ def generate_license_handler(
     \b
     Examples:
         # Generate MIT license for repos without license
-        repoindex ops generate license --no-license --dry-run
+        repoindex ops generate license "not has_license" --dry-run
         # Generate Apache 2.0 license
-        repoindex ops generate license --license apache-2.0 --no-license --dry-run
+        repoindex ops generate license --license apache-2.0 "not has_license" --dry-run
         # With custom author name
         repoindex ops generate license --author "My Company Inc." --dry-run
         # Force overwrite existing licenses
@@ -1302,10 +1147,7 @@ def generate_license_handler(
     """
     result = _resolve_repos(
         output_json, debug, query_string,
-        name=name, dirty=dirty, clean=clean, language=language, recent=recent,
-        starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
-        has_citation=has_citation, has_doi=has_doi, has_remote=has_remote,
-        archived=archived, public=public, private=private, fork=fork, no_fork=no_fork,
+        language=language, dirty=dirty, tag=tag, recent=recent,
     )
     if result is None:
         return
@@ -1403,23 +1245,10 @@ def generate_gitignore_handler(
     language_template: str,
     debug: bool,
     # Query flags
-    name: Optional[str],
-    dirty: bool,
-    clean: bool,
     language: Optional[str],
-    recent: Optional[str],
-    starred: bool,
+    dirty: bool,
     tag: tuple,
-    no_license: bool,
-    no_readme: bool,
-    has_citation: bool,
-    has_doi: bool,
-    has_remote: bool,
-    archived: bool,
-    public: bool,
-    private: bool,
-    fork: bool,
-    no_fork: bool,
+    recent: Optional[str],
 ):
     """
     Generate .gitignore files for repositories.
@@ -1440,10 +1269,7 @@ def generate_gitignore_handler(
     """
     result = _resolve_repos(
         output_json, debug, query_string,
-        name=name, dirty=dirty, clean=clean, language=language, recent=recent,
-        starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
-        has_citation=has_citation, has_doi=has_doi, has_remote=has_remote,
-        archived=archived, public=public, private=private, fork=fork, no_fork=no_fork,
+        language=language, dirty=dirty, tag=tag, recent=recent,
     )
     if result is None:
         return
@@ -1489,23 +1315,10 @@ def generate_code_of_conduct_handler(
     email: Optional[str],
     debug: bool,
     # Query flags
-    name: Optional[str],
-    dirty: bool,
-    clean: bool,
     language: Optional[str],
-    recent: Optional[str],
-    starred: bool,
+    dirty: bool,
     tag: tuple,
-    no_license: bool,
-    no_readme: bool,
-    has_citation: bool,
-    has_doi: bool,
-    has_remote: bool,
-    archived: bool,
-    public: bool,
-    private: bool,
-    fork: bool,
-    no_fork: bool,
+    recent: Optional[str],
 ):
     """
     Generate CODE_OF_CONDUCT.md files for repositories.
@@ -1526,10 +1339,7 @@ def generate_code_of_conduct_handler(
     """
     result = _resolve_repos(
         output_json, debug, query_string,
-        name=name, dirty=dirty, clean=clean, language=language, recent=recent,
-        starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
-        has_citation=has_citation, has_doi=has_doi, has_remote=has_remote,
-        archived=archived, public=public, private=private, fork=fork, no_fork=no_fork,
+        language=language, dirty=dirty, tag=tag, recent=recent,
     )
     if result is None:
         return
@@ -1579,23 +1389,10 @@ def generate_contributing_handler(
     force: bool,
     debug: bool,
     # Query flags
-    name: Optional[str],
-    dirty: bool,
-    clean: bool,
     language: Optional[str],
-    recent: Optional[str],
-    starred: bool,
+    dirty: bool,
     tag: tuple,
-    no_license: bool,
-    no_readme: bool,
-    has_citation: bool,
-    has_doi: bool,
-    has_remote: bool,
-    archived: bool,
-    public: bool,
-    private: bool,
-    fork: bool,
-    no_fork: bool,
+    recent: Optional[str],
 ):
     """
     Generate CONTRIBUTING.md files for repositories.
@@ -1614,10 +1411,7 @@ def generate_contributing_handler(
     """
     result = _resolve_repos(
         output_json, debug, query_string,
-        name=name, dirty=dirty, clean=clean, language=language, recent=recent,
-        starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
-        has_citation=has_citation, has_doi=has_doi, has_remote=has_remote,
-        archived=archived, public=public, private=private, fork=fork, no_fork=no_fork,
+        language=language, dirty=dirty, tag=tag, recent=recent,
     )
     if result is None:
         return
@@ -1667,23 +1461,10 @@ def generate_citation_handler(
     affiliation: Optional[str],
     debug: bool,
     # Query flags
-    name: Optional[str],
-    dirty: bool,
-    clean: bool,
     language: Optional[str],
-    recent: Optional[str],
-    starred: bool,
+    dirty: bool,
     tag: tuple,
-    no_license: bool,
-    no_readme: bool,
-    has_citation: bool,
-    has_doi: bool,
-    has_remote: bool,
-    archived: bool,
-    public: bool,
-    private: bool,
-    fork: bool,
-    no_fork: bool,
+    recent: Optional[str],
 ):
     """
     Generate CITATION.cff files for repositories.
@@ -1705,10 +1486,7 @@ def generate_citation_handler(
     """
     result = _resolve_repos(
         output_json, debug, query_string,
-        name=name, dirty=dirty, clean=clean, language=language, recent=recent,
-        starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
-        has_citation=has_citation, has_doi=has_doi, has_remote=has_remote,
-        archived=archived, public=public, private=private, fork=fork, no_fork=no_fork,
+        language=language, dirty=dirty, tag=tag, recent=recent,
     )
     if result is None:
         return
@@ -1767,23 +1545,10 @@ def generate_zenodo_handler(
     affiliation: Optional[str],
     debug: bool,
     # Query flags
-    name: Optional[str],
-    dirty: bool,
-    clean: bool,
     language: Optional[str],
-    recent: Optional[str],
-    starred: bool,
+    dirty: bool,
     tag: tuple,
-    no_license: bool,
-    no_readme: bool,
-    has_citation: bool,
-    has_doi: bool,
-    has_remote: bool,
-    archived: bool,
-    public: bool,
-    private: bool,
-    fork: bool,
-    no_fork: bool,
+    recent: Optional[str],
 ):
     """
     Generate .zenodo.json files for repositories.
@@ -1805,10 +1570,7 @@ def generate_zenodo_handler(
     """
     result = _resolve_repos(
         output_json, debug, query_string,
-        name=name, dirty=dirty, clean=clean, language=language, recent=recent,
-        starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
-        has_citation=has_citation, has_doi=has_doi, has_remote=has_remote,
-        archived=archived, public=public, private=private, fork=fork, no_fork=no_fork,
+        language=language, dirty=dirty, tag=tag, recent=recent,
     )
     if result is None:
         return
@@ -1859,23 +1621,10 @@ def generate_mkdocs_handler(
     force: bool,
     debug: bool,
     # Query flags
-    name: Optional[str],
-    dirty: bool,
-    clean: bool,
     language: Optional[str],
-    recent: Optional[str],
-    starred: bool,
+    dirty: bool,
     tag: tuple,
-    no_license: bool,
-    no_readme: bool,
-    has_citation: bool,
-    has_doi: bool,
-    has_remote: bool,
-    archived: bool,
-    public: bool,
-    private: bool,
-    fork: bool,
-    no_fork: bool,
+    recent: Optional[str],
 ):
     """
     Generate mkdocs.yml files for repositories.
@@ -1892,10 +1641,7 @@ def generate_mkdocs_handler(
     """
     result = _resolve_repos(
         output_json, debug, query_string,
-        name=name, dirty=dirty, clean=clean, language=language, recent=recent,
-        starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
-        has_citation=has_citation, has_doi=has_doi, has_remote=has_remote,
-        archived=archived, public=public, private=private, fork=fork, no_fork=no_fork,
+        language=language, dirty=dirty, tag=tag, recent=recent,
     )
     if result is None:
         return
@@ -1937,23 +1683,10 @@ def generate_gh_pages_handler(
     force: bool,
     debug: bool,
     # Query flags
-    name: Optional[str],
-    dirty: bool,
-    clean: bool,
     language: Optional[str],
-    recent: Optional[str],
-    starred: bool,
+    dirty: bool,
     tag: tuple,
-    no_license: bool,
-    no_readme: bool,
-    has_citation: bool,
-    has_doi: bool,
-    has_remote: bool,
-    archived: bool,
-    public: bool,
-    private: bool,
-    fork: bool,
-    no_fork: bool,
+    recent: Optional[str],
 ):
     """
     Generate GitHub Pages deployment workflow for repositories.
@@ -1970,10 +1703,7 @@ def generate_gh_pages_handler(
     """
     result = _resolve_repos(
         output_json, debug, query_string,
-        name=name, dirty=dirty, clean=clean, language=language, recent=recent,
-        starred=starred, tag=tag, no_license=no_license, no_readme=no_readme,
-        has_citation=has_citation, has_doi=has_doi, has_remote=has_remote,
-        archived=archived, public=public, private=private, fork=fork, no_fork=no_fork,
+        language=language, dirty=dirty, tag=tag, recent=recent,
     )
     if result is None:
         return

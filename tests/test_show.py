@@ -517,46 +517,23 @@ class TestQueryColumnsAlias:
                 assert 'No such option' not in (result.output or '')
 
 
-class TestOpsNameOption:
-    """Test that --name works in ops git subcommands."""
+class TestOpsQueryOptionsMinimal:
+    """Test that query_options provides the 4 essential flags."""
 
-    def test_git_status_accepts_name(self):
-        """ops git status accepts --name option."""
+    def test_git_status_accepts_language(self):
+        """ops git status accepts --language option."""
         from repoindex.commands.ops import git_status_handler
 
         runner = CliRunner()
         with patch('repoindex.commands.ops.load_config', return_value={}):
             with patch('repoindex.commands.ops._get_repos_from_query', return_value=[]):
-                result = runner.invoke(git_status_handler, ['--name', 'test-repo'])
-                # Should not fail with "No such option"
+                result = runner.invoke(git_status_handler, ['--language', 'python'])
                 assert 'No such option' not in (result.output or '')
 
-    def test_git_push_accepts_name(self):
-        """ops git push accepts --name option."""
-        from repoindex.commands.ops import git_push_handler
-
-        runner = CliRunner()
-        with patch('repoindex.commands.ops.load_config', return_value={}):
-            with patch('repoindex.commands.ops._get_repos_from_query', return_value=[]):
-                result = runner.invoke(git_push_handler, ['--name', 'test-repo'])
-                assert 'No such option' not in (result.output or '')
-
-    def test_git_pull_accepts_name(self):
-        """ops git pull accepts --name option."""
-        from repoindex.commands.ops import git_pull_handler
-
-        runner = CliRunner()
-        with patch('repoindex.commands.ops.load_config', return_value={}):
-            with patch('repoindex.commands.ops._get_repos_from_query', return_value=[]):
-                result = runner.invoke(git_pull_handler, ['--name', 'test-repo'])
-                assert 'No such option' not in (result.output or '')
-
-    def test_ops_has_remote_option(self):
-        """ops git status accepts --has-remote option."""
+    def test_removed_flags_are_gone(self):
+        """Removed flags like --name, --has-remote should not be accepted."""
         from repoindex.commands.ops import git_status_handler
 
         runner = CliRunner()
-        with patch('repoindex.commands.ops.load_config', return_value={}):
-            with patch('repoindex.commands.ops._get_repos_from_query', return_value=[]):
-                result = runner.invoke(git_status_handler, ['--has-remote'])
-                assert 'No such option' not in (result.output or '')
+        result = runner.invoke(git_status_handler, ['--has-remote'])
+        assert result.exit_code != 0

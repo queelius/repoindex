@@ -34,23 +34,10 @@ def export_handler(
     list_formats: bool,
     debug: bool,
     # Query flags from decorator
-    name: Optional[str],
-    dirty: bool,
-    clean: bool,
     language: Optional[str],
-    recent: Optional[str],
-    starred: bool,
+    dirty: bool,
     tag: tuple,
-    no_license: bool,
-    no_readme: bool,
-    has_citation: bool,
-    has_doi: bool,
-    has_remote: bool,
-    archived: bool,
-    public: bool,
-    private: bool,
-    fork: bool,
-    no_fork: bool,
+    recent: Optional[str],
 ):
     """
     Export repository data in various formats.
@@ -70,7 +57,7 @@ def export_handler(
         repoindex export bibtex --language python > refs.bib
 
         # CSV of starred repos
-        repoindex export csv --starred > repos.csv
+        repoindex export csv "github_stars > 0" > repos.csv
 
         # Arkiv archive to directory
         repoindex export arkiv -o ~/exports/repos/
@@ -124,13 +111,7 @@ def export_handler(
     # Query repos from database using the standard helper
     repos = _get_repos_from_query(
         config, query_string, debug=debug,
-        name=name, dirty=dirty, clean=clean, language=language,
-        recent=recent, starred=starred, tag=tag,
-        no_license=no_license, no_readme=no_readme,
-        has_citation=has_citation, has_doi=has_doi,
-        has_remote=has_remote,
-        archived=archived, public=public, private=private,
-        fork=fork, no_fork=no_fork,
+        language=language, dirty=dirty, tag=tag, recent=recent,
     )
 
     # Write output

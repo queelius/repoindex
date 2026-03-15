@@ -884,15 +884,19 @@ class TestOpsCommands:
         assert 'audit' in commands
 
     def test_query_options_decorator(self):
-        """Test that query_options adds expected options."""
+        """Test that query_options adds the 4 essential options."""
         from repoindex.commands.ops import git_push_handler
 
-        # Check that the handler has query-related options
+        # Check that the handler has the 4 kept query options
         params = [p.name for p in git_push_handler.params]
         assert 'dirty' in params
-        assert 'clean' in params
         assert 'language' in params
         assert 'tag' in params
+        assert 'recent' in params
+        # Removed flags should not be present
+        assert 'clean' not in params
+        assert 'starred' not in params
+        assert 'no_license' not in params
 
 
 class TestOpsCommandHelpers:

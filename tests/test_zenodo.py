@@ -881,18 +881,14 @@ class TestHasDoi:
 # ──────────────────────────────────────────────
 
 class TestQueryHasDoiFlag:
-    """Tests for the --has-doi query flag using has_doi() function."""
+    """Tests for has_doi() DSL query (formerly --has-doi flag)."""
 
-    def test_has_doi_flag_generates_has_doi_function(self):
-        """Test that --has-doi flag generates has_doi() DSL query."""
+    def test_has_doi_dsl_query(self):
+        """Test that has_doi() works as DSL query."""
         from repoindex.commands.query import _build_query_from_flags
 
         result = _build_query_from_flags(
-            query_string=None,
-            dirty=False, clean=False, language=None, recent=None,
-            starred=False, tag=[], no_license=False, no_readme=False,
-            has_citation=False, has_doi=True, archived=False,
-            public=False, private=False, fork=False, no_fork=False,
+            query_string="has_doi()",
         )
         assert 'has_doi()' in result
 

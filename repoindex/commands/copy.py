@@ -39,21 +39,10 @@ def _format_bytes(bytes_val: int) -> str:
 @click.option('--collision', type=click.Choice(['rename', 'skip', 'overwrite']),
               default='rename', help='How to handle name collisions (default: rename)')
 # Query convenience flags (same as query command)
+@click.option('--language', '-l', help='Filter by language (e.g., python, r, js)')
 @click.option('--dirty', is_flag=True, help='Repos with uncommitted changes')
-@click.option('--clean', is_flag=True, help='Repos with no uncommitted changes')
-@click.option('--language', '-l', help='Filter by language (e.g., python, js, rust)')
-@click.option('--recent', '-r', help='Repos with recent commits (e.g., 7d, 30d)')
-@click.option('--starred', is_flag=True, help='Repos with stars')
 @click.option('--tag', '-t', multiple=True, help='Filter by tag (supports wildcards)')
-@click.option('--no-license', is_flag=True, help='Repos without a license')
-@click.option('--no-readme', is_flag=True, help='Repos without a README')
-@click.option('--has-citation', is_flag=True, help='Repos with citation files')
-@click.option('--has-doi', is_flag=True, help='Repos with DOI in citation metadata')
-@click.option('--archived', is_flag=True, help='Archived repos only')
-@click.option('--public', is_flag=True, help='Public repos only')
-@click.option('--private', is_flag=True, help='Private repos only')
-@click.option('--fork', is_flag=True, help='Forked repos only')
-@click.option('--no-fork', is_flag=True, help='Non-forked repos only')
+@click.option('--recent', '-r', help='Repos with recent commits (e.g., 7d, 30d)')
 @click.option('--debug', is_flag=True, help='Enable debug logging')
 def copy_handler(
     destination: str,
@@ -64,21 +53,10 @@ def copy_handler(
     preserve_structure: bool,
     collision: str,
     # Query flags
-    dirty: bool,
-    clean: bool,
     language: Optional[str],
-    recent: Optional[str],
-    starred: bool,
+    dirty: bool,
     tag: tuple,
-    no_license: bool,
-    no_readme: bool,
-    has_citation: bool,
-    has_doi: bool,
-    archived: bool,
-    public: bool,
-    private: bool,
-    fork: bool,
-    no_fork: bool,
+    recent: Optional[str],
     debug: bool,
 ):
     """
@@ -115,13 +93,11 @@ def copy_handler(
     config = load_config()
 
     # Build query from flags
-    has_flags = any([dirty, clean, language, recent, starred, tag, no_license, no_readme,
-                     has_citation, has_doi, archived, public, private, fork, no_fork])
+    has_flags = any([dirty, language, recent, tag])
     if has_flags:
         query_string = _build_query_from_flags(
             query_string if query_string else None,
-            dirty, clean, language, recent, starred, list(tag),
-            no_license, no_readme, has_citation, has_doi, archived, public, private, fork, no_fork
+            dirty=dirty, language=language, recent=recent, tag=list(tag),
         )
 
     # If no query and no flags, copy all repos
