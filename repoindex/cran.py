@@ -6,7 +6,6 @@ This module provides functionality to detect R packages in repositories
 and check their status on CRAN, similar to the PyPI integration for Python.
 """
 
-import re
 import requests
 from pathlib import Path
 from typing import Dict, Optional, List
@@ -129,33 +128,28 @@ def extract_package_info(repo_path: str) -> Dict[str, Optional[str]]:
 def check_cran_package(package_name: str) -> Optional[Dict]:
     """Check if a package exists on CRAN and get its info.
 
-    Uses the CRAN web API to check package availability.
+    Uses the crandb JSON API (https://crandb.r-pkg.org/).
     """
     try:
         config = load_config()
         timeout = config.get('cran', {}).get('timeout_seconds', 10)
 
-        # CRAN package info endpoint
-        url = f"https://cran.r-project.org/web/packages/{package_name}/index.html"
-        response = requests.get(url, timeout=timeout, allow_redirects=True)
+        response = requests.get(
+            f'https://crandb.r-pkg.org/{package_name}', timeout=timeout,
+        )
 
         if response.status_code == 200:
-            # Package exists - try to get version from page
-            version = None
-            version_match = re.search(r'Version:\s*</td>\s*<td>([^<]+)</td>', response.text)
-            if version_match:
-                version = version_match.group(1).strip()
-
+            data = response.json()
             return {
                 'exists': True,
-                'version': version,
+                'version': data.get('Version'),
                 'url': f"https://cran.r-project.org/package={package_name}",
-                'registry': 'cran'
+                'registry': 'cran',
             }
         elif response.status_code == 404:
             return {'exists': False}
         else:
-            logger.warning(f"CRAN returned status {response.status_code} for {package_name}")
+            logger.warning(f"crandb returned status {response.status_code} for {package_name}")
             return None
 
     except requests.RequestException as e:
@@ -169,29 +163,22 @@ def check_cran_package(package_name: str) -> Optional[Dict]:
 def check_bioconductor_package(package_name: str) -> Optional[Dict]:
     """Check if a package exists on Bioconductor.
 
-    Bioconductor is the other major R package repository,
-    focused on bioinformatics packages.
+    Uses the Bioconductor JSON API.
     """
     try:
         config = load_config()
         timeout = config.get('cran', {}).get('timeout_seconds', 10)
 
-        # Bioconductor package info endpoint
-        url = f"https://bioconductor.org/packages/release/bioc/html/{package_name}.html"
-        response = requests.get(url, timeout=timeout, allow_redirects=True)
+        response = requests.get(
+            f'https://bioconductor.org/packages/json/3.20/bioc/{package_name}',
+            timeout=timeout,
+        )
 
         if response.status_code == 200:
-            # Package exists
-            version = None
-            version_match = re.search(r'Version:\s*([^\s<]+)', response.text)
-            if version_match:
-                version = version_match.group(1).strip()
-
             return {
                 'exists': True,
-                'version': version,
                 'url': f"https://bioconductor.org/packages/{package_name}",
-                'registry': 'bioconductor'
+                'registry': 'bioconductor',
             }
         elif response.status_code == 404:
             return {'exists': False}

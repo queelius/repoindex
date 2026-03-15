@@ -220,14 +220,18 @@ Suggests: testthat, knitr
 
 
 class TestCheckCranPackage(unittest.TestCase):
-    """Test CRAN API interaction."""
+    """Test CRAN API interaction via crandb JSON API."""
 
     @patch('repoindex.cran.requests.get')
     def test_package_exists(self, mock_get):
-        """Check existing CRAN package."""
+        """Check existing CRAN package via crandb JSON."""
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.text = '<td>Version:</td>\n<td>1.4.0</td>'
+        mock_response.json.return_value = {
+            'Package': 'dplyr',
+            'Version': '1.4.0',
+            'Title': 'A Grammar of Data Manipulation',
+        }
         mock_get.return_value = mock_response
 
         result = check_cran_package('dplyr')
@@ -236,6 +240,8 @@ class TestCheckCranPackage(unittest.TestCase):
         self.assertTrue(result['exists'])
         self.assertEqual(result['version'], '1.4.0')
         self.assertEqual(result['registry'], 'cran')
+        mock_get.assert_called_once()
+        self.assertIn('crandb.r-pkg.org/dplyr', mock_get.call_args[0][0])
 
     @patch('repoindex.cran.requests.get')
     def test_package_not_found(self, mock_get):
@@ -260,14 +266,13 @@ class TestCheckCranPackage(unittest.TestCase):
 
 
 class TestCheckBioconductorPackage(unittest.TestCase):
-    """Test Bioconductor API interaction."""
+    """Test Bioconductor JSON API interaction."""
 
     @patch('repoindex.cran.requests.get')
     def test_package_exists(self, mock_get):
-        """Check existing Bioconductor package."""
+        """Check existing Bioconductor package via JSON API."""
         mock_response = MagicMock()
         mock_response.status_code = 200
-        mock_response.text = 'Version: 3.14.0'
         mock_get.return_value = mock_response
 
         result = check_bioconductor_package('GenomicRanges')
@@ -275,6 +280,7 @@ class TestCheckBioconductorPackage(unittest.TestCase):
         self.assertIsNotNone(result)
         self.assertTrue(result['exists'])
         self.assertEqual(result['registry'], 'bioconductor')
+        self.assertIn('bioconductor.org/packages/json', mock_get.call_args[0][0])
 
     @patch('repoindex.cran.requests.get')
     def test_package_not_found(self, mock_get):
