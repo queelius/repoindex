@@ -57,7 +57,7 @@ Generate boilerplate files across repos. Uses author info from config (`repoinde
 repoindex ops generate codemeta --language python --dry-run
 
 # Generate LICENSE files
-repoindex ops generate license --license mit --no-license --dry-run
+repoindex ops generate license --license mit --dry-run
 repoindex ops generate license --license apache-2.0 --dry-run
 
 # Generate .gitignore
@@ -70,12 +70,12 @@ repoindex ops generate contributing --dry-run
 
 # Generate citation and documentation
 repoindex ops generate citation --language python --dry-run
-repoindex ops generate zenodo --has-citation --dry-run
+repoindex ops generate zenodo --dry-run
 repoindex ops generate mkdocs --language python --dry-run
 repoindex ops generate gh-pages --dry-run
 ```
 
-All generation commands support query flags (`--language`, `--tag`, `--dirty`, etc.) and `--force` to overwrite existing files.
+All generation commands support query flags (`--language`, `--dirty`, `--tag`, `--recent`) and `--force` to overwrite existing files. Use DSL expressions for additional filtering.
 
 ## GitHub Operations
 
@@ -94,16 +94,11 @@ repoindex ops github set-description --from-pyproject --dry-run
 
 ## Query Integration
 
-All ops subcommands support the same query flags as `query`:
+All ops subcommands support 4 shorthand flags plus DSL expressions:
 
 ```bash
-repoindex ops audit --language python --starred
+repoindex ops audit --language python
 repoindex ops git push --tag "work/*"
-repoindex ops generate license --no-license --language rust
-```
-
-Or use a query expression as positional argument:
-
-```bash
+repoindex ops generate license --language rust "not has_license"
 repoindex ops audit "language == 'Python' and github_stars > 0"
 ```

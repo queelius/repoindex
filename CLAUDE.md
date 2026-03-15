@@ -4,7 +4,7 @@
 
 **repoindex is a filesystem git catalog.** It indexes local git directories — the filesystem path IS the canonical identity. External platforms (GitHub, PyPI, CRAN) provide opt-in enrichment metadata, namespaced with prefixes (`github_stars`, `pypi_published`).
 
-**Version**: 0.11.0 | **Design**: [DESIGN.md](DESIGN.md)
+**Version**: 0.12.0 | **Design**: [DESIGN.md](DESIGN.md)
 
 ## Development Commands
 
@@ -21,7 +21,7 @@ pytest -k "test_status" -v                           # Pattern match
 pytest --cov=repoindex --cov-report=html             # Coverage (ALWAYS after changes)
 ```
 
-All `make` targets auto-activate `.venv/`. Test suite has **1500+ tests** in `tests/`.
+All `make` targets auto-activate `.venv/`. Test suite has **1600+ tests** in `tests/`.
 
 ## Architecture
 
@@ -43,9 +43,11 @@ commands/            services/    database/          domain/
 
 **Providers** (`providers/`): Registry detection via `RegistryProvider` ABC (`detect`, `check`, `match`, `prefetch`). Built-in: pypi, cran, zenodo, npm, cargo, conda, docker, rubygems, go. User extensions: `~/.repoindex/providers/*.py` with module-level `provider` attribute.
 
-**Exporters** (`exporters/`): Output renderers via `Exporter` ABC (`export(repos, output, config)`). Built-in: bibtex, csv, markdown, opml, jsonld, arkiv. User extensions: `~/.repoindex/exporters/*.py` with module-level `exporter` attribute.
+**Exporters** (`exporters/`): Output renderers via `Exporter` ABC (`export(repos, output, config)`). Built-in: bibtex, csv, markdown, opml, jsonld, arkiv. User extensions: `~/.repoindex/exporters/*.py` with module-level `exporter` attribute. The `export` command defaults to longecho-compliant arkiv archives; format-based exports are secondary.
 
 Discovery: `discover_providers(only=['pypi','npm'])` / `discover_exporters()`.
+
+**MCP Server** (`mcp/`): Provides LLM access to the database via 4 tools (`get_manifest`, `get_schema`, `run_sql`, `refresh`). Entry point: `repoindex mcp`. Requires `pip install repoindex[mcp]`.
 
 ### Database Usage
 
@@ -84,12 +86,12 @@ mock_run_command.return_value = (None, 1)        # Failure
 
 - `commands/query.py`: `_build_query_from_flags()` — converts CLI flags to query
 - `commands/ops.py`: `_resolve_repos()`, `_get_repos_from_query()` — fetch filtered repos from DB
-- `commands/ops.py`: `query_options` decorator — shared `--dirty`, `--language`, `--tag`, etc. flags
+- `commands/ops.py`: `query_options` decorator — shared `--dirty`, `--language`, `--tag`, `--recent` flags (4 essential shorthands; other filters via DSL)
 
 ### Output Contract
 
 - **Read commands** (`query`, `events`, `show`): Pretty tables by default, `--json` for JSONL
-- **Write commands** (`ops`, `copy`, `link`, `render`): Pretty output by default, `--json` for JSONL
+- **Write commands** (`ops`, `copy`, `link`, `export`): Pretty output by default, `--json` for JSONL
 - Errors to stderr as JSON: `{"error": "msg", "type": "...", "context": {...}}`
 - `--brief` for repo names only (one per line)
 - Use `flush=True` on JSONL prints for streaming
@@ -108,18 +110,18 @@ mock_run_command.return_value = (None, 1)        # Failure
 - Domain: direct instantiation, no mocking needed
 - `pyfakefs` available for complex filesystem scenarios
 
-## Commands (15 total)
+## Commands (16 total)
 
 ```
 repoindex
 ├── status    # Health dashboard
-├── query     # Filter repos (flags or DSL expressions)
+├── query     # Filter repos (DSL expressions + 4 shorthand flags)
 ├── events    # Query git events from database
 ├── sql       # Raw SQL + DB maintenance (--info, --schema, --reset, --vacuum)
 ├── refresh   # Sync DB from filesystem (--github, --pypi, --cran, --external)
 ├── show      # Detailed single-repo view
 ├── digest    # Summarize recent activity (conventional commit breakdown)
-├── render    # Export to formats via exporter plugins (bibtex, csv, etc.)
+├── export    # Longecho-compliant arkiv archive (default) or format plugins
 ├── copy      # Copy repos with query filtering
 ├── link      # Symlink tree management (tree/refresh/status)
 ├── ops       # Collection operations
@@ -128,6 +130,7 @@ repoindex
 ├── tag       # Tag management (add/remove/list/tree)
 ├── view      # Saved named queries
 ├── config    # Settings management
+├── mcp       # MCP server (stdio transport, requires repoindex[mcp])
 └── shell     # Interactive VFS navigation
 ```
 
@@ -176,7 +179,7 @@ Key sections: `repository_directories` (glob patterns), `github.token` (or `GITH
 2. **Database-First** — `refresh` populates SQLite; read commands query it (no live scanning)
 3. **Unix Philosophy** — compose via pipes, JSONL streams, errors to stderr
 4. **Namespaced Fields** — `github_stars`, `pypi_published`, `cran_version`
-5. **Three Query Layers** — flags (80%), DSL (15%), raw SQL (5%)
+5. **Three Query Layers** — DSL primary, 4 shorthand flags, raw SQL for power users
 6. **Pluggable Extensions** — provider/exporter ABCs with `~/.repoindex/` user directories
 
 ## Project Structure

@@ -14,7 +14,8 @@ Claude Code (deep work on ONE repo)
          +-- events   -> what happened
          +-- tags     -> organization
          +-- ops      -> collection operations
-         +-- render   -> export formats
+         +-- export   -> longecho-compliant archives
+         +-- mcp      -> LLM access via MCP server
 ```
 
 ## Quick Start
@@ -34,8 +35,8 @@ Pretty tables by default. `--json` for JSONL pipes.
 repoindex query --dirty                           # Uncommitted changes
 repoindex query --language python                  # By language
 repoindex query --tag "work/*"                     # By tag
-repoindex query --starred                          # GitHub stars
-repoindex query "language == 'Python' and github_stars > 10"  # DSL
+repoindex query "github_stars > 0"                 # DSL expression
+repoindex query "language == 'Python' and github_stars > 10"  # Complex DSL
 repoindex query --json --language python | jq '.name'         # Pipe
 ```
 
@@ -59,23 +60,34 @@ Multi-repo git operations, metadata audit, file generation, GitHub ops.
 ```bash
 repoindex ops git push --dry-run
 repoindex ops audit --language python
-repoindex ops generate license --license mit --no-license --dry-run
+repoindex ops generate license --license mit --dry-run
 repoindex ops github set-topics --from-pyproject --dry-run
 ```
 
 See [Ops & Audit](ops.md).
 
-## Render
+## Export
 
-Export as BibTeX, CSV, Markdown, OPML, JSON-LD, Arkiv. Stdout by default.
+Default: longecho-compliant arkiv archive with embedded HTML browser.
 
 ```bash
-repoindex render bibtex --language python > refs.bib
-repoindex render csv --starred > repos.csv
-repoindex render --list-formats
+repoindex export -o ~/archives/repos/                    # Full archive
+repoindex export -o ~/archives/python/ --language python  # Filtered
+repoindex export csv > repos.csv                          # Format plugin
+repoindex export --list-formats                           # Available plugins
 ```
 
-User-extensible via `~/.repoindex/exporters/`. See [Render Formats](render.md).
+User-extensible via `~/.repoindex/exporters/`. See [Export](export.md).
+
+## MCP Server
+
+LLM access to the database via Model Context Protocol.
+
+```bash
+repoindex mcp   # 4 tools: get_manifest, get_schema, run_sql, refresh
+```
+
+Requires: `pip install repoindex[mcp]`
 
 ## Refresh
 

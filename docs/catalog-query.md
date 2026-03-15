@@ -49,16 +49,25 @@ repoindex query "'ml' in tags and github_stars > 5"
 repoindex query "'machine-learning' in github_topics"
 ```
 
-### Convenience Flags
+### Shorthand Flags
+
+Four essential shorthands; everything else via DSL:
 
 ```bash
 repoindex query --dirty              # Uncommitted changes
 repoindex query --language python    # By language
 repoindex query --tag "work/*"       # By tag
-repoindex query --starred            # GitHub stars
-repoindex query --has-doi            # Has DOI
-repoindex query --no-license         # Missing license
 repoindex query --recent 7d          # Recent commits
+```
+
+### DSL for Everything Else
+
+```bash
+repoindex query "github_stars > 0"                    # Starred repos
+repoindex query "has_doi"                             # Has DOI
+repoindex query "not has_license"                     # Missing license
+repoindex query "github_is_archived"                  # Archived repos
+repoindex query "not github_is_private"               # Public repos
 ```
 
 ### Citation Fields
@@ -66,7 +75,7 @@ repoindex query --recent 7d          # Recent commits
 Repos with CITATION.cff or .zenodo.json expose: `citation_doi`, `citation_title`, `citation_authors`, `citation_version`.
 
 ```bash
-repoindex query --has-doi
+repoindex query "has_doi"
 repoindex sql "SELECT name, citation_doi FROM repos WHERE citation_doi IS NOT NULL"
 ```
 
