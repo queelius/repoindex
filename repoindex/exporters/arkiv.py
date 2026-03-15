@@ -24,10 +24,11 @@ def _repo_to_arkiv(repo: dict) -> dict:
     record = {
         'mimetype': 'inode/directory',
         'uri': f'file://{path}',
-        'content': None,
-        'timestamp': repo.get('scanned_at'),
         'metadata': {},
     }
+    scanned_at = repo.get('scanned_at')
+    if scanned_at is not None:
+        record['timestamp'] = scanned_at
 
     # Core identity
     meta = record['metadata']
@@ -132,20 +133,20 @@ def _event_to_arkiv(event: dict) -> dict:
 
     record = {
         'uri': uri,
-        'timestamp': event.get('timestamp'),
         'metadata': {
             'type': event.get('type'),
             'repo': event.get('repo_name'),
         },
     }
 
+    timestamp = event.get('timestamp')
+    if timestamp is not None:
+        record['timestamp'] = timestamp
+
     # Has a message -> text/plain content
     if message:
         record['mimetype'] = 'text/plain'
         record['content'] = message
-    else:
-        record['mimetype'] = None
-        record['content'] = None
 
     # Additional metadata
     meta = record['metadata']
@@ -341,13 +342,13 @@ class ArkivExporter(Exporter):
         if config is not None:
             try:
                 with Database(config=config, read_only=True) as db:
-                    # Get repo IDs for the filtered repos
-                    repo_paths = {r.get('path') for r in repos}
-                    for event in get_events(db):
-                        if event.get('repo_path') in repo_paths:
-                            record = _event_to_arkiv(event)
-                            output.write(json.dumps(record, default=str) + '\n')
-                            count += 1
+                    for repo in repos:
+                        repo_id = repo.get('id')
+                        if repo_id is not None:
+                            for event in get_events(db, repo_id=repo_id):
+                                record = _event_to_arkiv(event)
+                                output.write(json.dumps(record, default=str) + '\n')
+                                count += 1
             except Exception:
                 # If DB access fails, just export repos without events
                 pass

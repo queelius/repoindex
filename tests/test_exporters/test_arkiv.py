@@ -99,9 +99,9 @@ class TestRepoToArkiv:
         record = _repo_to_arkiv(SAMPLE_REPO)
         assert record['uri'] == 'file:///home/user/alpha-lib'
 
-    def test_content_is_null(self):
+    def test_content_omitted(self):
         record = _repo_to_arkiv(SAMPLE_REPO)
-        assert record['content'] is None
+        assert 'content' not in record
 
     def test_timestamp_from_scanned_at(self):
         record = _repo_to_arkiv(SAMPLE_REPO)
@@ -158,7 +158,8 @@ class TestRepoToArkiv:
         record = _repo_to_arkiv(MINIMAL_REPO)
         assert record['mimetype'] == 'inode/directory'
         assert record['uri'] == 'file:///home/user/bare-repo'
-        assert record['content'] is None
+        assert 'content' not in record
+        assert 'timestamp' not in record
         assert record['metadata']['name'] == 'bare-repo'
         # No github, citation, etc.
         assert 'github' not in record['metadata']
@@ -234,8 +235,8 @@ class TestEventToArkiv:
 
     def test_unannotated_tag_no_content(self):
         record = _event_to_arkiv(UNANNOTATED_TAG_EVENT)
-        assert record['mimetype'] is None
-        assert record['content'] is None
+        assert 'mimetype' not in record
+        assert 'content' not in record
 
     def test_unannotated_tag_uri(self):
         record = _event_to_arkiv(UNANNOTATED_TAG_EVENT)
@@ -312,13 +313,16 @@ class TestArkivExporter:
                 assert 'mimetype' in record
 
     def test_export_preserves_all_arkiv_fields(self):
-        """Verify the arkiv invariant: mimetype, uri, content, timestamp, metadata."""
+        """Verify arkiv fields: present fields included, absent fields omitted."""
         e = ArkivExporter()
         out = io.StringIO()
         e.export([SAMPLE_REPO], out)
         out.seek(0)
         record = json.loads(out.readline())
-        assert set(record.keys()) == {'mimetype', 'uri', 'content', 'timestamp', 'metadata'}
+        assert 'mimetype' in record
+        assert 'uri' in record
+        assert 'metadata' in record
+        assert 'content' not in record
 
     def test_export_no_config_skips_events(self):
         """Without config=None, no events are fetched."""
