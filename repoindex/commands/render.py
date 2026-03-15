@@ -141,18 +141,31 @@ def export_handler(
             from ..database.events import get_events
 
             events = []
+            publications = []
             try:
                 with Database(config=config, read_only=True) as db:
                     for repo in repos:
                         repo_id = repo.get('id')
                         if repo_id is not None:
                             events.extend(get_events(db, repo_id=repo_id))
+                    # Fetch publications for filtered repos
+                    repo_ids = [r['id'] for r in repos if r.get('id')]
+                    if repo_ids:
+                        placeholders = ','.join('?' * len(repo_ids))
+                        db.execute(
+                            f"SELECT p.*, r.name as repo_name, r.path as repo_path "
+                            f"FROM publications p JOIN repos r ON p.repo_id = r.id "
+                            f"WHERE p.repo_id IN ({placeholders})",
+                            tuple(repo_ids),
+                        )
+                        publications = [dict(row) for row in db.fetchall()]
             except Exception as e:
-                click.echo(f"Warning: could not fetch events: {e}", err=True)
+                click.echo(f"Warning: could not fetch data: {e}", err=True)
 
-            counts = export_archive(output_file, repos, events)
+            counts = export_archive(output_file, repos, events, publications=publications)
             click.echo(
-                f"Exported {counts['repos']} repos and {counts['events']} events to {output_file}/",
+                f"Exported {counts['repos']} repos, {counts['events']} events, "
+                f"{counts['publications']} publications to {output_file}/",
                 err=True,
             )
         else:

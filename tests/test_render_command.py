@@ -133,7 +133,7 @@ class TestExportArkiv:
         mock_db_class.return_value.__exit__ = MagicMock(return_value=False)
 
         with patch('repoindex.database.events.get_events', return_value=[]):
-            with patch('repoindex.exporters.arkiv.export_archive', return_value={'repos': 1, 'events': 0}) as mock_archive:
+            with patch('repoindex.exporters.arkiv.export_archive', return_value={'repos': 1, 'events': 0, 'publications': 0}) as mock_archive:
                 outdir = str(tmp_path / 'arkiv_out')
                 result = runner.invoke(export_handler, ['arkiv', '-o', outdir])
                 assert result.exit_code == 0

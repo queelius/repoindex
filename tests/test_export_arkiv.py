@@ -1,5 +1,6 @@
 """Tests for arkiv directory export."""
 import json
+import sqlite3
 import pytest
 import yaml
 
@@ -108,6 +109,7 @@ class TestExportArchive:
         counts = export_archive(tmp_path, MOCK_REPOS, MOCK_EVENTS, version='0.12.0')
         assert counts['repos'] == 1
         assert counts['events'] == 1
+        assert counts['publications'] == 0
 
     def test_creates_subdirectory(self, tmp_path):
         from repoindex.exporters.arkiv import export_archive
@@ -194,3 +196,154 @@ class TestDiscoverSchema:
         schema = _discover_schema(records)
         # string appears 2x, number 1x — string wins
         assert schema['val']['type'] == 'string'
+
+
+MOCK_PUBLICATIONS = [
+    {
+        'registry': 'pypi', 'package_name': 'myrepo', 'current_version': '1.0.0',
+        'published': 1, 'url': 'https://pypi.org/project/myrepo/',
+        'doi': None, 'downloads_total': None, 'downloads_30d': None,
+        'scanned_at': '2026-02-28T10:00:00',
+        'last_published': None,
+        'repo_name': 'myrepo', 'repo_path': '/home/user/github/myrepo',
+    },
+]
+
+
+class TestExportArchivePublications:
+    def test_publications_jsonl_created(self, tmp_path):
+        from repoindex.exporters.arkiv import export_archive
+        export_archive(tmp_path, MOCK_REPOS, MOCK_EVENTS, publications=MOCK_PUBLICATIONS, version='0.12.0')
+        assert (tmp_path / "publications.jsonl").exists()
+
+    def test_publications_jsonl_valid_records(self, tmp_path):
+        from repoindex.exporters.arkiv import export_archive
+        export_archive(tmp_path, MOCK_REPOS, MOCK_EVENTS, publications=MOCK_PUBLICATIONS, version='0.12.0')
+        with open(tmp_path / "publications.jsonl") as f:
+            records = [json.loads(line) for line in f if line.strip()]
+        assert len(records) == 1
+        assert records[0]['mimetype'] == 'application/json'
+        assert records[0]['uri'] == 'https://pypi.org/project/myrepo/'
+        assert records[0]['metadata']['registry'] == 'pypi'
+        assert records[0]['metadata']['package_name'] == 'myrepo'
+
+    def test_publications_in_schema(self, tmp_path):
+        from repoindex.exporters.arkiv import export_archive
+        export_archive(tmp_path, MOCK_REPOS, MOCK_EVENTS, publications=MOCK_PUBLICATIONS, version='0.12.0')
+        with open(tmp_path / "schema.yaml") as f:
+            schema = yaml.safe_load(f)
+        assert 'publications' in schema
+        assert schema['publications']['record_count'] == 1
+
+    def test_publications_in_readme_frontmatter(self, tmp_path):
+        from repoindex.exporters.arkiv import export_archive
+        export_archive(tmp_path, MOCK_REPOS, MOCK_EVENTS, publications=MOCK_PUBLICATIONS, version='0.12.0')
+        content = (tmp_path / "README.md").read_text()
+        parts = content.split('---\n', 2)
+        fm = yaml.safe_load(parts[1])
+        paths = [c['path'] for c in fm['contents']]
+        assert 'publications.jsonl' in paths
+
+    def test_publications_in_readme_body(self, tmp_path):
+        from repoindex.exporters.arkiv import export_archive
+        export_archive(tmp_path, MOCK_REPOS, MOCK_EVENTS, publications=MOCK_PUBLICATIONS, version='0.12.0')
+        content = (tmp_path / "README.md").read_text()
+        assert 'publications.jsonl' in content
+        assert '1 publication records' in content
+
+    def test_no_publications_no_file(self, tmp_path):
+        from repoindex.exporters.arkiv import export_archive
+        export_archive(tmp_path, MOCK_REPOS, MOCK_EVENTS, publications=[], version='0.12.0')
+        assert not (tmp_path / "publications.jsonl").exists()
+
+    def test_publications_default_none(self, tmp_path):
+        from repoindex.exporters.arkiv import export_archive
+        counts = export_archive(tmp_path, MOCK_REPOS, MOCK_EVENTS, version='0.12.0')
+        assert counts['publications'] == 0
+        assert not (tmp_path / "publications.jsonl").exists()
+
+    def test_no_publications_not_in_schema(self, tmp_path):
+        from repoindex.exporters.arkiv import export_archive
+        export_archive(tmp_path, MOCK_REPOS, MOCK_EVENTS, publications=[], version='0.12.0')
+        with open(tmp_path / "schema.yaml") as f:
+            schema = yaml.safe_load(f)
+        assert 'publications' not in schema
+
+    def test_no_publications_not_in_readme_frontmatter(self, tmp_path):
+        from repoindex.exporters.arkiv import export_archive
+        export_archive(tmp_path, MOCK_REPOS, MOCK_EVENTS, version='0.12.0')
+        content = (tmp_path / "README.md").read_text()
+        parts = content.split('---\n', 2)
+        fm = yaml.safe_load(parts[1])
+        paths = [c['path'] for c in fm['contents']]
+        assert 'publications.jsonl' not in paths
+
+    def test_counts_include_publications(self, tmp_path):
+        from repoindex.exporters.arkiv import export_archive
+        counts = export_archive(tmp_path, MOCK_REPOS, MOCK_EVENTS, publications=MOCK_PUBLICATIONS, version='0.12.0')
+        assert counts['publications'] == 1
+
+
+class TestArchiveSqlite:
+    def test_archive_db_created(self, tmp_path):
+        from repoindex.exporters.arkiv import export_archive
+        export_archive(tmp_path, MOCK_REPOS, MOCK_EVENTS, version='0.12.0')
+        assert (tmp_path / "archive.db").exists()
+
+    def test_records_table_schema(self, tmp_path):
+        from repoindex.exporters.arkiv import export_archive
+        export_archive(tmp_path, MOCK_REPOS, MOCK_EVENTS, version='0.12.0')
+        conn = sqlite3.connect(str(tmp_path / "archive.db"))
+        cursor = conn.execute("PRAGMA table_info(records)")
+        cols = {row[1] for row in cursor.fetchall()}
+        conn.close()
+        assert cols == {'id', 'collection', 'mimetype', 'uri', 'content', 'timestamp', 'metadata'}
+
+    def test_records_count_matches_jsonl(self, tmp_path):
+        from repoindex.exporters.arkiv import export_archive
+        export_archive(tmp_path, MOCK_REPOS, MOCK_EVENTS, publications=MOCK_PUBLICATIONS, version='0.12.0')
+        conn = sqlite3.connect(str(tmp_path / "archive.db"))
+        repos_n = conn.execute("SELECT COUNT(*) FROM records WHERE collection='repos'").fetchone()[0]
+        events_n = conn.execute("SELECT COUNT(*) FROM records WHERE collection='events'").fetchone()[0]
+        pubs_n = conn.execute("SELECT COUNT(*) FROM records WHERE collection='publications'").fetchone()[0]
+        conn.close()
+        assert repos_n == 1
+        assert events_n == 1
+        assert pubs_n == 1
+
+    def test_metadata_is_queryable_json(self, tmp_path):
+        from repoindex.exporters.arkiv import export_archive
+        export_archive(tmp_path, MOCK_REPOS, MOCK_EVENTS, version='0.12.0')
+        conn = sqlite3.connect(str(tmp_path / "archive.db"))
+        row = conn.execute(
+            "SELECT json_extract(metadata, '$.name') FROM records WHERE collection='repos'"
+        ).fetchone()
+        conn.close()
+        assert row[0] == 'myrepo'
+
+    def test_schema_table_populated(self, tmp_path):
+        from repoindex.exporters.arkiv import export_archive
+        export_archive(tmp_path, MOCK_REPOS, MOCK_EVENTS, version='0.12.0')
+        conn = sqlite3.connect(str(tmp_path / "archive.db"))
+        rows = conn.execute("SELECT * FROM _schema WHERE collection='repos'").fetchall()
+        conn.close()
+        assert len(rows) > 0
+
+    def test_metadata_table_has_frontmatter(self, tmp_path):
+        from repoindex.exporters.arkiv import export_archive
+        export_archive(tmp_path, MOCK_REPOS, MOCK_EVENTS, version='0.12.0')
+        conn = sqlite3.connect(str(tmp_path / "archive.db"))
+        row = conn.execute("SELECT value FROM _metadata WHERE key='readme_frontmatter'").fetchone()
+        conn.close()
+        assert row is not None
+        fm = json.loads(row[0])
+        assert fm['name'] == 'repoindex export'
+
+    def test_empty_export_creates_db(self, tmp_path):
+        from repoindex.exporters.arkiv import export_archive
+        export_archive(tmp_path, [], [], version='0.12.0')
+        assert (tmp_path / "archive.db").exists()
+        conn = sqlite3.connect(str(tmp_path / "archive.db"))
+        n = conn.execute("SELECT COUNT(*) FROM records").fetchone()[0]
+        conn.close()
+        assert n == 0

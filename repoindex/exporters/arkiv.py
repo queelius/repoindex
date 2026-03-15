@@ -10,6 +10,7 @@ See: arkiv SPEC.md for the universal record format.
 """
 
 import json
+import sqlite3
 from collections import Counter
 from typing import IO, List, Optional
 
@@ -162,6 +163,48 @@ def _event_to_arkiv(event: dict) -> dict:
     return record
 
 
+def _publication_to_arkiv(pub: dict) -> dict:
+    """Convert a publication row (joined with repo name/path) to an arkiv record."""
+    url = pub.get('url')
+    repo_path = pub.get('repo_path', '')
+    uri = url if url else f'file://{repo_path}'
+
+    record = {
+        'mimetype': 'application/json',
+        'uri': uri,
+        'metadata': {},
+    }
+
+    # Only include timestamp if present — prefer last_published, fall back to scanned_at
+    ts = pub.get('last_published') or pub.get('scanned_at')
+    if ts:
+        record['timestamp'] = ts
+
+    meta = record['metadata']
+    for key in ('registry', 'package_name'):
+        val = pub.get(key)
+        if val is not None:
+            meta[key] = val
+
+    version = pub.get('current_version')
+    if version is not None:
+        meta['version'] = version
+
+    if pub.get('published') is not None:
+        meta['published'] = bool(pub['published'])
+
+    repo_name = pub.get('repo_name')
+    if repo_name:
+        meta['repo'] = repo_name
+
+    for key in ('doi', 'downloads_total', 'downloads_30d', 'last_published'):
+        val = pub.get(key)
+        if val is not None and val != '':
+            meta[key] = val
+
+    return record
+
+
 def _walk_metadata(obj: dict, prefix: str, stats: dict) -> None:
     """Walk a metadata dict recursively, accumulating per-key statistics.
 
@@ -236,15 +279,97 @@ def _discover_schema(records: list) -> dict:
     return schema
 
 
+def _bundle_sqlite(output_dir, collections, schemas, readme_frontmatter, readme_body=''):
+    """Create arkiv-format SQLite database from record collections.
+
+    Args:
+        output_dir: Path to archive directory
+        collections: dict of {name: [records]} — already-converted arkiv records
+        schemas: dict of {name: {metadata_keys: {...}}} — discovered schemas
+        readme_frontmatter: dict of README.md frontmatter
+        readme_body: str of README.md markdown body
+    """
+    db_path = output_dir / "archive.db"
+    conn = sqlite3.connect(str(db_path))
+    try:
+        conn.executescript("""
+            CREATE TABLE records (
+                id INTEGER PRIMARY KEY,
+                collection TEXT,
+                mimetype TEXT,
+                uri TEXT,
+                content TEXT,
+                timestamp TEXT,
+                metadata JSON
+            );
+            CREATE TABLE _schema (
+                collection TEXT,
+                key_path TEXT,
+                type TEXT,
+                count INTEGER,
+                sample_values TEXT,
+                description TEXT
+            );
+            CREATE TABLE _metadata (
+                key TEXT PRIMARY KEY,
+                value TEXT
+            );
+            CREATE INDEX idx_records_collection ON records(collection);
+            CREATE INDEX idx_records_mimetype ON records(mimetype);
+            CREATE INDEX idx_records_timestamp ON records(timestamp);
+        """)
+
+        # Insert records
+        for collection_name, records in collections.items():
+            for record in records:
+                conn.execute(
+                    "INSERT INTO records (collection, mimetype, uri, content, timestamp, metadata) "
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    (
+                        collection_name,
+                        record.get('mimetype'),
+                        record.get('uri'),
+                        record.get('content'),
+                        record.get('timestamp'),
+                        json.dumps(record.get('metadata', {})),
+                    ),
+                )
+
+        # Insert schema
+        for collection_name, schema_data in schemas.items():
+            for key_path, entry in schema_data.get('metadata_keys', {}).items():
+                sample = json.dumps(entry.get('values', entry.get('example')))
+                conn.execute(
+                    "INSERT INTO _schema (collection, key_path, type, count, sample_values) "
+                    "VALUES (?, ?, ?, ?, ?)",
+                    (collection_name, key_path, entry.get('type'), entry.get('count'), sample),
+                )
+
+        # Insert metadata
+        conn.execute(
+            "INSERT INTO _metadata (key, value) VALUES (?, ?)",
+            ('readme_frontmatter', json.dumps(readme_frontmatter)),
+        )
+        conn.execute(
+            "INSERT INTO _metadata (key, value) VALUES (?, ?)",
+            ('readme_body', readme_body),
+        )
+
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def export_archive(
     output_dir,
     repos: list,
     events: list,
+    publications: list = None,
     version: str = None,
 ) -> dict:
     """Write full arkiv archive to output_dir.
 
-    Creates: repos.jsonl, events.jsonl, README.md, schema.yaml.
+    Creates: repos.jsonl, events.jsonl, publications.jsonl, README.md, schema.yaml.
     Returns dict with counts.
     """
     import yaml
@@ -274,29 +399,45 @@ def export_archive(
             f.write(json.dumps(record, default=str) + "\n")
             event_records.append(record)
 
+    # publications.jsonl
+    pub_records = []
+    if publications:
+        with open(output_dir / "publications.jsonl", "w", encoding="utf-8") as f:
+            for pub in publications:
+                record = _publication_to_arkiv(pub)
+                f.write(json.dumps(record, default=str) + "\n")
+                pub_records.append(record)
+
     # README.md
     now = datetime.now().strftime("%Y-%m-%d")
+    contents = [
+        {'path': 'repos.jsonl', 'description': 'Repository metadata (inode/directory records)'},
+        {'path': 'events.jsonl', 'description': 'Git events (text/plain records)'},
+    ]
+    if pub_records:
+        contents.append({'path': 'publications.jsonl', 'description': 'Package registry publications (application/json records)'})
+    contents.append({'path': 'archive.db', 'description': 'SQLite derived database (queryable, regenerable from JSONL)'})
     frontmatter = {
         'name': 'repoindex export',
         'description': 'Git repository metadata from repoindex',
         'datetime': now,
         'generator': f'repoindex v{version}',
-        'contents': [
-            {'path': 'repos.jsonl', 'description': 'Repository metadata (inode/directory records)'},
-            {'path': 'events.jsonl', 'description': 'Git events (text/plain records)'},
-        ],
+        'contents': contents,
     }
     with open(output_dir / "README.md", "w", encoding="utf-8") as f:
         f.write("---\n")
         yaml.dump(frontmatter, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
         f.write("---\n\n")
-        f.write(
+        readme_body = (
             "# repoindex Export\n\n"
             "This archive contains git repository metadata exported from repoindex.\n\n"
             "## Collections\n\n"
             f"- **repos.jsonl** - {len(repo_records)} repository records\n"
             f"- **events.jsonl** - {len(event_records)} event records\n"
         )
+        if pub_records:
+            readme_body += f"- **publications.jsonl** - {len(pub_records)} publication records\n"
+        f.write(readme_body)
 
     # schema.yaml
     schema = {}
@@ -310,10 +451,21 @@ def export_archive(
             'record_count': len(event_records),
             'metadata_keys': _discover_schema(event_records),
         }
+    if pub_records:
+        schema['publications'] = {
+            'record_count': len(pub_records),
+            'metadata_keys': _discover_schema(pub_records),
+        }
     with open(output_dir / "schema.yaml", "w", encoding="utf-8") as f:
         yaml.dump(schema, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
 
-    return {'repos': len(repo_records), 'events': len(event_records)}
+    # Bundle SQLite derived database
+    collections = {'repos': repo_records, 'events': event_records}
+    if pub_records:
+        collections['publications'] = pub_records
+    _bundle_sqlite(output_dir, collections, schema, frontmatter, readme_body=readme_body)
+
+    return {'repos': len(repo_records), 'events': len(event_records), 'publications': len(pub_records)}
 
 
 class ArkivExporter(Exporter):

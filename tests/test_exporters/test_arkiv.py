@@ -9,6 +9,7 @@ from repoindex.exporters.arkiv import (
     ArkivExporter,
     _repo_to_arkiv,
     _event_to_arkiv,
+    _publication_to_arkiv,
 )
 
 
@@ -266,6 +267,102 @@ class TestEventToArkiv:
         }
         record = _event_to_arkiv(event)
         assert 'author' not in record['metadata']
+
+
+# ============================================================================
+# Publication conversion
+# ============================================================================
+
+SAMPLE_PUBLICATION = {
+    'registry': 'pypi', 'package_name': 'repoindex', 'current_version': '0.12.0',
+    'published': 1, 'url': 'https://pypi.org/project/repoindex/',
+    'doi': None, 'downloads_total': None, 'downloads_30d': None,
+    'scanned_at': '2026-03-14T10:00:00',
+    'last_published': None,
+    'repo_name': 'repoindex', 'repo_path': '/home/user/github/repoindex',
+}
+
+
+class TestPublicationToArkiv:
+    def test_mimetype(self):
+        record = _publication_to_arkiv(SAMPLE_PUBLICATION)
+        assert record['mimetype'] == 'application/json'
+
+    def test_uri_from_url(self):
+        record = _publication_to_arkiv(SAMPLE_PUBLICATION)
+        assert record['uri'] == 'https://pypi.org/project/repoindex/'
+
+    def test_metadata(self):
+        record = _publication_to_arkiv(SAMPLE_PUBLICATION)
+        meta = record['metadata']
+        assert meta['registry'] == 'pypi'
+        assert meta['package_name'] == 'repoindex'
+        assert meta['version'] == '0.12.0'
+        assert meta['published'] is True
+        assert meta['repo'] == 'repoindex'
+
+    def test_no_url_uses_repo_path(self):
+        pub = {**SAMPLE_PUBLICATION, 'url': None}
+        record = _publication_to_arkiv(pub)
+        assert record['uri'] == 'file:///home/user/github/repoindex'
+
+    def test_null_fields_omitted(self):
+        record = _publication_to_arkiv(SAMPLE_PUBLICATION)
+        meta = record['metadata']
+        assert 'doi' not in meta
+        assert 'downloads_total' not in meta
+
+    def test_timestamp_prefers_last_published(self):
+        pub = {**SAMPLE_PUBLICATION, 'last_published': '2026-03-01T12:00:00'}
+        record = _publication_to_arkiv(pub)
+        assert record['timestamp'] == '2026-03-01T12:00:00'
+
+    def test_timestamp_falls_back_to_scanned_at(self):
+        record = _publication_to_arkiv(SAMPLE_PUBLICATION)
+        assert record['timestamp'] == '2026-03-14T10:00:00'
+
+    def test_no_timestamp_when_both_absent(self):
+        pub = {**SAMPLE_PUBLICATION, 'scanned_at': None, 'last_published': None}
+        record = _publication_to_arkiv(pub)
+        assert 'timestamp' not in record
+
+    def test_downloads_included_when_present(self):
+        pub = {**SAMPLE_PUBLICATION, 'downloads_total': 5000, 'downloads_30d': 200}
+        record = _publication_to_arkiv(pub)
+        assert record['metadata']['downloads_total'] == 5000
+        assert record['metadata']['downloads_30d'] == 200
+
+    def test_doi_included_when_present(self):
+        pub = {**SAMPLE_PUBLICATION, 'doi': '10.5281/zenodo.12345'}
+        record = _publication_to_arkiv(pub)
+        assert record['metadata']['doi'] == '10.5281/zenodo.12345'
+
+    def test_last_published_in_metadata_when_present(self):
+        pub = {**SAMPLE_PUBLICATION, 'last_published': '2026-03-01T12:00:00'}
+        record = _publication_to_arkiv(pub)
+        assert record['metadata']['last_published'] == '2026-03-01T12:00:00'
+
+    def test_empty_string_doi_omitted(self):
+        pub = {**SAMPLE_PUBLICATION, 'doi': ''}
+        record = _publication_to_arkiv(pub)
+        assert 'doi' not in record['metadata']
+
+    def test_published_false_included(self):
+        pub = {**SAMPLE_PUBLICATION, 'published': 0}
+        record = _publication_to_arkiv(pub)
+        assert record['metadata']['published'] is False
+
+    def test_no_repo_name_omits_repo_key(self):
+        pub = {**SAMPLE_PUBLICATION, 'repo_name': None}
+        record = _publication_to_arkiv(pub)
+        assert 'repo' not in record['metadata']
+
+    def test_record_is_valid_json_roundtrip(self):
+        record = _publication_to_arkiv(SAMPLE_PUBLICATION)
+        serialized = json.dumps(record, default=str)
+        deserialized = json.loads(serialized)
+        assert deserialized['mimetype'] == 'application/json'
+        assert deserialized['uri'] == 'https://pypi.org/project/repoindex/'
 
 
 # ============================================================================
