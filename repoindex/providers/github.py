@@ -82,8 +82,9 @@ class GitHubPlatformProvider(PlatformProvider):
         if repo.topics:
             result['github_topics'] = json.dumps(repo.topics)
 
-        if repo.license_key:
-            result['github_license'] = repo.license_key
+        # Also store pushed_at if available
+        if repo.pushed_at:
+            result['github_pushed_at'] = repo.pushed_at
 
         for attr in ('has_issues', 'has_wiki', 'has_pages'):
             result[f'github_{attr}'] = int(getattr(repo, attr, False))

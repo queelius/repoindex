@@ -405,7 +405,7 @@ class TestGitHubPlatformProvider:
         assert result['github_updated_at'] == '2026-03-14T00:00:00Z'
         assert '"python"' in result['github_topics']
         assert '"cli"' in result['github_topics']
-        assert result['github_license'] == 'mit'
+        assert result['github_pushed_at'] == '2026-03-14T00:00:00Z'
         assert result['github_has_issues'] == 1
         assert result['github_has_wiki'] == 1
         assert result['github_has_pages'] == 0
@@ -450,7 +450,7 @@ class TestGitHubPlatformProvider:
             )
 
         assert 'github_topics' not in result
-        assert 'github_license' not in result
+        assert 'github_pushed_at' not in result
         assert result['github_description'] == ''
 
     def test_enrich_token_from_config(self):
