@@ -121,8 +121,8 @@ def refresh_handler(
     that have changed since the last scan.
 
     Registry providers (PyPI, CRAN, Zenodo, npm, cargo, etc.) are
-    enabled via --provider or --external. GitHub metadata is separate
-    and enabled via --github.
+    enabled via --provider or --external. GitHub metadata is included
+    with --external or --provider github (--github is a convenience alias).
 
     \b
     Examples:
@@ -156,20 +156,26 @@ def refresh_handler(
     """
     config = load_config()
 
-    # Resolve GitHub flag using config defaults
-    # Priority: explicit flag > --external flag > config default > false
+    # Merge --github flag into provider names list
+    # Priority: explicit --no-github > explicit --github > --external > config default
     ext_config = config.get('refresh', {}).get('external_sources', {})
-    fetch_github = _resolve_external_flag(github, external, ext_config.get('github', False))
+    all_provider_names = list(provider_names)
+    if github is False:
+        # Explicit --no-github: remove github even if passed via --provider
+        all_provider_names = [n for n in all_provider_names if n != 'github']
+    elif github is True or _resolve_external_flag(None, external, ext_config.get('github', False)):
+        if 'github' not in all_provider_names:
+            all_provider_names.append('github')
 
-    # Build list of provider names from --provider + --external + config
+    # Build list of registry provider names from merged list + --external + config
     # Provider config lives at refresh.providers (sibling to external_sources)
     provider_config = config.get('refresh', {}).get('providers', {})
     active_provider_names = _resolve_provider_names(
-        provider_names=provider_names,
+        provider_names=tuple(n for n in all_provider_names if n != 'github'),
         external=external, provider_config=provider_config,
     )
 
-    # Discover and initialize active providers
+    # Discover and initialize registry providers
     active_providers = []
     if active_provider_names:
         from ..providers import discover_providers
@@ -185,6 +191,16 @@ def refresh_handler(
                 except Exception as e:
                     if not quiet:
                         click.echo(f"Warning: {p.name} prefetch failed: {e}", err=True)
+
+    # Discover platform providers (github, etc.)
+    from ..providers import discover_platforms
+    platform_names = [n for n in all_provider_names if n == 'github']
+    if external:
+        active_platforms = discover_platforms()  # all platforms
+    elif platform_names:
+        active_platforms = discover_platforms(only=platform_names)
+    else:
+        active_platforms = []
 
     # Get paths to scan
     if directory:
@@ -258,7 +274,7 @@ def refresh_handler(
                     db, service, repo, stats,
                     full=full,
                     since=since_datetime,
-                    fetch_github=fetch_github,
+                    platforms=active_platforms,
                     providers=active_providers,
                     config=config,
                     dry_run=dry_run,
@@ -280,8 +296,9 @@ def refresh_handler(
             try:
                 # Build sources list
                 sources = ["git"]
-                if fetch_github:
-                    sources.append("github")
+                for plat in active_platforms:
+                    if plat.platform_id not in sources:
+                        sources.append(plat.platform_id)
                 for p in active_providers:
                     if p.registry not in sources:
                         sources.append(p.registry)
@@ -328,6 +345,15 @@ def refresh_handler(
         _print_summary_pretty(stats)
 
 
+def _update_repo_platform_fields(db, repo_id, fields):
+    """Update repo with platform-specific fields."""
+    if not fields:
+        return
+    set_clauses = ', '.join(f'{k} = ?' for k in fields.keys())
+    params = list(fields.values()) + [repo_id]
+    db.execute(f"UPDATE repos SET {set_clauses} WHERE id = ?", tuple(params))
+
+
 def _process_repo(
     db: Database,
     service: RepositoryService,
@@ -335,7 +361,7 @@ def _process_repo(
     stats: dict,
     full: bool,
     since: datetime,
-    fetch_github: bool,
+    platforms: list,
     providers: list,
     config: dict,
     dry_run: bool,
@@ -356,10 +382,7 @@ def _process_repo(
             return
 
         # Enrich with status
-        enriched = service.get_status(
-            repo,
-            fetch_github=fetch_github,
-        )
+        enriched = service.get_status(repo)
 
         # Load tags from config
         tags_from_config = service.config.get('repository_tags', {}).get(repo.path, [])
@@ -368,6 +391,20 @@ def _process_repo(
 
         # Upsert to database
         repo_id = upsert_repo(db, enriched)
+
+        # Run platform providers (github, etc.)
+        if platforms and repo_id:
+            repo_dict = {'remote_url': enriched.remote_url, 'name': enriched.name,
+                         'owner': getattr(enriched, 'owner', None)}
+            for plat in platforms:
+                try:
+                    if plat.detect(repo.path, repo_dict):
+                        fields = plat.enrich(repo.path, repo_dict, config)
+                        if fields:
+                            _update_repo_platform_fields(db, repo_id, fields)
+                except Exception as e:
+                    if not quiet:
+                        click.echo(f"  Warning: {plat.name} failed for {repo.name}: {e}", err=True)
 
         # Run registry providers (new extension system)
         if providers and repo_id:
