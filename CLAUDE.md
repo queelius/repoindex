@@ -41,11 +41,14 @@ commands/            services/    database/          domain/
 
 ### Extension Systems
 
-**Providers** (`providers/`): Registry detection via `RegistryProvider` ABC (`detect`, `check`, `match`, `prefetch`). Built-in: pypi, cran, zenodo, npm, cargo, conda, docker, rubygems, go. User extensions: `~/.repoindex/providers/*.py` with module-level `provider` attribute.
+**Providers** (`providers/`): Two ABCs for external metadata, both discovered from `~/.repoindex/providers/*.py`:
+- `PlatformProvider` — hosting platform enrichment (`detect`, `enrich`). Enriches `repos` table with prefixed fields (`github_stars`, `gitlab_issues`). Built-in: github. Export `platform` attribute.
+- `RegistryProvider` — package registry detection (`detect`, `check`, `match`, `prefetch`). Creates records in `publications` table. Built-in: pypi, cran, zenodo, npm, cargo, conda, docker, rubygems, go. Export `provider` attribute.
+Both run in parallel via `ThreadPoolExecutor` during refresh.
 
 **Exporters** (`exporters/`): Output renderers via `Exporter` ABC (`export(repos, output, config)`). Built-in: bibtex, csv, markdown, opml, jsonld, arkiv. User extensions: `~/.repoindex/exporters/*.py` with module-level `exporter` attribute. The `export` command defaults to longecho-compliant arkiv archives; format-based exports are secondary.
 
-Discovery: `discover_providers(only=['pypi','npm'])` / `discover_exporters()`.
+Discovery: `discover_providers()` / `discover_platforms()` / `discover_exporters()`.
 
 **MCP Server** (`mcp/`): Provides LLM access to the database via 4 tools (`get_manifest`, `get_schema`, `run_sql`, `refresh`). Entry point: `repoindex mcp`. Requires `pip install repoindex[mcp]`.
 
