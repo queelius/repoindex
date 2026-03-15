@@ -6,12 +6,18 @@ This is the primary way to sync the database with filesystem state.
 """
 
 import json
+import logging
 import os
 import sys
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from typing import List, Optional, Tuple
 
 import click
+
+logger = logging.getLogger(__name__)
+
+_PROVIDER_WORKERS = 8
 
 from ..config import load_config, get_repository_directories
 from ..database import (
@@ -354,6 +360,58 @@ def _update_repo_platform_fields(db, repo_id, fields):
     db.execute(f"UPDATE repos SET {set_clauses} WHERE id = ?", tuple(params))
 
 
+def _run_providers_parallel(providers, repo_path, repo_dict, config):
+    """Run registry provider.match() calls in parallel.
+
+    Returns list of PackageMetadata for successful matches.
+    Errors are logged but don't prevent other providers from completing.
+    """
+    if not providers:
+        return []
+    results = []
+    with ThreadPoolExecutor(max_workers=min(len(providers), _PROVIDER_WORKERS)) as pool:
+        futures = {
+            pool.submit(p.match, repo_path, repo_record=repo_dict, config=config): p
+            for p in providers
+        }
+        for future in as_completed(futures):
+            provider = futures[future]
+            try:
+                metadata = future.result()
+                if metadata:
+                    results.append(metadata)
+            except Exception as e:
+                logger.debug(f"Provider {provider.registry} failed: {e}")
+    return results
+
+
+def _run_platforms_parallel(platforms, repo_path, repo_dict, config):
+    """Run platform provider detect+enrich calls in parallel.
+
+    Returns list of dicts with platform-prefixed fields for successful enrichments.
+    """
+    if not platforms:
+        return []
+
+    def _check(plat):
+        if plat.detect(repo_path, repo_dict):
+            return plat.enrich(repo_path, repo_dict, config)
+        return None
+
+    results = []
+    with ThreadPoolExecutor(max_workers=min(len(platforms), _PROVIDER_WORKERS)) as pool:
+        futures = {pool.submit(_check, p): p for p in platforms}
+        for future in as_completed(futures):
+            provider = futures[future]
+            try:
+                data = future.result()
+                if data:
+                    results.append(data)
+            except Exception as e:
+                logger.debug(f"Platform {provider.platform_id} failed: {e}")
+    return results
+
+
 def _process_repo(
     db: Database,
     service: RepositoryService,
@@ -396,28 +454,17 @@ def _process_repo(
         if platforms and repo_id:
             repo_dict = {'remote_url': enriched.remote_url, 'name': enriched.name,
                          'owner': getattr(enriched, 'owner', None)}
-            for plat in platforms:
-                try:
-                    if plat.detect(repo.path, repo_dict):
-                        fields = plat.enrich(repo.path, repo_dict, config)
-                        if fields:
-                            _update_repo_platform_fields(db, repo_id, fields)
-                except Exception as e:
-                    if not quiet:
-                        click.echo(f"  Warning: {plat.name} failed for {repo.name}: {e}", err=True)
+            platform_results = _run_platforms_parallel(platforms, repo.path, repo_dict, config)
+            for fields in platform_results:
+                _update_repo_platform_fields(db, repo_id, fields)
 
         # Run registry providers (new extension system)
         if providers and repo_id:
             from ..database.repository import _upsert_publication
             repo_dict = {'remote_url': enriched.remote_url, 'name': enriched.name}
-            for p in providers:
-                try:
-                    metadata = p.match(repo.path, repo_record=repo_dict, config=config)
-                    if metadata:
-                        _upsert_publication(db, repo_id, metadata)
-                except Exception as e:
-                    if not quiet:
-                        click.echo(f"  Warning: {p.registry} provider failed for {repo.name}: {e}", err=True)
+            matched = _run_providers_parallel(providers, repo.path, repo_dict, config)
+            for metadata in matched:
+                _upsert_publication(db, repo_id, metadata)
         stats['updated'] += 1
 
         # Clear any previous scan errors for this path
