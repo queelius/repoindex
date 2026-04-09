@@ -16,11 +16,16 @@ logger = logging.getLogger(__name__)
 
 
 def _fetch_downloads(package_name: str) -> Optional[int]:
-    """Fetch recent download stats from PyPI Stats API."""
+    """Fetch 30-day download count from PyPI Stats API.
+
+    Returns the last_month download count (NOT lifetime total).
+    PyPI does not expose lifetime totals — pypistats only has recent windows.
+    """
     try:
         resp = requests.get(
             f'https://pypistats.org/api/packages/{package_name}/recent',
             timeout=10,
+            headers={'User-Agent': 'repoindex (+https://github.com/queelius/repoindex)'},
         )
         if resp.status_code == 200:
             data = resp.json()
@@ -58,14 +63,14 @@ class PyPIProvider(RegistryProvider):
             info = check_pypi_package(package_name)
             if not info:
                 return None
-            downloads = _fetch_downloads(package_name) if info.get('exists') else None
+            downloads_30d = _fetch_downloads(package_name) if info.get('exists') else None
             return PackageMetadata(
                 registry='pypi',
                 name=package_name,
                 version=info.get('version'),
                 published=info.get('exists', False),
                 url=info.get('url'),
-                downloads=downloads,
+                downloads_30d=downloads_30d,
                 last_updated=info.get('last_updated'),
             )
         except Exception as e:

@@ -88,14 +88,20 @@ class GitHubMetadata:
 
 @dataclass(frozen=True)
 class PackageMetadata:
-    """Package registry metadata (PyPI, CRAN, npm, Zenodo, etc.)."""
+    """Package registry metadata (PyPI, CRAN, npm, Zenodo, etc.).
+
+    The `downloads` field is lifetime total (e.g., Cargo provides this).
+    The `downloads_30d` field is monthly (e.g., pypistats provides this).
+    Different registries populate different fields — they're not interchangeable.
+    """
     registry: str  # pypi, cran, npm, cargo, zenodo, etc.
     name: str
     version: Optional[str] = None
     published: bool = False
     url: Optional[str] = None
     doi: Optional[str] = None
-    downloads: Optional[int] = None
+    downloads: Optional[int] = None  # lifetime total (Cargo, RubyGems, Docker pulls)
+    downloads_30d: Optional[int] = None  # 30-day count (PyPI via pypistats)
     last_updated: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
@@ -107,6 +113,7 @@ class PackageMetadata:
             'url': self.url,
             'doi': self.doi,
             'downloads': self.downloads,
+            'downloads_30d': self.downloads_30d,
             'last_updated': self.last_updated
         }
 

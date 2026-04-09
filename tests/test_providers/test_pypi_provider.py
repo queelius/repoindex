@@ -92,10 +92,10 @@ class TestFetchDownloads:
         mock_resp.json.return_value = {'data': {'last_month': 500}}
         with patch('repoindex.providers.pypi.requests.get', return_value=mock_resp) as mock_get:
             _fetch_downloads('my-package')
-        mock_get.assert_called_once_with(
-            'https://pypistats.org/api/packages/my-package/recent',
-            timeout=10,
-        )
+        call_args = mock_get.call_args
+        assert call_args[0][0] == 'https://pypistats.org/api/packages/my-package/recent'
+        assert call_args[1]['timeout'] == 10
+        assert 'User-Agent' in call_args[1].get('headers', {})
 
 
 class TestPyPICheck:
@@ -115,7 +115,8 @@ class TestPyPICheck:
         assert result.name == "my-package"
         assert result.version == "2.0.0"
         assert result.published is True
-        assert result.downloads == 4200
+        assert result.downloads_30d == 4200
+        assert result.downloads is None  # lifetime total not available from PyPI
         mock_downloads.assert_called_once_with("my-package")
 
     @patch('repoindex.providers.pypi._fetch_downloads')
@@ -156,6 +157,7 @@ class TestPyPICheck:
         result = p.check("pkg")
         assert result is not None
         assert result.published is True
+        assert result.downloads_30d is None
         assert result.downloads is None
 
 

@@ -208,6 +208,7 @@ def _upsert_publication(db: Database, repo_id: int, package) -> None:
                 url = ?,
                 doi = ?,
                 downloads_total = ?,
+                downloads_30d = ?,
                 last_published = ?,
                 scanned_at = CURRENT_TIMESTAMP
             WHERE id = ?
@@ -218,6 +219,7 @@ def _upsert_publication(db: Database, repo_id: int, package) -> None:
             package.url,
             getattr(package, 'doi', None),
             package.downloads,
+            getattr(package, 'downloads_30d', None),
             package.last_updated,
             existing['id']
         ))
@@ -226,8 +228,8 @@ def _upsert_publication(db: Database, repo_id: int, package) -> None:
         db.execute("""
             INSERT INTO publications (
                 repo_id, registry, package_name, current_version,
-                published, url, doi, downloads_total, last_published
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                published, url, doi, downloads_total, downloads_30d, last_published
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             repo_id,
             package.registry,
@@ -237,6 +239,7 @@ def _upsert_publication(db: Database, repo_id: int, package) -> None:
             package.url,
             getattr(package, 'doi', None),
             package.downloads,
+            getattr(package, 'downloads_30d', None),
             package.last_updated
         ))
 
