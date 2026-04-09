@@ -17,63 +17,21 @@ logger = logging.getLogger(__name__)
 
 
 def _parse_description(desc_path: str) -> Dict[str, Optional[str]]:
-    """Parse an R DESCRIPTION file (DCF format) into a dict.
+    """Extract the Package name from an R DESCRIPTION file (DCF format).
 
-    DCF format uses ``Key: Value`` lines with continuation lines
-    that start with whitespace.  All values are stripped strings;
-    keys not present in the file map to ``None``.
-
-    Returns dict with keys: package, title, version, author,
-    maintainer, url, bugreports, description, license.
+    Returns a dict with the 'package' key, or {'package': None} on failure.
+    The parser handles the DCF format's ``Key: Value`` line structure.
     """
-    _FIELDS = {
-        'Package': 'package',
-        'Title': 'title',
-        'Version': 'version',
-        'Author': 'author',
-        'Authors@R': 'author',  # fallback
-        'Maintainer': 'maintainer',
-        'URL': 'url',
-        'BugReports': 'bugreports',
-        'Description': 'description',
-        'License': 'license',
-    }
-
-    raw: Dict[str, str] = {}
     try:
         text = Path(desc_path).read_text(encoding='utf-8')
     except Exception:
-        return {v: None for v in set(_FIELDS.values())}
+        return {'package': None}
 
-    current_field: Optional[str] = None
-    current_value: list = []
-
-    for line in text.split('\n'):
-        if line and not line[0].isspace():
-            # Save previous field
-            if current_field is not None:
-                raw[current_field] = ' '.join(current_value).strip()
-            # Parse new field
-            if ':' in line:
-                field, _, value = line.partition(':')
-                current_field = field.strip()
-                current_value = [value.strip()]
-            else:
-                current_field = None
-                current_value = []
-        elif current_field is not None and line.strip():
-            current_value.append(line.strip())
-
-    # Save last field
-    if current_field is not None:
-        raw[current_field] = ' '.join(current_value).strip()
-
-    # Map DCF keys to our normalized keys
-    result: Dict[str, Optional[str]] = {v: None for v in set(_FIELDS.values())}
-    for dcf_key, norm_key in _FIELDS.items():
-        if dcf_key in raw and result[norm_key] is None:
-            result[norm_key] = raw[dcf_key] or None
-    return result
+    for line in text.splitlines():
+        if line.startswith('Package:'):
+            value = line.split(':', 1)[1].strip()
+            return {'package': value or None}
+    return {'package': None}
 
 
 class CRANProvider(RegistryProvider):
@@ -96,10 +54,12 @@ class CRANProvider(RegistryProvider):
 
     def check(self, package_name: str, config: Optional[dict] = None) -> Optional[PackageMetadata]:
         """Check CRAN (via crandb JSON API) and Bioconductor for package."""
+        headers = {'User-Agent': 'repoindex (+https://github.com/queelius/repoindex)'}
+
         # Try CRAN via crandb (JSON API)
         try:
             resp = requests.get(
-                f'https://crandb.r-pkg.org/{package_name}', timeout=10,
+                f'https://crandb.r-pkg.org/{package_name}', timeout=10, headers=headers,
             )
             if resp.status_code == 200:
                 data = resp.json()
@@ -117,7 +77,7 @@ class CRANProvider(RegistryProvider):
         try:
             resp = requests.get(
                 f'https://bioconductor.org/packages/json/3.20/bioc/{package_name}',
-                timeout=10,
+                timeout=10, headers=headers,
             )
             if resp.status_code == 200:
                 return PackageMetadata(
@@ -129,7 +89,13 @@ class CRANProvider(RegistryProvider):
         except Exception:
             pass
 
-        return None
+        # Detected locally but not published to any known registry
+        return PackageMetadata(
+            registry='cran',
+            name=package_name,
+            published=False,
+            url=None,
+        )
 
 
 provider = CRANProvider()

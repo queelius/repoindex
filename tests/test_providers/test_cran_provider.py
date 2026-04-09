@@ -100,7 +100,12 @@ class TestCRANCheck:
 
     @patch('repoindex.providers.cran.requests.get')
     def test_check_not_published(self, mock_get):
-        """Both APIs return 404 -> None."""
+        """Both APIs return 404 -> PackageMetadata(published=False).
+
+        A locally-detected R package that isn't on CRAN or Bioconductor
+        should still produce a record (so 'repos I wrote but haven't
+        published' queries work).
+        """
         resp_404 = MagicMock()
         resp_404.status_code = 404
         mock_get.return_value = resp_404
@@ -108,7 +113,10 @@ class TestCRANCheck:
         p = CRANProvider()
         result = p.check("unpublished-pkg")
 
-        assert result is None
+        assert result is not None
+        assert result.published is False
+        assert result.registry == 'cran'
+        assert result.name == 'unpublished-pkg'
 
     @patch('repoindex.providers.cran.requests.get')
     def test_check_cran_exception_falls_through_to_bioc(self, mock_get):
@@ -126,13 +134,14 @@ class TestCRANCheck:
 
     @patch('repoindex.providers.cran.requests.get')
     def test_check_both_exception(self, mock_get):
-        """Both APIs raise -> None."""
+        """Both APIs raise -> still returns unpublished record (not None)."""
         mock_get.side_effect = Exception("fail")
 
         p = CRANProvider()
         result = p.check("error-pkg")
 
-        assert result is None
+        assert result is not None
+        assert result.published is False
 
     @patch('repoindex.providers.cran.requests.get')
     def test_check_version_none_when_missing(self, mock_get):
@@ -155,104 +164,42 @@ class TestCRANCheck:
 # ---------------------------------------------------------------------------
 
 class TestParseDescription:
-    def test_basic_fields(self, tmp_path):
-        """Parse all standard fields."""
-        desc = tmp_path / "DESCRIPTION"
-        desc.write_text(
-            "Package: testpkg\n"
-            "Title: My Test Package\n"
-            "Version: 1.0.0\n"
-            "Author: Jane Doe\n"
-            "Maintainer: Jane Doe <jane@example.com>\n"
-            "URL: https://example.com/testpkg\n"
-            "BugReports: https://example.com/testpkg/issues\n"
-            "Description: A package for testing.\n"
-            "License: MIT + file LICENSE\n"
-        )
-        result = _parse_description(str(desc))
+    """Tests for the simplified DESCRIPTION parser.
 
+    Only the Package field is currently consumed (used by detect()).
+    If richer fields are needed later, add them back with tests.
+    """
+
+    def test_basic_package(self, tmp_path):
+        desc = tmp_path / "DESCRIPTION"
+        desc.write_text("Package: testpkg\nVersion: 1.0.0\n")
+        result = _parse_description(str(desc))
         assert result['package'] == 'testpkg'
-        assert result['title'] == 'My Test Package'
-        assert result['version'] == '1.0.0'
-        assert result['author'] == 'Jane Doe'
-        assert result['maintainer'] == 'Jane Doe <jane@example.com>'
-        assert result['url'] == 'https://example.com/testpkg'
-        assert result['bugreports'] == 'https://example.com/testpkg/issues'
-        assert result['description'] == 'A package for testing.'
-        assert result['license'] == 'MIT + file LICENSE'
 
-    def test_multiline_values(self, tmp_path):
-        """Continuation lines (leading whitespace) are joined."""
+    def test_package_not_on_first_line(self, tmp_path):
         desc = tmp_path / "DESCRIPTION"
-        desc.write_text(
-            "Package: mypkg\n"
-            "Version: 0.2.0\n"
-            "Description: This is a long description\n"
-            "    that spans multiple lines\n"
-            "    and keeps going.\n"
-            "License: GPL-3\n"
-        )
+        desc.write_text("Title: Some Package\nPackage: mypkg\nVersion: 2.0\n")
         result = _parse_description(str(desc))
-
-        assert result['description'] == (
-            "This is a long description that spans multiple lines and keeps going."
-        )
-        assert result['license'] == 'GPL-3'
-
-    def test_missing_fields(self, tmp_path):
-        """Fields not present in file are None."""
-        desc = tmp_path / "DESCRIPTION"
-        desc.write_text("Package: minimal\nVersion: 0.0.1\n")
-        result = _parse_description(str(desc))
-
-        assert result['package'] == 'minimal'
-        assert result['version'] == '0.0.1'
-        assert result['title'] is None
-        assert result['author'] is None
-        assert result['maintainer'] is None
-        assert result['url'] is None
-        assert result['bugreports'] is None
-        assert result['description'] is None
-        assert result['license'] is None
+        assert result['package'] == 'mypkg'
 
     def test_empty_file(self, tmp_path):
-        """Empty DESCRIPTION file -> all None."""
         desc = tmp_path / "DESCRIPTION"
         desc.write_text("")
         result = _parse_description(str(desc))
-
         assert result['package'] is None
-        assert result['version'] is None
+
+    def test_no_package_field(self, tmp_path):
+        desc = tmp_path / "DESCRIPTION"
+        desc.write_text("Title: Only a title\nVersion: 1.0\n")
+        result = _parse_description(str(desc))
+        assert result['package'] is None
 
     def test_nonexistent_file(self, tmp_path):
-        """Non-existent path -> all None."""
         result = _parse_description(str(tmp_path / "nope"))
-
         assert result['package'] is None
 
-    def test_authors_at_r_fallback(self, tmp_path):
-        """Authors@R used when Author is absent."""
+    def test_package_with_surrounding_whitespace(self, tmp_path):
         desc = tmp_path / "DESCRIPTION"
-        desc.write_text(
-            "Package: fancy\n"
-            "Version: 1.0.0\n"
-            'Authors@R: person("Jane", "Doe", role = c("aut", "cre"))\n'
-        )
+        desc.write_text("Package:   spaced-pkg  \n")
         result = _parse_description(str(desc))
-
-        assert result['author'] is not None
-        assert 'Jane' in result['author']
-
-    def test_author_preferred_over_authors_at_r(self, tmp_path):
-        """Author field takes precedence over Authors@R."""
-        desc = tmp_path / "DESCRIPTION"
-        desc.write_text(
-            "Package: both\n"
-            "Version: 1.0.0\n"
-            "Author: Plain Author\n"
-            'Authors@R: person("Other", "Person")\n'
-        )
-        result = _parse_description(str(desc))
-
-        # Author appears first in DCF, so it wins
-        assert result['author'] == 'Plain Author'
+        assert result['package'] == 'spaced-pkg'
