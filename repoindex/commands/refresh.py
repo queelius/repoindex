@@ -8,6 +8,7 @@ This is the primary way to sync the database with filesystem state.
 import json
 import logging
 import os
+import re
 import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
@@ -18,6 +19,12 @@ import click
 logger = logging.getLogger(__name__)
 
 _PROVIDER_WORKERS = 8
+
+# SQL identifier validation (letters, digits, underscores; must start with letter/underscore)
+_IDENT_RE = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]*$')
+
+# Cache of valid repos table columns (populated lazily from PRAGMA table_info)
+_REPO_COLUMN_CACHE = None
 
 from ..config import load_config, get_repository_directories
 from ..database import (
@@ -199,10 +206,19 @@ def refresh_handler(
                         click.echo(f"Warning: {p.name} prefetch failed: {e}", err=True)
 
     # Discover platform providers (github, etc.)
+    # Track explicit exclusions so --no-github takes priority over --external.
     from ..providers import discover_platforms
+    excluded_platforms = set()
+    if github is False:
+        excluded_platforms.add('github')
+
     platform_names = [n for n in all_provider_names if n == 'github']
     if external:
-        active_platforms = discover_platforms()  # all platforms
+        # --external means "all platforms", but respect explicit exclusions
+        active_platforms = [
+            p for p in discover_platforms()
+            if p.platform_id not in excluded_platforms
+        ]
     elif platform_names:
         active_platforms = discover_platforms(only=platform_names)
     else:
@@ -351,20 +367,44 @@ def refresh_handler(
         _print_summary_pretty(stats)
 
 
+def _get_valid_repo_columns(db):
+    """Return the set of valid column names from the repos table (cached)."""
+    global _REPO_COLUMN_CACHE
+    if _REPO_COLUMN_CACHE is None:
+        db.execute("PRAGMA table_info(repos)")
+        _REPO_COLUMN_CACHE = {row['name'] for row in db.fetchall()}
+    return _REPO_COLUMN_CACHE
+
+
 def _update_repo_platform_fields(db, repo_id, fields):
-    """Update repo with platform-specific fields."""
+    """Update repo with platform-specific fields.
+
+    Column names are validated against the actual schema to prevent SQL
+    injection from user-provided platform providers. Unknown or malformed
+    column names are dropped with a warning.
+    """
     if not fields:
         return
-    set_clauses = ', '.join(f'{k} = ?' for k in fields.keys())
-    params = list(fields.values()) + [repo_id]
+    valid = _get_valid_repo_columns(db)
+    safe_fields = {
+        k: v for k, v in fields.items()
+        if _IDENT_RE.match(k) and k in valid
+    }
+    dropped = set(fields.keys()) - set(safe_fields.keys())
+    if dropped:
+        logger.warning(f"Dropping unknown platform fields: {sorted(dropped)}")
+    if not safe_fields:
+        return
+    set_clauses = ', '.join(f'{k} = ?' for k in safe_fields.keys())
+    params = list(safe_fields.values()) + [repo_id]
     db.execute(f"UPDATE repos SET {set_clauses} WHERE id = ?", tuple(params))
 
 
-def _run_providers_parallel(providers, repo_path, repo_dict, config):
+def _run_providers_parallel(providers, repo_path, repo_dict, config, quiet=False):
     """Run registry provider.match() calls in parallel.
 
     Returns list of PackageMetadata for successful matches.
-    Errors are logged but don't prevent other providers from completing.
+    Errors are logged as warnings and surfaced to stderr unless quiet.
     """
     if not providers:
         return []
@@ -381,14 +421,17 @@ def _run_providers_parallel(providers, repo_path, repo_dict, config):
                 if metadata:
                     results.append(metadata)
             except Exception as e:
-                logger.debug(f"Provider {provider.registry} failed: {e}")
+                logger.warning(f"Provider {provider.registry} failed: {e}")
+                if not quiet:
+                    click.echo(f"  Warning: provider {provider.registry} failed: {e}", err=True)
     return results
 
 
-def _run_platforms_parallel(platforms, repo_path, repo_dict, config):
+def _run_platforms_parallel(platforms, repo_path, repo_dict, config, quiet=False):
     """Run platform provider detect+enrich calls in parallel.
 
     Returns list of dicts with platform-prefixed fields for successful enrichments.
+    Errors are logged as warnings and surfaced to stderr unless quiet.
     """
     if not platforms:
         return []
@@ -408,7 +451,9 @@ def _run_platforms_parallel(platforms, repo_path, repo_dict, config):
                 if data:
                     results.append(data)
             except Exception as e:
-                logger.debug(f"Platform {provider.platform_id} failed: {e}")
+                logger.warning(f"Platform {provider.platform_id} failed: {e}")
+                if not quiet:
+                    click.echo(f"  Warning: platform {provider.platform_id} failed: {e}", err=True)
     return results
 
 
@@ -450,19 +495,28 @@ def _process_repo(
         # Upsert to database
         repo_id = upsert_repo(db, enriched)
 
-        # Run platform providers (github, etc.)
+        # Run platform providers (github, etc.) — isolated so platform failures
+        # don't poison the rest of repo processing (event scanning, registry providers).
         if platforms and repo_id:
-            repo_dict = {'remote_url': enriched.remote_url, 'name': enriched.name,
-                         'owner': getattr(enriched, 'owner', None)}
-            platform_results = _run_platforms_parallel(platforms, repo.path, repo_dict, config)
-            for fields in platform_results:
-                _update_repo_platform_fields(db, repo_id, fields)
+            try:
+                repo_dict = {'remote_url': enriched.remote_url, 'name': enriched.name,
+                             'owner': getattr(enriched, 'owner', None)}
+                platform_results = _run_platforms_parallel(
+                    platforms, repo.path, repo_dict, config, quiet=quiet
+                )
+                for fields in platform_results:
+                    _update_repo_platform_fields(db, repo_id, fields)
+            except Exception as e:
+                if not quiet:
+                    click.echo(f"  Warning: platform enrichment failed for {repo.name}: {e}", err=True)
 
         # Run registry providers (new extension system)
         if providers and repo_id:
             from ..database.repository import _upsert_publication
             repo_dict = {'remote_url': enriched.remote_url, 'name': enriched.name}
-            matched = _run_providers_parallel(providers, repo.path, repo_dict, config)
+            matched = _run_providers_parallel(
+                providers, repo.path, repo_dict, config, quiet=quiet
+            )
             for metadata in matched:
                 _upsert_publication(db, repo_id, metadata)
         stats['updated'] += 1

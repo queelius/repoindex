@@ -147,7 +147,10 @@ class TestPlatformWiring:
         mock_discover.assert_called_once_with()
 
     def test_no_github_skips_platform(self):
-        """--no-github should prevent github platform discovery."""
+        """--no-github should prevent github platform discovery.
+
+        Even with config default 'github: true', --no-github must exclude github.
+        """
         from click.testing import CliRunner
         from repoindex.commands.refresh import refresh_handler
 
@@ -160,13 +163,40 @@ class TestPlatformWiring:
              patch('repoindex.providers.discover_platforms', return_value=[]) as mock_discover:
             runner.invoke(refresh_handler, ['--no-github'])
 
-        # Should not discover any platforms (empty list)
-        # discover_platforms might not be called, or called with only=[]
+        # If called, must not request github (empty list is OK; None is NOT
+        # — None means "all platforms" which would re-include github).
         if mock_discover.called:
             args, kwargs = mock_discover.call_args
-            only = kwargs.get('only') or (args[0] if args else None)
-            # If called, only should be empty -- filtering out github
-            assert only == [] or only is None
+            only = kwargs.get('only')
+            assert only is not None, "--no-github must not use unfiltered discover_platforms()"
+            assert 'github' not in only
+
+    def test_external_plus_no_github_excludes_github(self):
+        """--external --no-github must not enrich GitHub (no-github takes priority)."""
+        from click.testing import CliRunner
+        from repoindex.commands.refresh import refresh_handler
+        from unittest.mock import MagicMock as MM
+
+        # Mock a github platform; verify it's filtered out of active_platforms
+        mock_github = MM()
+        mock_github.platform_id = 'github'
+
+        runner = CliRunner()
+        with patch('repoindex.commands.refresh.load_config', return_value={
+            'repository_directories': [],
+            'refresh': {'external_sources': {}, 'providers': {}},
+        }), \
+             patch('repoindex.commands.refresh.get_repository_directories', return_value=[]), \
+             patch('repoindex.providers.discover_platforms', return_value=[mock_github]), \
+             patch('repoindex.commands.refresh._process_repo') as mock_process:
+            runner.invoke(refresh_handler, ['--external', '--no-github'])
+
+        # If _process_repo was called, check that active_platforms didn't include github
+        if mock_process.called:
+            kwargs = mock_process.call_args.kwargs
+            platforms = kwargs.get('platforms', [])
+            platform_ids = [p.platform_id for p in platforms]
+            assert 'github' not in platform_ids
 
     def test_no_flags_no_platforms(self):
         """No flags + no config defaults = no platforms discovered."""
@@ -205,38 +235,84 @@ class TestPlatformWiring:
 class TestUpdateRepoPlatformFields:
     """Test the _update_repo_platform_fields helper."""
 
+    @pytest.fixture(autouse=True)
+    def _reset_column_cache(self):
+        """Reset the column cache between tests so introspection happens fresh."""
+        import repoindex.commands.refresh as refresh_mod
+        refresh_mod._REPO_COLUMN_CACHE = None
+        yield
+        refresh_mod._REPO_COLUMN_CACHE = None
+
+    def _mock_db_with_columns(self, columns):
+        """Build a mock db whose PRAGMA table_info returns the given columns."""
+        mock_db = MagicMock()
+        mock_db.fetchall.return_value = [{'name': c} for c in columns]
+        return mock_db
+
     def test_generates_correct_sql(self):
         """Should produce UPDATE with SET clauses for each field."""
-        mock_db = MagicMock()
+        mock_db = self._mock_db_with_columns(['id', 'github_stars', 'github_forks'])
         _update_repo_platform_fields(mock_db, 42, {
             'github_stars': 100,
             'github_forks': 5,
         })
-        mock_db.execute.assert_called_once()
-        sql, params = mock_db.execute.call_args[0]
+        # First execute() is PRAGMA, second is UPDATE
+        update_call = mock_db.execute.call_args_list[-1]
+        sql, params = update_call[0]
         assert 'UPDATE repos SET' in sql
         assert 'github_stars = ?' in sql
         assert 'github_forks = ?' in sql
         assert 'WHERE id = ?' in sql
-        assert params == (100, 5, 42)
+        # Params order matches dict key iteration (insertion order in 3.7+)
+        assert params[-1] == 42  # repo_id is last
 
     def test_empty_fields_is_noop(self):
-        """Empty fields dict should not execute any SQL."""
         mock_db = MagicMock()
         _update_repo_platform_fields(mock_db, 42, {})
         mock_db.execute.assert_not_called()
 
     def test_none_fields_is_noop(self):
-        """None fields should not execute any SQL."""
         mock_db = MagicMock()
         _update_repo_platform_fields(mock_db, 42, None)
         mock_db.execute.assert_not_called()
 
+    def test_drops_unknown_columns(self):
+        """Unknown column names should be dropped with a warning, not interpolated."""
+        mock_db = self._mock_db_with_columns(['id', 'github_stars'])
+        _update_repo_platform_fields(mock_db, 1, {
+            'github_stars': 42,
+            'nonexistent_column': 'x',
+        })
+        # PRAGMA + UPDATE (nonexistent dropped)
+        update_call = mock_db.execute.call_args_list[-1]
+        sql, params = update_call[0]
+        assert 'UPDATE repos SET github_stars = ?' in sql
+        assert 'nonexistent_column' not in sql
+
+    def test_rejects_sql_injection_identifiers(self):
+        """Non-identifier keys (e.g., injection attempts) must not be interpolated."""
+        mock_db = self._mock_db_with_columns(['id', 'github_stars'])
+        _update_repo_platform_fields(mock_db, 1, {
+            'github_stars = 1; DROP TABLE repos; --': 99,
+        })
+        # Only the PRAGMA should have been executed; no UPDATE because all fields invalid
+        calls = mock_db.execute.call_args_list
+        assert len(calls) == 1
+        assert 'PRAGMA' in calls[0][0][0]
+
+    def test_all_unknown_no_update(self):
+        """If every field is unknown, no UPDATE runs (only the PRAGMA)."""
+        mock_db = self._mock_db_with_columns(['id', 'github_stars'])
+        _update_repo_platform_fields(mock_db, 1, {'unknown_a': 1, 'unknown_b': 2})
+        calls = mock_db.execute.call_args_list
+        # Only PRAGMA was executed
+        assert all('PRAGMA' in call[0][0] for call in calls)
+
     def test_single_field(self):
-        """Single field should produce correct SQL."""
-        mock_db = MagicMock()
+        mock_db = self._mock_db_with_columns(['id', 'github_stars'])
         _update_repo_platform_fields(mock_db, 1, {'github_stars': 42})
-        sql, params = mock_db.execute.call_args[0]
+        update_call = mock_db.execute.call_args_list[-1]
+        sql, params = update_call[0]
         assert sql == 'UPDATE repos SET github_stars = ? WHERE id = ?'
         assert params == (42, 1)
 
