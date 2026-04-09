@@ -17,7 +17,9 @@ from ..infra.github_client import GitHubClient
 
 logger = logging.getLogger(__name__)
 
-_GITHUB_REMOTE_RE = re.compile(r'github\.com[:/]([^/]+)/([^/.]+)')
+# Matches github.com:owner/name or github.com/owner/name, with optional .git suffix
+# and optional trailing slash. Preserves dots in the name (e.g., three.js, Chart.js).
+_GITHUB_REMOTE_RE = re.compile(r'github\.com[:/]([^/\s]+)/([^/\s]+?)(?:\.git)?/?$')
 
 
 def _parse_github_remote(url: Optional[str]) -> Tuple[Optional[str], Optional[str]]:
@@ -25,6 +27,7 @@ def _parse_github_remote(url: Optional[str]) -> Tuple[Optional[str], Optional[st
     Extract (owner, name) from a GitHub remote URL.
 
     Handles HTTPS, SSH, and URLs with or without .git suffix.
+    Preserves dots in repo names (three.js, Chart.js, etc.).
     Returns (None, None) for non-GitHub URLs or empty/None input.
     """
     if not url:
@@ -41,6 +44,16 @@ class GitHubPlatformProvider(PlatformProvider):
     platform_id = "github"
     name = "GitHub"
     prefix = "github"
+
+    def __init__(self):
+        # Cache clients by token to avoid per-call 'gh auth status' subprocess cost
+        self._client_cache: dict = {}
+
+    def _get_client(self, token: Optional[str]) -> GitHubClient:
+        """Return a cached GitHubClient for the given token."""
+        if token not in self._client_cache:
+            self._client_cache[token] = GitHubClient(token=token)
+        return self._client_cache[token]
 
     def detect(self, repo_path: str, repo_record: Optional[dict] = None) -> bool:
         """Detect whether this repo has a GitHub remote."""
@@ -61,12 +74,16 @@ class GitHubPlatformProvider(PlatformProvider):
         if not token:
             token = os.environ.get('GITHUB_TOKEN') or os.environ.get('REPOINDEX_GITHUB_TOKEN')
 
-        client = GitHubClient(token=token)
+        client = self._get_client(token)
         repo = client.get_repo(owner, name)
         if not repo:
             return None
 
+        # Always include identity fields so record_to_domain() can reconstruct
+        # GitHubMetadata (it gates on the presence of github_owner).
         result = {
+            'github_owner': owner,
+            'github_name': name,
             'github_stars': repo.stars,
             'github_forks': repo.forks,
             'github_watchers': repo.watchers,
@@ -79,10 +96,13 @@ class GitHubPlatformProvider(PlatformProvider):
             'github_updated_at': repo.updated_at,
         }
 
+        # Also populate the top-level description column (used for FTS5 search)
+        if repo.description:
+            result['description'] = repo.description
+
         if repo.topics:
             result['github_topics'] = json.dumps(repo.topics)
 
-        # Also store pushed_at if available
         if repo.pushed_at:
             result['github_pushed_at'] = repo.pushed_at
 

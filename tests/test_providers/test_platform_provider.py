@@ -347,9 +347,42 @@ class TestParseGithubRemote:
         assert owner == 'user'
         assert name == 'repo'
 
+    def test_parses_dotted_repo_name(self):
+        """Names with dots (three.js, Chart.js) must not be truncated."""
+        from repoindex.providers.github import _parse_github_remote
+        owner, name = _parse_github_remote('https://github.com/mrdoob/three.js.git')
+        assert owner == 'mrdoob'
+        assert name == 'three.js'
+
+    def test_parses_dotted_repo_no_suffix(self):
+        from repoindex.providers.github import _parse_github_remote
+        owner, name = _parse_github_remote('https://github.com/chartjs/Chart.js')
+        assert owner == 'chartjs'
+        assert name == 'Chart.js'
+
+    def test_parses_rust_repo(self):
+        from repoindex.providers.github import _parse_github_remote
+        owner, name = _parse_github_remote('https://github.com/user/my-lib.rs.git')
+        assert owner == 'user'
+        assert name == 'my-lib.rs'
+
+    def test_parses_python_repo(self):
+        from repoindex.providers.github import _parse_github_remote
+        owner, name = _parse_github_remote('git@github.com:user/tool.py.git')
+        assert owner == 'user'
+        assert name == 'tool.py'
+
 
 class TestGitHubPlatformProvider:
     """Test the GitHubPlatformProvider concrete implementation."""
+
+    @pytest.fixture(autouse=True)
+    def _clear_client_cache(self):
+        """Clear the cached GitHubClient between tests (singleton pattern)."""
+        from repoindex.providers.github import platform
+        platform._client_cache.clear()
+        yield
+        platform._client_cache.clear()
 
     def test_platform_attributes(self):
         from repoindex.providers.github import platform
@@ -511,6 +544,93 @@ class TestGitHubPlatformProvider:
         from repoindex.providers.github import platform
         result = platform.enrich('/repo', repo_record={'remote_url': ''})
         assert result is None
+
+    def test_enrich_writes_owner_name_and_description(self):
+        """Enrich must populate github_owner, github_name, and top-level description.
+
+        record_to_domain() gates GitHubMetadata construction on github_owner,
+        and FTS5 search uses the top-level description column.
+        """
+        from repoindex.providers.github import platform
+        from unittest.mock import patch
+        from repoindex.infra.github_client import GitHubRepo
+
+        mock_repo = GitHubRepo(
+            owner='queelius', name='three.js', full_name='queelius/three.js',
+            description='A 3D JS library', homepage=None, language='JavaScript',
+            stars=100, forks=5, watchers=10, open_issues=2,
+            is_fork=False, is_private=False, is_archived=False,
+            default_branch='main', topics=[],
+            license_key=None, has_issues=True, has_wiki=True, has_pages=False,
+            created_at=None, updated_at=None, pushed_at=None,
+        )
+
+        with patch('repoindex.providers.github.GitHubClient') as MockClient:
+            MockClient.return_value.get_repo.return_value = mock_repo
+            result = platform.enrich(
+                '/repo',
+                repo_record={'remote_url': 'https://github.com/queelius/three.js.git'},
+                config={'github': {'token': 'fake'}},
+            )
+
+        assert result['github_owner'] == 'queelius'
+        assert result['github_name'] == 'three.js'
+        assert result['description'] == 'A 3D JS library'
+
+    def test_enrich_no_description_omits_toplevel_description(self):
+        """When GitHub description is empty, don't overwrite top-level description."""
+        from repoindex.providers.github import platform
+        from unittest.mock import patch
+        from repoindex.infra.github_client import GitHubRepo
+
+        mock_repo = GitHubRepo(
+            owner='user', name='repo', full_name='user/repo',
+            description=None, homepage=None, language=None,
+            stars=0, forks=0, watchers=0, open_issues=0,
+            is_fork=False, is_private=False, is_archived=False,
+            default_branch='main', topics=[],
+            license_key=None, has_issues=True, has_wiki=True, has_pages=False,
+            created_at=None, updated_at=None, pushed_at=None,
+        )
+
+        with patch('repoindex.providers.github.GitHubClient') as MockClient:
+            MockClient.return_value.get_repo.return_value = mock_repo
+            result = platform.enrich(
+                '/repo',
+                repo_record={'remote_url': 'https://github.com/user/repo.git'},
+                config={'github': {'token': 'fake'}},
+            )
+
+        # github_owner/name still set, but description NOT in result (won't clobber local)
+        assert result['github_owner'] == 'user'
+        assert 'description' not in result
+
+    def test_enrich_reuses_client_across_calls(self):
+        """GitHubClient should be cached per-token, not re-instantiated per call."""
+        from repoindex.providers.github import GitHubPlatformProvider
+        from unittest.mock import patch
+
+        provider = GitHubPlatformProvider()
+        with patch('repoindex.providers.github.GitHubClient') as MockClient:
+            MockClient.return_value.get_repo.return_value = None
+            provider.enrich('/r1', {'remote_url': 'https://github.com/a/b.git'}, config={'github': {'token': 't'}})
+            provider.enrich('/r2', {'remote_url': 'https://github.com/c/d.git'}, config={'github': {'token': 't'}})
+
+        # Same token → single client construction
+        assert MockClient.call_count == 1
+
+    def test_enrich_separate_clients_per_token(self):
+        """Different tokens should get separate cached clients."""
+        from repoindex.providers.github import GitHubPlatformProvider
+        from unittest.mock import patch
+
+        provider = GitHubPlatformProvider()
+        with patch('repoindex.providers.github.GitHubClient') as MockClient:
+            MockClient.return_value.get_repo.return_value = None
+            provider.enrich('/r1', {'remote_url': 'https://github.com/a/b.git'}, config={'github': {'token': 't1'}})
+            provider.enrich('/r2', {'remote_url': 'https://github.com/c/d.git'}, config={'github': {'token': 't2'}})
+
+        assert MockClient.call_count == 2
 
     def test_discovered_by_discover_platforms(self):
         from repoindex.providers import discover_platforms
