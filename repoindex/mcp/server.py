@@ -6,6 +6,8 @@ Provides LLM access to the repoindex database via tools:
 - get_schema: SQL DDL for schema introspection
 - run_sql: Execute read-only SQL queries
 - refresh: Trigger a database refresh
+- tag: Manage user-assigned repo tags
+- export: Produce longecho-compliant arkiv archive
 
 Requires: pip install repoindex[mcp]
 
@@ -147,6 +149,63 @@ def _refresh_impl(github: bool = False, full: bool = False) -> dict:
         return {'status': 'error', 'error': str(e)}
 
 
+def _tag_impl(repo: str, action: str, tag: str = "") -> dict:
+    """Manage user-assigned repo tags."""
+    if action not in ('add', 'remove', 'list'):
+        return {'error': f'Invalid action: {action}. Use add, remove, or list.'}
+
+    if action == 'list':
+        with _open_db() as (db, _config):
+            if repo:
+                db.execute(
+                    "SELECT t.tag, t.source FROM tags t "
+                    "JOIN repos r ON t.repo_id = r.id "
+                    "WHERE r.name = ? ORDER BY t.tag",
+                    (repo,)
+                )
+            else:
+                db.execute("SELECT DISTINCT tag, source FROM tags ORDER BY tag")
+            rows = [dict(r) for r in db.fetchall()]
+            return {'tags': rows, 'count': len(rows)}
+
+    if not tag:
+        return {'error': f'Tag is required for {action} action.'}
+
+    # add/remove via subprocess (writes to DB)
+    cmd = ['repoindex', 'tag', action, repo, tag]
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        if result.returncode == 0:
+            return {'status': 'ok', 'action': action, 'repo': repo, 'tag': tag}
+        else:
+            return {
+                'status': 'error',
+                'error': result.stderr.strip() or result.stdout.strip(),
+            }
+    except Exception as e:
+        return {'status': 'error', 'error': str(e)}
+
+
+def _export_impl(output_dir: str, query: str = "") -> dict:
+    """Export repos as longecho-compliant arkiv archive."""
+    cmd = ['repoindex', 'export', '-o', output_dir]
+    if query:
+        cmd.append(query)
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        if result.returncode == 0:
+            return {'status': 'ok', 'output': result.stdout.strip(), 'output_dir': output_dir}
+        else:
+            return {
+                'status': 'error',
+                'error': result.stderr.strip() or result.stdout.strip(),
+            }
+    except subprocess.TimeoutExpired:
+        return {'status': 'error', 'error': 'Export timed out after 2 minutes'}
+    except Exception as e:
+        return {'status': 'error', 'error': str(e)}
+
+
 def create_server():
     """Create and return a FastMCP server instance."""
     try:
@@ -178,5 +237,18 @@ def create_server():
     def refresh(github: bool = False, full: bool = False) -> dict:
         """Refresh the repoindex database. github=True for GitHub metadata, full=True for full rescan."""
         return _refresh_impl(github=github, full=full)
+
+    @mcp.tool()
+    def tag(repo: str, action: str, tag: str = "") -> dict:
+        """Manage user-assigned repo tags. Actions: add, remove, list.
+        Derived tags (from GitHub topics, PyPI, etc.) are auto-populated during refresh."""
+        return _tag_impl(repo, action, tag)
+
+    @mcp.tool()
+    def export(output_dir: str, query: str = "") -> dict:
+        """Export repos as longecho-compliant arkiv archive to output_dir.
+        Includes JSONL data, schema, SQLite database, and HTML browser.
+        Optional query filters which repos are exported (DSL or @view)."""
+        return _export_impl(output_dir, query)
 
     return mcp

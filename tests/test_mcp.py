@@ -205,6 +205,95 @@ class TestRefresh:
         assert 'timed out' in result['error'].lower()
 
 
+class TestTag:
+    def test_list_tags(self, patch_db):
+        patch_db.fetchall.return_value = [
+            {'tag': 'lang:python', 'source': 'implicit'},
+            {'tag': 'work/active', 'source': 'user'},
+        ]
+        from repoindex.mcp.server import _tag_impl
+        result = _tag_impl('myrepo', 'list')
+        assert result['count'] == 2
+        assert result['tags'][0]['tag'] == 'lang:python'
+
+    def test_list_all_tags(self, patch_db):
+        patch_db.fetchall.return_value = [{'tag': 'lang:python', 'source': 'implicit'}]
+        from repoindex.mcp.server import _tag_impl
+        result = _tag_impl('', 'list')
+        assert 'tags' in result
+
+    def test_add_tag(self):
+        from repoindex.mcp.server import _tag_impl
+        with patch('repoindex.mcp.server.subprocess.run') as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout='', stderr='')
+            result = _tag_impl('myrepo', 'add', 'work/active')
+        assert result['status'] == 'ok'
+        assert result['action'] == 'add'
+        cmd = mock_run.call_args[0][0]
+        assert cmd == ['repoindex', 'tag', 'add', 'myrepo', 'work/active']
+
+    def test_remove_tag(self):
+        from repoindex.mcp.server import _tag_impl
+        with patch('repoindex.mcp.server.subprocess.run') as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout='', stderr='')
+            result = _tag_impl('myrepo', 'remove', 'old-tag')
+        assert result['status'] == 'ok'
+
+    def test_invalid_action(self):
+        from repoindex.mcp.server import _tag_impl
+        result = _tag_impl('myrepo', 'invalid')
+        assert 'error' in result
+
+    def test_add_without_tag_errors(self):
+        from repoindex.mcp.server import _tag_impl
+        result = _tag_impl('myrepo', 'add', '')
+        assert 'error' in result
+
+    def test_add_failure(self):
+        from repoindex.mcp.server import _tag_impl
+        with patch('repoindex.mcp.server.subprocess.run') as mock_run:
+            mock_run.return_value = MagicMock(returncode=1, stdout='', stderr='Repo not found')
+            result = _tag_impl('nonexistent', 'add', 'x')
+        assert result['status'] == 'error'
+
+
+class TestExport:
+    def test_export_success(self):
+        from repoindex.mcp.server import _export_impl
+        with patch('repoindex.mcp.server.subprocess.run') as mock_run:
+            mock_run.return_value = MagicMock(
+                returncode=0, stdout='Exported 42 repos', stderr=''
+            )
+            result = _export_impl('/tmp/out')
+        assert result['status'] == 'ok'
+        assert '42' in result['output']
+        cmd = mock_run.call_args[0][0]
+        assert cmd == ['repoindex', 'export', '-o', '/tmp/out']
+
+    def test_export_with_query(self):
+        from repoindex.mcp.server import _export_impl
+        with patch('repoindex.mcp.server.subprocess.run') as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout='Done', stderr='')
+            _export_impl('/tmp/out', "language == 'Python'")
+        cmd = mock_run.call_args[0][0]
+        assert cmd == ['repoindex', 'export', '-o', '/tmp/out', "language == 'Python'"]
+
+    def test_export_failure(self):
+        from repoindex.mcp.server import _export_impl
+        with patch('repoindex.mcp.server.subprocess.run') as mock_run:
+            mock_run.return_value = MagicMock(returncode=1, stdout='', stderr='DB not found')
+            result = _export_impl('/tmp/out')
+        assert result['status'] == 'error'
+
+    def test_export_timeout(self):
+        from repoindex.mcp.server import _export_impl
+        with patch('repoindex.mcp.server.subprocess.run') as mock_run:
+            mock_run.side_effect = subprocess.TimeoutExpired('repoindex', 120)
+            result = _export_impl('/tmp/out')
+        assert result['status'] == 'error'
+        assert 'timed out' in result['error'].lower()
+
+
 class TestMcpCli:
     def test_mcp_command_registered(self):
         from click.testing import CliRunner
