@@ -4,7 +4,7 @@
 
 **repoindex is a filesystem git catalog.** It indexes local git directories — the filesystem path IS the canonical identity. External platforms (GitHub, PyPI, CRAN) provide opt-in enrichment metadata, namespaced with prefixes (`github_stars`, `pypi_published`).
 
-**Version**: 0.13.0 | **Design**: [DESIGN.md](DESIGN.md)
+**Version**: 0.14.0 | **Design**: [DESIGN.md](DESIGN.md)
 
 ## Development Commands
 
