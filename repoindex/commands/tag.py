@@ -223,6 +223,45 @@ def tag_cmd():
     pass
 
 
+def _sync_user_tags_to_db(repo_path: str, added: List[str] = None, removed: List[str] = None) -> None:
+    """Sync user tag add/remove operations directly to the tags table.
+
+    config.yaml is the persistent source of truth for user tags (survives
+    database resets), but the tags table is the queryable index. Without
+    this sync, user tags added via CLI are invisible to run_sql / MCP until
+    the next refresh. This helper keeps both in sync immediately.
+    """
+    try:
+        config = load_config()
+        db_path = get_db_path(config)
+        if not db_path.exists():
+            return  # DB not initialized yet; tags will be synced on first refresh
+
+        with Database(config=config) as db:
+            # Find the repo row for this path
+            db.execute("SELECT id FROM repos WHERE path = ?", (repo_path,))
+            row = db.fetchone()
+            if not row:
+                return  # Repo not in DB yet; tags will be synced on first refresh
+            repo_id = row['id']
+
+            if added:
+                for tag in added:
+                    db.execute(
+                        "INSERT OR IGNORE INTO tags (repo_id, tag, source) VALUES (?, ?, 'user')",
+                        (repo_id, tag)
+                    )
+            if removed:
+                for tag in removed:
+                    db.execute(
+                        "DELETE FROM tags WHERE repo_id = ? AND tag = ? AND source = 'user'",
+                        (repo_id, tag)
+                    )
+    except Exception as e:
+        # Don't fail the CLI operation if DB sync fails: config.yaml is the source of truth
+        console.print(f"[yellow]Warning: could not sync tags to database: {e}[/yellow]")
+
+
 @tag_cmd.command('add')
 @click.argument('repository')
 @click.argument('tags', nargs=-1, required=True)
@@ -270,6 +309,9 @@ def tag_add(repository, tags):
         repo_tags[repo_path] = current_tags
         config["repository_tags"] = repo_tags
         save_config(config)
+
+        # Also sync directly to the tags table so queries see the change immediately
+        _sync_user_tags_to_db(repo_path, added=added)
 
         console.print(f"[green]Added {len(added)} tag(s) to {Path(repo_path).name}:[/green]")
         for tag in added:
@@ -335,6 +377,9 @@ def tag_remove(repository, tags):
 
         config["repository_tags"] = repo_tags
         save_config(config)
+
+        # Also sync directly to the tags table
+        _sync_user_tags_to_db(repo_path, removed=removed)
 
         console.print(f"[green]Removed {len(removed)} tag(s) from {Path(repo_path).name}:[/green]")
         for tag in removed:

@@ -127,6 +127,12 @@ def _run_sql_impl(query: str) -> dict:
         return {'error': str(e)}
 
 
+# Refresh timeout: 30 minutes covers collections of ~1000 repos with all
+# external sources enabled (GitHub API, PyPI, CRAN, Zenodo, etc.).
+# Smaller collections finish much faster; this is just an upper bound.
+_REFRESH_TIMEOUT_SECONDS = 1800
+
+
 def _refresh_impl(github: bool = False, full: bool = False) -> dict:
     """Run the repoindex refresh command as a subprocess."""
     cmd = ['repoindex', 'refresh']
@@ -135,7 +141,9 @@ def _refresh_impl(github: bool = False, full: bool = False) -> dict:
     if full:
         cmd.append('--full')
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=_REFRESH_TIMEOUT_SECONDS
+        )
         if result.returncode == 0:
             return {'status': 'ok', 'output': result.stdout.strip()}
         else:
@@ -144,7 +152,10 @@ def _refresh_impl(github: bool = False, full: bool = False) -> dict:
                 'error': result.stderr.strip() or result.stdout.strip(),
             }
     except subprocess.TimeoutExpired:
-        return {'status': 'error', 'error': 'Refresh timed out after 5 minutes'}
+        return {
+            'status': 'error',
+            'error': f'Refresh timed out after {_REFRESH_TIMEOUT_SECONDS // 60} minutes',
+        }
     except Exception as e:
         return {'status': 'error', 'error': str(e)}
 
