@@ -276,7 +276,8 @@ class TestExport:
             mock_run.return_value = MagicMock(returncode=0, stdout='Done', stderr='')
             _export_impl('/tmp/out', "language == 'Python'")
         cmd = mock_run.call_args[0][0]
-        assert cmd == ['repoindex', 'export', '-o', '/tmp/out', "language == 'Python'"]
+        # Must pass 'arkiv' explicitly so click doesn't parse query as FORMAT_ID
+        assert cmd == ['repoindex', 'export', 'arkiv', "language == 'Python'", '-o', '/tmp/out']
 
     def test_export_failure(self):
         from repoindex.mcp.server import _export_impl

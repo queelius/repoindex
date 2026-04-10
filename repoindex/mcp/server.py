@@ -188,9 +188,13 @@ def _tag_impl(repo: str, action: str, tag: str = "") -> dict:
 
 def _export_impl(output_dir: str, query: str = "") -> dict:
     """Export repos as longecho-compliant arkiv archive."""
-    cmd = ['repoindex', 'export', '-o', output_dir]
+    # CLI signature: repoindex export [FORMAT_ID] [QUERY] -o DIR
+    # When query is present, we must pass 'arkiv' explicitly so click doesn't
+    # parse the query string as FORMAT_ID.
+    cmd = ['repoindex', 'export']
     if query:
-        cmd.append(query)
+        cmd.extend(['arkiv', query])
+    cmd.extend(['-o', output_dir])
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
         if result.returncode == 0:
