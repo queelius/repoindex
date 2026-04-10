@@ -124,6 +124,16 @@ def _build_builtin_sources() -> List[MetadataSource]:
     """Build the list of built-in sources by wrapping existing providers."""
     sources = []
 
+    # Load built-in sources (local file scanners + remote platform sources)
+    for module_name in ('citation_cff', 'keywords', 'local_assets', 'gitea'):
+        try:
+            mod = importlib.import_module(f'.{module_name}', package='repoindex.sources')
+            src = getattr(mod, 'source', None)
+            if src and isinstance(src, MetadataSource):
+                sources.append(src)
+        except Exception as e:
+            logger.debug("Could not load local source %s: %s", module_name, e)
+
     # Wrap registry providers (pypi, cran, zenodo, npm, cargo, etc.)
     try:
         from ..providers import discover_providers

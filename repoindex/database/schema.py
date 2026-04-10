@@ -21,7 +21,8 @@ from typing import List, Tuple
 # v5+: Added refresh_log table (non-breaking, uses CREATE IF NOT EXISTS)
 # v6: Added keywords column (JSON array extracted from project manifests)
 # v7: Added local asset detection columns (has_codemeta, has_funding, has_contributors, has_changelog)
-CURRENT_VERSION = 7
+# v8: Added Gitea/Codeberg/Forgejo metadata columns (gitea_*)
+CURRENT_VERSION = 8
 
 # Schema definition as SQL statements
 SCHEMA_V1 = """
@@ -110,6 +111,25 @@ CREATE TABLE IF NOT EXISTS repos (
     github_created_at TIMESTAMP,
     github_updated_at TIMESTAMP,
     github_pushed_at TIMESTAMP,
+
+    -- Gitea/Codeberg/Forgejo metadata (nullable, fetched via gitea source)
+    gitea_owner TEXT,
+    gitea_name TEXT,
+    gitea_host TEXT,
+    gitea_stars INTEGER DEFAULT 0,
+    gitea_forks INTEGER DEFAULT 0,
+    gitea_watchers INTEGER DEFAULT 0,
+    gitea_open_issues INTEGER DEFAULT 0,
+    gitea_is_fork BOOLEAN DEFAULT 0,
+    gitea_is_private BOOLEAN DEFAULT 0,
+    gitea_is_archived BOOLEAN DEFAULT 0,
+    gitea_description TEXT,
+    gitea_topics TEXT,
+    gitea_created_at TEXT,
+    gitea_updated_at TEXT,
+    gitea_has_issues BOOLEAN DEFAULT 1,
+    gitea_has_wiki BOOLEAN DEFAULT 1,
+    gitea_has_pull_requests BOOLEAN DEFAULT 1,
 
     -- Local scan timestamp
     scanned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -352,7 +372,7 @@ def apply_schema(conn: sqlite3.Connection, version: int = CURRENT_VERSION) -> No
     conn.executescript(SCHEMA_V1)
     conn.execute(
         "INSERT OR REPLACE INTO _schema_info (version, description) VALUES (?, ?)",
-        (CURRENT_VERSION, "v0.12.0: Added local asset detection columns")
+        (CURRENT_VERSION, "v0.13.0: Added Gitea/Codeberg/Forgejo metadata columns")
     )
 
     conn.commit()
