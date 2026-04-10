@@ -1725,3 +1725,169 @@ def generate_gh_pages_handler(
                            "Generate deploy-docs.yml", len(repos),
                            success_label="Generated",
                            success_msg="Generated {count} " + file_label)
+
+
+# ============================================================================
+# WIP Snapshot command
+# ============================================================================
+
+@ops_cmd.command('wip-snapshot')
+@click.argument('query_string', required=False, default='')
+@click.option('--dry-run', is_flag=True, help='Preview what would be snapshotted')
+@click.option('--hostname', help='Override hostname for wip branch name')
+@click.option('--json', 'output_json', is_flag=True, help='Output as JSONL')
+@click.option('--debug', is_flag=True, help='Enable debug logging')
+@query_options
+def wip_snapshot_handler(
+    query_string: str,
+    dry_run: bool,
+    hostname: Optional[str],
+    output_json: bool,
+    debug: bool,
+    # Query flags
+    language: Optional[str],
+    dirty: bool,
+    tag: tuple,
+    recent: Optional[str],
+):
+    """Snapshot dirty working trees to wip/ branches on origin.
+
+    Creates remote-recoverable snapshots using git plumbing without
+    modifying your working tree or main branches. Safe to run anytime.
+
+    Each dirty repo gets a commit pushed to origin/wip/<hostname>/<date>.
+    Force-push is used (safe: wip branches are throwaway).
+
+    \b
+    Examples:
+        # Snapshot all dirty repos
+        repoindex ops wip-snapshot
+        # Preview first
+        repoindex ops wip-snapshot --dry-run
+        # Only Python repos
+        repoindex ops wip-snapshot --language python
+        # Specific repo
+        repoindex ops wip-snapshot "name == 'dreamlog'"
+
+    Recovery:
+        git fetch origin wip/<hostname>/<date>
+        git checkout -b recovered FETCH_HEAD
+    """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    from ..services.wip_service import snapshot_repo, SnapshotResult
+
+    if debug:
+        import logging
+        logging.basicConfig(level=logging.DEBUG)
+
+    config = load_config()
+
+    # Always filter to dirty repos (the whole point is snapshotting uncommitted work)
+    try:
+        repos = _get_repos_from_query(
+            config, query_string, debug=debug,
+            language=language, dirty=True, tag=tag, recent=recent,
+        )
+    except QueryCompileError as e:
+        _handle_query_error(e, query_string, output_json)
+        return
+
+    if not repos:
+        if output_json:
+            print(json.dumps({"error": "No dirty repos found."}), flush=True)
+        else:
+            click.echo("No dirty repos found.", err=True)
+        return
+
+    if not output_json:
+        click.echo(
+            f"{'[DRY RUN] ' if dry_run else ''}Snapshotting {len(repos)} dirty repo(s)...",
+            err=True,
+        )
+
+    results = []
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        futures = {
+            pool.submit(snapshot_repo, r['path'], hostname=hostname, dry_run=dry_run): r
+            for r in repos
+        }
+        for future in as_completed(futures):
+            result = future.result()
+            results.append(result)
+
+    # Categorize results
+    snapshotted = [r for r in results if r.success and not r.skipped]
+    skipped = [r for r in results if r.skipped]
+    failed = [r for r in results if not r.success and not r.skipped]
+
+    if output_json:
+        _wip_snapshot_output_json(snapshotted, skipped, failed, dry_run)
+    else:
+        _wip_snapshot_output_pretty(snapshotted, skipped, failed, dry_run)
+
+
+def _wip_snapshot_output_json(snapshotted, skipped, failed, dry_run):
+    """JSONL output for wip-snapshot."""
+    for r in snapshotted:
+        record = {
+            "status": "snapshotted",
+            "repo": r.repo_name,
+            "path": r.repo_path,
+            "branch": r.branch,
+        }
+        if not dry_run:
+            record["commit"] = r.commit_sha
+        print(json.dumps(record), flush=True)
+
+    for r in skipped:
+        print(json.dumps({
+            "status": "skipped",
+            "repo": r.repo_name,
+            "path": r.repo_path,
+            "reason": r.skip_reason,
+        }), flush=True)
+
+    for r in failed:
+        print(json.dumps({
+            "status": "failed",
+            "repo": r.repo_name,
+            "path": r.repo_path,
+            "error": r.error,
+        }), flush=True)
+
+    print(json.dumps({
+        "summary": {
+            "snapshotted": len(snapshotted),
+            "skipped": len(skipped),
+            "failed": len(failed),
+            "dry_run": dry_run,
+        }
+    }), flush=True)
+
+
+def _wip_snapshot_output_pretty(snapshotted, skipped, failed, dry_run):
+    """Pretty terminal output for wip-snapshot."""
+    if snapshotted:
+        click.echo(f"\nSnapshotted ({len(snapshotted)}):", err=True)
+        for r in sorted(snapshotted, key=lambda x: x.repo_name):
+            if dry_run:
+                click.echo(f"  {r.repo_name} -> origin/{r.branch}", err=True)
+            else:
+                click.echo(f"  {r.repo_name} -> origin/{r.branch} [{r.commit_sha[:8]}]", err=True)
+
+    if skipped:
+        skip_counts = {}
+        for r in skipped:
+            skip_counts[r.skip_reason] = skip_counts.get(r.skip_reason, 0) + 1
+        skip_summary = ', '.join(f'{v} {k}' for k, v in sorted(skip_counts.items()))
+        click.echo(f"\nSkipped ({len(skipped)}): {skip_summary}", err=True)
+
+    if failed:
+        click.echo(f"\nFailed ({len(failed)}):", err=True)
+        for r in sorted(failed, key=lambda x: x.repo_name):
+            click.echo(f"  {r.repo_name}: {r.error}", err=True)
+
+    click.echo(
+        f"\nSummary: {len(snapshotted)} snapshotted, {len(skipped)} skipped, {len(failed)} failed",
+        err=True,
+    )
