@@ -415,6 +415,115 @@ def _run_sources_parallel(sources, repo_path, repo_dict, config, quiet=False):
     return results
 
 
+def _derive_tags(db, repo_id, repo_record):
+    """Derive tags from metadata fields and sync to tags table.
+
+    Runs after all MetadataSources have enriched a repo. Reads metadata
+    columns and populates the tags table with source-attributed entries.
+
+    User-assigned tags (source='user') are never touched.
+    Derived tags (all other sources) are synced: stale ones removed, new ones added.
+    """
+    derived = []  # list of (tag_string, source_name)
+
+    # Platform topics
+    for field, source_name in [('github_topics', 'github'), ('gitea_topics', 'gitea')]:
+        raw = repo_record.get(field)
+        if raw:
+            try:
+                topics = json.loads(raw) if isinstance(raw, str) else raw
+                for topic in topics:
+                    if isinstance(topic, str) and topic.strip():
+                        derived.append((f'topic:{topic.strip().lower()}', source_name))
+            except (json.JSONDecodeError, TypeError):
+                pass
+
+    # Project keywords
+    raw_kw = repo_record.get('keywords')
+    if raw_kw:
+        try:
+            keywords = json.loads(raw_kw) if isinstance(raw_kw, str) else raw_kw
+            for kw in keywords:
+                if isinstance(kw, str) and kw.strip():
+                    derived.append((f'keyword:{kw.strip().lower()}', 'pyproject'))
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    # Language
+    lang = repo_record.get('language')
+    if lang and isinstance(lang, str):
+        derived.append((f'lang:{lang.lower()}', 'implicit'))
+
+    # Boolean flags
+    for flag in ('has_readme', 'has_license', 'has_ci', 'has_citation',
+                 'has_codemeta', 'has_funding', 'has_contributors', 'has_changelog'):
+        if repo_record.get(flag):
+            tag_name = flag.replace('has_', 'has:')
+            derived.append((tag_name, 'implicit'))
+
+    # Publication status
+    db.execute(
+        "SELECT DISTINCT registry FROM publications WHERE repo_id = ? AND published = 1",
+        (repo_id,)
+    )
+    for row in db.fetchall():
+        derived.append((f'published:{row["registry"]}', row['registry']))
+
+    # Sync derived tags (remove stale, add new, never touch user tags)
+    _sync_derived_tags(db, repo_id, derived)
+
+
+def _sync_derived_tags(db, repo_id, derived_tags):
+    """Sync derived tags for a repo. Preserves user-assigned tags.
+
+    Uses the tag string as the identity key (matches PRIMARY KEY (repo_id, tag)).
+    Tags with source='user' are never modified. For derived tags, stale ones
+    are removed and new ones are added.
+
+    Args:
+        db: Database connection
+        repo_id: Repository ID
+        derived_tags: list of (tag_string, source_name) tuples
+    """
+    # Build desired map: tag_string -> source_name
+    # If the same tag appears from multiple sources, first one wins
+    desired = {}
+    for tag, source in derived_tags:
+        if tag not in desired:
+            desired[tag] = source
+
+    # Get current non-user tags
+    db.execute(
+        "SELECT tag, source FROM tags WHERE repo_id = ? AND source != 'user'",
+        (repo_id,)
+    )
+    current = {row['tag']: row['source'] for row in db.fetchall()}
+
+    # Remove stale tags (in current but not desired)
+    for tag in current:
+        if tag not in desired:
+            db.execute(
+                "DELETE FROM tags WHERE repo_id = ? AND tag = ?",
+                (repo_id, tag)
+            )
+
+    # Add new tags (in desired but not current)
+    for tag, source in desired.items():
+        if tag not in current:
+            db.execute(
+                "INSERT OR IGNORE INTO tags (repo_id, tag, source) VALUES (?, ?, ?)",
+                (repo_id, tag, source)
+            )
+
+    # Update source if it changed for an existing derived tag
+    for tag, source in desired.items():
+        if tag in current and current[tag] != source:
+            db.execute(
+                "UPDATE tags SET source = ? WHERE repo_id = ? AND tag = ?",
+                (source, repo_id, tag)
+            )
+
+
 def _process_repo(
     db: Database,
     service: RepositoryService,
@@ -486,6 +595,17 @@ def _process_repo(
                 if not quiet:
                     click.echo(f"  Warning: source enrichment failed for {repo.name}: {e}", err=True)
         stats['updated'] += 1
+
+        # Derive tags from all metadata (runs after sources have enriched the repo)
+        if repo_id:
+            try:
+                db.execute("SELECT * FROM repos WHERE id = ?", (repo_id,))
+                updated_record = db.fetchone()
+                if updated_record:
+                    _derive_tags(db, repo_id, dict(updated_record))
+            except Exception as e:
+                if not quiet:
+                    click.echo(f"  Warning: tag derivation failed for {repo.name}: {e}", err=True)
 
         # Clear any previous scan errors for this path
         clear_scan_error_for_path(db, repo.path)
