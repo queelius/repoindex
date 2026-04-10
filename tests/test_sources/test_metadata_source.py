@@ -295,7 +295,8 @@ source = S()
         user_dir.mkdir()
         (user_dir / "wrong_type.py").write_text("source = 'not a MetadataSource'\n")
         result = discover_sources(user_dir=str(user_dir))
-        assert len(result) == 0
+        # Built-in adapters are still present; the wrong_type.py source is not
+        assert all(s.source_id != 'wrong_type' for s in result)
 
     def test_backward_compat_providers_dir(self, tmp_path, monkeypatch):
         """User sources in ~/.repoindex/providers/ with MetadataSource are discovered."""
@@ -460,22 +461,8 @@ source = S2()
         (user_dir / "readme.txt").write_text("not a source")
         (user_dir / "data.json").write_text("{}")
         result = discover_sources(user_dir=str(user_dir))
-        assert result == []
-
-
-class TestBuiltinSources:
-    def test_builtin_sources_is_list(self):
-        from repoindex.sources import BUILTIN_SOURCES
-        assert isinstance(BUILTIN_SOURCES, list)
-
-    def test_builtin_sources_currently_empty(self):
-        from repoindex.sources import BUILTIN_SOURCES
-        assert len(BUILTIN_SOURCES) == 0
-
-    def test_all_builtins_are_metadata_sources(self):
-        from repoindex.sources import BUILTIN_SOURCES, MetadataSource
-        for s in BUILTIN_SOURCES:
-            assert isinstance(s, MetadataSource)
+        # Built-in adapters are present; non-.py files are not loaded as user sources
+        assert all(s.source_id != 'readme' for s in result)
 
 
 class TestLoadSourcesFromDirectory:
@@ -571,3 +558,150 @@ source = S()
         result = _load_sources_from_directory(str(d), "test", ["source"])
         ids = [s.source_id for s in result]
         assert ids == ["aa", "mm", "zz"]
+
+
+class TestRegistryProviderAdapter:
+    """Test the adapter that wraps RegistryProvider as MetadataSource."""
+
+    def test_wraps_registry_provider(self):
+        from repoindex.sources import _RegistryProviderAdapter, MetadataSource
+        mock_provider = MagicMock()
+        mock_provider.registry = "fakepkg"
+        mock_provider.name = "Fake Package Registry"
+        mock_provider.batch = False
+
+        adapter = _RegistryProviderAdapter(mock_provider)
+        assert isinstance(adapter, MetadataSource)
+        assert adapter.source_id == "fakepkg"
+        assert adapter.target == "publications"
+
+    def test_detect_delegates(self):
+        from repoindex.sources import _RegistryProviderAdapter
+        mock_provider = MagicMock()
+        mock_provider.registry = "test"
+        mock_provider.name = "Test"
+        mock_provider.detect.return_value = "pkg-name"  # non-None = detected
+
+        adapter = _RegistryProviderAdapter(mock_provider)
+        assert adapter.detect("/repo", {}) is True
+
+    def test_detect_none_means_false(self):
+        from repoindex.sources import _RegistryProviderAdapter
+        mock_provider = MagicMock()
+        mock_provider.registry = "test"
+        mock_provider.name = "Test"
+        mock_provider.detect.return_value = None
+
+        adapter = _RegistryProviderAdapter(mock_provider)
+        assert adapter.detect("/repo", {}) is False
+
+    def test_fetch_delegates_to_match(self):
+        from repoindex.sources import _RegistryProviderAdapter
+        mock_metadata = MagicMock()
+        mock_metadata.to_dict.return_value = {'registry': 'test', 'name': 'pkg', 'published': True}
+
+        mock_provider = MagicMock()
+        mock_provider.registry = "test"
+        mock_provider.name = "Test"
+        mock_provider.match.return_value = mock_metadata
+
+        adapter = _RegistryProviderAdapter(mock_provider)
+        result = adapter.fetch("/repo", {}, {})
+        assert result == {'registry': 'test', 'name': 'pkg', 'published': True}
+
+    def test_fetch_returns_none_when_no_match(self):
+        from repoindex.sources import _RegistryProviderAdapter
+        mock_provider = MagicMock()
+        mock_provider.registry = "test"
+        mock_provider.name = "Test"
+        mock_provider.match.return_value = None
+
+        adapter = _RegistryProviderAdapter(mock_provider)
+        assert adapter.fetch("/repo", {}, {}) is None
+
+    def test_prefetch_delegates(self):
+        from repoindex.sources import _RegistryProviderAdapter
+        mock_provider = MagicMock()
+        mock_provider.registry = "test"
+        mock_provider.name = "Test"
+        mock_provider.batch = True
+
+        adapter = _RegistryProviderAdapter(mock_provider)
+        adapter.prefetch({'key': 'val'})
+        mock_provider.prefetch.assert_called_once_with({'key': 'val'})
+
+
+class TestPlatformProviderAdapter:
+    """Test the adapter that wraps PlatformProvider as MetadataSource."""
+
+    def test_wraps_platform_provider(self):
+        from repoindex.sources import _PlatformProviderAdapter, MetadataSource
+        mock_platform = MagicMock()
+        mock_platform.platform_id = "fakehost"
+        mock_platform.name = "Fake Host"
+
+        adapter = _PlatformProviderAdapter(mock_platform)
+        assert isinstance(adapter, MetadataSource)
+        assert adapter.source_id == "fakehost"
+        assert adapter.target == "repos"
+
+    def test_detect_delegates(self):
+        from repoindex.sources import _PlatformProviderAdapter
+        mock_platform = MagicMock()
+        mock_platform.platform_id = "test"
+        mock_platform.name = "Test"
+        mock_platform.detect.return_value = True
+
+        adapter = _PlatformProviderAdapter(mock_platform)
+        assert adapter.detect("/repo", {'remote_url': 'test.com'}) is True
+
+    def test_fetch_delegates_to_enrich(self):
+        from repoindex.sources import _PlatformProviderAdapter
+        mock_platform = MagicMock()
+        mock_platform.platform_id = "test"
+        mock_platform.name = "Test"
+        mock_platform.enrich.return_value = {'test_stars': 42}
+
+        adapter = _PlatformProviderAdapter(mock_platform)
+        result = adapter.fetch("/repo", {}, {})
+        assert result == {'test_stars': 42}
+
+
+class TestBuiltinSourcesDiscovery:
+    """Test that discover_sources() finds existing providers via adapters."""
+
+    def test_discovers_github_platform(self):
+        from repoindex.sources import discover_sources
+        sources = discover_sources()
+        ids = [s.source_id for s in sources]
+        assert 'github' in ids
+
+    def test_discovers_pypi_registry(self):
+        from repoindex.sources import discover_sources
+        sources = discover_sources()
+        ids = [s.source_id for s in sources]
+        assert 'pypi' in ids
+
+    def test_discovers_cran_registry(self):
+        from repoindex.sources import discover_sources
+        sources = discover_sources()
+        ids = [s.source_id for s in sources]
+        assert 'cran' in ids
+
+    def test_github_has_repos_target(self):
+        from repoindex.sources import discover_sources
+        sources = discover_sources(only=['github'])
+        assert len(sources) == 1
+        assert sources[0].target == 'repos'
+
+    def test_pypi_has_publications_target(self):
+        from repoindex.sources import discover_sources
+        sources = discover_sources(only=['pypi'])
+        assert len(sources) == 1
+        assert sources[0].target == 'publications'
+
+    def test_only_filter_works(self):
+        from repoindex.sources import discover_sources
+        sources = discover_sources(only=['github', 'pypi'])
+        ids = {s.source_id for s in sources}
+        assert ids == {'github', 'pypi'}

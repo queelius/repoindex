@@ -22,7 +22,7 @@ from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
-__all__ = ['MetadataSource', 'discover_sources']
+__all__ = ['MetadataSource', 'discover_sources', '_RegistryProviderAdapter', '_PlatformProviderAdapter']
 
 
 class MetadataSource(ABC):
@@ -78,10 +78,81 @@ class MetadataSource(ABC):
         """Optional batch pre-fetch hook, called once per refresh."""
 
 
-BUILTIN_SOURCES: List[MetadataSource] = [
-    # These will be populated as providers are migrated (Task 2)
-    # For now, empty - sources are discovered from providers via compatibility layer
-]
+class _RegistryProviderAdapter(MetadataSource):
+    """Adapts an old-style RegistryProvider to the MetadataSource interface."""
+
+    target = "publications"
+
+    def __init__(self, provider):
+        self._provider = provider
+        self.source_id = provider.registry
+        self.name = provider.name
+        self.batch = getattr(provider, 'batch', False)
+
+    def detect(self, repo_path, repo_record=None):
+        result = self._provider.detect(repo_path, repo_record)
+        return result is not None
+
+    def fetch(self, repo_path, repo_record=None, config=None):
+        result = self._provider.match(repo_path, repo_record, config)
+        if result is None:
+            return None
+        return result.to_dict()
+
+    def prefetch(self, config):
+        self._provider.prefetch(config)
+
+
+class _PlatformProviderAdapter(MetadataSource):
+    """Adapts an old-style PlatformProvider to the MetadataSource interface."""
+
+    target = "repos"
+
+    def __init__(self, platform):
+        self._platform = platform
+        self.source_id = platform.platform_id
+        self.name = platform.name
+
+    def detect(self, repo_path, repo_record=None):
+        return self._platform.detect(repo_path, repo_record)
+
+    def fetch(self, repo_path, repo_record=None, config=None):
+        return self._platform.enrich(repo_path, repo_record, config)
+
+
+def _build_builtin_sources() -> List[MetadataSource]:
+    """Build the list of built-in sources by wrapping existing providers."""
+    sources = []
+
+    # Wrap registry providers (pypi, cran, zenodo, npm, cargo, etc.)
+    try:
+        from ..providers import discover_providers
+        for provider in discover_providers():
+            sources.append(_RegistryProviderAdapter(provider))
+    except Exception as e:
+        logger.debug("Could not load registry providers: %s", e)
+
+    # Wrap platform providers (github, etc.)
+    try:
+        from ..providers import discover_platforms
+        for platform in discover_platforms():
+            sources.append(_PlatformProviderAdapter(platform))
+    except Exception as e:
+        logger.debug("Could not load platform providers: %s", e)
+
+    return sources
+
+
+# Lazy-initialized cache of built-in sources (adapting old providers)
+_BUILTIN_SOURCES_CACHE: Optional[List[MetadataSource]] = None
+
+
+def _get_builtin_sources() -> List[MetadataSource]:
+    """Get built-in sources, building the adapter cache on first call."""
+    global _BUILTIN_SOURCES_CACHE
+    if _BUILTIN_SOURCES_CACHE is None:
+        _BUILTIN_SOURCES_CACHE = _build_builtin_sources()
+    return _BUILTIN_SOURCES_CACHE
 
 
 def _load_sources_from_directory(
@@ -156,7 +227,7 @@ def discover_sources(
     Returns:
         List of MetadataSource instances
     """
-    sources: List[MetadataSource] = list(BUILTIN_SOURCES)
+    sources: List[MetadataSource] = list(_get_builtin_sources())
 
     # Load user sources from ~/.repoindex/sources/
     if user_dir is None:
