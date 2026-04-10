@@ -90,6 +90,11 @@ class _RegistryProviderAdapter(MetadataSource):
         self.batch = getattr(provider, 'batch', False)
 
     def detect(self, repo_path, repo_record=None):
+        # Batch providers (Zenodo) don't use detect() — their matching logic
+        # is inside match(), which we call via fetch(). Always return True so
+        # _run_sources_parallel gives them a chance to match.
+        if self.batch:
+            return True
         result = self._provider.detect(repo_path, repo_record)
         return result is not None
 

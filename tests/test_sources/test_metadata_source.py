@@ -580,6 +580,7 @@ class TestRegistryProviderAdapter:
         mock_provider = MagicMock()
         mock_provider.registry = "test"
         mock_provider.name = "Test"
+        mock_provider.batch = False
         mock_provider.detect.return_value = "pkg-name"  # non-None = detected
 
         adapter = _RegistryProviderAdapter(mock_provider)
@@ -590,10 +591,23 @@ class TestRegistryProviderAdapter:
         mock_provider = MagicMock()
         mock_provider.registry = "test"
         mock_provider.name = "Test"
+        mock_provider.batch = False  # non-batch provider
         mock_provider.detect.return_value = None
 
         adapter = _RegistryProviderAdapter(mock_provider)
         assert adapter.detect("/repo", {}) is False
+
+    def test_batch_provider_detect_always_true(self):
+        """Batch providers (Zenodo) always return True from detect."""
+        from repoindex.sources import _RegistryProviderAdapter
+        mock_provider = MagicMock()
+        mock_provider.registry = "zenodo"
+        mock_provider.name = "Zenodo"
+        mock_provider.batch = True
+        mock_provider.detect.return_value = None  # batch providers return None
+
+        adapter = _RegistryProviderAdapter(mock_provider)
+        assert adapter.detect("/repo", {}) is True
 
     def test_fetch_delegates_to_match(self):
         from repoindex.sources import _RegistryProviderAdapter
