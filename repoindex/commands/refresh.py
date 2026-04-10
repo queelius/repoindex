@@ -26,6 +26,9 @@ _IDENT_RE = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]*$')
 # Cache of valid repos table columns (populated lazily from PRAGMA table_info)
 _REPO_COLUMN_CACHE = None
 
+# Local sources that run by default (fast, no HTTP)
+_LOCAL_SOURCE_IDS = frozenset({'citation_cff', 'keywords', 'local_assets'})
+
 from ..config import load_config, get_repository_directories
 from ..database import (
     Database,
@@ -43,72 +46,85 @@ from ..database import (
 from ..database.events import insert_events
 from ..services.repository_service import RepositoryService
 from ..events import scan_events
+from ..sources import discover_sources
 
 
-def _resolve_external_flag(explicit: Optional[bool], external: bool, config_default: bool) -> bool:
-    """
-    Resolve an external source flag.
-
-    Priority: explicit flag > --external flag > config default
-
-    Args:
-        explicit: Explicit flag value (True/False/None)
-        external: Whether --external was passed
-        config_default: Default from config
-
-    Returns:
-        Whether to enable this source
-    """
-    if explicit is not None:
-        return explicit
-    if external:
-        return True
-    return config_default
-
-
-def _resolve_provider_names(
+def _resolve_active_sources(
+    source_names: Tuple[str, ...],
     provider_names: Tuple[str, ...],
+    github: Optional[bool],
     external: bool,
-    provider_config: dict,
-) -> List[str]:
+    config: dict,
+) -> list:
     """
-    Build the list of active provider registry names.
+    Resolve the list of active MetadataSource instances.
 
     Merges:
-    - Explicit --provider flags
-    - --external (all providers)
-    - Config defaults from refresh.providers
+    - Explicit --source flags (primary)
+    - Deprecated --provider flags (merged into source names)
+    - --github / --no-github convenience alias
+    - --external (all sources)
+    - Config defaults from refresh.external_sources and refresh.providers
+
+    Local sources (citation_cff, keywords, local_assets) always run unless
+    explicitly excluded.
 
     Args:
-        provider_names: Explicit --provider flag values
+        source_names: Explicit --source flag values
+        provider_names: Deprecated --provider flag values
+        github: --github/--no-github flag (True/False/None)
         external: Whether --external was passed
-        provider_config: Dict from config['refresh']['providers'],
-            e.g. {'pypi': True, 'npm': False}
+        config: Full config dict
 
     Returns:
-        Deduplicated list of provider registry identifiers
+        List of MetadataSource instances to run
     """
-    names: set = set(provider_names)
+    ext_config = config.get('refresh', {}).get('external_sources', {})
+    provider_config = config.get('refresh', {}).get('providers', {})
 
-    # --external enables all providers
-    if external:
-        names.add('__all__')
+    # Merge --source and --provider (deprecated) into one set
+    all_names = set(source_names) | set(provider_names)
 
-    # Config defaults for providers
+    # Handle --github / --no-github
+    excluded = set()
+    if github is False:
+        excluded.add('github')
+        all_names.discard('github')
+    elif github is True:
+        all_names.add('github')
+    elif ext_config.get('github', False):
+        # Config default enables github
+        all_names.add('github')
+
+    # Config defaults for providers (e.g., pypi: true)
     for name, enabled in provider_config.items():
-        if enabled:
-            names.add(name)
+        if enabled and name not in excluded:
+            all_names.add(name)
 
-    return list(names) if names else []
+    # Determine active sources
+    if external:
+        # All sources, but respect explicit exclusions
+        active_sources = [s for s in discover_sources() if s.source_id not in excluded]
+    elif all_names:
+        # Explicit names + always include local sources
+        requested = all_names | _LOCAL_SOURCE_IDS
+        active_sources = discover_sources(only=list(requested))
+    else:
+        # Default: only local sources (fast, no HTTP)
+        active_sources = discover_sources(only=list(_LOCAL_SOURCE_IDS))
+
+    return active_sources
 
 
 @click.command('refresh')
 @click.option('--full', is_flag=True, help='Force full refresh of all repos')
 @click.option('--since', default='90d', help='How far back to scan for events (e.g., 7d, 30d, 90d)')
-@click.option('--github/--no-github', default=None, help='Fetch GitHub metadata (stars, topics)')
+@click.option('--github/--no-github', default=None, help='Fetch GitHub metadata (alias for --source github)')
+@click.option('--source', '-s', 'source_names', multiple=True,
+              help='Enable specific sources (e.g., --source github --source pypi)')
 @click.option('--provider', '-p', 'provider_names', multiple=True,
-              help='Enable specific providers (e.g., --provider pypi --provider npm)')
-@click.option('--external', is_flag=True, help='Enable all external sources (github + all registry providers)')
+              help='(Deprecated: use --source) Enable specific providers', hidden=True)
+@click.option('--external', is_flag=True, help='Enable all external sources (GitHub, registries, etc.)')
 @click.option('-d', '--dir', 'directory', type=click.Path(exists=True),
               help='Refresh specific directory instead of configured paths')
 @click.option('--dry-run', is_flag=True, help='Show what would be refreshed')
@@ -117,6 +133,7 @@ def refresh_handler(
     full: bool,
     since: str,
     github: Optional[bool],
+    source_names: Tuple[str, ...],
     provider_names: Tuple[str, ...],
     external: bool,
     directory: Optional[str],
@@ -131,11 +148,13 @@ def refresh_handler(
     are always scanned.
 
     By default, performs a smart refresh that only updates repos
-    that have changed since the last scan.
+    that have changed since the last scan. Local sources (CITATION.cff,
+    keywords, local assets) always run.
 
-    Registry providers (PyPI, CRAN, Zenodo, npm, cargo, etc.) are
-    enabled via --provider or --external. GitHub metadata is included
-    with --external or --provider github (--github is a convenience alias).
+    External sources (GitHub, PyPI, CRAN, Zenodo, npm, cargo, etc.) are
+    enabled via --source or --external. --github is a convenience alias
+    for --source github. The deprecated --provider flag is equivalent
+    to --source.
 
     \b
     Examples:
@@ -145,9 +164,10 @@ def refresh_handler(
         repoindex refresh --full
         # Include GitHub metadata
         repoindex refresh --github
-        # Include specific registry providers
-        repoindex refresh --provider pypi --provider cran
-        repoindex refresh -p npm -p cargo
+        repoindex refresh --source github
+        # Include specific sources
+        repoindex refresh --source pypi --source cran
+        repoindex refresh -s npm -s cargo
         # Include all external sources (slower)
         repoindex refresh --external
         # Refresh specific directory
@@ -169,60 +189,25 @@ def refresh_handler(
     """
     config = load_config()
 
-    # Merge --github flag into provider names list
-    # Priority: explicit --no-github > explicit --github > --external > config default
-    ext_config = config.get('refresh', {}).get('external_sources', {})
-    all_provider_names = list(provider_names)
-    if github is False:
-        # Explicit --no-github: remove github even if passed via --provider
-        all_provider_names = [n for n in all_provider_names if n != 'github']
-    elif github is True or _resolve_external_flag(None, external, ext_config.get('github', False)):
-        if 'github' not in all_provider_names:
-            all_provider_names.append('github')
-
-    # Build list of registry provider names from merged list + --external + config
-    # Provider config lives at refresh.providers (sibling to external_sources)
-    provider_config = config.get('refresh', {}).get('providers', {})
-    active_provider_names = _resolve_provider_names(
-        provider_names=tuple(n for n in all_provider_names if n != 'github'),
-        external=external, provider_config=provider_config,
+    # Resolve active sources from all flags + config
+    active_sources = _resolve_active_sources(
+        source_names=source_names,
+        provider_names=provider_names,
+        github=github,
+        external=external,
+        config=config,
     )
 
-    # Discover and initialize registry providers
-    active_providers = []
-    if active_provider_names:
-        from ..providers import discover_providers
-        only = None if '__all__' in active_provider_names else active_provider_names
-        active_providers = discover_providers(only=only)
-        # Prefetch batch providers
-        for p in active_providers:
-            if p.batch:
-                try:
-                    p.prefetch(config)
-                    if not quiet:
-                        click.echo(f"Provider {p.name}: prefetch complete", err=True)
-                except Exception as e:
-                    if not quiet:
-                        click.echo(f"Warning: {p.name} prefetch failed: {e}", err=True)
-
-    # Discover platform providers (github, etc.)
-    # Track explicit exclusions so --no-github takes priority over --external.
-    from ..providers import discover_platforms
-    excluded_platforms = set()
-    if github is False:
-        excluded_platforms.add('github')
-
-    platform_names = [n for n in all_provider_names if n == 'github']
-    if external:
-        # --external means "all platforms", but respect explicit exclusions
-        active_platforms = [
-            p for p in discover_platforms()
-            if p.platform_id not in excluded_platforms
-        ]
-    elif platform_names:
-        active_platforms = discover_platforms(only=platform_names)
-    else:
-        active_platforms = []
+    # Prefetch batch sources (e.g., Zenodo ORCID lookup)
+    for s in active_sources:
+        if s.batch:
+            try:
+                s.prefetch(config)
+                if not quiet:
+                    click.echo(f"Source {s.name}: prefetch complete", err=True)
+            except Exception as e:
+                if not quiet:
+                    click.echo(f"Warning: {s.name} prefetch failed: {e}", err=True)
 
     # Get paths to scan
     if directory:
@@ -296,8 +281,7 @@ def refresh_handler(
                     db, service, repo, stats,
                     full=full,
                     since=since_datetime,
-                    platforms=active_platforms,
-                    providers=active_providers,
+                    sources=active_sources,
                     config=config,
                     dry_run=dry_run,
                     quiet=quiet
@@ -317,13 +301,11 @@ def refresh_handler(
         if not dry_run:
             try:
                 # Build sources list
-                sources = ["git"]
-                for plat in active_platforms:
-                    if plat.platform_id not in sources:
-                        sources.append(plat.platform_id)
-                for p in active_providers:
-                    if p.registry not in sources:
-                        sources.append(p.registry)
+                source_list = ["git"]
+                for s in active_sources:
+                    if s.source_id not in source_list:
+                        source_list.append(s.source_id)
+                sources = source_list
 
                 # Compute duration
                 start_dt = datetime.fromisoformat(stats['start_time'])
@@ -400,60 +382,36 @@ def _update_repo_platform_fields(db, repo_id, fields):
     db.execute(f"UPDATE repos SET {set_clauses} WHERE id = ?", tuple(params))
 
 
-def _run_providers_parallel(providers, repo_path, repo_dict, config, quiet=False):
-    """Run registry provider.match() calls in parallel.
+def _run_sources_parallel(sources, repo_path, repo_dict, config, quiet=False):
+    """Run MetadataSource.fetch() calls in parallel.
 
-    Returns list of PackageMetadata for successful matches.
-    Errors are logged as warnings and surfaced to stderr unless quiet.
+    Returns list of (source, data) tuples for successful fetches.
+    Each source's detect() is checked first; if it returns False, the
+    source is skipped. Errors are isolated per-source.
     """
-    if not providers:
-        return []
-    results = []
-    with ThreadPoolExecutor(max_workers=min(len(providers), _PROVIDER_WORKERS)) as pool:
-        futures = {
-            pool.submit(p.match, repo_path, repo_record=repo_dict, config=config): p
-            for p in providers
-        }
-        for future in as_completed(futures):
-            provider = futures[future]
-            try:
-                metadata = future.result()
-                if metadata:
-                    results.append(metadata)
-            except Exception as e:
-                logger.warning(f"Provider {provider.registry} failed: {e}")
-                if not quiet:
-                    click.echo(f"  Warning: provider {provider.registry} failed: {e}", err=True)
-    return results
-
-
-def _run_platforms_parallel(platforms, repo_path, repo_dict, config, quiet=False):
-    """Run platform provider detect+enrich calls in parallel.
-
-    Returns list of dicts with platform-prefixed fields for successful enrichments.
-    Errors are logged as warnings and surfaced to stderr unless quiet.
-    """
-    if not platforms:
+    if not sources:
         return []
 
-    def _check(plat):
-        if plat.detect(repo_path, repo_dict):
-            return plat.enrich(repo_path, repo_dict, config)
+    def _check(src):
+        if src.detect(repo_path, repo_dict):
+            data = src.fetch(repo_path, repo_dict, config)
+            if data:
+                return src, data
         return None
 
     results = []
-    with ThreadPoolExecutor(max_workers=min(len(platforms), _PROVIDER_WORKERS)) as pool:
-        futures = {pool.submit(_check, p): p for p in platforms}
+    with ThreadPoolExecutor(max_workers=min(len(sources), _PROVIDER_WORKERS)) as pool:
+        futures = {pool.submit(_check, s): s for s in sources}
         for future in as_completed(futures):
-            provider = futures[future]
+            src = futures[future]
             try:
-                data = future.result()
-                if data:
-                    results.append(data)
+                result = future.result()
+                if result:
+                    results.append(result)
             except Exception as e:
-                logger.warning(f"Platform {provider.platform_id} failed: {e}")
+                logger.warning(f"Source {src.source_id} failed: {e}")
                 if not quiet:
-                    click.echo(f"  Warning: platform {provider.platform_id} failed: {e}", err=True)
+                    click.echo(f"  Warning: source {src.source_id} failed: {e}", err=True)
     return results
 
 
@@ -464,8 +422,7 @@ def _process_repo(
     stats: dict,
     full: bool,
     since: datetime,
-    platforms: list,
-    providers: list,
+    sources: list,
     config: dict,
     dry_run: bool,
     quiet: bool,
@@ -495,30 +452,39 @@ def _process_repo(
         # Upsert to database
         repo_id = upsert_repo(db, enriched)
 
-        # Run platform providers (github, etc.) — isolated so platform failures
-        # don't poison the rest of repo processing (event scanning, registry providers).
-        if platforms and repo_id:
+        # Run all active sources (parallel) — isolated so source failures
+        # don't poison the rest of repo processing (event scanning, etc.).
+        if sources and repo_id:
             try:
-                repo_dict = {'remote_url': enriched.remote_url, 'name': enriched.name,
-                             'owner': getattr(enriched, 'owner', None)}
-                platform_results = _run_platforms_parallel(
-                    platforms, repo.path, repo_dict, config, quiet=quiet
+                repo_dict = {
+                    'remote_url': enriched.remote_url,
+                    'name': enriched.name,
+                    'owner': getattr(enriched, 'owner', None),
+                }
+                results = _run_sources_parallel(
+                    sources, repo.path, repo_dict, config, quiet=quiet
                 )
-                for fields in platform_results:
-                    _update_repo_platform_fields(db, repo_id, fields)
+                for source, data in results:
+                    if source.target == 'repos':
+                        _update_repo_platform_fields(db, repo_id, data)
+                    elif source.target == 'publications':
+                        from ..database.repository import _upsert_publication
+                        from ..domain.repository import PackageMetadata
+                        pkg = PackageMetadata(
+                            registry=data.get('registry', ''),
+                            name=data.get('name', ''),
+                            version=data.get('version'),
+                            published=data.get('published', False),
+                            url=data.get('url'),
+                            doi=data.get('doi'),
+                            downloads=data.get('downloads'),
+                            downloads_30d=data.get('downloads_30d'),
+                            last_updated=data.get('last_updated'),
+                        )
+                        _upsert_publication(db, repo_id, pkg)
             except Exception as e:
                 if not quiet:
-                    click.echo(f"  Warning: platform enrichment failed for {repo.name}: {e}", err=True)
-
-        # Run registry providers (new extension system)
-        if providers and repo_id:
-            from ..database.repository import _upsert_publication
-            repo_dict = {'remote_url': enriched.remote_url, 'name': enriched.name}
-            matched = _run_providers_parallel(
-                providers, repo.path, repo_dict, config, quiet=quiet
-            )
-            for metadata in matched:
-                _upsert_publication(db, repo_id, metadata)
+                    click.echo(f"  Warning: source enrichment failed for {repo.name}: {e}", err=True)
         stats['updated'] += 1
 
         # Clear any previous scan errors for this path

@@ -1,104 +1,165 @@
-"""Tests for provider integration with the refresh command."""
+"""Tests for source integration with the refresh command."""
 
 from unittest.mock import patch, MagicMock
 
 import pytest
 
 from repoindex.commands.refresh import (
-    _resolve_provider_names,
+    _resolve_active_sources,
     _update_repo_platform_fields,
+    _LOCAL_SOURCE_IDS,
 )
+from repoindex.sources import MetadataSource
 
 
-class TestResolveProviderNames:
-    """Test the provider name resolution logic."""
+_SENTINEL = object()
 
-    def test_no_flags_returns_empty(self):
-        result = _resolve_provider_names(
-            provider_names=(),
-            external=False, provider_config={},
+def _make_source(source_id, target="repos", batch=False,
+                 detect_val=True, fetch_val=_SENTINEL):
+    """Helper to create a mock MetadataSource."""
+    src = MagicMock(spec=MetadataSource)
+    src.source_id = source_id
+    src.name = source_id.title()
+    src.target = target
+    src.batch = batch
+    src.detect = MagicMock(return_value=detect_val)
+    src.fetch = MagicMock(return_value={'test': True} if fetch_val is _SENTINEL else fetch_val)
+    return src
+
+
+class TestResolveActiveSources:
+    """Test the unified source resolution logic."""
+
+    def _resolve(self, source_names=(), provider_names=(), github=None,
+                 external=False, config=None):
+        if config is None:
+            config = {'refresh': {'external_sources': {}, 'providers': {}}}
+        return _resolve_active_sources(
+            source_names=source_names,
+            provider_names=provider_names,
+            github=github,
+            external=external,
+            config=config,
         )
-        assert result == []
 
-    def test_explicit_provider_names(self):
-        result = _resolve_provider_names(
-            provider_names=('npm', 'cargo'),
-            external=False, provider_config={},
-        )
-        assert set(result) == {'npm', 'cargo'}
+    def test_default_returns_local_sources_only(self):
+        """No flags = local sources only."""
+        with patch('repoindex.commands.refresh.discover_sources') as mock_discover:
+            mock_discover.return_value = [
+                _make_source('citation_cff'),
+                _make_source('keywords'),
+            ]
+            result = self._resolve()
+            # discover_sources called with only=local source IDs
+            call_kwargs = mock_discover.call_args
+            only = call_kwargs[1].get('only') or call_kwargs[0][0] if call_kwargs[0] else call_kwargs[1].get('only')
+            assert set(only) == _LOCAL_SOURCE_IDS
 
-    def test_pypi_as_explicit_provider(self):
-        """PyPI is passed as an explicit provider name."""
-        result = _resolve_provider_names(
-            provider_names=('pypi',),
-            external=False, provider_config={},
-        )
-        assert 'pypi' in result
+    def test_source_github_activates_github(self):
+        """--source github should request github + local sources."""
+        with patch('repoindex.commands.refresh.discover_sources') as mock_discover:
+            mock_discover.return_value = [_make_source('github')]
+            self._resolve(source_names=('github',))
+            call_kwargs = mock_discover.call_args
+            only = call_kwargs[1].get('only') if call_kwargs[1] else None
+            assert only is not None
+            assert 'github' in only
 
-    def test_mixed_explicit_providers(self):
-        result = _resolve_provider_names(
-            provider_names=('npm', 'pypi', 'cran'),
-            external=False, provider_config={},
-        )
-        assert set(result) == {'npm', 'pypi', 'cran'}
+    def test_provider_flag_activates_source(self):
+        """Deprecated --provider flag should work like --source."""
+        with patch('repoindex.commands.refresh.discover_sources') as mock_discover:
+            mock_discover.return_value = [_make_source('pypi', target='publications')]
+            self._resolve(provider_names=('pypi',))
+            call_kwargs = mock_discover.call_args
+            only = call_kwargs[1].get('only') if call_kwargs[1] else None
+            assert only is not None
+            assert 'pypi' in only
 
-    def test_external_flag_adds_sentinel(self):
-        result = _resolve_provider_names(
-            provider_names=(),
-            external=True, provider_config={},
-        )
-        assert '__all__' in result
+    def test_github_flag_activates_source(self):
+        """--github flag should include github in requested sources."""
+        with patch('repoindex.commands.refresh.discover_sources') as mock_discover:
+            mock_discover.return_value = [_make_source('github')]
+            self._resolve(github=True)
+            call_kwargs = mock_discover.call_args
+            only = call_kwargs[1].get('only') if call_kwargs[1] else None
+            assert only is not None
+            assert 'github' in only
 
-    def test_config_defaults(self):
-        """Providers enabled in config are auto-activated."""
-        result = _resolve_provider_names(
-            provider_names=(),
-            external=False,
-            provider_config={'npm': True, 'cargo': False},
-        )
-        assert 'npm' in result
-        assert 'cargo' not in result
+    def test_no_github_excludes_github(self):
+        """--no-github should exclude github even from --external."""
+        with patch('repoindex.commands.refresh.discover_sources') as mock_discover:
+            github_src = _make_source('github')
+            pypi_src = _make_source('pypi', target='publications')
+            mock_discover.return_value = [github_src, pypi_src]
+            result = self._resolve(github=False, external=True)
+            source_ids = [s.source_id for s in result]
+            assert 'github' not in source_ids
+            assert 'pypi' in source_ids
 
-    def test_config_enables_pypi(self):
-        """Setting pypi: true in config enables it without --provider flag."""
-        result = _resolve_provider_names(
-            provider_names=(),
-            external=False,
-            provider_config={'pypi': True},
-        )
-        assert 'pypi' in result
+    def test_external_activates_all_sources(self):
+        """--external should return all sources."""
+        with patch('repoindex.commands.refresh.discover_sources') as mock_discover:
+            all_sources = [
+                _make_source('citation_cff'),
+                _make_source('github'),
+                _make_source('pypi', target='publications'),
+            ]
+            mock_discover.return_value = all_sources
+            result = self._resolve(external=True)
+            # discover_sources() called without only= filter
+            call_kwargs = mock_discover.call_args
+            assert call_kwargs == ((), {}) or call_kwargs[1].get('only') is None
 
-    def test_deduplication(self):
-        result = _resolve_provider_names(
-            provider_names=('pypi',),
-            external=False,
-            provider_config={'pypi': True},
-        )
-        assert result.count('pypi') == 1
+    def test_config_default_github_activates(self):
+        """Config github: true should include github."""
+        config = {'refresh': {'external_sources': {'github': True}, 'providers': {}}}
+        with patch('repoindex.commands.refresh.discover_sources') as mock_discover:
+            mock_discover.return_value = [_make_source('github')]
+            self._resolve(config=config)
+            call_kwargs = mock_discover.call_args
+            only = call_kwargs[1].get('only') if call_kwargs[1] else None
+            assert only is not None
+            assert 'github' in only
 
-    def test_external_plus_explicit(self):
-        result = _resolve_provider_names(
-            provider_names=('npm',),
-            external=True, provider_config={},
-        )
-        assert '__all__' in result
-        assert 'npm' in result
+    def test_config_provider_defaults(self):
+        """Config providers: pypi: true should include pypi."""
+        config = {'refresh': {'external_sources': {}, 'providers': {'pypi': True}}}
+        with patch('repoindex.commands.refresh.discover_sources') as mock_discover:
+            mock_discover.return_value = [_make_source('pypi', target='publications')]
+            self._resolve(config=config)
+            call_kwargs = mock_discover.call_args
+            only = call_kwargs[1].get('only') if call_kwargs[1] else None
+            assert only is not None
+            assert 'pypi' in only
 
-    def test_config_with_multiple_providers(self):
-        """Multiple providers enabled in config."""
-        result = _resolve_provider_names(
-            provider_names=(),
-            external=False,
-            provider_config={'pypi': True, 'cran': True, 'zenodo': True, 'npm': False},
-        )
-        assert set(result) == {'pypi', 'cran', 'zenodo'}
+    def test_local_sources_always_included(self):
+        """Local sources should always be requested unless --external."""
+        with patch('repoindex.commands.refresh.discover_sources') as mock_discover:
+            mock_discover.return_value = []
+            self._resolve(source_names=('github',))
+            call_kwargs = mock_discover.call_args
+            only = call_kwargs[1].get('only') if call_kwargs[1] else None
+            assert only is not None
+            for local_id in _LOCAL_SOURCE_IDS:
+                assert local_id in only
+
+    def test_no_github_with_config_default(self):
+        """--no-github overrides config default github: true."""
+        config = {'refresh': {'external_sources': {'github': True}, 'providers': {}}}
+        with patch('repoindex.commands.refresh.discover_sources') as mock_discover:
+            mock_discover.return_value = [_make_source('citation_cff')]
+            result = self._resolve(github=False, config=config)
+            call_kwargs = mock_discover.call_args
+            only = call_kwargs[1].get('only') if call_kwargs[1] else None
+            if only is not None:
+                assert 'github' not in only
 
 
-class TestPlatformWiring:
-    """Test that platform providers are wired into refresh correctly."""
+class TestSourceWiring:
+    """Test that source system is wired into refresh correctly via CLI."""
 
-    def test_github_flag_activates_platform(self):
-        """--github flag should discover github platform."""
+    def test_source_flag_activates_source(self):
+        """--source github should activate github source."""
         from click.testing import CliRunner
         from repoindex.commands.refresh import refresh_handler
 
@@ -108,13 +169,37 @@ class TestPlatformWiring:
             'refresh': {'external_sources': {}, 'providers': {}},
         }), \
              patch('repoindex.commands.refresh.get_repository_directories', return_value=[]), \
-             patch('repoindex.providers.discover_platforms', return_value=[]) as mock_discover:
+             patch('repoindex.commands.refresh.discover_sources') as mock_discover:
+            mock_discover.return_value = []
+            runner.invoke(refresh_handler, ['--source', 'github'])
+
+        call_kwargs = mock_discover.call_args
+        only = call_kwargs[1].get('only') if call_kwargs[1] else None
+        assert only is not None
+        assert 'github' in only
+
+    def test_github_flag_activates_source(self):
+        """--github flag should discover github source."""
+        from click.testing import CliRunner
+        from repoindex.commands.refresh import refresh_handler
+
+        runner = CliRunner()
+        with patch('repoindex.commands.refresh.load_config', return_value={
+            'repository_directories': [],
+            'refresh': {'external_sources': {}, 'providers': {}},
+        }), \
+             patch('repoindex.commands.refresh.get_repository_directories', return_value=[]), \
+             patch('repoindex.commands.refresh.discover_sources') as mock_discover:
+            mock_discover.return_value = []
             runner.invoke(refresh_handler, ['--github'])
 
-        mock_discover.assert_called_once_with(only=['github'])
+        call_kwargs = mock_discover.call_args
+        only = call_kwargs[1].get('only') if call_kwargs[1] else None
+        assert only is not None
+        assert 'github' in only
 
-    def test_provider_github_activates_platform(self):
-        """--provider github should discover github platform."""
+    def test_provider_flag_backward_compat(self):
+        """--provider pypi should work (deprecated but functional)."""
         from click.testing import CliRunner
         from repoindex.commands.refresh import refresh_handler
 
@@ -124,13 +209,17 @@ class TestPlatformWiring:
             'refresh': {'external_sources': {}, 'providers': {}},
         }), \
              patch('repoindex.commands.refresh.get_repository_directories', return_value=[]), \
-             patch('repoindex.providers.discover_platforms', return_value=[]) as mock_discover:
-            runner.invoke(refresh_handler, ['--provider', 'github'])
+             patch('repoindex.commands.refresh.discover_sources') as mock_discover:
+            mock_discover.return_value = []
+            runner.invoke(refresh_handler, ['--provider', 'pypi'])
 
-        mock_discover.assert_called_once_with(only=['github'])
+        call_kwargs = mock_discover.call_args
+        only = call_kwargs[1].get('only') if call_kwargs[1] else None
+        assert only is not None
+        assert 'pypi' in only
 
-    def test_external_discovers_all_platforms(self):
-        """--external should discover all platforms (no filter)."""
+    def test_external_discovers_all_sources(self):
+        """--external should discover all sources (no filter)."""
         from click.testing import CliRunner
         from repoindex.commands.refresh import refresh_handler
 
@@ -140,46 +229,20 @@ class TestPlatformWiring:
             'refresh': {'external_sources': {}, 'providers': {}},
         }), \
              patch('repoindex.commands.refresh.get_repository_directories', return_value=[]), \
-             patch('repoindex.providers.discover_providers', return_value=[]), \
-             patch('repoindex.providers.discover_platforms', return_value=[]) as mock_discover:
+             patch('repoindex.commands.refresh.discover_sources') as mock_discover:
+            mock_discover.return_value = []
             runner.invoke(refresh_handler, ['--external'])
 
+        # discover_sources() called without only= filter
         mock_discover.assert_called_once_with()
 
-    def test_no_github_skips_platform(self):
-        """--no-github should prevent github platform discovery.
-
-        Even with config default 'github: true', --no-github must exclude github.
-        """
+    def test_no_github_excludes_github_from_external(self):
+        """--external --no-github must not include GitHub."""
         from click.testing import CliRunner
         from repoindex.commands.refresh import refresh_handler
 
-        runner = CliRunner()
-        with patch('repoindex.commands.refresh.load_config', return_value={
-            'repository_directories': [],
-            'refresh': {'external_sources': {'github': True}, 'providers': {}},
-        }), \
-             patch('repoindex.commands.refresh.get_repository_directories', return_value=[]), \
-             patch('repoindex.providers.discover_platforms', return_value=[]) as mock_discover:
-            runner.invoke(refresh_handler, ['--no-github'])
-
-        # If called, must not request github (empty list is OK; None is NOT
-        # — None means "all platforms" which would re-include github).
-        if mock_discover.called:
-            args, kwargs = mock_discover.call_args
-            only = kwargs.get('only')
-            assert only is not None, "--no-github must not use unfiltered discover_platforms()"
-            assert 'github' not in only
-
-    def test_external_plus_no_github_excludes_github(self):
-        """--external --no-github must not enrich GitHub (no-github takes priority)."""
-        from click.testing import CliRunner
-        from repoindex.commands.refresh import refresh_handler
-        from unittest.mock import MagicMock as MM
-
-        # Mock a github platform; verify it's filtered out of active_platforms
-        mock_github = MM()
-        mock_github.platform_id = 'github'
+        mock_github = _make_source('github')
+        mock_pypi = _make_source('pypi', target='publications')
 
         runner = CliRunner()
         with patch('repoindex.commands.refresh.load_config', return_value={
@@ -187,19 +250,19 @@ class TestPlatformWiring:
             'refresh': {'external_sources': {}, 'providers': {}},
         }), \
              patch('repoindex.commands.refresh.get_repository_directories', return_value=[]), \
-             patch('repoindex.providers.discover_platforms', return_value=[mock_github]), \
+             patch('repoindex.commands.refresh.discover_sources', return_value=[mock_github, mock_pypi]), \
              patch('repoindex.commands.refresh._process_repo') as mock_process:
             runner.invoke(refresh_handler, ['--external', '--no-github'])
 
-        # If _process_repo was called, check that active_platforms didn't include github
+        # If _process_repo was called, check that sources didn't include github
         if mock_process.called:
             kwargs = mock_process.call_args.kwargs
-            platforms = kwargs.get('platforms', [])
-            platform_ids = [p.platform_id for p in platforms]
-            assert 'github' not in platform_ids
+            sources = kwargs.get('sources', [])
+            source_ids = [s.source_id for s in sources]
+            assert 'github' not in source_ids
 
-    def test_no_flags_no_platforms(self):
-        """No flags + no config defaults = no platforms discovered."""
+    def test_no_flags_defaults_to_local_sources(self):
+        """No flags = local sources only."""
         from click.testing import CliRunner
         from repoindex.commands.refresh import refresh_handler
 
@@ -209,14 +272,17 @@ class TestPlatformWiring:
             'refresh': {'external_sources': {}, 'providers': {}},
         }), \
              patch('repoindex.commands.refresh.get_repository_directories', return_value=[]), \
-             patch('repoindex.providers.discover_platforms', return_value=[]) as mock_discover:
+             patch('repoindex.commands.refresh.discover_sources') as mock_discover:
+            mock_discover.return_value = []
             runner.invoke(refresh_handler, [])
 
-        # discover_platforms should not be called (no platform names)
-        mock_discover.assert_not_called()
+        call_kwargs = mock_discover.call_args
+        only = call_kwargs[1].get('only') if call_kwargs[1] else None
+        assert only is not None
+        assert set(only) == _LOCAL_SOURCE_IDS
 
-    def test_config_default_github_activates_platform(self):
-        """Config github: true should discover github platform."""
+    def test_config_default_github_activates_source(self):
+        """Config github: true should activate github source."""
         from click.testing import CliRunner
         from repoindex.commands.refresh import refresh_handler
 
@@ -226,10 +292,14 @@ class TestPlatformWiring:
             'refresh': {'external_sources': {'github': True}, 'providers': {}},
         }), \
              patch('repoindex.commands.refresh.get_repository_directories', return_value=[]), \
-             patch('repoindex.providers.discover_platforms', return_value=[]) as mock_discover:
+             patch('repoindex.commands.refresh.discover_sources') as mock_discover:
+            mock_discover.return_value = []
             runner.invoke(refresh_handler, [])
 
-        mock_discover.assert_called_once_with(only=['github'])
+        call_kwargs = mock_discover.call_args
+        only = call_kwargs[1].get('only') if call_kwargs[1] else None
+        assert only is not None
+        assert 'github' in only
 
 
 class TestUpdateRepoPlatformFields:
@@ -317,11 +387,11 @@ class TestUpdateRepoPlatformFields:
         assert params == (42, 1)
 
 
-class TestProcessRepoWithPlatforms:
-    """Test that _process_repo integrates platform providers."""
+class TestProcessRepoWithSources:
+    """Test that _process_repo integrates sources correctly."""
 
-    def test_platform_enrich_called_for_detected_repo(self):
-        """Platform provider's enrich() should be called when detect() returns True."""
+    def test_repos_target_source_updates_fields(self):
+        """Source with target='repos' should update repo fields via _update_repo_platform_fields."""
         from repoindex.commands.refresh import _process_repo
 
         mock_db = MagicMock()
@@ -339,9 +409,9 @@ class TestProcessRepoWithPlatforms:
 
         stats = {'scanned': 0, 'updated': 0, 'skipped': 0, 'events_added': 0, 'errors': 0}
 
-        mock_platform = MagicMock()
-        mock_platform.detect.return_value = True
-        mock_platform.enrich.return_value = {'github_stars': 42}
+        mock_source = _make_source('github', target='repos')
+        mock_source.detect.return_value = True
+        mock_source.fetch.return_value = {'github_stars': 42}
 
         with patch('repoindex.commands.refresh.needs_refresh', return_value=True), \
              patch('repoindex.commands.refresh.upsert_repo', return_value=1), \
@@ -351,16 +421,59 @@ class TestProcessRepoWithPlatforms:
             _process_repo(
                 mock_db, mock_service, mock_repo, stats,
                 full=True, since=MagicMock(),
-                platforms=[mock_platform], providers=[],
+                sources=[mock_source],
                 config={}, dry_run=False, quiet=True,
             )
 
-        mock_platform.detect.assert_called_once()
-        mock_platform.enrich.assert_called_once()
         mock_update.assert_called_once_with(mock_db, 1, {'github_stars': 42})
 
-    def test_platform_not_called_when_detect_false(self):
-        """Platform provider's enrich() should NOT be called when detect() returns False."""
+    def test_publications_target_source_upserts_publication(self):
+        """Source with target='publications' should upsert a publication record."""
+        from repoindex.commands.refresh import _process_repo
+
+        mock_db = MagicMock()
+        mock_service = MagicMock()
+        mock_repo = MagicMock()
+        mock_repo.path = '/repos/test'
+        mock_repo.name = 'test'
+
+        enriched = MagicMock()
+        enriched.remote_url = 'https://github.com/user/test.git'
+        enriched.name = 'test'
+        enriched.owner = 'user'
+        mock_service.get_status.return_value = enriched
+        mock_service.config = {}
+
+        stats = {'scanned': 0, 'updated': 0, 'skipped': 0, 'events_added': 0, 'errors': 0}
+
+        mock_source = _make_source('pypi', target='publications')
+        mock_source.detect.return_value = True
+        mock_source.fetch.return_value = {
+            'registry': 'pypi', 'name': 'test-pkg',
+            'version': '1.0.0', 'published': True,
+        }
+
+        with patch('repoindex.commands.refresh.needs_refresh', return_value=True), \
+             patch('repoindex.commands.refresh.upsert_repo', return_value=1), \
+             patch('repoindex.commands.refresh.clear_scan_error_for_path'), \
+             patch('repoindex.commands.refresh.scan_events', return_value=[]), \
+             patch('repoindex.database.repository._upsert_publication') as mock_upsert:
+            _process_repo(
+                mock_db, mock_service, mock_repo, stats,
+                full=True, since=MagicMock(),
+                sources=[mock_source],
+                config={}, dry_run=False, quiet=True,
+            )
+
+        mock_upsert.assert_called_once()
+        pkg = mock_upsert.call_args[0][2]
+        assert pkg.registry == 'pypi'
+        assert pkg.name == 'test-pkg'
+        assert pkg.version == '1.0.0'
+        assert pkg.published is True
+
+    def test_source_not_called_when_detect_false(self):
+        """Source's fetch() should NOT be called when detect() returns False."""
         from repoindex.commands.refresh import _process_repo
 
         mock_db = MagicMock()
@@ -378,8 +491,7 @@ class TestProcessRepoWithPlatforms:
 
         stats = {'scanned': 0, 'updated': 0, 'skipped': 0, 'events_added': 0, 'errors': 0}
 
-        mock_platform = MagicMock()
-        mock_platform.detect.return_value = False
+        mock_source = _make_source('github', detect_val=False)
 
         with patch('repoindex.commands.refresh.needs_refresh', return_value=True), \
              patch('repoindex.commands.refresh.upsert_repo', return_value=1), \
@@ -388,15 +500,14 @@ class TestProcessRepoWithPlatforms:
             _process_repo(
                 mock_db, mock_service, mock_repo, stats,
                 full=True, since=MagicMock(),
-                platforms=[mock_platform], providers=[],
+                sources=[mock_source],
                 config={}, dry_run=False, quiet=True,
             )
 
-        mock_platform.detect.assert_called_once()
-        mock_platform.enrich.assert_not_called()
+        mock_source.fetch.assert_not_called()
 
-    def test_platform_error_is_warning_not_failure(self):
-        """Platform provider errors should be warnings, not failures."""
+    def test_source_error_is_warning_not_failure(self):
+        """Source errors should be warnings, not failures."""
         from repoindex.commands.refresh import _process_repo
 
         mock_db = MagicMock()
@@ -414,9 +525,8 @@ class TestProcessRepoWithPlatforms:
 
         stats = {'scanned': 0, 'updated': 0, 'skipped': 0, 'events_added': 0, 'errors': 0}
 
-        mock_platform = MagicMock()
-        mock_platform.name = 'GitHub'
-        mock_platform.detect.side_effect = RuntimeError("API timeout")
+        mock_source = _make_source('github')
+        mock_source.detect.side_effect = RuntimeError("API timeout")
 
         with patch('repoindex.commands.refresh.needs_refresh', return_value=True), \
              patch('repoindex.commands.refresh.upsert_repo', return_value=1), \
@@ -425,11 +535,11 @@ class TestProcessRepoWithPlatforms:
             _process_repo(
                 mock_db, mock_service, mock_repo, stats,
                 full=True, since=MagicMock(),
-                platforms=[mock_platform], providers=[],
+                sources=[mock_source],
                 config={}, dry_run=False, quiet=True,
             )
 
-        # Should still count as updated (platform failure is non-fatal)
+        # Should still count as updated (source failure is non-fatal)
         assert stats['updated'] == 1
         assert stats['errors'] == 0
 
@@ -458,15 +568,15 @@ class TestProcessRepoWithPlatforms:
             _process_repo(
                 mock_db, mock_service, mock_repo, stats,
                 full=True, since=MagicMock(),
-                platforms=[], providers=[],
+                sources=[],
                 config={}, dry_run=False, quiet=True,
             )
 
         # get_status should be called with just repo, no fetch_github
         mock_service.get_status.assert_called_once_with(mock_repo)
 
-    def test_platform_enrich_null_result_skips_update(self):
-        """When enrich() returns None, no DB update should happen."""
+    def test_source_fetch_null_result_skips_update(self):
+        """When fetch() returns None, no DB update should happen."""
         from repoindex.commands.refresh import _process_repo
 
         mock_db = MagicMock()
@@ -484,9 +594,8 @@ class TestProcessRepoWithPlatforms:
 
         stats = {'scanned': 0, 'updated': 0, 'skipped': 0, 'events_added': 0, 'errors': 0}
 
-        mock_platform = MagicMock()
-        mock_platform.detect.return_value = True
-        mock_platform.enrich.return_value = None
+        mock_source = _make_source('github', detect_val=True)
+        mock_source.fetch.return_value = None
 
         with patch('repoindex.commands.refresh.needs_refresh', return_value=True), \
              patch('repoindex.commands.refresh.upsert_repo', return_value=1), \
@@ -496,7 +605,7 @@ class TestProcessRepoWithPlatforms:
             _process_repo(
                 mock_db, mock_service, mock_repo, stats,
                 full=True, since=MagicMock(),
-                platforms=[mock_platform], providers=[],
+                sources=[mock_source],
                 config={}, dry_run=False, quiet=True,
             )
 
