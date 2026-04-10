@@ -53,7 +53,7 @@ Event Types:
         - cran_publish (cran=True)
 """
 
-__version__ = "0.15.1"
+__version__ = "0.15.2"
 
 # High-level API
 from .api import RepoIndex, create
