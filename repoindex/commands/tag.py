@@ -18,6 +18,7 @@ from ..utils import find_git_repos_from_config, is_git_repo
 from ..commands.catalog import get_repository_tags, is_protected_tag
 from ..database.connection import Database, get_db_path
 from ..database.repository import get_all_repos
+from ..services.tag_derivation import derive_implicit_tags
 from rich.console import Console
 from rich.table import Table
 from rich.tree import Tree
@@ -51,8 +52,12 @@ def get_implicit_tags_from_row(repo_dict: Dict[str, Any]) -> List[str]:
     """
     Generate implicit tags from a database row.
 
-    This produces the same tags as TagService.get_implicit_tags() but works
-    directly from database rows without needing full domain object conversion.
+    Thin wrapper around
+    `repoindex.services.tag_derivation.derive_implicit_tags` — the real
+    logic lives there so that the refresh writer and this read-view
+    helper always agree. Previously both re-implemented the derivation
+    and drifted (e.g., topics were lowercased in one place but not the
+    other).
 
     Args:
         repo_dict: Database row as dictionary
@@ -60,77 +65,7 @@ def get_implicit_tags_from_row(repo_dict: Dict[str, Any]) -> List[str]:
     Returns:
         List of implicit tag strings
     """
-    tags = []
-
-    # repo:name
-    if repo_dict.get('name'):
-        tags.append(f"repo:{repo_dict['name']}")
-
-    # dir:parent (from path)
-    if repo_dict.get('path'):
-        parent = Path(repo_dict['path']).parent.name
-        tags.append(f"dir:{parent}")
-
-    # lang:language
-    if repo_dict.get('language'):
-        tags.append(f"lang:{repo_dict['language'].lower()}")
-
-    # owner:owner
-    if repo_dict.get('owner'):
-        tags.append(f"owner:{repo_dict['owner']}")
-
-    # license:key
-    if repo_dict.get('license_key'):
-        tags.append(f"license:{repo_dict['license_key']}")
-
-    # status:clean or status:dirty
-    if repo_dict.get('is_clean') is not None:
-        status = "clean" if repo_dict['is_clean'] else "dirty"
-        tags.append(f"status:{status}")
-
-    # GitHub-specific implicit tags (all have github_ prefix in database)
-    if repo_dict.get('github_owner'):
-        # visibility:public/private
-        if repo_dict.get('github_is_private'):
-            tags.append("visibility:private")
-        else:
-            tags.append("visibility:public")
-
-        # source:fork
-        if repo_dict.get('github_is_fork'):
-            tags.append("source:fork")
-
-        # archived:true
-        if repo_dict.get('github_is_archived'):
-            tags.append("archived:true")
-
-        # Stars buckets
-        stars = repo_dict.get('github_stars', 0) or 0
-        if stars >= 1000:
-            tags.append("stars:1000+")
-        elif stars >= 100:
-            tags.append("stars:100+")
-        elif stars >= 10:
-            tags.append("stars:10+")
-
-        # GitHub topics as topic:{topic} (provider tags)
-        # Lowercase to match _derive_tags in refresh.py — otherwise the same
-        # conceptual tag gets stored as topic:JavaScript here and
-        # topic:javascript there and queries diverge.
-        if repo_dict.get('github_topics'):
-            try:
-                topics = json.loads(repo_dict['github_topics'])
-                for topic in topics:
-                    if isinstance(topic, str) and topic.strip():
-                        tags.append(f"topic:{topic.strip().lower()}")
-            except (json.JSONDecodeError, TypeError):
-                pass
-
-    # Package registry tags
-    # Note: these would come from publications table, not repos table
-    # For now, we skip these as they require a join
-
-    return tags
+    return derive_implicit_tags(repo_dict)
 
 
 def get_all_tags_from_database(

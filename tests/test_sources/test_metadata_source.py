@@ -719,3 +719,153 @@ class TestBuiltinSourcesDiscovery:
         sources = discover_sources(only=['github', 'pypi'])
         ids = {s.source_id for s in sources}
         assert ids == {'github', 'pypi'}
+
+
+class TestTargetValidation:
+    """Tests for MetadataSource.target validation in discover_sources.
+
+    Sources with an unknown target would silently no-op in the refresh
+    dispatcher (neither the 'repos' nor 'publications' branch fires),
+    so discover_sources filters them out with a WARNING log. This
+    catches typos in user-provided sources dropped into
+    ~/.repoindex/sources/*.py.
+    """
+
+    def test_valid_targets_exported(self):
+        from repoindex.sources import VALID_TARGETS
+        assert VALID_TARGETS == frozenset({"repos", "publications"})
+
+    def test_bogus_target_skipped_with_warning(self, tmp_path, caplog):
+        import logging
+        from repoindex.sources import discover_sources
+
+        user_dir = tmp_path / "sources"
+        user_dir.mkdir()
+        (user_dir / "bogus.py").write_text('''
+from repoindex.sources import MetadataSource
+
+class BogusSource(MetadataSource):
+    source_id = "bogus"
+    name = "Bogus"
+    target = "bogus"  # invalid!
+    def detect(self, repo_path, repo_record=None):
+        return False
+    def fetch(self, repo_path, repo_record=None, config=None):
+        return None
+
+source = BogusSource()
+''')
+        with caplog.at_level(logging.WARNING, logger='repoindex.sources'):
+            result = discover_sources(user_dir=str(user_dir))
+
+        ids = [s.source_id for s in result]
+        # bogus is dropped
+        assert 'bogus' not in ids
+        # warning mentions the bogus source and its invalid target
+        messages = ' '.join(r.message for r in caplog.records)
+        assert 'bogus' in messages
+        assert "'bogus'" in messages or '"bogus"' in messages
+
+    def test_typo_target_repo_singular_rejected(self, tmp_path, caplog):
+        """A common typo target='repo' (singular) is caught as invalid."""
+        import logging
+        from repoindex.sources import discover_sources
+
+        user_dir = tmp_path / "sources"
+        user_dir.mkdir()
+        (user_dir / "typo.py").write_text('''
+from repoindex.sources import MetadataSource
+
+class TypoSource(MetadataSource):
+    source_id = "typo"
+    name = "Typo"
+    target = "repo"  # singular! -- the real target is "repos"
+    def detect(self, repo_path, repo_record=None):
+        return False
+    def fetch(self, repo_path, repo_record=None, config=None):
+        return None
+
+source = TypoSource()
+''')
+        with caplog.at_level(logging.WARNING, logger='repoindex.sources'):
+            result = discover_sources(user_dir=str(user_dir))
+
+        assert 'typo' not in [s.source_id for s in result]
+
+    def test_valid_targets_kept(self, tmp_path):
+        """Sources with valid targets 'repos' and 'publications' are kept."""
+        from repoindex.sources import discover_sources
+
+        user_dir = tmp_path / "sources"
+        user_dir.mkdir()
+        (user_dir / "good_repos.py").write_text('''
+from repoindex.sources import MetadataSource
+
+class RepoSource(MetadataSource):
+    source_id = "good_repos"
+    name = "Good Repos"
+    target = "repos"
+    def detect(self, repo_path, repo_record=None):
+        return False
+    def fetch(self, repo_path, repo_record=None, config=None):
+        return None
+
+source = RepoSource()
+''')
+        (user_dir / "good_pubs.py").write_text('''
+from repoindex.sources import MetadataSource
+
+class PubSource(MetadataSource):
+    source_id = "good_pubs"
+    name = "Good Pubs"
+    target = "publications"
+    def detect(self, repo_path, repo_record=None):
+        return False
+    def fetch(self, repo_path, repo_record=None, config=None):
+        return None
+
+source = PubSource()
+''')
+        result = discover_sources(user_dir=str(user_dir))
+        ids = [s.source_id for s in result]
+        assert 'good_repos' in ids
+        assert 'good_pubs' in ids
+
+    def test_mixed_valid_and_invalid_only_invalid_dropped(self, tmp_path):
+        """When both good and bad sources are present, only bad ones are dropped."""
+        from repoindex.sources import discover_sources
+
+        user_dir = tmp_path / "sources"
+        user_dir.mkdir()
+        (user_dir / "good.py").write_text('''
+from repoindex.sources import MetadataSource
+
+class Good(MetadataSource):
+    source_id = "keeper"
+    name = "Keeper"
+    target = "repos"
+    def detect(self, repo_path, repo_record=None):
+        return False
+    def fetch(self, repo_path, repo_record=None, config=None):
+        return None
+
+source = Good()
+''')
+        (user_dir / "bad.py").write_text('''
+from repoindex.sources import MetadataSource
+
+class Bad(MetadataSource):
+    source_id = "discard"
+    name = "Discard"
+    target = "nowhere"
+    def detect(self, repo_path, repo_record=None):
+        return False
+    def fetch(self, repo_path, repo_record=None, config=None):
+        return None
+
+source = Bad()
+''')
+        result = discover_sources(user_dir=str(user_dir))
+        ids = [s.source_id for s in result]
+        assert 'keeper' in ids
+        assert 'discard' not in ids

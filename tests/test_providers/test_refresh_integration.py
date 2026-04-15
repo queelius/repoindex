@@ -610,3 +610,60 @@ class TestProcessRepoWithSources:
             )
 
         mock_update.assert_not_called()
+
+    def test_unknown_target_logs_warning_and_skips(self, caplog):
+        """A source whose target is neither 'repos' nor 'publications' should
+        log a warning and skip, not silently drop the fetched data.
+
+        discover_sources() already filters bad targets, but this defensive
+        else-arm catches the case where a source mutates self.target after
+        discovery, or is constructed and passed directly (bypassing discovery).
+        """
+        import logging
+        from repoindex.commands.refresh import _process_repo
+
+        mock_db = MagicMock()
+        mock_service = MagicMock()
+        mock_repo = MagicMock()
+        mock_repo.path = '/repos/test'
+        mock_repo.name = 'test'
+
+        enriched = MagicMock()
+        enriched.remote_url = 'https://example.com/user/test.git'
+        enriched.name = 'test'
+        enriched.owner = 'user'
+        mock_service.get_status.return_value = enriched
+        mock_service.config = {}
+
+        stats = {'scanned': 0, 'updated': 0, 'skipped': 0, 'events_added': 0, 'errors': 0}
+
+        # A source with a bogus target — bypasses the discover_sources()
+        # validation because we pass it directly.
+        mock_source = _make_source('weird', target='somewhere_else')
+        mock_source.detect.return_value = True
+        mock_source.fetch.return_value = {'arbitrary': 'data'}
+
+        with patch('repoindex.commands.refresh.needs_refresh', return_value=True), \
+             patch('repoindex.commands.refresh.upsert_repo', return_value=1), \
+             patch('repoindex.commands.refresh.clear_scan_error_for_path'), \
+             patch('repoindex.commands.refresh.scan_events', return_value=[]), \
+             patch('repoindex.commands.refresh._update_repo_platform_fields') as mock_update, \
+             patch('repoindex.database.repository._upsert_publication') as mock_upsert:
+            with caplog.at_level(logging.WARNING, logger='repoindex.commands.refresh'):
+                _process_repo(
+                    mock_db, mock_service, mock_repo, stats,
+                    full=True, since=MagicMock(),
+                    sources=[mock_source],
+                    config={}, dry_run=False, quiet=True,
+                )
+
+        # Neither dispatch branch should fire
+        mock_update.assert_not_called()
+        mock_upsert.assert_not_called()
+        # Warning surfaced with the source id and its bogus target
+        messages = ' '.join(r.message for r in caplog.records)
+        assert 'weird' in messages
+        assert 'somewhere_else' in messages
+        # Stats still reflect a successful update (source failure is non-fatal)
+        assert stats['updated'] == 1
+        assert stats['errors'] == 0

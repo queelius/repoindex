@@ -18,11 +18,22 @@ import logging
 import os
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Literal, Optional
 
 logger = logging.getLogger(__name__)
 
-__all__ = ['MetadataSource', 'discover_sources', '_RegistryProviderAdapter', '_PlatformProviderAdapter']
+__all__ = [
+    'MetadataSource', 'discover_sources',
+    'VALID_TARGETS',
+    '_RegistryProviderAdapter', '_PlatformProviderAdapter',
+]
+
+# Valid values for MetadataSource.target. The discriminator drives where
+# fetch() output is merged: "repos" rows (platform enrichment, local file
+# parsing) vs "publications" rows (registry detection). Any other value
+# would silently no-op in the refresh dispatcher, so discover_sources()
+# validates against this set.
+VALID_TARGETS = frozenset({"repos", "publications"})
 
 
 class MetadataSource(ABC):
@@ -36,12 +47,14 @@ class MetadataSource(ABC):
     Attributes:
         source_id: Short identifier (e.g., "github", "pypi", "citation_cff")
         name: Human-readable name (e.g., "GitHub", "CITATION.cff")
-        target: Where data goes: "repos" or "publications"
+        target: Where data goes: "repos" or "publications". Typed as a
+            Literal so IDEs and type checkers catch typos; runtime
+            validation in discover_sources() enforces the same contract.
         batch: True if this source uses batch pre-fetch (e.g., Zenodo ORCID lookup)
     """
     source_id: str = ""
     name: str = ""
-    target: str = "repos"
+    target: Literal["repos", "publications"] = "repos"
     batch: bool = False
 
     @abstractmethod
@@ -130,6 +143,7 @@ def _build_builtin_sources() -> List[MetadataSource]:
     sources = []
 
     # Load built-in sources (local file scanners + remote platform sources)
+    # Built-in source failures are bugs -- log at WARNING so they aren't hidden.
     for module_name in ('citation_cff', 'keywords', 'local_assets', 'gitea'):
         try:
             mod = importlib.import_module(f'.{module_name}', package='repoindex.sources')
@@ -137,7 +151,7 @@ def _build_builtin_sources() -> List[MetadataSource]:
             if src and isinstance(src, MetadataSource):
                 sources.append(src)
         except Exception as e:
-            logger.debug("Could not load local source %s: %s", module_name, e)
+            logger.warning("Could not load built-in source %s: %s", module_name, e)
 
     # Wrap registry providers (pypi, cran, zenodo, npm, cargo, etc.)
     try:
@@ -145,7 +159,7 @@ def _build_builtin_sources() -> List[MetadataSource]:
         for provider in discover_providers():
             sources.append(_RegistryProviderAdapter(provider))
     except Exception as e:
-        logger.debug("Could not load registry providers: %s", e)
+        logger.warning("Could not load registry providers: %s", e)
 
     # Wrap platform providers (github, etc.)
     try:
@@ -153,7 +167,7 @@ def _build_builtin_sources() -> List[MetadataSource]:
         for platform in discover_platforms():
             sources.append(_PlatformProviderAdapter(platform))
     except Exception as e:
-        logger.debug("Could not load platform providers: %s", e)
+        logger.warning("Could not load platform providers: %s", e)
 
     return sources
 
@@ -274,4 +288,19 @@ def discover_sources(
         only_set = set(only)
         sources = [s for s in sources if s.source_id in only_set]
 
-    return sources
+    # Validate source.target against known values. Any source with an unknown
+    # target would silently no-op in the refresh dispatcher (neither the
+    # 'repos' nor 'publications' branch would fire), so catch typos here and
+    # skip the offending source rather than letting a user-provided source
+    # with target='repo' vanish into thin air.
+    validated: List[MetadataSource] = []
+    for s in sources:
+        if s.target not in VALID_TARGETS:
+            logger.warning(
+                "Source %r has invalid target %r (expected one of %s); skipping",
+                s.source_id, s.target, sorted(VALID_TARGETS),
+            )
+            continue
+        validated.append(s)
+
+    return validated

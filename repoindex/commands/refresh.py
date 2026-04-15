@@ -45,6 +45,7 @@ from ..database import (
 )
 from ..database.events import insert_events
 from ..services.repository_service import RepositoryService
+from ..services.tag_derivation import derive_persistable_tags
 from ..events import scan_events
 from ..sources import discover_sources
 
@@ -423,51 +424,23 @@ def _derive_tags(db, repo_id, repo_record):
 
     User-assigned tags (source='user') are never touched.
     Derived tags (all other sources) are synced: stale ones removed, new ones added.
+
+    The actual derivation logic lives in
+    `repoindex.services.tag_derivation.derive_persistable_tags`; this
+    function is the thin DB-aware wrapper that supplies the published
+    registries from the publications table.
     """
-    derived = []  # list of (tag_string, source_name)
-
-    # Platform topics
-    for field, source_name in [('github_topics', 'github'), ('gitea_topics', 'gitea')]:
-        raw = repo_record.get(field)
-        if raw:
-            try:
-                topics = json.loads(raw) if isinstance(raw, str) else raw
-                for topic in topics:
-                    if isinstance(topic, str) and topic.strip():
-                        derived.append((f'topic:{topic.strip().lower()}', source_name))
-            except (json.JSONDecodeError, TypeError):
-                pass
-
-    # Project keywords
-    raw_kw = repo_record.get('keywords')
-    if raw_kw:
-        try:
-            keywords = json.loads(raw_kw) if isinstance(raw_kw, str) else raw_kw
-            for kw in keywords:
-                if isinstance(kw, str) and kw.strip():
-                    derived.append((f'keyword:{kw.strip().lower()}', 'pyproject'))
-        except (json.JSONDecodeError, TypeError):
-            pass
-
-    # Language
-    lang = repo_record.get('language')
-    if lang and isinstance(lang, str):
-        derived.append((f'lang:{lang.lower()}', 'implicit'))
-
-    # Boolean flags
-    for flag in ('has_readme', 'has_license', 'has_ci', 'has_citation',
-                 'has_codemeta', 'has_funding', 'has_contributors', 'has_changelog'):
-        if repo_record.get(flag):
-            tag_name = flag.replace('has_', 'has:')
-            derived.append((tag_name, 'implicit'))
-
-    # Publication status
+    # Look up which registries have a published row for this repo.
+    # Kept at the call site (rather than pushed into tag_derivation) so
+    # the shared helper stays pure / DB-free and can be used by read-view
+    # code paths that already hold the data in memory.
     db.execute(
         "SELECT DISTINCT registry FROM publications WHERE repo_id = ? AND published = 1",
         (repo_id,)
     )
-    for row in db.fetchall():
-        derived.append((f'published:{row["registry"]}', row['registry']))
+    published_registries = [row['registry'] for row in db.fetchall()]
+
+    derived = derive_persistable_tags(repo_record, published_registries)
 
     # Sync derived tags (remove stale, add new, never touch user tags)
     _sync_derived_tags(db, repo_id, derived)
@@ -591,6 +564,16 @@ def _process_repo(
                             last_updated=data.get('last_updated'),
                         )
                         _upsert_publication(db, repo_id, pkg)
+                    else:
+                        # Belt-and-suspenders: discover_sources() already
+                        # filters unknown targets, but if something slips
+                        # through (e.g., a source mutates self.target after
+                        # discovery), surface it instead of silently dropping
+                        # the fetched data.
+                        logger.warning(
+                            "Source %s has unknown target %r; skipping",
+                            source.source_id, source.target,
+                        )
             except Exception as e:
                 if not quiet:
                     click.echo(f"  Warning: source enrichment failed for {repo.name}: {e}", err=True)
