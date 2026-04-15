@@ -39,3 +39,6 @@ Thumbs.db
 *.tmp
 *.bak
 *~
+
+# Accidental export dirs from misparsed CLI flags
+/--help/

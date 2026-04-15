@@ -206,20 +206,24 @@ def _refresh_impl(
     external: bool = False,
 ) -> dict:
     """Run the repoindex refresh command as a subprocess."""
-    # Acquire lock to prevent concurrent refreshes
+    # Acquire lock to prevent concurrent refreshes. Any failure during
+    # acquisition must close lock_fd if it was opened, or we leak the fd.
     lock_path = Path.home() / '.repoindex' / 'refresh.lock'
+    lock_fd = None
     try:
         lock_path.parent.mkdir(parents=True, exist_ok=True)
         lock_fd = open(lock_path, 'w')
-        try:
-            fcntl.flock(lock_fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError:
+        fcntl.flock(lock_fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        if lock_fd is not None:
             lock_fd.close()
-            return {
-                'status': 'error',
-                'error': 'Another refresh is already running. Wait for it to complete.'
-            }
+        return {
+            'status': 'error',
+            'error': 'Another refresh is already running. Wait for it to complete.'
+        }
     except Exception as e:
+        if lock_fd is not None:
+            lock_fd.close()
         return {
             'status': 'error',
             'error': _sanitize_error(f'Could not acquire refresh lock: {e}'),
@@ -273,7 +277,7 @@ def _tag_impl(repo: str, action: str, tag: str = "") -> dict:
     if action in ('add', 'remove'):
         if not repo or not repo.strip():
             return {'error': f'Repository is required for {action} action.'}
-        if not tag:
+        if not tag or not tag.strip():
             return {'error': f'Tag is required for {action} action.'}
         if repo.startswith('-') or tag.startswith('-'):
             return {
@@ -297,6 +301,12 @@ def _tag_impl(repo: str, action: str, tag: str = "") -> dict:
 
 def _export_impl(output_dir: str, query: str = "") -> dict:
     """Export repos as longecho-compliant arkiv archive."""
+    # Reject queries that would be parsed as CLI flags by Click.
+    if query.startswith('-'):
+        return {
+            'status': 'error',
+            'error': 'query must not start with "-" (would be parsed as a flag).',
+        }
     # Validate output_dir before invoking the CLI to prevent clobbering.
     p = Path(output_dir).expanduser().resolve()
 

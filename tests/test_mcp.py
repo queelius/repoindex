@@ -269,6 +269,35 @@ class TestRefresh:
             fcntl.flock(f.fileno(), fcntl.LOCK_UN)
             f.close()
 
+    def test_refresh_lock_failure_closes_fd(self, tmp_path, monkeypatch):
+        """Non-BlockingIOError during flock must not leak the lock file descriptor.
+
+        Regression: code review found that if fcntl.flock raised OSError (e.g.,
+        EIO on NFS), the fd was opened but never closed.
+        """
+        monkeypatch.setattr('repoindex.mcp.server.Path.home', lambda: tmp_path)
+
+        opened_files = []
+        real_open = open
+
+        def tracking_open(path, *args, **kwargs):
+            f = real_open(path, *args, **kwargs)
+            opened_files.append(f)
+            return f
+
+        with patch('repoindex.mcp.server.open', tracking_open), \
+             patch('repoindex.mcp.server.fcntl.flock',
+                   side_effect=OSError(5, 'Input/output error')):
+            from repoindex.mcp.server import _refresh_impl
+            result = _refresh_impl()
+
+        assert result['status'] == 'error'
+        assert 'lock' in result['error'].lower()
+        # The lock fd must be closed even though acquisition raised a non-
+        # BlockingIOError; otherwise we leak one fd per failed attempt.
+        for f in opened_files:
+            assert f.closed, f'lock fd {f.name} was not closed'
+
 
 class TestTag:
     def test_list_tags(self, patch_db):
@@ -351,6 +380,11 @@ class TestTag:
     def test_tag_remove_rejects_flag_like_args(self):
         from repoindex.mcp.server import _tag_impl
         result = _tag_impl('-repo', 'remove', 'tag')
+        assert 'error' in result
+
+    def test_tag_rejects_whitespace_only_tag(self):
+        from repoindex.mcp.server import _tag_impl
+        result = _tag_impl('repo', 'add', '   ')
         assert 'error' in result
 
 
@@ -477,6 +511,17 @@ class TestExport:
         result = _export_impl(str(target))
         assert result['status'] == 'error'
         assert 'readme' in result['error'].lower()
+
+    def test_export_rejects_flag_like_query(self, tmp_path):
+        """Query must not be parseable as a CLI flag by Click."""
+        from repoindex.mcp.server import _export_impl
+        target = tmp_path / 'new_out'
+        # Must reject before subprocess.run is called — assert it never runs.
+        with patch('repoindex.mcp.server.subprocess.run') as mock_run:
+            result = _export_impl(str(target), query='--help')
+        assert result['status'] == 'error'
+        assert '-' in result['error']
+        mock_run.assert_not_called()
 
 
 class TestSanitizeError:
