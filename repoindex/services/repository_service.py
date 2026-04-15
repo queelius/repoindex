@@ -58,10 +58,7 @@ def _extract_keywords(repo_path) -> Optional[list]:
     """
     import json as _json
 
-    try:
-        import tomllib
-    except ImportError:
-        import tomli as tomllib  # type: ignore[no-redef]
+    from ..compat import tomllib
 
     repo_path = Path(repo_path)
 

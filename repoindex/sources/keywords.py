@@ -3,11 +3,7 @@ import json
 from pathlib import Path
 from typing import Optional
 
-try:
-    import tomllib  # Python 3.11+
-except ImportError:
-    import tomli as tomllib  # type: ignore[no-redef]
-
+from ..compat import tomllib
 from . import MetadataSource
 
 # Files checked for keywords, in priority order

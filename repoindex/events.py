@@ -992,10 +992,7 @@ def scan_pypi_publishes(
     pyproject_path = Path(repo_path) / 'pyproject.toml'
     if pyproject_path.exists():
         try:
-            try:
-                import tomllib
-            except ImportError:
-                import tomli as tomllib  # type: ignore[no-redef]
+            from .compat import tomllib
             with open(pyproject_path, 'rb') as f:
                 pyproject = tomllib.load(f)
             package_name = pyproject.get('project', {}).get('name')
@@ -1328,10 +1325,7 @@ def scan_cargo_publishes(
     # Parse Cargo.toml for package name
     package_name = None
     try:
-        try:
-            import tomllib
-        except ImportError:
-            import tomli as tomllib  # type: ignore[no-redef]
+        from .compat import tomllib
         with open(cargo_path, 'rb') as f:
             cargo = tomllib.load(f)
         package_name = cargo.get('package', {}).get('name')

@@ -21,6 +21,7 @@ import re
 import subprocess
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Optional
 
 from ..config import load_config
 from ..database.connection import Database, get_db_path
@@ -115,6 +116,39 @@ def _get_schema_impl(table=None) -> dict:
 MAX_ROWS = 500
 
 
+def _run_cli(cmd: list, timeout: int, timeout_msg: str,
+             ok_extra: Optional[dict] = None) -> dict:
+    """Invoke a repoindex CLI subcommand and shape the result as an MCP dict.
+
+    Collapses the identical subprocess-run + status/error shaping used by
+    ``_refresh_impl``, ``_tag_impl``, and ``_export_impl``. On timeout,
+    returns ``timeout_msg`` so each caller can phrase its own message.
+    On other exceptions, returns a sanitized ``{type.__name__}: {e}``.
+
+    ok_extra is merged into the ok-branch dict — callers that need
+    ``output`` or echo-back fields set them there.
+    """
+    try:
+        result = subprocess.run(
+            cmd, capture_output=True, text=True,
+            timeout=timeout, cwd=str(Path.home()),
+        )
+    except subprocess.TimeoutExpired:
+        return {'status': 'error', 'error': timeout_msg}
+    except Exception as e:
+        return {'status': 'error', 'error': _sanitize_error(f'{type(e).__name__}: {e}')}
+
+    if result.returncode == 0:
+        out = {'status': 'ok', 'output': result.stdout.strip()}
+        if ok_extra:
+            out.update(ok_extra)
+        return out
+    return {
+        'status': 'error',
+        'error': result.stderr.strip() or result.stdout.strip(),
+    }
+
+
 def _strip_sql_comments(query: str) -> str:
     """Remove leading SQL comments and whitespace before prefix check."""
     while True:
@@ -203,31 +237,11 @@ def _refresh_impl(
             cmd.append('--external')
         if full:
             cmd.append('--full')
-        try:
-            result = subprocess.run(
-                cmd,
-                capture_output=True,
-                text=True,
-                timeout=_REFRESH_TIMEOUT_SECONDS,
-                cwd=str(Path.home()),
-            )
-            if result.returncode == 0:
-                return {'status': 'ok', 'output': result.stdout.strip()}
-            else:
-                return {
-                    'status': 'error',
-                    'error': result.stderr.strip() or result.stdout.strip(),
-                }
-        except subprocess.TimeoutExpired:
-            return {
-                'status': 'error',
-                'error': f'Refresh timed out after {_REFRESH_TIMEOUT_SECONDS // 60} minutes',
-            }
-        except Exception as e:
-            return {
-                'status': 'error',
-                'error': _sanitize_error(f'{type(e).__name__}: {e}'),
-            }
+        return _run_cli(
+            cmd,
+            timeout=_REFRESH_TIMEOUT_SECONDS,
+            timeout_msg=f'Refresh timed out after {_REFRESH_TIMEOUT_SECONDS // 60} minutes',
+        )
     finally:
         try:
             fcntl.flock(lock_fd.fileno(), fcntl.LOCK_UN)
@@ -345,29 +359,12 @@ def _export_impl(output_dir: str, query: str = "") -> dict:
     if query:
         cmd.extend(['arkiv', query])
     cmd.extend(['-o', str(p)])
-    try:
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=120,
-            cwd=str(Path.home()),
-        )
-        if result.returncode == 0:
-            return {
-                'status': 'ok',
-                'output': result.stdout.strip(),
-                'output_dir': str(p),
-            }
-        else:
-            return {
-                'status': 'error',
-                'error': result.stderr.strip() or result.stdout.strip(),
-            }
-    except subprocess.TimeoutExpired:
-        return {'status': 'error', 'error': 'Export timed out after 2 minutes'}
-    except Exception as e:
-        return {'status': 'error', 'error': _sanitize_error(f'{type(e).__name__}: {e}')}
+    return _run_cli(
+        cmd,
+        timeout=120,
+        timeout_msg='Export timed out after 2 minutes',
+        ok_extra={'output_dir': str(p)},
+    )
 
 
 def create_server():

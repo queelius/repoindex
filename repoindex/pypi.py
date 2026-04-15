@@ -7,11 +7,7 @@ from typing import Any, Dict, List, Optional
 import requests
 import toml
 
-try:
-    import tomllib
-except ImportError:
-    import tomli as tomllib  # type: ignore[no-redef]
-
+from .compat import tomllib
 from .config import logger
 
 
