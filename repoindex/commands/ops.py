@@ -1812,8 +1812,19 @@ def wip_snapshot_handler(
             for r in repos
         }
         for future in as_completed(futures):
-            result = future.result()
-            results.append(result)
+            repo = futures[future]
+            try:
+                results.append(future.result())
+            except Exception as e:
+                # An uncaught exception in snapshot_repo must not kill the
+                # whole batch — it would throw away the already-completed
+                # (possibly already-pushed) snapshots sitting in ``results``.
+                results.append(SnapshotResult(
+                    repo_name=Path(repo['path']).name,
+                    repo_path=repo['path'],
+                    success=False,
+                    error=f'unexpected: {type(e).__name__}: {e}',
+                ))
 
     # Categorize results
     snapshotted = [r for r in results if r.success and not r.skipped]
