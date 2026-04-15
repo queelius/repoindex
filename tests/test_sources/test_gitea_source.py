@@ -113,6 +113,85 @@ class TestParseGiteaRemote:
         )
         assert host is None
 
+    def test_url_with_port(self):
+        """HTTPS URLs with explicit ports should parse correctly (port is not owner)."""
+        from repoindex.sources.gitea import _parse_gitea_remote
+        host, owner, name = _parse_gitea_remote(
+            'https://gitea.example.com:3000/user/repo.git',
+            ['gitea.example.com']
+        )
+        assert host == 'gitea.example.com'
+        assert owner == 'user'
+        assert name == 'repo'
+
+    def test_https_url_with_port_443(self):
+        """Explicit https port 443 should be stripped, not treated as owner."""
+        from repoindex.sources.gitea import _parse_gitea_remote
+        host, owner, name = _parse_gitea_remote(
+            'https://codeberg.org:443/user/repo', ['codeberg.org']
+        )
+        assert host == 'codeberg.org'
+        assert owner == 'user'
+        assert name == 'repo'
+
+    def test_http_url_with_port(self):
+        """HTTP URL with port should also work."""
+        from repoindex.sources.gitea import _parse_gitea_remote
+        host, owner, name = _parse_gitea_remote(
+            'http://gitea.internal:8080/team/project.git',
+            ['gitea.internal']
+        )
+        assert host == 'gitea.internal'
+        assert owner == 'team'
+        assert name == 'project'
+
+    def test_subgroup_path(self):
+        """Nested subgroup paths: parent/sub/repo -> owner='parent/sub', name='repo'."""
+        from repoindex.sources.gitea import _parse_gitea_remote
+        host, owner, name = _parse_gitea_remote(
+            'https://codeberg.org/parent/sub/repo', ['codeberg.org']
+        )
+        assert host == 'codeberg.org'
+        # Repo name is the last segment; nested subgroups are joined as owner
+        assert owner == 'parent/sub'
+        assert name == 'repo'
+
+    def test_deep_subgroup_path(self):
+        """Deeply nested subgroups should still parse."""
+        from repoindex.sources.gitea import _parse_gitea_remote
+        host, owner, name = _parse_gitea_remote(
+            'https://codeberg.org/a/b/c/d/repo.git', ['codeberg.org']
+        )
+        assert host == 'codeberg.org'
+        assert owner == 'a/b/c/d'
+        assert name == 'repo'
+
+    def test_ssh_with_scheme(self):
+        """ssh:// scheme URL should work too."""
+        from repoindex.sources.gitea import _parse_gitea_remote
+        host, owner, name = _parse_gitea_remote(
+            'ssh://git@codeberg.org/user/repo.git', ['codeberg.org']
+        )
+        assert host == 'codeberg.org'
+        assert owner == 'user'
+        assert name == 'repo'
+
+    def test_missing_owner(self):
+        """URL missing owner/repo parts should return None."""
+        from repoindex.sources.gitea import _parse_gitea_remote, _DEFAULT_HOSTS
+        host, owner, name = _parse_gitea_remote(
+            'https://codeberg.org/onlyone', _DEFAULT_HOSTS
+        )
+        assert host is None
+
+    def test_just_host_no_path(self):
+        """URL with just host, no path, should return None."""
+        from repoindex.sources.gitea import _parse_gitea_remote, _DEFAULT_HOSTS
+        host, owner, name = _parse_gitea_remote(
+            'https://codeberg.org/', _DEFAULT_HOSTS
+        )
+        assert host is None
+
 
 class TestGiteaSourceAttributes:
     """Tests for GiteaSource class attributes and identity."""
@@ -135,7 +214,13 @@ class TestGiteaSourceAttributes:
 
 
 class TestGiteaSourceDetect:
-    """Tests for GiteaSource.detect()."""
+    """Tests for GiteaSource.detect().
+
+    detect() always returns True so that fetch() (which has access to config)
+    can do the actual host matching. This allows self-hosted Gitea users with
+    custom hosts in config to use this source. fetch() returns None if the URL
+    doesn't match any configured host.
+    """
 
     def test_detect_codeberg(self):
         from repoindex.sources.gitea import source
@@ -145,21 +230,22 @@ class TestGiteaSourceDetect:
         from repoindex.sources.gitea import source
         assert source.detect('/repo', {'remote_url': 'git@codeberg.org:user/repo.git'})
 
-    def test_detect_non_gitea(self):
+    def test_detect_non_gitea_still_true(self):
+        """detect() returns True even for non-Gitea URLs; fetch() filters."""
         from repoindex.sources.gitea import source
-        assert not source.detect('/repo', {'remote_url': 'https://github.com/user/repo'})
+        assert source.detect('/repo', {'remote_url': 'https://github.com/user/repo'})
 
-    def test_detect_empty_record(self):
+    def test_detect_empty_record_still_true(self):
         from repoindex.sources.gitea import source
-        assert not source.detect('/repo', {})
+        assert source.detect('/repo', {})
 
-    def test_detect_none_record(self):
+    def test_detect_none_record_still_true(self):
         from repoindex.sources.gitea import source
-        assert not source.detect('/repo', None)
+        assert source.detect('/repo', None)
 
-    def test_detect_no_remote_url(self):
+    def test_detect_no_remote_url_still_true(self):
         from repoindex.sources.gitea import source
-        assert not source.detect('/repo', {'name': 'myrepo'})
+        assert source.detect('/repo', {'name': 'myrepo'})
 
 
 class TestGiteaSourceFetch:
@@ -192,7 +278,7 @@ class TestGiteaSourceFetch:
     def test_fetch_returns_prefixed_fields(self):
         from repoindex.sources.gitea import source
         mock_resp = self._make_api_response()
-        with patch('repoindex.sources.gitea.requests.get', return_value=mock_resp):
+        with patch('repoindex.sources.gitea.requests.Session.get', return_value=mock_resp):
             result = source.fetch(
                 '/repo',
                 {'remote_url': 'https://codeberg.org/user/repo.git'},
@@ -209,7 +295,7 @@ class TestGiteaSourceFetch:
     def test_fetch_description_also_sets_top_level(self):
         from repoindex.sources.gitea import source
         mock_resp = self._make_api_response(description='A cool project')
-        with patch('repoindex.sources.gitea.requests.get', return_value=mock_resp):
+        with patch('repoindex.sources.gitea.requests.Session.get', return_value=mock_resp):
             result = source.fetch(
                 '/repo',
                 {'remote_url': 'https://codeberg.org/user/repo.git'},
@@ -221,7 +307,7 @@ class TestGiteaSourceFetch:
     def test_fetch_empty_description(self):
         from repoindex.sources.gitea import source
         mock_resp = self._make_api_response(description='')
-        with patch('repoindex.sources.gitea.requests.get', return_value=mock_resp):
+        with patch('repoindex.sources.gitea.requests.Session.get', return_value=mock_resp):
             result = source.fetch(
                 '/repo',
                 {'remote_url': 'https://codeberg.org/user/repo.git'},
@@ -233,7 +319,7 @@ class TestGiteaSourceFetch:
     def test_fetch_null_description(self):
         from repoindex.sources.gitea import source
         mock_resp = self._make_api_response(description=None)
-        with patch('repoindex.sources.gitea.requests.get', return_value=mock_resp):
+        with patch('repoindex.sources.gitea.requests.Session.get', return_value=mock_resp):
             result = source.fetch(
                 '/repo',
                 {'remote_url': 'https://codeberg.org/user/repo.git'},
@@ -245,7 +331,7 @@ class TestGiteaSourceFetch:
     def test_fetch_topics_json_serialized(self):
         from repoindex.sources.gitea import source
         mock_resp = self._make_api_response(topics=['python', 'tool'])
-        with patch('repoindex.sources.gitea.requests.get', return_value=mock_resp):
+        with patch('repoindex.sources.gitea.requests.Session.get', return_value=mock_resp):
             result = source.fetch(
                 '/repo',
                 {'remote_url': 'https://codeberg.org/user/repo.git'},
@@ -257,7 +343,7 @@ class TestGiteaSourceFetch:
     def test_fetch_no_topics(self):
         from repoindex.sources.gitea import source
         mock_resp = self._make_api_response(topics=None)
-        with patch('repoindex.sources.gitea.requests.get', return_value=mock_resp):
+        with patch('repoindex.sources.gitea.requests.Session.get', return_value=mock_resp):
             result = source.fetch(
                 '/repo',
                 {'remote_url': 'https://codeberg.org/user/repo.git'},
@@ -268,7 +354,7 @@ class TestGiteaSourceFetch:
     def test_fetch_empty_topics_list(self):
         from repoindex.sources.gitea import source
         mock_resp = self._make_api_response(topics=[])
-        with patch('repoindex.sources.gitea.requests.get', return_value=mock_resp):
+        with patch('repoindex.sources.gitea.requests.Session.get', return_value=mock_resp):
             result = source.fetch(
                 '/repo',
                 {'remote_url': 'https://codeberg.org/user/repo.git'},
@@ -282,7 +368,7 @@ class TestGiteaSourceFetch:
             fork=True, private=True, archived=True,
             has_issues=False, has_wiki=False, has_pull_requests=False,
         )
-        with patch('repoindex.sources.gitea.requests.get', return_value=mock_resp):
+        with patch('repoindex.sources.gitea.requests.Session.get', return_value=mock_resp):
             result = source.fetch(
                 '/repo',
                 {'remote_url': 'https://codeberg.org/user/repo.git'},
@@ -301,7 +387,7 @@ class TestGiteaSourceFetch:
             created_at='2025-01-01T00:00:00Z',
             updated_at='2026-03-15T12:30:00Z',
         )
-        with patch('repoindex.sources.gitea.requests.get', return_value=mock_resp):
+        with patch('repoindex.sources.gitea.requests.Session.get', return_value=mock_resp):
             result = source.fetch(
                 '/repo',
                 {'remote_url': 'https://codeberg.org/user/repo.git'},
@@ -314,7 +400,7 @@ class TestGiteaSourceFetch:
         from repoindex.sources.gitea import source
         mock_resp = MagicMock()
         mock_resp.status_code = 404
-        with patch('repoindex.sources.gitea.requests.get', return_value=mock_resp):
+        with patch('repoindex.sources.gitea.requests.Session.get', return_value=mock_resp):
             result = source.fetch(
                 '/repo',
                 {'remote_url': 'https://codeberg.org/user/repo.git'},
@@ -326,7 +412,7 @@ class TestGiteaSourceFetch:
         from repoindex.sources.gitea import source
         mock_resp = MagicMock()
         mock_resp.status_code = 500
-        with patch('repoindex.sources.gitea.requests.get', return_value=mock_resp):
+        with patch('repoindex.sources.gitea.requests.Session.get', return_value=mock_resp):
             result = source.fetch(
                 '/repo',
                 {'remote_url': 'https://codeberg.org/user/repo.git'},
@@ -336,7 +422,7 @@ class TestGiteaSourceFetch:
 
     def test_fetch_network_error(self):
         from repoindex.sources.gitea import source
-        with patch('repoindex.sources.gitea.requests.get', side_effect=Exception('timeout')):
+        with patch('repoindex.sources.gitea.requests.Session.get', side_effect=Exception('timeout')):
             result = source.fetch(
                 '/repo',
                 {'remote_url': 'https://codeberg.org/user/repo.git'},
@@ -360,10 +446,12 @@ class TestGiteaSourceFetch:
         assert result is None
 
     def test_fetch_with_token(self):
-        from repoindex.sources.gitea import source
+        from repoindex.sources.gitea import GiteaSource
+        # Use a fresh instance so we can inspect its session cache
+        src = GiteaSource()
         mock_resp = self._make_api_response()
-        with patch('repoindex.sources.gitea.requests.get', return_value=mock_resp) as mock_get:
-            source.fetch(
+        with patch('repoindex.sources.gitea.requests.Session.get', return_value=mock_resp):
+            src.fetch(
                 '/repo',
                 {'remote_url': 'https://codeberg.org/user/repo.git'},
                 config={'gitea': {
@@ -371,25 +459,26 @@ class TestGiteaSourceFetch:
                     'tokens': {'codeberg.org': 'my-token'},
                 }},
             )
-        headers = mock_get.call_args[1]['headers']
-        assert headers['Authorization'] == 'token my-token'
+        session = src._client_cache[('codeberg.org', 'my-token')]
+        assert session.headers['Authorization'] == 'token my-token'
 
     def test_fetch_without_token(self):
-        from repoindex.sources.gitea import source
+        from repoindex.sources.gitea import GiteaSource
+        src = GiteaSource()
         mock_resp = self._make_api_response()
-        with patch('repoindex.sources.gitea.requests.get', return_value=mock_resp) as mock_get:
-            source.fetch(
+        with patch('repoindex.sources.gitea.requests.Session.get', return_value=mock_resp):
+            src.fetch(
                 '/repo',
                 {'remote_url': 'https://codeberg.org/user/repo.git'},
                 config={'gitea': {'hosts': ['codeberg.org']}},
             )
-        headers = mock_get.call_args[1]['headers']
-        assert 'Authorization' not in headers
+        session = src._client_cache[('codeberg.org', None)]
+        assert 'Authorization' not in session.headers
 
     def test_fetch_api_url_construction(self):
         from repoindex.sources.gitea import source
         mock_resp = self._make_api_response()
-        with patch('repoindex.sources.gitea.requests.get', return_value=mock_resp) as mock_get:
+        with patch('repoindex.sources.gitea.requests.Session.get', return_value=mock_resp) as mock_get:
             source.fetch(
                 '/repo',
                 {'remote_url': 'https://codeberg.org/myorg/myrepo.git'},
@@ -401,7 +490,7 @@ class TestGiteaSourceFetch:
     def test_fetch_custom_host_api_url(self):
         from repoindex.sources.gitea import source
         mock_resp = self._make_api_response()
-        with patch('repoindex.sources.gitea.requests.get', return_value=mock_resp) as mock_get:
+        with patch('repoindex.sources.gitea.requests.Session.get', return_value=mock_resp) as mock_get:
             source.fetch(
                 '/repo',
                 {'remote_url': 'https://git.example.com/team/proj.git'},
@@ -414,7 +503,7 @@ class TestGiteaSourceFetch:
         """fetch() uses hosts from config, not just defaults."""
         from repoindex.sources.gitea import source
         mock_resp = self._make_api_response()
-        with patch('repoindex.sources.gitea.requests.get', return_value=mock_resp):
+        with patch('repoindex.sources.gitea.requests.Session.get', return_value=mock_resp):
             result = source.fetch(
                 '/repo',
                 {'remote_url': 'https://git.custom.org/user/repo.git'},
@@ -427,7 +516,7 @@ class TestGiteaSourceFetch:
         """fetch() uses default hosts when config is None."""
         from repoindex.sources.gitea import source
         mock_resp = self._make_api_response()
-        with patch('repoindex.sources.gitea.requests.get', return_value=mock_resp):
+        with patch('repoindex.sources.gitea.requests.Session.get', return_value=mock_resp):
             result = source.fetch(
                 '/repo',
                 {'remote_url': 'https://codeberg.org/user/repo.git'},
@@ -442,7 +531,7 @@ class TestGiteaSourceFetch:
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.json.return_value = {}  # Minimal response
-        with patch('repoindex.sources.gitea.requests.get', return_value=mock_resp):
+        with patch('repoindex.sources.gitea.requests.Session.get', return_value=mock_resp):
             result = source.fetch(
                 '/repo',
                 {'remote_url': 'https://codeberg.org/user/repo.git'},
@@ -457,7 +546,7 @@ class TestGiteaSourceFetch:
     def test_fetch_timeout_parameter(self):
         from repoindex.sources.gitea import source
         mock_resp = self._make_api_response()
-        with patch('repoindex.sources.gitea.requests.get', return_value=mock_resp) as mock_get:
+        with patch('repoindex.sources.gitea.requests.Session.get', return_value=mock_resp) as mock_get:
             source.fetch(
                 '/repo',
                 {'remote_url': 'https://codeberg.org/user/repo.git'},
@@ -466,16 +555,17 @@ class TestGiteaSourceFetch:
         assert mock_get.call_args[1]['timeout'] == 10
 
     def test_fetch_user_agent(self):
-        from repoindex.sources.gitea import source
+        from repoindex.sources.gitea import GiteaSource
+        src = GiteaSource()
         mock_resp = self._make_api_response()
-        with patch('repoindex.sources.gitea.requests.get', return_value=mock_resp) as mock_get:
-            source.fetch(
+        with patch('repoindex.sources.gitea.requests.Session.get', return_value=mock_resp):
+            src.fetch(
                 '/repo',
                 {'remote_url': 'https://codeberg.org/user/repo.git'},
                 config={'gitea': {'hosts': ['codeberg.org']}},
             )
-        headers = mock_get.call_args[1]['headers']
-        assert 'repoindex' in headers['User-Agent']
+        session = src._client_cache[('codeberg.org', None)]
+        assert 'repoindex' in session.headers['User-Agent']
 
 
 class TestGiteaSourceConfig:

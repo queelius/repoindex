@@ -418,7 +418,10 @@ class AuditService:
         if not pyproject.exists():
             return True  # No pyproject.toml — skip
         try:
-            import tomllib
+            try:
+                import tomllib
+            except ImportError:
+                import tomli as tomllib  # type: ignore[no-redef]
             with open(pyproject, 'rb') as f:
                 data = tomllib.load(f)
             authors = data.get('project', {}).get('authors', [])
@@ -438,7 +441,10 @@ class AuditService:
         if not pyproject.exists():
             return True
         try:
-            import tomllib
+            try:
+                import tomllib
+            except ImportError:
+                import tomli as tomllib  # type: ignore[no-redef]
             with open(pyproject, 'rb') as f:
                 data = tomllib.load(f)
             authors = data.get('project', {}).get('authors', [])

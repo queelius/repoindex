@@ -3,6 +3,11 @@ import json
 from pathlib import Path
 from typing import Optional
 
+try:
+    import tomllib  # Python 3.11+
+except ImportError:
+    import tomli as tomllib  # type: ignore[no-redef]
+
 from . import MetadataSource
 
 # Files checked for keywords, in priority order
@@ -59,10 +64,6 @@ class KeywordsSource(MetadataSource):
     def _extract_toml_keywords(path: Path, key_path: tuple) -> Optional[dict]:
         """Extract keywords from a TOML file at the given nested key path."""
         try:
-            try:
-                import tomllib
-            except ImportError:
-                import tomli as tomllib  # type: ignore[no-redef]
             with open(path, 'rb') as f:
                 data = tomllib.load(f)
             node = data

@@ -60,8 +60,45 @@ class TestCitationCffSource:
         from repoindex.sources.citation_cff import source
         (tmp_path / 'CITATION.cff').write_text('- just\n- a\n- list\n')
         result = source.fetch(str(tmp_path))
-        # yaml.safe_load returns a list, not dict -- should return None
-        assert result is None
+        # yaml.safe_load returns a list, not dict -- file exists but
+        # unparseable as expected, consistent with exception path
+        assert result == {'has_citation': 1}
+
+    def test_fetch_non_dict_scalar(self, tmp_path):
+        """Scalar YAML (e.g., just a string) should also flag has_citation."""
+        from repoindex.sources.citation_cff import source
+        (tmp_path / 'CITATION.cff').write_text('just a string\n')
+        result = source.fetch(str(tmp_path))
+        assert result == {'has_citation': 1}
+
+    def test_fetch_float_version_warns(self, tmp_path, caplog):
+        """Float version (unquoted 1.10 -> 1.1) should log a warning."""
+        import logging
+        from repoindex.sources.citation_cff import source
+        # YAML will parse 1.10 as float 1.1, losing precision
+        (tmp_path / 'CITATION.cff').write_text('title: T\nversion: 1.10\n')
+        with caplog.at_level(logging.WARNING):
+            result = source.fetch(str(tmp_path))
+        assert result['citation_version'] == '1.1'  # precision lost
+        # Warning should have been emitted
+        assert any(
+            'CITATION.cff' in rec.message and 'version' in rec.message.lower()
+            for rec in caplog.records
+        )
+
+    def test_fetch_quoted_version_no_warn(self, tmp_path, caplog):
+        """Quoted version string should not emit a warning."""
+        import logging
+        from repoindex.sources.citation_cff import source
+        (tmp_path / 'CITATION.cff').write_text('title: T\nversion: "1.10"\n')
+        with caplog.at_level(logging.WARNING):
+            result = source.fetch(str(tmp_path))
+        assert result['citation_version'] == '1.10'  # precision preserved
+        # No warning expected
+        assert not any(
+            'version' in rec.message.lower() and 'precision' in rec.message.lower()
+            for rec in caplog.records
+        )
 
     def test_fetch_version_coerced_to_string(self, tmp_path):
         from repoindex.sources.citation_cff import source

@@ -16,7 +16,8 @@ Configuration (in ~/.repoindex/config.yaml):
 import json
 import logging
 import re
-from typing import List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple
+from urllib.parse import urlparse
 
 import requests
 
@@ -32,20 +33,56 @@ def _parse_gitea_remote(
 ) -> Tuple[Optional[str], Optional[str], Optional[str]]:
     """Extract (host, owner, name) from a Gitea remote URL.
 
+    Handles HTTPS (with optional port), SSH, and URLs with/without .git suffix.
+    Supports nested subgroup paths (e.g., parent/sub/repo -> owner='parent/sub').
     Returns (None, None, None) if URL doesn't match any configured host.
-    Handles HTTPS and SSH URLs, with/without .git suffix.
     """
     if not url:
         return None, None, None
-    for host in hosts:
-        # Matches both HTTPS (https://host/user/repo) and SSH (git@host:user/repo)
-        pattern = re.compile(
-            rf'{re.escape(host)}[:/]([^/\s]+)/([^/\s]+?)(?:\.git)?/?$'
-        )
-        m = pattern.search(url)
-        if m:
-            return host, m.group(1), m.group(2)
-    return None, None, None
+
+    host: Optional[str] = None
+    path: Optional[str] = None
+
+    if url.startswith(('http://', 'https://', 'ssh://')):
+        try:
+            parsed = urlparse(url)
+            host = parsed.hostname  # urllib strips port
+            path = parsed.path.lstrip('/')
+        except Exception:
+            return None, None, None
+    else:
+        # SSH form: git@host:owner/repo[.git] (no scheme)
+        ssh_match = re.match(r'^(?:[^@]+@)?([^:/\s]+):(.+?)$', url)
+        if ssh_match:
+            host = ssh_match.group(1)
+            path = ssh_match.group(2)
+        else:
+            return None, None, None
+
+    if not host or not path:
+        return None, None, None
+
+    if host not in hosts:
+        return None, None, None
+
+    # Strip .git suffix and trailing slash
+    path = re.sub(r'\.git/?$', '', path).rstrip('/')
+    if not path:
+        return None, None, None
+
+    parts = path.split('/')
+    if len(parts) < 2:
+        return None, None, None
+
+    # Repo name is the last segment, owner is everything before
+    # This supports nested Gitea subgroups (parent/sub/repo)
+    name = parts[-1]
+    owner = '/'.join(parts[:-1])
+
+    if not owner or not name:
+        return None, None, None
+
+    return host, owner, name
 
 
 class GiteaSource(MetadataSource):
@@ -56,7 +93,8 @@ class GiteaSource(MetadataSource):
     target = "repos"
 
     def __init__(self):
-        self._client_cache = {}  # (host, token) -> requests.Session
+        # Session cache keyed by (host, token_or_None) for connection pooling
+        self._client_cache: Dict[Tuple[str, Optional[str]], requests.Session] = {}
 
     def _get_hosts(self, config):
         """Get configured Gitea hosts. Default: ['codeberg.org']."""
@@ -67,11 +105,27 @@ class GiteaSource(MetadataSource):
         tokens = (config or {}).get('gitea', {}).get('tokens', {})
         return tokens.get(host)
 
+    def _get_session(self, host: str, token: Optional[str]) -> requests.Session:
+        """Get a cached requests.Session for this host+token combo."""
+        key = (host, token)
+        session = self._client_cache.get(key)
+        if session is None:
+            session = requests.Session()
+            session.headers['User-Agent'] = 'repoindex (+https://github.com/queelius/repoindex)'
+            if token:
+                session.headers['Authorization'] = f'token {token}'
+            self._client_cache[key] = session
+        return session
+
     def detect(self, repo_path, repo_record=None):
-        url = (repo_record or {}).get('remote_url', '')
-        # Use default hosts for detection (config not available in detect)
-        host, owner, name = _parse_gitea_remote(url, _DEFAULT_HOSTS)
-        return host is not None
+        """Always return True; actual host matching happens in fetch()
+        where config (with custom Gitea hosts) is available.
+
+        The cost is one regex/URL parse per repo in fetch(), which is trivial.
+        This allows self-hosted Gitea users with custom hosts in their config
+        to use this source.
+        """
+        return True
 
     def fetch(self, repo_path, repo_record=None, config=None):
         url = (repo_record or {}).get('remote_url', '')
@@ -81,13 +135,11 @@ class GiteaSource(MetadataSource):
             return None
 
         token = self._get_token(config, host)
-        headers = {'User-Agent': 'repoindex (+https://github.com/queelius/repoindex)'}
-        if token:
-            headers['Authorization'] = f'token {token}'
+        session = self._get_session(host, token)
 
         try:
             api_url = f'https://{host}/api/v1/repos/{owner}/{name}'
-            resp = requests.get(api_url, headers=headers, timeout=10)
+            resp = session.get(api_url, timeout=10)
             if resp.status_code != 200:
                 logger.debug(
                     "Gitea API %s returned %d for %s/%s",

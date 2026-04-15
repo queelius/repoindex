@@ -1,9 +1,12 @@
 """CITATION.cff metadata source for repoindex."""
 import json
+import logging
 from pathlib import Path
 from typing import Optional
 
 from . import MetadataSource
+
+logger = logging.getLogger(__name__)
 
 
 class CitationCffSource(MetadataSource):
@@ -27,14 +30,25 @@ class CitationCffSource(MetadataSource):
             with open(cff_path) as f:
                 data = yaml.safe_load(f)
             if not isinstance(data, dict):
-                return None
+                # File exists but isn't a mapping (list, scalar, etc.) --
+                # flag has_citation so callers know the file is present.
+                return {'has_citation': 1}
             result = {}
             if data.get('doi'):
                 result['citation_doi'] = data['doi']
             if data.get('title'):
                 result['citation_title'] = data['title']
-            if data.get('version'):
-                result['citation_version'] = str(data['version'])
+            v = data.get('version')
+            if v is not None:
+                if isinstance(v, float):
+                    # YAML coerces unquoted values like "1.10" to float 1.1,
+                    # silently losing precision. Warn so users can quote.
+                    logger.warning(
+                        "CITATION.cff in %s has unquoted float version %r; "
+                        "quote it (e.g., version: \"1.10\") to preserve precision",
+                        repo_path, v,
+                    )
+                result['citation_version'] = str(v)
             if data.get('repository-code'):
                 result['citation_repository'] = data['repository-code']
             if data.get('license'):

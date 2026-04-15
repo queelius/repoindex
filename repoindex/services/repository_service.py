@@ -57,7 +57,11 @@ def _extract_keywords(repo_path) -> Optional[list]:
         List of keyword strings, or None if no keywords found.
     """
     import json as _json
-    import tomllib
+
+    try:
+        import tomllib
+    except ImportError:
+        import tomli as tomllib  # type: ignore[no-redef]
 
     repo_path = Path(repo_path)
 
