@@ -172,7 +172,8 @@ class TestRunSql:
 
 
 class TestRefresh:
-    def test_runs_subprocess(self):
+    def test_runs_subprocess(self, tmp_path, monkeypatch):
+        monkeypatch.setattr('repoindex.mcp.server.Path.home', lambda: tmp_path)
         with patch('repoindex.mcp.server.subprocess.run') as mock_run:
             mock_run.return_value = MagicMock(returncode=0, stdout='Refreshed 42 repos', stderr='')
             from repoindex.mcp.server import _refresh_impl
@@ -180,7 +181,8 @@ class TestRefresh:
         assert result['status'] == 'ok'
         assert '42' in result['output']
 
-    def test_with_flags(self):
+    def test_with_flags(self, tmp_path, monkeypatch):
+        monkeypatch.setattr('repoindex.mcp.server.Path.home', lambda: tmp_path)
         with patch('repoindex.mcp.server.subprocess.run') as mock_run:
             mock_run.return_value = MagicMock(returncode=0, stdout='Done', stderr='')
             from repoindex.mcp.server import _refresh_impl
@@ -189,20 +191,83 @@ class TestRefresh:
         assert '--github' in cmd
         assert '--full' in cmd
 
-    def test_failure(self):
+    def test_with_pypi_flag(self, tmp_path, monkeypatch):
+        monkeypatch.setattr('repoindex.mcp.server.Path.home', lambda: tmp_path)
+        with patch('repoindex.mcp.server.subprocess.run') as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout='Done', stderr='')
+            from repoindex.mcp.server import _refresh_impl
+            _refresh_impl(pypi=True)
+        cmd = mock_run.call_args[0][0]
+        assert '--source' in cmd
+        assert 'pypi' in cmd
+
+    def test_with_cran_flag(self, tmp_path, monkeypatch):
+        monkeypatch.setattr('repoindex.mcp.server.Path.home', lambda: tmp_path)
+        with patch('repoindex.mcp.server.subprocess.run') as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout='Done', stderr='')
+            from repoindex.mcp.server import _refresh_impl
+            _refresh_impl(cran=True)
+        cmd = mock_run.call_args[0][0]
+        assert '--source' in cmd
+        assert 'cran' in cmd
+
+    def test_with_external_flag(self, tmp_path, monkeypatch):
+        monkeypatch.setattr('repoindex.mcp.server.Path.home', lambda: tmp_path)
+        with patch('repoindex.mcp.server.subprocess.run') as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout='Done', stderr='')
+            from repoindex.mcp.server import _refresh_impl
+            _refresh_impl(external=True)
+        cmd = mock_run.call_args[0][0]
+        assert '--external' in cmd
+
+    def test_with_all_sources(self, tmp_path, monkeypatch):
+        monkeypatch.setattr('repoindex.mcp.server.Path.home', lambda: tmp_path)
+        with patch('repoindex.mcp.server.subprocess.run') as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout='Done', stderr='')
+            from repoindex.mcp.server import _refresh_impl
+            _refresh_impl(github=True, pypi=True, cran=True)
+        cmd = mock_run.call_args[0][0]
+        assert '--github' in cmd
+        # Two --source pairs (pypi + cran)
+        assert cmd.count('--source') == 2
+        assert 'pypi' in cmd
+        assert 'cran' in cmd
+
+    def test_failure(self, tmp_path, monkeypatch):
+        monkeypatch.setattr('repoindex.mcp.server.Path.home', lambda: tmp_path)
         with patch('repoindex.mcp.server.subprocess.run') as mock_run:
             mock_run.return_value = MagicMock(returncode=1, stdout='', stderr='Config not found')
             from repoindex.mcp.server import _refresh_impl
             result = _refresh_impl()
         assert result['status'] == 'error'
 
-    def test_timeout(self):
+    def test_timeout(self, tmp_path, monkeypatch):
+        monkeypatch.setattr('repoindex.mcp.server.Path.home', lambda: tmp_path)
         with patch('repoindex.mcp.server.subprocess.run') as mock_run:
             mock_run.side_effect = subprocess.TimeoutExpired('repoindex', 300)
             from repoindex.mcp.server import _refresh_impl
             result = _refresh_impl()
         assert result['status'] == 'error'
         assert 'timed out' in result['error'].lower()
+
+    def test_concurrent_refresh_returns_error(self, tmp_path, monkeypatch):
+        """Two simultaneous refreshes — second should fail with lock error."""
+        import fcntl
+        monkeypatch.setattr('repoindex.mcp.server.Path.home', lambda: tmp_path)
+
+        # Acquire the lock manually to simulate another refresh in progress
+        lock_path = tmp_path / '.repoindex' / 'refresh.lock'
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+        f = open(lock_path, 'w')
+        fcntl.flock(f.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        try:
+            from repoindex.mcp.server import _refresh_impl
+            result = _refresh_impl()
+            assert result['status'] == 'error'
+            assert 'already running' in result['error'].lower()
+        finally:
+            fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+            f.close()
 
 
 class TestTag:
@@ -256,43 +321,223 @@ class TestTag:
             result = _tag_impl('nonexistent', 'add', 'x')
         assert result['status'] == 'error'
 
+    def test_tag_add_rejects_empty_repo(self):
+        from repoindex.mcp.server import _tag_impl
+        result = _tag_impl('', 'add', 'sometag')
+        assert 'error' in result
+
+    def test_tag_add_rejects_whitespace_repo(self):
+        from repoindex.mcp.server import _tag_impl
+        result = _tag_impl('   ', 'add', 'sometag')
+        assert 'error' in result
+
+    def test_tag_remove_rejects_empty_repo(self):
+        from repoindex.mcp.server import _tag_impl
+        result = _tag_impl('', 'remove', 'sometag')
+        assert 'error' in result
+
+    def test_tag_rejects_flag_like_repo(self):
+        from repoindex.mcp.server import _tag_impl
+        result = _tag_impl('--help', 'add', 'tag')
+        assert 'error' in result
+        assert '-' in result['error']
+
+    def test_tag_rejects_flag_like_tag(self):
+        from repoindex.mcp.server import _tag_impl
+        result = _tag_impl('repo', 'add', '--force')
+        assert 'error' in result
+        assert '-' in result['error']
+
+    def test_tag_remove_rejects_flag_like_args(self):
+        from repoindex.mcp.server import _tag_impl
+        result = _tag_impl('-repo', 'remove', 'tag')
+        assert 'error' in result
+
 
 class TestExport:
-    def test_export_success(self):
+    def test_export_success(self, tmp_path):
         from repoindex.mcp.server import _export_impl
+        target = tmp_path / 'new_out'  # does not exist yet
         with patch('repoindex.mcp.server.subprocess.run') as mock_run:
             mock_run.return_value = MagicMock(
                 returncode=0, stdout='Exported 42 repos', stderr=''
             )
-            result = _export_impl('/tmp/out')
+            result = _export_impl(str(target))
         assert result['status'] == 'ok'
         assert '42' in result['output']
         cmd = mock_run.call_args[0][0]
-        assert cmd == ['repoindex', 'export', '-o', '/tmp/out']
+        assert cmd == ['repoindex', 'export', '-o', str(target.resolve())]
 
-    def test_export_with_query(self):
+    def test_export_with_query(self, tmp_path):
         from repoindex.mcp.server import _export_impl
+        target = tmp_path / 'new_out'
         with patch('repoindex.mcp.server.subprocess.run') as mock_run:
             mock_run.return_value = MagicMock(returncode=0, stdout='Done', stderr='')
-            _export_impl('/tmp/out', "language == 'Python'")
+            _export_impl(str(target), "language == 'Python'")
         cmd = mock_run.call_args[0][0]
         # Must pass 'arkiv' explicitly so click doesn't parse query as FORMAT_ID
-        assert cmd == ['repoindex', 'export', 'arkiv', "language == 'Python'", '-o', '/tmp/out']
+        assert cmd == [
+            'repoindex', 'export', 'arkiv', "language == 'Python'",
+            '-o', str(target.resolve()),
+        ]
 
-    def test_export_failure(self):
+    def test_export_failure(self, tmp_path):
         from repoindex.mcp.server import _export_impl
+        target = tmp_path / 'new_out'
         with patch('repoindex.mcp.server.subprocess.run') as mock_run:
             mock_run.return_value = MagicMock(returncode=1, stdout='', stderr='DB not found')
-            result = _export_impl('/tmp/out')
+            result = _export_impl(str(target))
         assert result['status'] == 'error'
 
-    def test_export_timeout(self):
+    def test_export_timeout(self, tmp_path):
         from repoindex.mcp.server import _export_impl
+        target = tmp_path / 'new_out'
         with patch('repoindex.mcp.server.subprocess.run') as mock_run:
             mock_run.side_effect = subprocess.TimeoutExpired('repoindex', 120)
-            result = _export_impl('/tmp/out')
+            result = _export_impl(str(target))
         assert result['status'] == 'error'
         assert 'timed out' in result['error'].lower()
+
+    def test_export_rejects_existing_non_archive_dir(self, tmp_path):
+        """Export refuses to clobber a non-empty directory that isn't an arkiv archive."""
+        from repoindex.mcp.server import _export_impl
+        # Create a directory with random content (not an arkiv archive)
+        (tmp_path / 'random.txt').write_text('hello')
+        result = _export_impl(str(tmp_path))
+        assert result['status'] == 'error'
+        assert (
+            'arkiv' in result['error'].lower()
+            or 'empty' in result['error'].lower()
+            or 'readme' in result['error'].lower()
+        )
+
+    def test_export_rejects_sensitive_dirs(self, monkeypatch, tmp_path):
+        """Export refuses to write to ~/.ssh, ~/.gnupg, etc."""
+        from repoindex.mcp.server import _export_impl
+        # Point Path.home() at our fake home so test is hermetic
+        monkeypatch.setattr('repoindex.mcp.server.Path.home', lambda: tmp_path)
+        result = _export_impl(str(tmp_path / '.ssh' / 'foo'))
+        assert result['status'] == 'error'
+        assert 'sensitive' in result['error'].lower()
+
+    def test_export_rejects_gnupg_dir(self, monkeypatch, tmp_path):
+        from repoindex.mcp.server import _export_impl
+        monkeypatch.setattr('repoindex.mcp.server.Path.home', lambda: tmp_path)
+        result = _export_impl(str(tmp_path / '.gnupg' / 'backup'))
+        assert result['status'] == 'error'
+        assert 'sensitive' in result['error'].lower()
+
+    def test_export_allows_new_directory(self, tmp_path):
+        """Export succeeds when output_dir does not exist yet."""
+        from repoindex.mcp.server import _export_impl
+        new_dir = str(tmp_path / 'new_archive')
+        with patch('repoindex.mcp.server.subprocess.run') as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout='ok', stderr='')
+            result = _export_impl(new_dir)
+        assert result['status'] == 'ok'
+
+    def test_export_allows_empty_existing_directory(self, tmp_path):
+        """Export allows existing empty directory."""
+        from repoindex.mcp.server import _export_impl
+        empty_dir = tmp_path / 'empty_archive'
+        empty_dir.mkdir()
+        with patch('repoindex.mcp.server.subprocess.run') as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout='ok', stderr='')
+            result = _export_impl(str(empty_dir))
+        assert result['status'] == 'ok'
+
+    def test_export_allows_existing_arkiv_archive(self, tmp_path):
+        """Export allows overwriting an existing repoindex arkiv archive."""
+        from repoindex.mcp.server import _export_impl
+        archive = tmp_path / 'archive'
+        archive.mkdir()
+        (archive / 'README.md').write_text(
+            '---\ngenerator: repoindex\nformat: arkiv\n---\n'
+        )
+        with patch('repoindex.mcp.server.subprocess.run') as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout='ok', stderr='')
+            result = _export_impl(str(archive))
+        assert result['status'] == 'ok'
+
+    def test_export_rejects_file_as_output(self, tmp_path):
+        """Export rejects output_dir that is a file, not a directory."""
+        from repoindex.mcp.server import _export_impl
+        a_file = tmp_path / 'a_file'
+        a_file.write_text('not a directory')
+        result = _export_impl(str(a_file))
+        assert result['status'] == 'error'
+        assert 'not a directory' in result['error'].lower()
+
+    def test_export_rejects_non_empty_dir_without_readme(self, tmp_path):
+        """Export rejects dir with content but no README at all."""
+        from repoindex.mcp.server import _export_impl
+        target = tmp_path / 'populated'
+        target.mkdir()
+        (target / 'arbitrary.txt').write_text('stuff')
+        result = _export_impl(str(target))
+        assert result['status'] == 'error'
+        assert 'readme' in result['error'].lower()
+
+
+class TestSanitizeError:
+    def test_sanitize_strips_home(self, monkeypatch, tmp_path):
+        from repoindex.mcp.server import _sanitize_error
+        monkeypatch.setattr('repoindex.mcp.server.Path.home', lambda: tmp_path)
+        msg = f'Failed at {tmp_path}/some/path'
+        result = _sanitize_error(msg)
+        assert str(tmp_path) not in result
+        assert '~' in result
+
+    def test_sanitize_no_home_in_msg(self, tmp_path, monkeypatch):
+        from repoindex.mcp.server import _sanitize_error
+        monkeypatch.setattr('repoindex.mcp.server.Path.home', lambda: tmp_path)
+        msg = 'Generic error without any path'
+        assert _sanitize_error(msg) == msg
+
+
+class TestSqlCommentStripping:
+    def test_leading_line_comment(self, patch_db):
+        """SQL with leading -- comment is accepted."""
+        patch_db.fetchmany.return_value = [{'n': 1}]
+        from repoindex.mcp.server import _run_sql_impl
+        result = _run_sql_impl("-- count repos\nSELECT COUNT(*) AS n FROM repos")
+        assert 'rows' in result
+
+    def test_leading_block_comment(self, patch_db):
+        """SQL with leading /* ... */ comment is accepted."""
+        patch_db.fetchmany.return_value = [{'n': 1}]
+        from repoindex.mcp.server import _run_sql_impl
+        result = _run_sql_impl("/* a block comment */ SELECT COUNT(*) AS n FROM repos")
+        assert 'rows' in result
+
+    def test_multiple_leading_comments(self, patch_db):
+        """Multiple stacked leading comments are stripped."""
+        patch_db.fetchmany.return_value = [{'n': 1}]
+        from repoindex.mcp.server import _run_sql_impl
+        result = _run_sql_impl(
+            "-- first comment\n"
+            "-- second comment\n"
+            "/* block */ SELECT COUNT(*) AS n FROM repos"
+        )
+        assert 'rows' in result
+
+    def test_comment_then_insert_still_rejected(self):
+        """Comments don't bypass the INSERT/DROP/DELETE reject."""
+        from repoindex.mcp.server import _run_sql_impl
+        result = _run_sql_impl("-- sneaky\nDELETE FROM repos")
+        assert 'error' in result
+
+    def test_only_comments_rejected(self):
+        """Query that contains only comments is rejected."""
+        from repoindex.mcp.server import _run_sql_impl
+        result = _run_sql_impl("-- only a comment")
+        assert 'error' in result
+
+    def test_unclosed_block_comment_rejected(self):
+        """Unclosed block comment gets rejected (returns empty after strip)."""
+        from repoindex.mcp.server import _run_sql_impl
+        result = _run_sql_impl("/* never closed SELECT * FROM repos")
+        assert 'error' in result
 
 
 class TestMcpCli:

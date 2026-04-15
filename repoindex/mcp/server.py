@@ -16,14 +16,24 @@ write protection. The prefix check is a courtesy guard for better error
 messages, not a security boundary.
 """
 
+import fcntl
 import re
 import subprocess
 from contextlib import contextmanager
+from pathlib import Path
 
 from ..config import load_config
 from ..database.connection import Database, get_db_path
 
 _TABLE_NAME_RE = re.compile(r'^[a-zA-Z_][a-zA-Z0-9_]*$')
+
+
+def _sanitize_error(msg: str) -> str:
+    """Strip user-identifying paths from error messages."""
+    home = str(Path.home())
+    if home in msg:
+        msg = msg.replace(home, '~')
+    return msg
 
 
 @contextmanager
@@ -105,9 +115,29 @@ def _get_schema_impl(table=None) -> dict:
 MAX_ROWS = 500
 
 
+def _strip_sql_comments(query: str) -> str:
+    """Remove leading SQL comments and whitespace before prefix check."""
+    while True:
+        stripped = query.lstrip()
+        if stripped.startswith('--'):
+            # Skip to end of line
+            nl = stripped.find('\n')
+            if nl == -1:
+                return ''
+            query = stripped[nl+1:]
+        elif stripped.startswith('/*'):
+            end = stripped.find('*/')
+            if end == -1:
+                return ''
+            query = stripped[end+2:]
+        else:
+            return stripped
+
+
 def _run_sql_impl(query: str) -> dict:
     """Execute a read-only SQL query."""
-    normalized = query.strip().upper()
+    cleaned = _strip_sql_comments(query)
+    normalized = cleaned.upper()
     if not (normalized.startswith('SELECT') or normalized.startswith('WITH')):
         return {'error': 'Only SELECT and WITH (CTE) queries are allowed.'}
 
@@ -124,6 +154,7 @@ def _run_sql_impl(query: str) -> dict:
                 'truncated': truncated,
             }
     except Exception as e:
+        # SQL errors are useful for the LLM — don't sanitize
         return {'error': str(e)}
 
 
@@ -133,31 +164,76 @@ def _run_sql_impl(query: str) -> dict:
 _REFRESH_TIMEOUT_SECONDS = 1800
 
 
-def _refresh_impl(github: bool = False, full: bool = False) -> dict:
+def _refresh_impl(
+    github: bool = False,
+    full: bool = False,
+    pypi: bool = False,
+    cran: bool = False,
+    external: bool = False,
+) -> dict:
     """Run the repoindex refresh command as a subprocess."""
-    cmd = ['repoindex', 'refresh']
-    if github:
-        cmd.append('--github')
-    if full:
-        cmd.append('--full')
+    # Acquire lock to prevent concurrent refreshes
+    lock_path = Path.home() / '.repoindex' / 'refresh.lock'
     try:
-        result = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=_REFRESH_TIMEOUT_SECONDS
-        )
-        if result.returncode == 0:
-            return {'status': 'ok', 'output': result.stdout.strip()}
-        else:
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+        lock_fd = open(lock_path, 'w')
+        try:
+            fcntl.flock(lock_fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            lock_fd.close()
             return {
                 'status': 'error',
-                'error': result.stderr.strip() or result.stdout.strip(),
+                'error': 'Another refresh is already running. Wait for it to complete.'
             }
-    except subprocess.TimeoutExpired:
+    except Exception as e:
         return {
             'status': 'error',
-            'error': f'Refresh timed out after {_REFRESH_TIMEOUT_SECONDS // 60} minutes',
+            'error': _sanitize_error(f'Could not acquire refresh lock: {e}'),
         }
-    except Exception as e:
-        return {'status': 'error', 'error': str(e)}
+
+    try:
+        cmd = ['repoindex', 'refresh']
+        if github:
+            cmd.append('--github')
+        if pypi:
+            cmd.extend(['--source', 'pypi'])
+        if cran:
+            cmd.extend(['--source', 'cran'])
+        if external:
+            cmd.append('--external')
+        if full:
+            cmd.append('--full')
+        try:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=_REFRESH_TIMEOUT_SECONDS,
+                cwd=str(Path.home()),
+            )
+            if result.returncode == 0:
+                return {'status': 'ok', 'output': result.stdout.strip()}
+            else:
+                return {
+                    'status': 'error',
+                    'error': result.stderr.strip() or result.stdout.strip(),
+                }
+        except subprocess.TimeoutExpired:
+            return {
+                'status': 'error',
+                'error': f'Refresh timed out after {_REFRESH_TIMEOUT_SECONDS // 60} minutes',
+            }
+        except Exception as e:
+            return {
+                'status': 'error',
+                'error': _sanitize_error(f'{type(e).__name__}: {e}'),
+            }
+    finally:
+        try:
+            fcntl.flock(lock_fd.fileno(), fcntl.LOCK_UN)
+            lock_fd.close()
+        except Exception:
+            pass
 
 
 def _tag_impl(repo: str, action: str, tag: str = "") -> dict:
@@ -179,8 +255,16 @@ def _tag_impl(repo: str, action: str, tag: str = "") -> dict:
             rows = [dict(r) for r in db.fetchall()]
             return {'tags': rows, 'count': len(rows)}
 
-    if not tag:
-        return {'error': f'Tag is required for {action} action.'}
+    # add/remove validation
+    if action in ('add', 'remove'):
+        if not repo or not repo.strip():
+            return {'error': f'Repository is required for {action} action.'}
+        if not tag:
+            return {'error': f'Tag is required for {action} action.'}
+        if repo.startswith('-') or tag.startswith('-'):
+            return {
+                'error': 'Repository and tag must not start with "-" (would be parsed as a flag).'
+            }
 
     # add/remove via subprocess (writes to DB)
     cmd = ['repoindex', 'tag', action, repo, tag]
@@ -194,22 +278,87 @@ def _tag_impl(repo: str, action: str, tag: str = "") -> dict:
                 'error': result.stderr.strip() or result.stdout.strip(),
             }
     except Exception as e:
-        return {'status': 'error', 'error': str(e)}
+        return {'status': 'error', 'error': _sanitize_error(str(e))}
 
 
 def _export_impl(output_dir: str, query: str = "") -> dict:
     """Export repos as longecho-compliant arkiv archive."""
+    # Validate output_dir before invoking the CLI to prevent clobbering.
+    p = Path(output_dir).expanduser().resolve()
+
+    # Refuse to write into common sensitive dotfile directories
+    home = Path.home().resolve()
+    sensitive_dirs = {'.ssh', '.gnupg', '.aws', '.config', '.kube'}
+    try:
+        rel = p.relative_to(home)
+        first = rel.parts[0] if rel.parts else ''
+        if first in sensitive_dirs:
+            return {
+                'status': 'error',
+                'error': _sanitize_error(f'Refusing to write to sensitive directory: {p}'),
+            }
+    except ValueError:
+        # Not under home, that's fine
+        pass
+
+    # If directory exists and is non-empty, require it to look like an arkiv archive
+    # (has a README.md with arkiv frontmatter) — prevents clobbering arbitrary dirs
+    if p.exists():
+        if not p.is_dir():
+            return {
+                'status': 'error',
+                'error': _sanitize_error(f'output_dir exists and is not a directory: {p}'),
+            }
+        contents = list(p.iterdir())
+        if contents:
+            readme = p / 'README.md'
+            if readme.exists():
+                # Check it's an arkiv archive (has the right frontmatter)
+                try:
+                    head = readme.read_text(encoding='utf-8', errors='replace')[:500]
+                    if 'generator: repoindex' not in head and 'arkiv' not in head.lower():
+                        return {
+                            'status': 'error',
+                            'error': _sanitize_error(
+                                f'output_dir exists but does not look like an arkiv archive: {p}. '
+                                f'Use a new directory or empty an existing one.'
+                            ),
+                        }
+                except Exception:
+                    return {
+                        'status': 'error',
+                        'error': _sanitize_error(f'output_dir exists with unreadable content: {p}'),
+                    }
+            else:
+                return {
+                    'status': 'error',
+                    'error': _sanitize_error(
+                        f'output_dir exists and is non-empty but has no README.md: {p}. '
+                        f'Use a new directory or empty an existing one.'
+                    ),
+                }
+
     # CLI signature: repoindex export [FORMAT_ID] [QUERY] -o DIR
     # When query is present, we must pass 'arkiv' explicitly so click doesn't
     # parse the query string as FORMAT_ID.
     cmd = ['repoindex', 'export']
     if query:
         cmd.extend(['arkiv', query])
-    cmd.extend(['-o', output_dir])
+    cmd.extend(['-o', str(p)])
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=120,
+            cwd=str(Path.home()),
+        )
         if result.returncode == 0:
-            return {'status': 'ok', 'output': result.stdout.strip(), 'output_dir': output_dir}
+            return {
+                'status': 'ok',
+                'output': result.stdout.strip(),
+                'output_dir': str(p),
+            }
         else:
             return {
                 'status': 'error',
@@ -218,7 +367,7 @@ def _export_impl(output_dir: str, query: str = "") -> dict:
     except subprocess.TimeoutExpired:
         return {'status': 'error', 'error': 'Export timed out after 2 minutes'}
     except Exception as e:
-        return {'status': 'error', 'error': str(e)}
+        return {'status': 'error', 'error': _sanitize_error(f'{type(e).__name__}: {e}')}
 
 
 def create_server():
@@ -249,9 +398,35 @@ def create_server():
         return _run_sql_impl(query)
 
     @mcp.tool()
-    def refresh(github: bool = False, full: bool = False) -> dict:
-        """Refresh the repoindex database. github=True for GitHub metadata, full=True for full rescan."""
-        return _refresh_impl(github=github, full=full)
+    def refresh(
+        github: bool = False,
+        pypi: bool = False,
+        cran: bool = False,
+        external: bool = False,
+        full: bool = False,
+    ) -> dict:
+        """Refresh the repoindex database.
+
+        Sources to enable:
+        - github=True: GitHub stars, topics, fork status
+        - pypi=True: PyPI version, downloads
+        - cran=True: CRAN version
+        - external=True: ALL external sources (github + all registries + zenodo)
+
+        full=True: force re-scan of all repos (default: smart, only changed)
+
+        Local sources (CITATION.cff, keywords, asset detection) always run.
+
+        WRITES TO DISK: modifies ~/.repoindex/index.db. Concurrent refreshes
+        are prevented via file lock.
+        """
+        return _refresh_impl(
+            github=github,
+            pypi=pypi,
+            cran=cran,
+            external=external,
+            full=full,
+        )
 
     @mcp.tool()
     def tag(repo: str, action: str, tag: str = "") -> dict:
