@@ -256,7 +256,7 @@ class QueryCompiler:
         """Tokenize a predicate string."""
         # Pattern to match tokens
         pattern = r"""
-            @\w+           |  # View reference
+            @[\w-]+        |  # View reference (hyphens allowed in view names)
             '[^']*'        |  # Single-quoted string
             "[^"]*"        |  # Double-quoted string
             \d+\.?\d*      |  # Number

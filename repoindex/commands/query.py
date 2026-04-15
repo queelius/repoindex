@@ -41,6 +41,32 @@ BOOLEAN_FIELDS = {
 }
 
 
+def _load_query_views(config: dict) -> dict:
+    """Load query-based views for `@name` expansion in the DSL.
+
+    Views live in ~/.repoindex/views.yaml (managed by ViewService), not in
+    config.yaml. Only query-based views are inlineable into the DSL — list-
+    based and composite views are resolved by ViewService separately. Any
+    error loading views.yaml is logged and the returned dict is empty, so
+    the query command stays usable if the file is malformed.
+    """
+    views: dict = dict(config.get('views', {}))  # legacy config-yaml path
+    try:
+        from ..services.view_service import ViewService
+        service = ViewService(config=config)
+        service.load()
+        for name in service.list_views():
+            spec = service.get_spec(name)
+            if spec is not None and spec.query:
+                views.setdefault(name, spec.query)
+    except Exception as e:
+        click.echo(
+            json.dumps({'warning': f'Could not load views: {e}', 'type': 'view_load_warning'}),
+            err=True,
+        )
+    return views
+
+
 def _is_simple_text_query(query_string: str) -> bool:
     """
     Check if a query is a simple text search (not a DSL query).
@@ -253,7 +279,7 @@ def query_handler(
 
     # Compile to SQL
     try:
-        views = config.get('views', {})
+        views = _load_query_views(config)
         compiled = compile_query(query_string, views=views)
 
         if limit and not compiled.limit:

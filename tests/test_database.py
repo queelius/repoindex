@@ -622,6 +622,19 @@ class TestQueryCompiler(unittest.TestCase):
         self.assertIn("language = ?", result.sql)
         self.assertIn("stars > ?", result.sql)
 
+    def test_view_reference_with_hyphen(self):
+        """View names with hyphens must tokenize as a single @-reference.
+
+        Regression: v0.9.0 tokenizer used `@\\w+` which stopped at the
+        hyphen, so `@python-libs` parsed as `@python`, `-`, `libs` and
+        raised 'Unknown view: python'.
+        """
+        views = {'python-libs': "language == 'Python'"}
+        compiler = QueryCompiler(views=views)
+        result = compiler.compile("@python-libs and stars > 10")
+        self.assertIn("language = ?", result.sql)
+        self.assertIn("stars > ?", result.sql)
+
     def test_field_mapping(self):
         """Test that field names are mapped correctly."""
         result = compile_query("updated > '2024-01-01'")
