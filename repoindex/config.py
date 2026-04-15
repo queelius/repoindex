@@ -2,8 +2,12 @@
 
 import os
 import json
-import tomllib
 from pathlib import Path
+
+try:
+    import tomllib
+except ImportError:
+    import tomli as tomllib  # type: ignore[no-redef]
 
 import logging
 import sys
@@ -158,10 +162,14 @@ def load_config():
     return config
 
 def save_config(config):
-    """Save configuration to file.
+    """Save configuration to file atomically.
 
     Always saves as YAML (the only supported format for writing).
+    Uses temp file + os.replace so concurrent readers never see a partial
+    file and a crash mid-write can't leave a truncated config.
     """
+    import tempfile
+
     config_path = get_config_path()
 
     # Always use YAML for new saves
@@ -174,16 +182,27 @@ def save_config(config):
         logger.error("PyYAML not installed. Install with 'pip install pyyaml'")
         return
 
+    # Create directory if it doesn't exist
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Write to temp file in the same directory so os.replace is atomic on POSIX
+    fd, tmp_path = tempfile.mkstemp(
+        prefix='.config-',
+        suffix='.tmp',
+        dir=str(config_path.parent),
+    )
     try:
-        # Create directory if it doesn't exist
-        config_path.parent.mkdir(parents=True, exist_ok=True)
-
-        with open(config_path, 'w') as f:
+        with os.fdopen(fd, 'w') as f:
             yaml.safe_dump(config, f, default_flow_style=False, sort_keys=False)
-
+        os.replace(tmp_path, config_path)
         logger.info(f"Configuration saved to {config_path}")
     except Exception as e:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
         logger.error(f"Error saving config to {config_path}: {e}")
+        raise
 
 
 def load_raw_config() -> dict:

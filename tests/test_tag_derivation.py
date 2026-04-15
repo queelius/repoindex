@@ -1,6 +1,7 @@
 """Tests for tag derivation from metadata during refresh."""
 import json
 import sqlite3
+import click
 import pytest
 
 from repoindex.commands.refresh import _derive_tags, _sync_derived_tags
@@ -532,3 +533,319 @@ class TestSyncDerivedTags:
 
         tags = _get_tags(db, 1)
         assert len(tags) == 0
+
+
+class TestUpsertRepoEmptyTags:
+    """Regression: upsert_repo must reconcile tags even when repo.tags is empty.
+
+    Before this fix, upsert_repo skipped the _sync_tags call when repo.tags was
+    empty, which left zombie source='user' rows in the database after the user
+    removed their last tag from config.yaml.
+    """
+
+    def test_empty_tags_removes_old_user_tags(self, tmp_path):
+        """Upserting a repo with empty tags clears stale user tags."""
+        from repoindex.database.connection import Database
+        from repoindex.database.repository import upsert_repo
+        from repoindex.domain.repository import Repository, GitStatus
+
+        db_path = tmp_path / 'test.db'
+
+        # Seed: repo with a user tag already in DB
+        with Database(db_path=db_path) as db:
+            repo = Repository(
+                name='test', path='/tmp/testrepo',
+                status=GitStatus(branch='main', clean=True),
+                tags=frozenset({'old-user-tag'}),
+            )
+            repo_id = upsert_repo(db, repo)
+
+            # Verify the seed landed
+            db.execute(
+                "SELECT tag FROM tags WHERE repo_id = ? AND source = 'user'",
+                (repo_id,)
+            )
+            assert {r['tag'] for r in db.fetchall()} == {'old-user-tag'}
+
+        # Upsert the same repo with empty tags (simulates user removing their last tag)
+        with Database(db_path=db_path) as db:
+            repo = Repository(
+                name='test', path='/tmp/testrepo',
+                status=GitStatus(branch='main', clean=True),
+                tags=frozenset(),  # empty!
+            )
+            upsert_repo(db, repo)
+
+            # Zombie should be gone
+            db.execute(
+                "SELECT id FROM repos WHERE path = ?",
+                ('/tmp/testrepo',)
+            )
+            repo_id = db.fetchone()['id']
+            db.execute(
+                "SELECT tag FROM tags WHERE repo_id = ? AND source = 'user'",
+                (repo_id,)
+            )
+            assert db.fetchall() == []
+
+    def test_empty_tags_preserves_non_user_tags(self, tmp_path):
+        """Reconciling user tags does not touch implicit/github-sourced tags."""
+        from repoindex.database.connection import Database
+        from repoindex.database.repository import upsert_repo
+        from repoindex.domain.repository import Repository, GitStatus
+
+        db_path = tmp_path / 'test.db'
+
+        # Seed: repo with a user tag, then inject a source='implicit' row
+        with Database(db_path=db_path) as db:
+            repo = Repository(
+                name='test', path='/tmp/testrepo',
+                status=GitStatus(branch='main', clean=True),
+                tags=frozenset({'old-user-tag'}),
+            )
+            repo_id = upsert_repo(db, repo)
+            db.execute(
+                "INSERT INTO tags (repo_id, tag, source) VALUES (?, 'lang:python', 'implicit')",
+                (repo_id,),
+            )
+
+        # Upsert with empty tags
+        with Database(db_path=db_path) as db:
+            repo = Repository(
+                name='test', path='/tmp/testrepo',
+                status=GitStatus(branch='main', clean=True),
+                tags=frozenset(),
+            )
+            upsert_repo(db, repo)
+
+            db.execute("SELECT id FROM repos WHERE path = ?", ('/tmp/testrepo',))
+            repo_id = db.fetchone()['id']
+
+            db.execute(
+                "SELECT tag, source FROM tags WHERE repo_id = ?",
+                (repo_id,),
+            )
+            rows = {(r['tag'], r['source']) for r in db.fetchall()}
+
+            # Implicit tag preserved, user zombie removed
+            assert rows == {('lang:python', 'implicit')}
+
+
+class TestSyncUserTagsToDB:
+    """Tests for _sync_user_tags_to_db full reconciliation and error handling."""
+
+    def test_full_reconciliation_adds_and_removes(self, tmp_path):
+        """config.yaml is the source of truth; DB is brought into agreement."""
+        from repoindex.commands.tag import _sync_user_tags_to_db
+        from repoindex.database.connection import Database
+        from repoindex.database.repository import upsert_repo
+        from repoindex.domain.repository import Repository, GitStatus
+        from unittest.mock import patch
+
+        db_path = tmp_path / 'test.db'
+
+        # Seed the repo in the DB
+        with Database(db_path=db_path) as db:
+            repo = Repository(
+                name='test', path='/tmp/reco',
+                status=GitStatus(branch='main', clean=True),
+                tags=frozenset({'stale-tag'}),  # will become a zombie
+            )
+            upsert_repo(db, repo)
+
+        config = {
+            'repository_tags': {'/tmp/reco': ['new-tag-1', 'new-tag-2']},
+        }
+
+        with patch('repoindex.commands.tag.load_config', return_value=config), \
+             patch('repoindex.commands.tag.get_db_path', return_value=db_path), \
+             patch('repoindex.commands.tag.Database') as MockDB:
+            # Proxy to the real Database against our tmp_path
+            MockDB.side_effect = lambda **kw: Database(db_path=db_path)
+            _sync_user_tags_to_db('/tmp/reco')
+
+        with Database(db_path=db_path) as db:
+            db.execute("SELECT id FROM repos WHERE path = ?", ('/tmp/reco',))
+            repo_id = db.fetchone()['id']
+            db.execute(
+                "SELECT tag FROM tags WHERE repo_id = ? AND source = 'user'",
+                (repo_id,),
+            )
+            tags = {r['tag'] for r in db.fetchall()}
+
+        # Stale user tag removed, new tags present — full reconciliation.
+        assert tags == {'new-tag-1', 'new-tag-2'}
+
+    def test_db_failure_raises(self, tmp_path):
+        """If DB sync fails, user must see an error and Abort, not silent success."""
+        from repoindex.commands.tag import _sync_user_tags_to_db
+        from unittest.mock import patch
+
+        # Force a DB failure by mocking Database to raise on __enter__
+        fake_db = tmp_path / 'fake.db'
+        fake_db.touch()  # must exist so we get past the early return
+
+        with patch('repoindex.commands.tag.Database') as MockDB, \
+             patch('repoindex.commands.tag.load_config', return_value={
+                 'repository_tags': {'/r': ['tag']},
+             }), \
+             patch('repoindex.commands.tag.get_db_path', return_value=fake_db):
+            MockDB.side_effect = Exception("simulated DB failure")
+            with pytest.raises(click.Abort):
+                _sync_user_tags_to_db('/r')
+
+    def test_early_return_when_db_missing(self, tmp_path):
+        """No DB file -> silently no-op (tags will sync on first refresh)."""
+        from repoindex.commands.tag import _sync_user_tags_to_db
+        from unittest.mock import patch
+
+        missing = tmp_path / 'does-not-exist.db'
+        with patch('repoindex.commands.tag.load_config', return_value={}), \
+             patch('repoindex.commands.tag.get_db_path', return_value=missing):
+            # Must not raise
+            _sync_user_tags_to_db('/r')
+
+    def test_early_return_when_repo_not_in_db(self, tmp_path):
+        """Repo not yet tracked in DB -> silently no-op."""
+        from repoindex.commands.tag import _sync_user_tags_to_db
+        from repoindex.database.connection import Database
+        from unittest.mock import patch
+
+        db_path = tmp_path / 'empty.db'
+        # Initialize the DB so the schema exists but with no repos
+        with Database(db_path=db_path):
+            pass
+
+        config = {'repository_tags': {'/nope': ['some-tag']}}
+
+        with patch('repoindex.commands.tag.load_config', return_value=config), \
+             patch('repoindex.commands.tag.get_db_path', return_value=db_path), \
+             patch('repoindex.commands.tag.Database') as MockDB:
+            MockDB.side_effect = lambda **kw: Database(db_path=db_path)
+            # Must not raise
+            _sync_user_tags_to_db('/nope')
+
+
+class TestConfigLock:
+    """Tests for _config_lock contextmanager used to serialize tag ops."""
+
+    def test_lock_acquires_and_releases(self, tmp_path, monkeypatch):
+        """Basic sanity: the lock can be acquired and released."""
+        from repoindex.commands.tag import _config_lock
+
+        monkeypatch.setattr('pathlib.Path.home', lambda: tmp_path)
+
+        with _config_lock():
+            # Lock file should exist inside the context
+            assert (tmp_path / '.repoindex' / 'config.lock').exists()
+        # Still exists after (we don't delete it — only release the lock)
+        assert (tmp_path / '.repoindex' / 'config.lock').exists()
+
+    def test_lock_exclusive_between_holders(self, tmp_path, monkeypatch):
+        """A second fcntl LOCK_EX on the same lock file blocks until release."""
+        import fcntl
+        from repoindex.commands.tag import _config_lock
+
+        monkeypatch.setattr('pathlib.Path.home', lambda: tmp_path)
+
+        # Acquire via our contextmanager
+        with _config_lock():
+            # Try non-blocking lock from a separate fd — should fail (BlockingIOError)
+            lock_path = tmp_path / '.repoindex' / 'config.lock'
+            f2 = open(lock_path, 'w')
+            try:
+                with pytest.raises(BlockingIOError):
+                    fcntl.flock(f2.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            finally:
+                f2.close()
+
+        # After release, a non-blocking lock succeeds
+        f3 = open(tmp_path / '.repoindex' / 'config.lock', 'w')
+        try:
+            fcntl.flock(f3.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            fcntl.flock(f3.fileno(), fcntl.LOCK_UN)
+        finally:
+            f3.close()
+
+
+class TestSaveConfigAtomic:
+    """Tests for atomic save_config via temp file + os.replace."""
+
+    def test_save_config_writes_atomically(self, tmp_path, monkeypatch):
+        """save_config should write via a temp file and rename to the target."""
+        from repoindex import config as config_mod
+
+        target = tmp_path / 'config.yaml'
+        monkeypatch.setattr(config_mod, 'get_config_path', lambda: target)
+
+        config_mod.save_config({'repository_tags': {'/a': ['x']}})
+
+        import yaml
+        with open(target) as f:
+            loaded = yaml.safe_load(f)
+        assert loaded == {'repository_tags': {'/a': ['x']}}
+
+    def test_save_config_no_temp_files_leak(self, tmp_path, monkeypatch):
+        """After save_config, no .config-*.tmp files should be left behind."""
+        from repoindex import config as config_mod
+
+        target = tmp_path / 'config.yaml'
+        monkeypatch.setattr(config_mod, 'get_config_path', lambda: target)
+
+        config_mod.save_config({'repository_tags': {}})
+
+        leftovers = list(tmp_path.glob('.config-*.tmp'))
+        assert leftovers == [], f"temp files leaked: {leftovers}"
+
+
+class TestLowercaseConsistency:
+    """Regression: get_implicit_tags_from_row must lowercase topics to match _derive_tags."""
+
+    def test_get_implicit_tags_from_row_lowercases_topics(self):
+        """Topics should be lowercased to match _derive_tags in refresh.py."""
+        from repoindex.commands.tag import get_implicit_tags_from_row
+
+        repo = {
+            'name': 'test',
+            'path': '/p/test',
+            'github_owner': 'someone',
+            'github_topics': json.dumps(['JavaScript', 'CLI', 'web-framework']),
+        }
+        tags = get_implicit_tags_from_row(repo)
+
+        # All topics should be lowercased to match _derive_tags
+        assert 'topic:javascript' in tags
+        assert 'topic:cli' in tags
+        assert 'topic:web-framework' in tags
+
+        # Un-lowercased versions should NOT exist
+        assert 'topic:JavaScript' not in tags
+        assert 'topic:CLI' not in tags
+
+    def test_whitespace_in_topics_trimmed(self):
+        """Topic strings with surrounding whitespace should be trimmed."""
+        from repoindex.commands.tag import get_implicit_tags_from_row
+
+        repo = {
+            'name': 'test',
+            'path': '/p/test',
+            'github_owner': 'someone',
+            'github_topics': json.dumps(['  python  ', ' CLI ']),
+        }
+        tags = get_implicit_tags_from_row(repo)
+        assert 'topic:python' in tags
+        assert 'topic:cli' in tags
+
+    def test_empty_and_non_string_topics_skipped(self):
+        """Empty strings and non-string values should not produce tags."""
+        from repoindex.commands.tag import get_implicit_tags_from_row
+
+        repo = {
+            'name': 'test',
+            'path': '/p/test',
+            'github_owner': 'someone',
+            'github_topics': json.dumps(['python', '', '   ', 42, None]),
+        }
+        tags = get_implicit_tags_from_row(repo)
+        topic_tags = [t for t in tags if t.startswith('topic:')]
+        assert topic_tags == ['topic:python']

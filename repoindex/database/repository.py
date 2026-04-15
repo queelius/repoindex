@@ -41,9 +41,10 @@ def upsert_repo(db: Database, repo: Repository) -> int:
         # Insert new
         repo_id = _insert_repo(db, record)
 
-    # Handle tags
-    if repo.tags:
-        _sync_tags(db, repo_id, repo.tags, source='user')
+    # Handle tags — unconditional so reconciliation runs even when tags is empty
+    # (otherwise zombie source='user' rows linger forever after the user removes
+    # their last tag from config.yaml)
+    _sync_tags(db, repo_id, repo.tags, source='user')
 
     # Handle package/publication metadata
     if repo.package:

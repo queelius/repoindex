@@ -5,8 +5,10 @@ Provides CLI parity with the shell's filesystem-like tag operations.
 """
 
 import click
+import fcntl
 import json
 import os
+from contextlib import contextmanager
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from collections import defaultdict
@@ -21,6 +23,28 @@ from rich.table import Table
 from rich.tree import Tree
 
 console = Console()
+
+
+@contextmanager
+def _config_lock():
+    """File lock around config.yaml read-modify-write.
+
+    Prevents concurrent tag_add / tag_remove invocations from racing on
+    the config file and losing each other's writes. Uses fcntl.LOCK_EX
+    so processes serialize the whole load -> mutate -> save cycle.
+    """
+    lock_path = Path.home() / '.repoindex' / 'config.lock'
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    f = open(lock_path, 'w')
+    try:
+        fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+        yield
+    finally:
+        try:
+            fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+            f.close()
+        except Exception:
+            pass
 
 
 def get_implicit_tags_from_row(repo_dict: Dict[str, Any]) -> List[str]:
@@ -90,11 +114,15 @@ def get_implicit_tags_from_row(repo_dict: Dict[str, Any]) -> List[str]:
             tags.append("stars:10+")
 
         # GitHub topics as topic:{topic} (provider tags)
+        # Lowercase to match _derive_tags in refresh.py — otherwise the same
+        # conceptual tag gets stored as topic:JavaScript here and
+        # topic:javascript there and queries diverge.
         if repo_dict.get('github_topics'):
             try:
                 topics = json.loads(repo_dict['github_topics'])
                 for topic in topics:
-                    tags.append(f"topic:{topic}")
+                    if isinstance(topic, str) and topic.strip():
+                        tags.append(f"topic:{topic.strip().lower()}")
             except (json.JSONDecodeError, TypeError):
                 pass
 
@@ -223,19 +251,30 @@ def tag_cmd():
     pass
 
 
-def _sync_user_tags_to_db(repo_path: str, added: List[str] = None, removed: List[str] = None) -> None:
-    """Sync user tag add/remove operations directly to the tags table.
+def _sync_user_tags_to_db(repo_path: str) -> None:
+    """Full reconciliation of user tags in the tags table from config.yaml.
 
     config.yaml is the persistent source of truth for user tags (survives
-    database resets), but the tags table is the queryable index. Without
-    this sync, user tags added via CLI are invisible to run_sql / MCP until
-    the next refresh. This helper keeps both in sync immediately.
+    database resets), but the tags table is the queryable index. This helper
+    reads the desired set from config.yaml, reads the current source='user'
+    rows from the DB, set-diffs them, and applies the difference.
+
+    Doing full reconciliation (rather than applying per-tag add/remove deltas)
+    ensures that zombie rows from prior bugs or out-of-band config edits get
+    cleaned up whenever the user touches tags via the CLI.
+
+    If DB sync fails, raises click.Abort. config.yaml is still the source of
+    truth and any save already succeeded, but silently swallowing the error
+    leaves the user with a false success message and stale queries until the
+    next refresh — better to make the divergence visible.
     """
     try:
         config = load_config()
         db_path = get_db_path(config)
         if not db_path.exists():
             return  # DB not initialized yet; tags will be synced on first refresh
+
+        desired = set(config.get('repository_tags', {}).get(repo_path, []))
 
         with Database(config=config) as db:
             # Find the repo row for this path
@@ -245,21 +284,36 @@ def _sync_user_tags_to_db(repo_path: str, added: List[str] = None, removed: List
                 return  # Repo not in DB yet; tags will be synced on first refresh
             repo_id = row['id']
 
-            if added:
-                for tag in added:
-                    db.execute(
-                        "INSERT OR IGNORE INTO tags (repo_id, tag, source) VALUES (?, ?, 'user')",
-                        (repo_id, tag)
-                    )
-            if removed:
-                for tag in removed:
-                    db.execute(
-                        "DELETE FROM tags WHERE repo_id = ? AND tag = ? AND source = 'user'",
-                        (repo_id, tag)
-                    )
+            db.execute(
+                "SELECT tag FROM tags WHERE repo_id = ? AND source = 'user'",
+                (repo_id,)
+            )
+            current = {r['tag'] for r in db.fetchall()}
+
+            to_remove = current - desired
+            to_add = desired - current
+
+            for tag in to_remove:
+                db.execute(
+                    "DELETE FROM tags WHERE repo_id = ? AND tag = ? AND source = 'user'",
+                    (repo_id, tag)
+                )
+            for tag in to_add:
+                db.execute(
+                    "INSERT OR IGNORE INTO tags (repo_id, tag, source) VALUES (?, ?, 'user')",
+                    (repo_id, tag)
+                )
+    except click.Abort:
+        raise
     except Exception as e:
-        # Don't fail the CLI operation if DB sync fails: config.yaml is the source of truth
-        console.print(f"[yellow]Warning: could not sync tags to database: {e}[/yellow]")
+        console.print(
+            f"[red]Error: tag saved to config.yaml but DB sync failed: {e}[/red]"
+        )
+        console.print(
+            "[yellow]Run 'repoindex refresh -d <repo>' to reconcile, "
+            "or fix the underlying issue.[/yellow]"
+        )
+        raise click.Abort()
 
 
 @tag_cmd.command('add')
@@ -278,54 +332,58 @@ def tag_add(repository, tags):
         repoindex tag add myproject topic:ml/research work/active
         repoindex tag add /path/to/repo client/acme/backend
     """
-    config = load_config()
+    # Serialize the whole read-modify-write cycle so concurrent tag ops don't
+    # lose tags (load_config -> mutate -> save_config is a race otherwise).
+    with _config_lock():
+        config = load_config()
 
-    # Resolve repository path
-    repo_path = resolve_repository_path(repository, config)
-    if not repo_path:
-        console.print(f"[red]Error: Repository '{repository}' not found[/red]")
-        raise click.Abort()
+        # Resolve repository path
+        repo_path = resolve_repository_path(repository, config)
+        if not repo_path:
+            console.print(f"[red]Error: Repository '{repository}' not found[/red]")
+            raise click.Abort()
 
-    # Get current tags
-    repo_tags = config.get("repository_tags", {})
-    current_tags = repo_tags.get(repo_path, [])
+        # Get current tags
+        repo_tags = config.get("repository_tags", {})
+        current_tags = repo_tags.get(repo_path, [])
 
-    # Add new tags
-    added = []
-    skipped = []
-    protected = []
+        # Add new tags
+        added = []
+        skipped = []
+        protected = []
 
-    for tag in tags:
-        if is_protected_tag(tag):
-            protected.append(tag)
-        elif tag in current_tags:
-            skipped.append(tag)
-        else:
-            current_tags.append(tag)
-            added.append(tag)
+        for tag in tags:
+            if is_protected_tag(tag):
+                protected.append(tag)
+            elif tag in current_tags:
+                skipped.append(tag)
+            else:
+                current_tags.append(tag)
+                added.append(tag)
 
-    # Save if we added any tags
-    if added:
-        repo_tags[repo_path] = current_tags
-        config["repository_tags"] = repo_tags
-        save_config(config)
+        # Save if we added any tags
+        if added:
+            repo_tags[repo_path] = current_tags
+            config["repository_tags"] = repo_tags
+            save_config(config)
 
-        # Also sync directly to the tags table so queries see the change immediately
-        _sync_user_tags_to_db(repo_path, added=added)
+            # Full reconciliation from config.yaml to tags table so queries
+            # see the change immediately (raises click.Abort on DB failure).
+            _sync_user_tags_to_db(repo_path)
 
-        console.print(f"[green]Added {len(added)} tag(s) to {Path(repo_path).name}:[/green]")
-        for tag in added:
-            console.print(f"  • {tag}")
+            console.print(f"[green]Added {len(added)} tag(s) to {Path(repo_path).name}:[/green]")
+            for tag in added:
+                console.print(f"  • {tag}")
 
-    if skipped:
-        console.print(f"[yellow]Already tagged (skipped {len(skipped)}):[/yellow]")
-        for tag in skipped:
-            console.print(f"  • {tag}")
+        if skipped:
+            console.print(f"[yellow]Already tagged (skipped {len(skipped)}):[/yellow]")
+            for tag in skipped:
+                console.print(f"  • {tag}")
 
-    if protected:
-        console.print(f"[red]Cannot add protected tags (skipped {len(protected)}):[/red]")
-        for tag in protected:
-            console.print(f"  • {tag}")
+        if protected:
+            console.print(f"[red]Cannot add protected tags (skipped {len(protected)}):[/red]")
+            for tag in protected:
+                console.print(f"  • {tag}")
 
 
 @tag_cmd.command('remove')
@@ -343,52 +401,56 @@ def tag_remove(repository, tags):
         repoindex tag remove myproject alex/beta
         repoindex tag remove myproject topic:ml/research work/active
     """
-    config = load_config()
+    # Serialize the whole read-modify-write cycle so concurrent tag ops don't
+    # lose tags (load_config -> mutate -> save_config is a race otherwise).
+    with _config_lock():
+        config = load_config()
 
-    # Resolve repository path
-    repo_path = resolve_repository_path(repository, config)
-    if not repo_path:
-        console.print(f"[red]Error: Repository '{repository}' not found[/red]")
-        raise click.Abort()
+        # Resolve repository path
+        repo_path = resolve_repository_path(repository, config)
+        if not repo_path:
+            console.print(f"[red]Error: Repository '{repository}' not found[/red]")
+            raise click.Abort()
 
-    # Get current tags
-    repo_tags = config.get("repository_tags", {})
-    current_tags = repo_tags.get(repo_path, [])
+        # Get current tags
+        repo_tags = config.get("repository_tags", {})
+        current_tags = repo_tags.get(repo_path, [])
 
-    # Remove tags
-    removed = []
-    not_found = []
+        # Remove tags
+        removed = []
+        not_found = []
 
-    for tag in tags:
-        if tag in current_tags:
-            current_tags.remove(tag)
-            removed.append(tag)
-        else:
-            not_found.append(tag)
+        for tag in tags:
+            if tag in current_tags:
+                current_tags.remove(tag)
+                removed.append(tag)
+            else:
+                not_found.append(tag)
 
-    # Save if we removed any tags
-    if removed:
-        if current_tags:
-            repo_tags[repo_path] = current_tags
-        else:
-            # Remove repo entry if no tags left
-            if repo_path in repo_tags:
-                del repo_tags[repo_path]
+        # Save if we removed any tags
+        if removed:
+            if current_tags:
+                repo_tags[repo_path] = current_tags
+            else:
+                # Remove repo entry if no tags left
+                if repo_path in repo_tags:
+                    del repo_tags[repo_path]
 
-        config["repository_tags"] = repo_tags
-        save_config(config)
+            config["repository_tags"] = repo_tags
+            save_config(config)
 
-        # Also sync directly to the tags table
-        _sync_user_tags_to_db(repo_path, removed=removed)
+            # Full reconciliation from config.yaml to tags table so queries
+            # see the change immediately (raises click.Abort on DB failure).
+            _sync_user_tags_to_db(repo_path)
 
-        console.print(f"[green]Removed {len(removed)} tag(s) from {Path(repo_path).name}:[/green]")
-        for tag in removed:
-            console.print(f"  • {tag}")
+            console.print(f"[green]Removed {len(removed)} tag(s) from {Path(repo_path).name}:[/green]")
+            for tag in removed:
+                console.print(f"  • {tag}")
 
-    if not_found:
-        console.print(f"[yellow]Tag(s) not found (skipped {len(not_found)}):[/yellow]")
-        for tag in not_found:
-            console.print(f"  • {tag}")
+        if not_found:
+            console.print(f"[yellow]Tag(s) not found (skipped {len(not_found)}):[/yellow]")
+            for tag in not_found:
+                console.print(f"  • {tag}")
 
 
 @tag_cmd.command('move')
@@ -410,40 +472,47 @@ def tag_move(repository, old_tag, new_tag):
         repoindex tag move myproject alex/beta alex/production
         repoindex tag move myproject topic:ml topic:nlp
     """
-    config = load_config()
+    # Serialize the whole read-modify-write cycle so concurrent tag ops don't
+    # lose tags.
+    with _config_lock():
+        config = load_config()
 
-    # Resolve repository path
-    repo_path = resolve_repository_path(repository, config)
-    if not repo_path:
-        console.print(f"[red]Error: Repository '{repository}' not found[/red]")
-        raise click.Abort()
+        # Resolve repository path
+        repo_path = resolve_repository_path(repository, config)
+        if not repo_path:
+            console.print(f"[red]Error: Repository '{repository}' not found[/red]")
+            raise click.Abort()
 
-    # Get current tags
-    repo_tags = config.get("repository_tags", {})
-    current_tags = repo_tags.get(repo_path, [])
+        # Get current tags
+        repo_tags = config.get("repository_tags", {})
+        current_tags = repo_tags.get(repo_path, [])
 
-    # Check if old tag exists
-    if old_tag not in current_tags:
-        console.print(f"[red]Error: Tag '{old_tag}' not found on repository[/red]")
-        raise click.Abort()
+        # Check if old tag exists
+        if old_tag not in current_tags:
+            console.print(f"[red]Error: Tag '{old_tag}' not found on repository[/red]")
+            raise click.Abort()
 
-    # Check if new tag is protected
-    if is_protected_tag(new_tag):
-        console.print(f"[red]Error: Cannot add protected tag '{new_tag}'[/red]")
-        raise click.Abort()
+        # Check if new tag is protected
+        if is_protected_tag(new_tag):
+            console.print(f"[red]Error: Cannot add protected tag '{new_tag}'[/red]")
+            raise click.Abort()
 
-    # Perform the move
-    current_tags.remove(old_tag)
-    if new_tag not in current_tags:
-        current_tags.append(new_tag)
+        # Perform the move
+        current_tags.remove(old_tag)
+        if new_tag not in current_tags:
+            current_tags.append(new_tag)
 
-    repo_tags[repo_path] = current_tags
-    config["repository_tags"] = repo_tags
-    save_config(config)
+        repo_tags[repo_path] = current_tags
+        config["repository_tags"] = repo_tags
+        save_config(config)
 
-    console.print(f"[green]Moved {Path(repo_path).name}:[/green]")
-    console.print(f"  From: {old_tag}")
-    console.print(f"  To:   {new_tag}")
+        # Full reconciliation from config.yaml to tags table so queries
+        # see the change immediately (raises click.Abort on DB failure).
+        _sync_user_tags_to_db(repo_path)
+
+        console.print(f"[green]Moved {Path(repo_path).name}:[/green]")
+        console.print(f"  From: {old_tag}")
+        console.print(f"  To:   {new_tag}")
 
 
 @tag_cmd.command('list')
