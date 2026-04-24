@@ -476,17 +476,16 @@ class RepoIndexShell(cmd.Cmd):
         self.update_prompt()
 
     def do_query(self, arg):
-        """Query repositories with expression (deprecated).
+        """Query repositories (removed in v0.16.0).
 
-        The in-memory query matcher was removed in v0.16.0. Use the top-level
-        `repoindex query` command instead, which runs the DSL against the
-        SQLite index:
-
-            repoindex query "language == 'Python' and github_stars > 10"
+        The in-memory matcher and the `repoindex query` command were both
+        removed. Use `repoindex sql` or the MCP `run_sql` tool for SQL,
+        or filter flags (--dirty, --language, --tag, --recent) on `copy`,
+        `link`, `ops`, and `export`.
         """
         print(
-            "query: the in-memory matcher was removed in v0.16.0. "
-            "Use `repoindex query <expr>` from outside the shell instead.",
+            "query: removed in v0.16.0. Use `repoindex sql \"SELECT ...\"` "
+            "from outside the shell, or filter flags on operation commands.",
             file=sys.stderr,
         )
 

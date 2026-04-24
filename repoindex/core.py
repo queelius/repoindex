@@ -10,7 +10,7 @@ import json
 import os
 from datetime import datetime
 from pathlib import Path
-from typing import List, Dict, Generator, Optional, Any
+from typing import Dict, Generator, Optional, Any
 
 from repoindex.config import logger, load_config
 
@@ -121,31 +121,19 @@ def get_repositories_from_path(base_dir: str, recursive: bool = False) -> Genera
 
 
 def get_repository_status(base_dir: Optional[str] = None, recursive: bool = False, skip_pages_check: bool = False,
-                         deduplicate: bool = True, tag_filters: Optional[List[Any]] = None, all_tags: bool = False,
+                         deduplicate: bool = True,
                          use_github_api: bool = False) -> Generator[Dict[str, Any], None, None]:
     """
     Generator that yields repository status objects.
 
-    This is a pure function that returns a generator of repository status dictionaries.
-    It does not print, format, or interact with the terminal.
-
     Args:
-        base_dir: Base directory to search for repositories
-        recursive: Whether to search recursively
-        skip_pages_check: Whether to skip GitHub Pages checking
-        deduplicate: Whether to deduplicate by remote URL (default True)
-        tag_filters: List of tag filters to apply
-        all_tags: Whether to match all tags (True) or any (False)
-        use_github_api: Whether to make GitHub API calls for visibility/fork info (default False for speed)
-
-    Yields:
-        Repository status dictionaries following the standard schema
+        base_dir: Base directory to search for repositories.
+        recursive: Whether to search recursively.
+        skip_pages_check: Whether to skip GitHub Pages checking.
+        deduplicate: Whether to deduplicate by remote URL (default True).
+        use_github_api: Whether to make GitHub API calls for visibility/fork
+            info (default False for speed).
     """
-    # tag_filters/all_tags are accepted for backward compatibility but are
-    # no longer honored here — the tag-aware query path now lives in the
-    # SQLite-backed `repoindex query` command. Callers that still pass
-    # tag_filters get unfiltered results rather than an import error from
-    # the removed catalog helpers.
     if deduplicate:
         yield from _get_deduplicated_status(base_dir, recursive, skip_pages_check, use_github_api)
     else:
