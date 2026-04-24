@@ -12,9 +12,8 @@ from pathlib import Path
 from typing import Optional
 
 from ..config import load_config
-from ..database import Database, compile_query, QueryCompileError
 from ..services.copy_service import CopyService, CopyOptions, CollisionStrategy
-from .query import _build_query_from_flags
+from ..services.flag_query import fetch_repos_by_flags
 
 
 def _format_bytes(bytes_val: int) -> str:
@@ -29,7 +28,6 @@ def _format_bytes(bytes_val: int) -> str:
 
 @click.command('copy')
 @click.argument('destination', type=click.Path())
-@click.argument('query_string', required=False, default='')
 # Output options
 @click.option('--json', 'output_json', is_flag=True, help='Output as JSONL')
 @click.option('--dry-run', is_flag=True, help='Preview copy without writing files')
@@ -38,7 +36,7 @@ def _format_bytes(bytes_val: int) -> str:
 @click.option('--preserve-structure', is_flag=True, help='Keep parent directory hierarchy')
 @click.option('--collision', type=click.Choice(['rename', 'skip', 'overwrite']),
               default='rename', help='How to handle name collisions (default: rename)')
-# Query convenience flags (same as query command)
+# Query convenience flags
 @click.option('--language', '-l', help='Filter by language (e.g., python, r, js)')
 @click.option('--dirty', is_flag=True, help='Repos with uncommitted changes')
 @click.option('--tag', '-t', multiple=True, help='Filter by tag (supports wildcards)')
@@ -46,7 +44,6 @@ def _format_bytes(bytes_val: int) -> str:
 @click.option('--debug', is_flag=True, help='Enable debug logging')
 def copy_handler(
     destination: str,
-    query_string: str,
     output_json: bool,
     dry_run: bool,
     exclude_git: bool,
@@ -62,8 +59,9 @@ def copy_handler(
     """
     Copy repositories to a destination directory.
 
-    Supports the same query filters as the query command for selecting
-    which repositories to copy.
+    Use the filter flags (--language/--dirty/--tag/--recent) to select which
+    repositories to copy. For complex selection, pipe paths from
+    `repoindex sql` instead.
 
     \b
     Examples:
@@ -75,8 +73,6 @@ def copy_handler(
         repoindex copy ~/backups/uncommitted --dirty
         # Copy repos with specific tag
         repoindex copy ~/backups/work --tag "work/*"
-        # Copy with DSL query
-        repoindex copy ~/backups/popular "language == 'Python' and github_stars > 10"
         # Options
         repoindex copy ~/backups --exclude-git          # Skip .git directories
         repoindex copy ~/backups --preserve-structure   # Keep parent dir hierarchy
@@ -92,44 +88,11 @@ def copy_handler(
 
     config = load_config()
 
-    # Build query from flags
-    has_flags = any([dirty, language, recent, tag])
-    if has_flags:
-        query_string = _build_query_from_flags(
-            query_string if query_string else None,
-            dirty=dirty, language=language, recent=recent, tag=list(tag),
-        )
-
-    # If no query and no flags, copy all repos
-    if not query_string:
-        query_string = "1 == 1"
-
-    # Query repos from database
-    try:
-        views = config.get('views', {})
-        compiled = compile_query(query_string, views=views)
-
-        repos = []
-        with Database(config=config, read_only=True) as db:
-            if debug:
-                print(f"DEBUG: SQL: {compiled.sql}", file=sys.stderr)
-                print(f"DEBUG: Params: {compiled.params}", file=sys.stderr)
-
-            db.execute(compiled.sql, tuple(compiled.params))
-            for row in db.fetchall():
-                repos.append(dict(row))
-
-    except QueryCompileError as e:
-        error = {
-            'error': str(e),
-            'type': 'query_compile_error',
-            'query': query_string,
-        }
-        if output_json:
-            print(json.dumps(error), file=sys.stderr)
-        else:
-            print(f"Error: {e}", file=sys.stderr)
-        sys.exit(1)
+    repos = fetch_repos_by_flags(
+        config,
+        dirty=dirty, language=language, tag=tag, recent=recent,
+        debug=debug,
+    )
 
     if not repos:
         if output_json:

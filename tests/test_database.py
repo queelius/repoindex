@@ -49,13 +49,6 @@ from repoindex.database.events import (
     has_event,
     event_count,
 )
-from repoindex.database.query_compiler import (
-    compile_query,
-    QueryCompiler,
-    QueryCompileError,
-    CompiledQuery,
-)
-
 # Domain objects
 from repoindex.domain.repository import Repository, GitStatus, LicenseInfo, PackageMetadata
 from repoindex.domain.event import Event
@@ -538,133 +531,6 @@ class TestEventOperations(unittest.TestCase):
             self.assertEqual(count, 5)
 
 
-class TestQueryCompiler(unittest.TestCase):
-    """Tests for query compiler."""
-
-    def test_simple_equality(self):
-        """Test simple equality comparison."""
-        result = compile_query("language == 'Python'")
-        self.assertIn("language = ?", result.sql)
-        self.assertEqual(result.params, ['Python'])
-
-    def test_numeric_comparison(self):
-        """Test numeric comparison."""
-        result = compile_query("stars > 100")
-        self.assertIn("stars > ?", result.sql)
-        self.assertEqual(result.params, [100])
-
-    def test_and_expression(self):
-        """Test AND expression."""
-        result = compile_query("language == 'Python' and stars > 10")
-        self.assertIn("AND", result.sql)
-        self.assertEqual(len(result.params), 2)
-
-    def test_or_expression(self):
-        """Test OR expression."""
-        result = compile_query("language == 'Python' or language == 'Rust'")
-        self.assertIn("OR", result.sql)
-        self.assertEqual(result.params, ['Python', 'Rust'])
-
-    def test_not_expression(self):
-        """Test NOT expression."""
-        result = compile_query("not archived")
-        self.assertIn("NOT", result.sql)
-
-    def test_boolean_field(self):
-        """Test boolean field without comparison."""
-        result = compile_query("is_clean")
-        self.assertIn("is_clean = 1", result.sql)
-
-    def test_order_by(self):
-        """Test ORDER BY clause."""
-        result = compile_query("language == 'Python' order by stars desc")
-        self.assertIn("ORDER BY github_stars DESC", result.sql)
-        self.assertEqual(result.order_by, [('stars', 'desc')])
-
-    def test_limit(self):
-        """Test LIMIT clause."""
-        result = compile_query("language == 'Python' limit 10")
-        self.assertIn("LIMIT 10", result.sql)
-        self.assertEqual(result.limit, 10)
-
-    def test_order_by_and_limit(self):
-        """Test ORDER BY and LIMIT together."""
-        result = compile_query("stars > 50 order by updated desc limit 20")
-        self.assertIn("ORDER BY github_updated_at DESC", result.sql)
-        self.assertIn("LIMIT 20", result.sql)
-
-    def test_has_event_function(self):
-        """Test has_event function compilation."""
-        result = compile_query("has_event('commit')")
-        self.assertIn("EXISTS", result.sql)
-        self.assertIn("events", result.sql)
-        self.assertIn("type = ?", result.sql)
-        self.assertEqual(result.params[0], 'commit')
-
-    def test_has_event_with_since(self):
-        """Test has_event with since parameter."""
-        result = compile_query("has_event('commit', since='30d')")
-        self.assertIn("timestamp >= ?", result.sql)
-        self.assertEqual(len(result.params), 2)
-
-    def test_tagged_function(self):
-        """Test tagged function compilation."""
-        result = compile_query("tagged('work/*')")
-        self.assertIn("EXISTS", result.sql)
-        self.assertIn("tags", result.sql)
-        self.assertIn("LIKE", result.sql)
-
-    def test_view_reference(self):
-        """Test @view reference expansion."""
-        views = {'python': "language == 'Python'"}
-        compiler = QueryCompiler(views=views)
-        result = compiler.compile("@python and stars > 10")
-        self.assertIn("language = ?", result.sql)
-        self.assertIn("stars > ?", result.sql)
-
-    def test_view_reference_with_hyphen(self):
-        """View names with hyphens must tokenize as a single @-reference.
-
-        Regression: v0.9.0 tokenizer used `@\\w+` which stopped at the
-        hyphen, so `@python-libs` parsed as `@python`, `-`, `libs` and
-        raised 'Unknown view: python'.
-        """
-        views = {'python-libs': "language == 'Python'"}
-        compiler = QueryCompiler(views=views)
-        result = compiler.compile("@python-libs and stars > 10")
-        self.assertIn("language = ?", result.sql)
-        self.assertIn("stars > ?", result.sql)
-
-    def test_field_mapping(self):
-        """Test that field names are mapped correctly."""
-        result = compile_query("updated > '2024-01-01'")
-        self.assertIn("updated_at", result.sql)
-
-    def test_fuzzy_match(self):
-        """Test fuzzy match operator."""
-        result = compile_query("name ~= 'test'")
-        self.assertIn("LIKE", result.sql)
-        self.assertIn("%test%", result.params)
-
-    def test_empty_query(self):
-        """Test empty query returns all repos."""
-        result = compile_query("")
-        self.assertEqual(result.sql, "SELECT * FROM repos")
-        self.assertEqual(result.params, [])
-
-    def test_complex_query(self):
-        """Test complex query with multiple clauses."""
-        result = compile_query(
-            "language == 'Python' and stars > 10 and is_clean "
-            "order by stars desc limit 5"
-        )
-        self.assertIn("language = ?", result.sql)
-        self.assertIn("stars > ?", result.sql)
-        self.assertIn("is_clean = 1", result.sql)
-        self.assertIn("ORDER BY", result.sql)
-        self.assertIn("LIMIT 5", result.sql)
-
-
 class TestIntegration(unittest.TestCase):
     """Integration tests for the database module."""
 
@@ -700,15 +566,13 @@ class TestIntegration(unittest.TestCase):
                     )
                     insert_event(db, event, repo_id)
 
-            # Query using compiled queries
-            query = compile_query("language == 'Python'")
-            db.execute(query.sql, tuple(query.params))
+            # Query using raw SQL
+            db.execute("SELECT * FROM repos WHERE language = ?", ('Python',))
             python_repos = db.fetchall()
             self.assertEqual(len(python_repos), 1)
 
             # Query with ordering
-            query = compile_query("language != '' order by name")
-            db.execute(query.sql, tuple(query.params))
+            db.execute("SELECT * FROM repos WHERE language != '' ORDER BY name")
             all_repos = db.fetchall()
             self.assertEqual(len(all_repos), 3)
 
@@ -732,9 +596,15 @@ class TestIntegration(unittest.TestCase):
             repo2 = Repository(path='/test/stale', name='stale', language='Python')
             upsert_repo(db, repo2)
 
-            # Query for repos with recent commits
-            query = compile_query("has_event('commit', since='7d')")
-            db.execute(query.sql, tuple(query.params))
+            # Query for repos with recent commits (raw SQL EXISTS subquery)
+            cutoff = (datetime.now() - timedelta(days=7)).isoformat()
+            db.execute(
+                "SELECT * FROM repos WHERE EXISTS ("
+                "  SELECT 1 FROM events WHERE events.repo_id = repos.id "
+                "  AND events.type = 'commit' AND events.timestamp >= ?"
+                ")",
+                (cutoff,),
+            )
             active_repos = db.fetchall()
             self.assertEqual(len(active_repos), 1)
             self.assertEqual(active_repos[0]['name'], 'active')
@@ -847,27 +717,6 @@ class TestCitationDetection(unittest.TestCase):
             # CITATION.cff should be detected first (priority order)
             self.assertTrue(result['has_citation'])
             self.assertEqual(result['citation_file'], 'CITATION.cff')
-
-
-class TestCitationQueryCompiler(unittest.TestCase):
-    """Tests for citation field query compilation."""
-
-    def test_has_citation_boolean_field(self):
-        """Test has_citation as boolean field in query."""
-        result = compile_query("has_citation")
-        self.assertIn("has_citation = 1", result.sql)
-
-    def test_not_has_citation(self):
-        """Test negation of has_citation."""
-        result = compile_query("not has_citation")
-        self.assertIn("NOT", result.sql)
-        self.assertIn("has_citation = 1", result.sql)
-
-    def test_citation_file_equality(self):
-        """Test querying specific citation file type."""
-        result = compile_query("citation_file == 'CITATION.cff'")
-        self.assertIn("citation_file = ?", result.sql)
-        self.assertEqual(result.params, ['CITATION.cff'])
 
 
 if __name__ == '__main__':

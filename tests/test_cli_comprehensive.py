@@ -510,86 +510,6 @@ class TestStatusCommand(CLITestBase):
 
 
 
-class TestQueryCommand(CLITestBase):
-    """Test the 'repoindex query' command."""
-
-    def test_query_matches_repo_name(self):
-        """Test query can match repository names."""
-        # Given: Repos with different names
-        self.create_git_repo("python-utils")
-        self.create_git_repo("go-tools")
-
-        self.write_config({
-            "repository_directories": [str(self.repos_dir) + "/**"],
-            "registries": {"pypi": False, "cran": False},
-            "cache": {"enabled": False},
-            "repository_tags": {}
-        })
-
-        # Refresh database first (required for SQL-based queries)
-        refresh_result = self.run_cli("refresh", "--quiet")
-        self.assertEqual(refresh_result.returncode, 0)
-
-        # When: We query for "python"
-        result = self.run_cli("query", "python", "--brief")
-
-        # Then: Should find the python repo
-        self.assertEqual(result.returncode, 0)
-        names = [line.strip() for line in result.stdout.strip().split("\n") if line.strip()]
-        self.assertIn("python-utils", names)
-        self.assertNotIn("go-tools", names)
-
-    def test_query_field_match_no_results(self):
-        """Test query with field match that returns no results."""
-        # Given: A repo
-        self.create_git_repo("test-project")
-
-        self.write_config({
-            "repository_directories": [str(self.repos_dir) + "/**"],
-            "registries": {"pypi": False, "cran": False},
-            "cache": {"enabled": False},
-            "repository_tags": {}
-        })
-
-        # Refresh database first (required for SQL-based queries)
-        refresh_result = self.run_cli("refresh", "--quiet")
-        self.assertEqual(refresh_result.returncode, 0)
-
-        # When: We query for a specific field value that doesn't exist
-        # Using name == 'nonexistent' is an exact match query
-        result = self.run_cli("query", "name == 'nonexistent-repo-xyz'", "--brief")
-
-        # Then: Should succeed but with empty output
-        self.assertEqual(result.returncode, 0)
-        # Output should be empty or whitespace only
-        self.assertEqual(result.stdout.strip(), "")
-
-    def test_query_limit_option(self):
-        """Test query with --limit option."""
-        # Given: Multiple repos
-        for i in range(5):
-            self.create_git_repo(f"project-{i}")
-
-        self.write_config({
-            "repository_directories": [str(self.repos_dir) + "/**"],
-            "registries": {"pypi": False, "cran": False},
-            "cache": {"enabled": False},
-            "repository_tags": {}
-        })
-
-        # Refresh database first (required for SQL-based queries)
-        refresh_result = self.run_cli("refresh", "--quiet")
-        self.assertEqual(refresh_result.returncode, 0)
-
-        # When: We query with a limit
-        result = self.run_cli("query", "project", "--brief", "--limit", "2")
-
-        # Then: Should only return up to the limit
-        self.assertEqual(result.returncode, 0)
-        names = [line.strip() for line in result.stdout.strip().split("\n") if line.strip()]
-        self.assertLessEqual(len(names), 2)
-
-
 class TestHelpCommands(CLITestBase):
     """Test help output for various commands."""
 
@@ -628,13 +548,13 @@ class TestHelpCommands(CLITestBase):
         self.assertEqual(result.returncode, 0)
         self.assertIn("init", result.stdout.lower())
 
-    def test_query_help(self):
-        """Test query command help."""
+    def test_sql_help(self):
+        """Test sql command help."""
         self.write_config({"repository_directories": [], "repository_tags": {}})
-        result = self.run_cli("query", "--help")
+        result = self.run_cli("sql", "--help")
 
         self.assertEqual(result.returncode, 0)
-        self.assertIn("query", result.stdout.lower())
+        self.assertIn("sql", result.stdout.lower())
 
 
 class TestInvalidCommands(CLITestBase):

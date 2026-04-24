@@ -5,7 +5,8 @@ Default: produces a longecho-compliant arkiv archive with an embedded
 HTML browser (site/index.html). Format-based exports (bibtex, csv, etc.)
 are available via the exporter plugin system.
 
-Use 'repoindex query' to preview which repos will be exported.
+Repo selection is via filter flags (--language, --dirty, --tag, --recent).
+Use `repoindex sql` for ad-hoc SQL inspection before running an export.
 """
 
 import sys
@@ -43,7 +44,11 @@ def export_handler(
 
     Without FORMAT_ID, produces an arkiv archive directory containing
     JSONL data, schema, SQLite database, and an interactive HTML browser.
-    Use 'repoindex query' to preview which repos will be exported.
+
+    Repo selection is via the filter flags below. The optional QUERY
+    positional is retained for backward compatibility with MCP callers
+    and is currently ignored (the DSL query language was removed in
+    v0.16.0; use `repoindex sql` or flags instead).
 
     With FORMAT_ID, uses the exporter plugin system (bibtex, csv, etc.).
     Use --list-formats to see available format plugins.
@@ -56,9 +61,6 @@ def export_handler(
         # Filtered archive
         repoindex export -o ~/archives/python/ --language python
 
-        # With DSL query
-        repoindex export -o ~/archives/starred/ "github_stars > 0"
-
         # Format-based exports (via exporter plugins)
         repoindex export bibtex --language python > refs.bib
         repoindex export csv -o repos.csv
@@ -67,6 +69,17 @@ def export_handler(
         repoindex export --list-formats
     """
     from ..exporters import discover_exporters
+
+    # query_string is retained in the signature for MCP back-compat but
+    # has no effect now that the DSL has been removed. Warn so callers
+    # don't silently get unfiltered results.
+    if query_string:
+        click.echo(
+            f"warning: export no longer accepts a DSL query "
+            f"(got: {query_string!r}); use --language/--dirty/--tag/--recent "
+            f"flags instead.",
+            err=True,
+        )
 
     # List formats
     if list_formats:
@@ -79,13 +92,13 @@ def export_handler(
     if not format_id:
         if not output_file:
             click.echo(
-                "Usage: repoindex export -o <directory> [QUERY]\n"
-                "       repoindex export FORMAT [QUERY] [-o FILE]\n\n"
+                "Usage: repoindex export -o <directory>\n"
+                "       repoindex export FORMAT [-o FILE]\n\n"
                 "Use --list-formats for format plugins, or -o for arkiv archive.",
                 err=True,
             )
             sys.exit(1)
-        _export_archive(output_file, query_string, debug, language, dirty, tag, recent)
+        _export_archive(output_file, debug, language, dirty, tag, recent)
         return
 
     # Explicit "arkiv" format → same as default archive
@@ -93,7 +106,7 @@ def export_handler(
         if not output_file:
             click.echo("Error: arkiv export requires -o <directory>", err=True)
             sys.exit(1)
-        _export_archive(output_file, query_string, debug, language, dirty, tag, recent)
+        _export_archive(output_file, debug, language, dirty, tag, recent)
         return
 
     # Format-based export via exporter plugins
@@ -106,7 +119,7 @@ def export_handler(
     exporter = exporters[format_id]
     config = load_config()
     repos = _get_repos_from_query(
-        config, query_string, debug=debug,
+        config, debug=debug,
         language=language, dirty=dirty, tag=tag, recent=recent,
     )
 
@@ -119,7 +132,7 @@ def export_handler(
         click.echo(f"{count} records exported ({exporter.name})", err=True)
 
 
-def _export_archive(output_file, query_string, debug, language, dirty, tag, recent):
+def _export_archive(output_file, debug, language, dirty, tag, recent):
     """Produce a longecho-compliant arkiv archive with embedded HTML browser."""
     from ..database.connection import get_db_path
     from ..database.events import get_events
@@ -129,7 +142,7 @@ def _export_archive(output_file, query_string, debug, language, dirty, tag, rece
 
     config = load_config()
     repos = _get_repos_from_query(
-        config, query_string, debug=debug,
+        config, debug=debug,
         language=language, dirty=dirty, tag=tag, recent=recent,
     )
 

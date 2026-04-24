@@ -112,12 +112,6 @@ class TestCLISmokeWithRealConfig(unittest.TestCase):
         # events might return 0 even with no events
         self.assertIn(result.returncode, [0, 64], f"Failed: {result.stderr}")
 
-    def test_query_command_works(self):
-        """query should filter repositories."""
-        result = self.run_cli('query', "name contains 'a'")
-
-        self.assertEqual(result.returncode, 0, f"Failed: {result.stderr}")
-
     def test_config_repos_list_works(self):
         """config repos list should show configured directories."""
         result = self.run_cli('config', 'repos', 'list', '--json')
@@ -135,7 +129,7 @@ class TestCLISmokeWithRealConfig(unittest.TestCase):
             ['status', '--help'],
             ['config', '--help'],
             ['config', 'init', '--help'],
-            ['query', '--help'],
+            ['sql', '--help'],
         ]
 
         for cmd in commands_to_test:
@@ -206,9 +200,9 @@ class TestCLIRealConfigIntegrity(unittest.TestCase):
         # repository_directories should be a list
         self.assertIsInstance(config['repository_directories'], list)
 
-    def test_status_repos_matches_query_count(self):
+    def test_status_repos_matches_sql_count(self):
         """
-        The number of repos from status --repos should match query result.
+        The number of repos from status --repos should match raw SQL count.
 
         This catches bugs where discovery works but database sync fails.
         """
@@ -219,13 +213,18 @@ class TestCLIRealConfigIntegrity(unittest.TestCase):
 
         status_repos = json.loads(status_result.stdout)
 
-        # Get repo count from query (all repos)
-        query_result = self.run_cli('query', '--brief')
-        query_lines = [l for l in query_result.stdout.strip().split('\n') if l.strip()]
+        # Get repo count from raw SQL
+        sql_result = self.run_cli('sql', 'SELECT COUNT(*) AS n FROM repos', '--json')
+        if sql_result.returncode != 0:
+            self.skipTest("sql command failed, database may not exist")
+        lines = [l for l in sql_result.stdout.strip().split('\n') if l.strip()]
+        import json as _json
+        row = _json.loads(lines[0])
+        sql_count = row.get('n') or row.get('COUNT(*)') or list(row.values())[0]
 
         # Should match
-        self.assertEqual(len(status_repos), len(query_lines),
-            "status --repos and query returned different repo counts")
+        self.assertEqual(len(status_repos), sql_count,
+            "status --repos and SQL returned different repo counts")
 
 
 if __name__ == '__main__':

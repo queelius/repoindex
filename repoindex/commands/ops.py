@@ -14,7 +14,7 @@ from typing import Optional
 import click
 
 from ..config import load_config
-from ..database import Database, QueryCompileError, compile_query
+from ..database import Database
 from ..services.boilerplate_service import (
     GITIGNORE_TEMPLATES,
     LICENSES,
@@ -22,9 +22,9 @@ from ..services.boilerplate_service import (
     BoilerplateService,
     GenerationOptions,
 )
+from ..services.flag_query import fetch_repos_by_flags
 from ..services.git_ops_service import GitOpsOptions, GitOpsService
 from ..services.github_ops_service import GitHubOpsOptions, GitHubOpsService
-from .query import _build_query_from_flags
 
 # ============================================================================
 # Main ops command group
@@ -88,53 +88,25 @@ def query_options(f):
     return f
 
 
-def _get_repos_from_query(config, query_string: str, debug: bool = False, **query_flags):
-    """Get repos matching query and flags."""
-    language = query_flags.get('language', None)
-    dirty = query_flags.get('dirty', False)
-    tag = query_flags.get('tag', ())
-    recent = query_flags.get('recent', None)
+def _get_repos_from_query(config, query_string: str = '', debug: bool = False, **query_flags):
+    """Get repos matching the standard filter flags.
 
-    # Build query from flags
-    has_flags = any([dirty, language, recent, tag])
-    if has_flags:
-        query_string = _build_query_from_flags(
-            query_string if query_string else None,
-            dirty=dirty, language=language, recent=recent, tag=list(tag),
-        )
-
-    # If no query and no flags, match all repos
-    if not query_string:
-        query_string = "1 == 1"
-
-    # Query repos from database
-    views = config.get('views', {})
-    compiled = compile_query(query_string, views=views)
-
-    repos = []
-    with Database(config=config, read_only=True) as db:
-        from . import warn_if_stale
-        warn_if_stale(db)
-
-        if debug:
-            print(f"DEBUG: SQL: {compiled.sql}", file=sys.stderr)
-            print(f"DEBUG: Params: {compiled.params}", file=sys.stderr)
-
-        db.execute(compiled.sql, tuple(compiled.params))
-        for row in db.fetchall():
-            repos.append(dict(row))
-
-    # Post-filter excluded directories from config
-    exclude_dirs = config.get('exclude_directories', [])
-    if exclude_dirs:
-        expanded = [str(Path(d).expanduser()).rstrip('/') for d in exclude_dirs]
-        repos = [r for r in repos if not any(r['path'].startswith(e) for e in expanded)]
-
-    return repos
+    The ``query_string`` parameter is retained for signature compatibility
+    with call sites that pre-date the DSL removal; it is ignored. For complex
+    selection, use ``repoindex sql`` or the MCP ``run_sql`` tool.
+    """
+    return fetch_repos_by_flags(
+        config,
+        dirty=query_flags.get('dirty', False),
+        language=query_flags.get('language', None),
+        tag=query_flags.get('tag', ()),
+        recent=query_flags.get('recent', None),
+        debug=debug,
+    )
 
 
 def _resolve_repos(output_json, debug, query_string, **query_flags):
-    """Load config, resolve repos from query, handle errors.
+    """Load config, resolve repos from flag filters, handle empty result.
 
     Returns (config, repos) on success, None on failure (after printing error).
     """
@@ -144,11 +116,7 @@ def _resolve_repos(output_json, debug, query_string, **query_flags):
 
     config = load_config()
 
-    try:
-        repos = _get_repos_from_query(config, query_string, debug=debug, **query_flags)
-    except QueryCompileError as e:
-        _handle_query_error(e, query_string, output_json)
-        return None
+    repos = _get_repos_from_query(config, query_string, debug=debug, **query_flags)
 
     if not repos:
         _no_repos_message(output_json)
@@ -864,20 +832,6 @@ def github_set_description_handler(
 # ============================================================================
 # Helper functions
 # ============================================================================
-
-def _handle_query_error(e, query_string, output_json):
-    """Handle query compilation error."""
-    error = {
-        'error': str(e),
-        'type': 'query_compile_error',
-        'query': query_string,
-    }
-    if output_json:
-        print(json.dumps(error), file=sys.stderr)
-    else:
-        print(f"Error: {e}", file=sys.stderr)
-    sys.exit(1)
-
 
 def _no_repos_message(output_json):
     """Show message when no repos match."""
@@ -1783,14 +1737,10 @@ def wip_snapshot_handler(
     config = load_config()
 
     # Always filter to dirty repos (the whole point is snapshotting uncommitted work)
-    try:
-        repos = _get_repos_from_query(
-            config, query_string, debug=debug,
-            language=language, dirty=True, tag=tag, recent=recent,
-        )
-    except QueryCompileError as e:
-        _handle_query_error(e, query_string, output_json)
-        return
+    repos = _get_repos_from_query(
+        config, query_string, debug=debug,
+        language=language, dirty=True, tag=tag, recent=recent,
+    )
 
     if not repos:
         if output_json:

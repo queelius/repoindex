@@ -5,8 +5,6 @@ import click
 from repoindex.commands.status import status_handler
 from repoindex.commands.config import config_cmd
 from repoindex.commands.tag import tag_cmd
-from repoindex.commands.view import view_cmd
-from repoindex.commands.query import query_handler
 from repoindex.commands.shell import shell_handler
 from repoindex.commands.events import events_handler
 from repoindex.commands.refresh import refresh_handler, db_handler, sql_handler
@@ -43,7 +41,6 @@ def cli(ctx, config_path):
 
 # Core commands
 cli.add_command(status_handler)
-cli.add_command(query_handler, name='query')
 cli.add_command(events_handler, name='events')
 cli.add_command(sql_handler, name='sql')
 cli.add_command(refresh_handler, name='refresh')
@@ -56,7 +53,6 @@ cli.add_command(shell_handler, name='shell')
 
 # Command groups
 cli.add_command(tag_cmd)
-cli.add_command(view_cmd)
 cli.add_command(link_cmd)
 cli.add_command(ops_cmd)
 cli.add_command(config_cmd)

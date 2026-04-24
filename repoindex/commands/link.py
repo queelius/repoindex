@@ -11,11 +11,11 @@ from pathlib import Path
 from typing import Optional
 
 from ..config import load_config
-from ..database import Database, compile_query, QueryCompileError
+from ..database import Database
+from ..services.flag_query import fetch_repos_by_flags
 from ..services.link_service import (
     LinkService, LinkTreeOptions, OrganizeBy, MANIFEST_FILENAME
 )
-from .query import _build_query_from_flags
 from .tag import get_implicit_tags_from_row
 
 
@@ -44,7 +44,6 @@ def link_cmd():
 @click.argument('destination', type=click.Path())
 @click.option('--by', 'organize_by', type=click.Choice(['tag', 'language', 'created-year', 'modified-year', 'owner']),
               required=True, help='How to organize the symlink tree')
-@click.argument('query_string', required=False, default='')
 # Output options
 @click.option('--json', 'output_json', is_flag=True, help='Output as JSONL')
 @click.option('--dry-run', is_flag=True, help='Preview without creating links')
@@ -52,7 +51,7 @@ def link_cmd():
 @click.option('--max-depth', type=int, default=10, help='Maximum directory depth (default: 10)')
 @click.option('--collision', type=click.Choice(['rename', 'skip']),
               default='rename', help='How to handle name collisions (default: rename)')
-# Query convenience flags (same as query command)
+# Query convenience flags
 @click.option('--language', '-l', help='Filter by language (e.g., python, r, js)')
 @click.option('--dirty', is_flag=True, help='Repos with uncommitted changes')
 @click.option('--tag', '-t', multiple=True, help='Filter by tag (supports wildcards)')
@@ -61,7 +60,6 @@ def link_cmd():
 def tree_handler(
     destination: str,
     organize_by: str,
-    query_string: str,
     output_json: bool,
     dry_run: bool,
     max_depth: int,
@@ -76,8 +74,9 @@ def tree_handler(
     """
     Create a symlink tree organized by metadata.
 
-    Supports the same query filters as the query command for selecting
-    which repositories to include.
+    Use the filter flags (--language/--dirty/--tag/--recent) to select which
+    repositories to include. For complex selection, pipe paths from
+    `repoindex sql` instead.
 
     \b
     Examples:
@@ -103,54 +102,20 @@ def tree_handler(
 
     config = load_config()
 
-    # Build query from flags
-    has_flags = any([dirty, language, recent, tag])
-    if has_flags:
-        query_string = _build_query_from_flags(
-            query_string if query_string else None,
-            dirty=dirty, language=language, recent=recent, tag=list(tag),
-        )
+    repos = fetch_repos_by_flags(
+        config,
+        dirty=dirty, language=language, tag=tag, recent=recent,
+        debug=debug,
+    )
 
-    # If no query and no flags, include all repos
-    if not query_string:
-        query_string = "1 == 1"
-
-    # Query repos from database
-    try:
-        views = config.get('views', {})
-        compiled = compile_query(query_string, views=views)
-
-        repos = []
+    # Enrich each repo with its tags (explicit + implicit) for organize-by-tag
+    if repos:
         with Database(config=config, read_only=True) as db:
-            if debug:
-                print(f"DEBUG: SQL: {compiled.sql}", file=sys.stderr)
-                print(f"DEBUG: Params: {compiled.params}", file=sys.stderr)
-
-            db.execute(compiled.sql, tuple(compiled.params))
-            for row in db.fetchall():
-                record = dict(row)
-                # Get explicit tags from database
+            for record in repos:
                 db.execute("SELECT tag FROM tags WHERE repo_id = ?", (record['id'],))
                 explicit_tags = [r['tag'] for r in db.fetchall()]
-
-                # Get implicit tags (including topic:{github_topic})
                 implicit_tags = get_implicit_tags_from_row(record)
-
-                # Merge all tags (deduplication via set)
                 record['tags'] = list(set(explicit_tags + implicit_tags))
-                repos.append(record)
-
-    except QueryCompileError as e:
-        error = {
-            'error': str(e),
-            'type': 'query_compile_error',
-            'query': query_string,
-        }
-        if output_json:
-            print(json.dumps(error), file=sys.stderr)
-        else:
-            print(f"Error: {e}", file=sys.stderr)
-        sys.exit(1)
 
     if not repos:
         if output_json:

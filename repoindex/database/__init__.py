@@ -9,7 +9,6 @@ Key components:
 - schema: Table definitions and schema versioning
 - repository: Repository CRUD operations
 - events: Event CRUD operations
-- query: Query compilation (DSL -> SQL)
 """
 
 from .connection import (
@@ -50,12 +49,6 @@ from .events import (
     has_event,
     event_count,
     last_event_timestamp,
-)
-from .query_compiler import (
-    compile_query,
-    CompiledQuery,
-    QueryCompiler,
-    QueryCompileError,
 )
 from .errors import (
     ensure_scan_errors_table,
@@ -112,11 +105,6 @@ __all__ = [
     'has_event',
     'event_count',
     'last_event_timestamp',
-    # Query compiler
-    'compile_query',
-    'CompiledQuery',
-    'QueryCompiler',
-    'QueryCompileError',
     # Scan errors
     'ensure_scan_errors_table',
     'record_scan_error',

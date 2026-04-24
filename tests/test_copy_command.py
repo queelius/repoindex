@@ -62,7 +62,7 @@ class TestCopyCommandCLI:
         return config, db_path, tmp_path
 
     def test_copy_with_no_repos_found(self, setup_test_environment, tmp_path):
-        """Test copy command when query returns no results."""
+        """Test copy command when filter flags match no repos."""
         config, db_path, source_tmp = setup_test_environment
         dest_dir = tmp_path / 'backup'
 
@@ -71,8 +71,8 @@ class TestCopyCommandCLI:
         with patch('repoindex.commands.copy.load_config') as mock_config:
             mock_config.return_value = config
 
-            # Use a query that matches nothing
-            result = runner.invoke(cli, ['copy', str(dest_dir), "name == 'nonexistent'"])
+            # Use a language filter that matches nothing in the fixture
+            result = runner.invoke(cli, ['copy', str(dest_dir), '--language', 'cobol'])
 
             assert 'No repositories found' in result.output or result.exit_code == 0
 
@@ -91,8 +91,8 @@ class TestCopyCommandCLI:
             # Dry run should not create the destination
             assert not dest_dir.exists() or result.exit_code == 0
 
-    def test_copy_with_query_compile_error(self, setup_test_environment, tmp_path):
-        """Test copy command with invalid query."""
+    def test_copy_rejects_positional_query(self, setup_test_environment, tmp_path):
+        """Test copy command no longer accepts a DSL query argument."""
         config, db_path, source_tmp = setup_test_environment
         dest_dir = tmp_path / 'backup'
 
@@ -101,10 +101,12 @@ class TestCopyCommandCLI:
         with patch('repoindex.commands.copy.load_config') as mock_config:
             mock_config.return_value = config
 
-            # Invalid query syntax
-            result = runner.invoke(cli, ['copy', str(dest_dir), "invalid ===== query"])
+            # After the views/DSL removal, copy only accepts one positional
+            # (the destination); any extra argument is rejected by Click.
+            result = runner.invoke(cli, ['copy', str(dest_dir), "some-query"])
 
-            assert result.exit_code == 1 or 'Error' in result.output
+            assert result.exit_code != 0
+            assert 'unexpected' in result.output.lower() or 'usage' in result.output.lower()
 
     def test_copy_json_output(self, setup_test_environment, tmp_path):
         """Test copy command with JSON output."""

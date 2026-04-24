@@ -147,7 +147,7 @@ class TestLinkCommandCLI:
             assert result.exit_code == 0 or 'No repositories' in result.output
 
     def test_link_tree_no_repos_found(self, setup_test_environment, tmp_path):
-        """Test link tree command when query returns no results."""
+        """Test link tree command when filter flags match no repos."""
         config, db_path, source_tmp = setup_test_environment
         dest_dir = tmp_path / 'links'
 
@@ -156,7 +156,8 @@ class TestLinkCommandCLI:
         with patch('repoindex.commands.link.load_config') as mock_config:
             mock_config.return_value = config
 
-            result = runner.invoke(cli, ['link', 'tree', str(dest_dir), '--by', 'language', "name == 'nonexistent'"])
+            # Language filter that matches nothing in the fixture
+            result = runner.invoke(cli, ['link', 'tree', str(dest_dir), '--by', 'language', '--language', 'cobol'])
 
             assert 'No repositories found' in result.output or result.exit_code == 0
 
