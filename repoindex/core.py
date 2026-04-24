@@ -141,49 +141,15 @@ def get_repository_status(base_dir: Optional[str] = None, recursive: bool = Fals
     Yields:
         Repository status dictionaries following the standard schema
     """
-    # Apply tag filtering if specified
-    if tag_filters:
-        filtered_repos = _get_filtered_repositories(base_dir, recursive, tag_filters, all_tags)
-        for repo in filtered_repos:
-            if deduplicate:
-                # Need to collect and deduplicate filtered repos
-                # For now, just yield them without deduplication when filtering
-                yield from _get_repository_status_for_path(repo, skip_pages_check, use_github_api)
-            else:
-                yield from _get_repository_status_for_path(repo, skip_pages_check, use_github_api)
+    # tag_filters/all_tags are accepted for backward compatibility but are
+    # no longer honored here — the tag-aware query path now lives in the
+    # SQLite-backed `repoindex query` command. Callers that still pass
+    # tag_filters get unfiltered results rather than an import error from
+    # the removed catalog helpers.
+    if deduplicate:
+        yield from _get_deduplicated_status(base_dir, recursive, skip_pages_check, use_github_api)
     else:
-        # Original behavior without filtering
-        if deduplicate:
-            # Collect all statuses and deduplicate
-            yield from _get_deduplicated_status(base_dir, recursive, skip_pages_check, use_github_api)
-        else:
-            # Stream without deduplication
-            yield from _get_repository_status_raw(base_dir, recursive, skip_pages_check, use_github_api)
-
-
-def _get_filtered_repositories(base_dir: str, recursive: bool, tag_filters: list, all_tags: bool) -> List[str]:
-    """Get repositories filtered by tags."""
-    from .commands.catalog import get_repositories_by_tags
-    config = load_config()
-    
-    # Get all repos based on base_dir or config
-    if base_dir is not None:
-        # If base_dir is specified (including "."), use it
-        repos = list(get_repositories_from_path(base_dir, recursive))
-    else:
-        # Only use config if no base_dir specified
-        repo_dirs = config.get("repository_directories", [])
-        repos = list(find_git_repos_from_config(
-            repo_dirs,
-            exclude_dirs_config=config.get('exclude_directories', [])
-        ))
-    
-    # Get filtered repos by tags
-    filtered_repos = list(get_repositories_by_tags(tag_filters, config, all_tags))
-    filtered_paths = {r["path"] for r in filtered_repos}
-    
-    # Filter the discovered repos
-    return [r for r in repos if os.path.abspath(r) in filtered_paths]
+        yield from _get_repository_status_raw(base_dir, recursive, skip_pages_check, use_github_api)
 
 
 def _get_repository_status_for_path(repo_path: str, skip_pages_check: bool = False, use_github_api: bool = False) -> Generator[Dict, None, None]:
@@ -336,7 +302,7 @@ def _get_repository_status_for_path(repo_path: str, skip_pages_check: bool = Fal
                 repo_status["github"] = github_info
 
         # Add tags (both explicit and implicit)
-        from .commands.catalog import get_repository_tags
+        from .tags import get_repository_tags
 
         # Get all tags for this repository
         all_tags = get_repository_tags(repo_path, repo_info=repo_status)

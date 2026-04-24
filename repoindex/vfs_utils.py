@@ -10,7 +10,7 @@ from pathlib import Path
 
 from .utils import find_git_repos_from_config
 from .metadata import get_metadata_store
-from .commands.catalog import get_repository_tags
+from .tags import get_repository_tags
 
 
 def _build_config_vfs(config_node: Dict[str, Any], config: Dict[str, Any]):

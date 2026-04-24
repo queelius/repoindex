@@ -15,7 +15,7 @@ import shlex
 from ..config import load_config, save_config
 from ..utils import find_git_repos_from_config
 from ..metadata import get_metadata_store
-from ..commands.catalog import get_repository_tags
+from ..tags import get_repository_tags
 
 
 class RepoIndexShell(cmd.Cmd):
@@ -476,34 +476,19 @@ class RepoIndexShell(cmd.Cmd):
         self.update_prompt()
 
     def do_query(self, arg):
-        """Query repositories with expression.
+        """Query repositories with expression (deprecated).
 
-        Usage: query <expression>
+        The in-memory query matcher was removed in v0.16.0. Use the top-level
+        `repoindex query` command instead, which runs the DSL against the
+        SQLite index:
 
-        Examples:
-            query "stars > 10"
-            query "language == 'Python'"
-            query "stars > 10 and language ~= 'python'"
+            repoindex query "language == 'Python' and github_stars > 10"
         """
-        if not arg:
-            print("Usage: query <expression>")
-            return
-
-        # Import query engine
-        from ..query import query_repositories
-
-        # Execute query
-        try:
-            results = query_repositories(arg, self.metadata_store, self.config)
-
-            # Output as JSONL
-            for result in results:
-                print(json.dumps({
-                    "name": Path(result).name,
-                    "path": result
-                }))
-        except Exception as e:
-            print(f"query error: {e}", file=sys.stderr)
+        print(
+            "query: the in-memory matcher was removed in v0.16.0. "
+            "Use `repoindex query <expr>` from outside the shell instead.",
+            file=sys.stderr,
+        )
 
     def do_find(self, arg):
         """Find repositories by criteria.

@@ -398,3 +398,168 @@ def auto_detect_tags(repo_path: str) -> List[str]:
         tags.append("has:docker-compose")
 
     return tags
+
+
+# ---------------------------------------------------------------------------
+# Legacy helpers used by tag.py, shell.py, and vfs_utils.py
+# ---------------------------------------------------------------------------
+#
+# These were previously in commands/catalog.py. They mix "derived from path"
+# with "derived from metadata dict" inputs and predate the services-layer
+# tag_derivation module. The tag command still uses them to render the
+# repository-tag view, so they live here until a proper DB-driven rewrite.
+#
+# Prefer `repoindex.services.tag_derivation.derive_implicit_tags` for new
+# code that already has a repos-table row — it produces a superset that
+# lines up with what refresh persists. The helpers below are scoped to the
+# "I only have a filesystem path plus an optional status dict" callers.
+
+
+def get_implicit_tags(repo_path: str, repo_info: Optional[Dict[str, Any]] = None) -> List[str]:
+    """
+    Generate implicit tags for a repository based on its path and metadata.
+
+    Args:
+        repo_path: Path to the repository
+        repo_info: Optional repository metadata (e.g., from status command)
+
+    Returns:
+        List of implicit tags
+    """
+    import os
+    from .pypi import extract_pypi_tags
+
+    implicit_tags = []
+
+    # Add repo name tag
+    repo_name = os.path.basename(repo_path)
+    implicit_tags.append(f"repo:{repo_name}")
+
+    # Add parent directory tag
+    parent_dir = os.path.basename(os.path.dirname(repo_path))
+    if parent_dir:
+        implicit_tags.append(f"dir:{parent_dir}")
+
+    # If we have repo metadata, add more tags
+    if repo_info:
+        # GitHub hosting
+        if repo_info.get("remote", {}).get("url", ""):
+            remote_url = repo_info["remote"]["url"]
+            if "github.com" in remote_url:
+                implicit_tags.append("github")
+
+        # PyPI publishing
+        if repo_info.get("package", {}).get("published"):
+            implicit_tags.append("pypi")
+
+        # License info
+        license_info = repo_info.get("license")
+        if license_info:
+            if isinstance(license_info, dict):
+                license_type = license_info.get("type", "").lower()
+            else:
+                license_type = str(license_info).lower()
+
+            if license_type and license_type != "none":
+                implicit_tags.append("has:license")
+                implicit_tags.append(f"license:{license_type}")
+
+        # Package info
+        if repo_info.get("package"):
+            implicit_tags.append("has:package")
+
+        # GitHub Pages
+        if repo_info.get("github", {}).get("pages_url"):
+            implicit_tags.append("has:pages")
+
+        # Repository visibility
+        github_info = repo_info.get("github", {})
+        if github_info.get("is_private") is True:
+            implicit_tags.append("type:private")
+        elif github_info.get("is_private") is False:
+            implicit_tags.append("type:public")
+
+        # Git status
+        status = repo_info.get("status", {})
+        if status.get("clean"):
+            implicit_tags.append("status:clean")
+        elif status.get("uncommitted_changes") or status.get("unpushed_commits"):
+            implicit_tags.append("status:dirty")
+
+        # Documentation info
+        if repo_info.get("has_docs"):
+            implicit_tags.append("has:docs")
+            docs_tool = repo_info.get("docs_tool")
+            if docs_tool:
+                implicit_tags.append(f"tool:{docs_tool}")
+
+    # Extract PyPI classifier tags if this is a Python package
+    if repo_info and repo_info.get("package"):
+        # Only extract if we have packaging files
+        pypi_tags = extract_pypi_tags(repo_path)
+        implicit_tags.extend(pypi_tags)
+
+    return implicit_tags
+
+
+def get_repository_tags(repo_path: str, repo_info: Optional[Dict[str, Any]] = None) -> List[str]:
+    """
+    Get all tags for a repository (explicit and implicit).
+
+    Args:
+        repo_path: Path to the repository
+        repo_info: Optional repository metadata (from status command)
+
+    Returns:
+        Combined list of explicit and implicit tags
+    """
+    from .config import load_config
+
+    config = load_config()
+
+    # Get explicit tags from config
+    explicit_tags = config.get("repository_tags", {}).get(repo_path, [])
+
+    # Get implicit tags
+    implicit_tags = get_implicit_tags(repo_path, repo_info)
+
+    # Combine and deduplicate
+    all_tags = list(set(explicit_tags + implicit_tags))
+
+    return sorted(all_tags)
+
+
+def is_protected_tag(tag: str) -> bool:
+    """
+    Check if a tag is protected (implicit/system tag that cannot be manually assigned).
+
+    Args:
+        tag: Tag to check
+
+    Returns:
+        True if the tag is protected
+    """
+    protected_prefixes = [
+        "repo:",      # Repository name
+        "dir:",       # Parent directory
+        "license:",   # License type
+        "has:",       # Feature flags (has:license, has:package, has:pages)
+        "status:",    # Git status
+        "type:",      # Repository type (private/public)
+    ]
+
+    protected_exact = [
+        "github",     # Hosted on GitHub
+        "pypi",       # Published on PyPI
+    ]
+
+    # Check prefixes
+    for prefix in protected_prefixes:
+        if tag.startswith(prefix):
+            return True
+
+    # Check exact matches
+    if tag in protected_exact:
+        return True
+
+    return False
