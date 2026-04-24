@@ -4,7 +4,7 @@
 
 **repoindex is a filesystem git catalog.** It indexes local git directories — the filesystem path IS the canonical identity. External platforms (GitHub, PyPI, CRAN) provide opt-in enrichment metadata, namespaced with prefixes (`github_stars`, `pypi_published`).
 
-**Version**: 0.16.0 | **Design**: [DESIGN.md](DESIGN.md)
+**Version**: 1.0.0 | **Design**: [DESIGN.md](DESIGN.md) | **Stability**: [STABILITY.md](STABILITY.md)
 
 ## Development Commands
 
@@ -62,7 +62,7 @@ where, params = build_where_and_params(language='Python', dirty=True)
 repos = fetch_repos_by_flags(config, language='Python', recent='7d')
 ```
 
-Schema v5, migrations in `database/schema.py`. See **SQL Data Model** below for table details.
+Schema v8, migrations in `database/schema.py`. See **SQL Data Model** below for table details.
 
 ### Other Key Modules
 
