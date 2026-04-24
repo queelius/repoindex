@@ -1,16 +1,12 @@
-"""
-PyPI registry provider for repoindex.
-
-Thin wrapper around repoindex.pypi — delegates detection and
-API checks to the existing module.
-"""
+"""PyPI registry metadata source for repoindex."""
 
 import logging
 from typing import Optional
 
 import requests
 
-from . import RegistryProvider, PackageMetadata
+from ..domain.repository import PackageMetadata
+from . import MetadataSource
 
 logger = logging.getLogger(__name__)
 
@@ -19,7 +15,7 @@ def _fetch_downloads(package_name: str) -> Optional[int]:
     """Fetch 30-day download count from PyPI Stats API.
 
     Returns the last_month download count (NOT lifetime total).
-    PyPI does not expose lifetime totals — pypistats only has recent windows.
+    PyPI does not expose lifetime totals -- pypistats only has recent windows.
     """
     try:
         resp = requests.get(
@@ -35,13 +31,15 @@ def _fetch_downloads(package_name: str) -> Optional[int]:
     return None
 
 
-class PyPIProvider(RegistryProvider):
-    """Python Package Index provider."""
-    registry = "pypi"
+class PyPISource(MetadataSource):
+    """Python Package Index source."""
+
+    source_id = "pypi"
     name = "Python Package Index"
+    target = "publications"
     batch = False
 
-    def detect(self, repo_path: str, repo_record: Optional[dict] = None) -> Optional[str]:
+    def _detect_name(self, repo_path: str) -> Optional[str]:
         """Detect Python package name from packaging files."""
         try:
             from ..pypi import find_packaging_files, extract_package_name
@@ -55,6 +53,9 @@ class PyPIProvider(RegistryProvider):
         except Exception as e:
             logger.debug(f"PyPI detect failed for {repo_path}: {e}")
         return None
+
+    def detect(self, repo_path: str, repo_record: Optional[dict] = None) -> bool:
+        return self._detect_name(repo_path) is not None
 
     def check(self, package_name: str, config: Optional[dict] = None) -> Optional[PackageMetadata]:
         """Check PyPI for package."""
@@ -77,5 +78,15 @@ class PyPIProvider(RegistryProvider):
             logger.debug(f"PyPI check failed for {package_name}: {e}")
             return None
 
+    def fetch(self, repo_path: str, repo_record: Optional[dict] = None,
+              config: Optional[dict] = None) -> Optional[dict]:
+        name = self._detect_name(repo_path)
+        if not name:
+            return None
+        metadata = self.check(name, config)
+        if metadata is None:
+            return None
+        return metadata.to_dict()
 
-provider = PyPIProvider()
+
+source = PyPISource()

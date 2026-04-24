@@ -1,5 +1,4 @@
-"""
-npm registry provider for repoindex.
+"""npm registry metadata source for repoindex.
 
 Detects Node.js packages from package.json and checks the npm registry.
 Skips packages marked as private.
@@ -12,18 +11,21 @@ from typing import Optional
 
 import requests
 
-from . import RegistryProvider, PackageMetadata
+from ..domain.repository import PackageMetadata
+from . import MetadataSource
 
 logger = logging.getLogger(__name__)
 
 
-class NpmProvider(RegistryProvider):
-    """npm (Node.js) registry provider."""
-    registry = "npm"
+class NpmSource(MetadataSource):
+    """npm (Node.js) registry source."""
+
+    source_id = "npm"
     name = "npm Registry"
+    target = "publications"
     batch = False
 
-    def detect(self, repo_path: str, repo_record: Optional[dict] = None) -> Optional[str]:
+    def _detect_name(self, repo_path: str) -> Optional[str]:
         """Detect npm package from package.json."""
         pkg_path = Path(repo_path) / 'package.json'
         if not pkg_path.exists():
@@ -43,6 +45,9 @@ class NpmProvider(RegistryProvider):
         except Exception as e:
             logger.debug(f"npm detect failed for {repo_path}: {e}")
         return None
+
+    def detect(self, repo_path: str, repo_record: Optional[dict] = None) -> bool:
+        return self._detect_name(repo_path) is not None
 
     def check(self, package_name: str, config: Optional[dict] = None) -> Optional[PackageMetadata]:
         """Check npm registry for package."""
@@ -70,5 +75,15 @@ class NpmProvider(RegistryProvider):
             logger.debug(f"npm check failed for {package_name}: {e}")
         return None
 
+    def fetch(self, repo_path: str, repo_record: Optional[dict] = None,
+              config: Optional[dict] = None) -> Optional[dict]:
+        name = self._detect_name(repo_path)
+        if not name:
+            return None
+        metadata = self.check(name, config)
+        if metadata is None:
+            return None
+        return metadata.to_dict()
 
-provider = NpmProvider()
+
+source = NpmSource()

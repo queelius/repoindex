@@ -41,14 +41,11 @@ commands/            services/    database/          domain/
 
 ### Extension Systems
 
-**Providers** (`providers/`): Two ABCs for external metadata, both discovered from `~/.repoindex/providers/*.py`:
-- `PlatformProvider` — hosting platform enrichment (`detect`, `enrich`). Enriches `repos` table with prefixed fields (`github_stars`, `gitlab_issues`). Built-in: github. Export `platform` attribute.
-- `RegistryProvider` — package registry detection (`detect`, `check`, `match`, `prefetch`). Creates records in `publications` table. Built-in: pypi, cran, zenodo, npm, cargo, conda, docker, rubygems, go. Export `provider` attribute.
-Both run in parallel via `ThreadPoolExecutor` during refresh.
+**Sources** (`sources/`): Single ABC (`MetadataSource`) for all external metadata, discovered from `~/.repoindex/sources/*.py` (module-level `source` attribute). Each source has a `target` of `"repos"` (merged into the `repos` table: github, gitea, citation_cff, keywords, local_assets) or `"publications"` (upserted into the `publications` table: pypi, cran, zenodo, npm, cargo, conda, docker, rubygems, go). Batch sources (zenodo) implement `prefetch()` and return `True` from `detect()` unconditionally. All 14 built-in sources are native `MetadataSource` subclasses; adapters and the old `providers/` package are gone. Sources run in parallel via `ThreadPoolExecutor` during refresh.
 
 **Exporters** (`exporters/`): Output renderers via `Exporter` ABC (`export(repos, output, config)`). Built-in: bibtex, csv, markdown, opml, jsonld, arkiv. User extensions: `~/.repoindex/exporters/*.py` with module-level `exporter` attribute. The `export` command defaults to longecho-compliant arkiv archives; format-based exports are secondary.
 
-Discovery: `discover_providers()` / `discover_platforms()` / `discover_exporters()`.
+Discovery: `discover_sources()` / `discover_exporters()`.
 
 **MCP Server** (`mcp/`): Provides LLM access to the database via 4 tools (`get_manifest`, `get_schema`, `run_sql`, `refresh`). Entry point: `repoindex mcp`. Requires `pip install repoindex[mcp]`.
 
@@ -188,4 +185,4 @@ Key sections: `repository_directories` (glob patterns), `github.token` (or `GITH
 ## Project Structure
 
 - Entry point: `cli.py:main()` | Build system: **hatchling** (not setuptools)
-- User data: `~/.repoindex/` — `config.yaml`, `index.db`, `providers/*.py`, `exporters/*.py`
+- User data: `~/.repoindex/`: `config.yaml`, `index.db`, `sources/*.py`, `exporters/*.py`

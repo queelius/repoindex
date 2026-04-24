@@ -1,9 +1,7 @@
-"""
-GitHub platform provider for repoindex.
+"""GitHub platform metadata source for repoindex.
 
 Wraps the existing GitHubClient infrastructure to provide
-repo-level metadata enrichment (stars, forks, topics, etc.)
-via the PlatformProvider ABC.
+repo-level metadata enrichment (stars, forks, topics, etc.).
 """
 
 import json
@@ -12,8 +10,8 @@ import os
 import re
 from typing import Optional, Tuple
 
-from . import PlatformProvider
 from ..infra.github_client import GitHubClient
+from . import MetadataSource
 
 logger = logging.getLogger(__name__)
 
@@ -23,8 +21,7 @@ _GITHUB_REMOTE_RE = re.compile(r'github\.com[:/]([^/\s]+)/([^/\s]+?)(?:\.git)?/?
 
 
 def _parse_github_remote(url: Optional[str]) -> Tuple[Optional[str], Optional[str]]:
-    """
-    Extract (owner, name) from a GitHub remote URL.
+    """Extract (owner, name) from a GitHub remote URL.
 
     Handles HTTPS, SSH, and URLs with or without .git suffix.
     Preserves dots in repo names (three.js, Chart.js, etc.).
@@ -38,12 +35,13 @@ def _parse_github_remote(url: Optional[str]) -> Tuple[Optional[str], Optional[st
     return None, None
 
 
-class GitHubPlatformProvider(PlatformProvider):
-    """GitHub hosting platform provider."""
+class GitHubSource(MetadataSource):
+    """GitHub hosting platform source."""
 
-    platform_id = "github"
+    source_id = "github"
     name = "GitHub"
-    prefix = "github"
+    target = "repos"
+    batch = False
 
     def __init__(self):
         # Cache clients by token to avoid per-call 'gh auth status' subprocess cost
@@ -61,8 +59,8 @@ class GitHubPlatformProvider(PlatformProvider):
         owner, name = _parse_github_remote(url)
         return owner is not None
 
-    def enrich(self, repo_path: str, repo_record: Optional[dict] = None,
-               config: Optional[dict] = None) -> Optional[dict]:
+    def fetch(self, repo_path: str, repo_record: Optional[dict] = None,
+              config: Optional[dict] = None) -> Optional[dict]:
         """Fetch GitHub metadata and return prefixed fields."""
         url = (repo_record or {}).get('remote_url', '')
         owner, name = _parse_github_remote(url)
@@ -112,4 +110,4 @@ class GitHubPlatformProvider(PlatformProvider):
         return result
 
 
-platform = GitHubPlatformProvider()
+source = GitHubSource()

@@ -1,8 +1,7 @@
-"""
-Go module proxy registry provider for repoindex.
+"""Go module proxy metadata source for repoindex.
 
 Detects Go modules from go.mod and checks the Go module proxy.
-Handles Go's module path encoding (uppercase → !lowercase).
+Handles Go's module path encoding (uppercase -> !lowercase).
 """
 
 import logging
@@ -12,17 +11,17 @@ from typing import Optional
 
 import requests
 
-from . import RegistryProvider, PackageMetadata
+from ..domain.repository import PackageMetadata
+from . import MetadataSource
 
 logger = logging.getLogger(__name__)
 
 
 def _encode_module_path(path: str) -> str:
-    """
-    Encode a Go module path for the proxy API.
+    """Encode a Go module path for the proxy API.
 
     Go proxy uses a case-encoding where uppercase letters
-    are replaced with !lowercase (e.g., "GitHub" → "!git!hub").
+    are replaced with !lowercase (e.g., "GitHub" -> "!git!hub").
     """
     result = []
     for ch in path:
@@ -34,13 +33,15 @@ def _encode_module_path(path: str) -> str:
     return ''.join(result)
 
 
-class GoProvider(RegistryProvider):
-    """Go module proxy provider."""
-    registry = "go"
+class GoSource(MetadataSource):
+    """Go module proxy source."""
+
+    source_id = "go"
     name = "Go Module Proxy"
+    target = "publications"
     batch = False
 
-    def detect(self, repo_path: str, repo_record: Optional[dict] = None) -> Optional[str]:
+    def _detect_name(self, repo_path: str) -> Optional[str]:
         """Detect Go module path from go.mod."""
         gomod_path = Path(repo_path) / 'go.mod'
         if not gomod_path.exists():
@@ -55,6 +56,9 @@ class GoProvider(RegistryProvider):
         except Exception as e:
             logger.debug(f"Go detect failed for {repo_path}: {e}")
         return None
+
+    def detect(self, repo_path: str, repo_record: Optional[dict] = None) -> bool:
+        return self._detect_name(repo_path) is not None
 
     def check(self, package_name: str, config: Optional[dict] = None) -> Optional[PackageMetadata]:
         """Check Go module proxy for module."""
@@ -82,5 +86,15 @@ class GoProvider(RegistryProvider):
             logger.debug(f"Go check failed for {package_name}: {e}")
         return None
 
+    def fetch(self, repo_path: str, repo_record: Optional[dict] = None,
+              config: Optional[dict] = None) -> Optional[dict]:
+        name = self._detect_name(repo_path)
+        if not name:
+            return None
+        metadata = self.check(name, config)
+        if metadata is None:
+            return None
+        return metadata.to_dict()
 
-provider = GoProvider()
+
+source = GoSource()

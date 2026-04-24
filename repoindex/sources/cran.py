@@ -1,5 +1,4 @@
-"""
-CRAN/Bioconductor registry provider for repoindex.
+"""CRAN/Bioconductor registry metadata source for repoindex.
 
 Detects R packages via DESCRIPTION files and checks publication
 status using the crandb JSON API (CRAN) and Bioconductor JSON API.
@@ -11,7 +10,8 @@ from typing import Dict, Optional
 
 import requests
 
-from . import RegistryProvider, PackageMetadata
+from ..domain.repository import PackageMetadata
+from . import MetadataSource
 
 logger = logging.getLogger(__name__)
 
@@ -34,13 +34,15 @@ def _parse_description(desc_path: str) -> Dict[str, Optional[str]]:
     return {'package': None}
 
 
-class CRANProvider(RegistryProvider):
-    """Comprehensive R Archive Network provider."""
-    registry = "cran"
+class CRANSource(MetadataSource):
+    """Comprehensive R Archive Network source."""
+
+    source_id = "cran"
     name = "CRAN / Bioconductor"
+    target = "publications"
     batch = False
 
-    def detect(self, repo_path: str, repo_record: Optional[dict] = None) -> Optional[str]:
+    def _detect_name(self, repo_path: str) -> Optional[str]:
         """Detect R package name from DESCRIPTION file."""
         desc_path = Path(repo_path) / 'DESCRIPTION'
         if not desc_path.exists():
@@ -51,6 +53,9 @@ class CRANProvider(RegistryProvider):
         except Exception as e:
             logger.debug(f"CRAN detect failed for {repo_path}: {e}")
             return None
+
+    def detect(self, repo_path: str, repo_record: Optional[dict] = None) -> bool:
+        return self._detect_name(repo_path) is not None
 
     def check(self, package_name: str, config: Optional[dict] = None) -> Optional[PackageMetadata]:
         """Check CRAN (via crandb JSON API) and Bioconductor for package."""
@@ -97,5 +102,15 @@ class CRANProvider(RegistryProvider):
             url=None,
         )
 
+    def fetch(self, repo_path: str, repo_record: Optional[dict] = None,
+              config: Optional[dict] = None) -> Optional[dict]:
+        name = self._detect_name(repo_path)
+        if not name:
+            return None
+        metadata = self.check(name, config)
+        if metadata is None:
+            return None
+        return metadata.to_dict()
 
-provider = CRANProvider()
+
+source = CRANSource()

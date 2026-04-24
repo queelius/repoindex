@@ -1,24 +1,27 @@
-"""Tests for the PyPI provider wrapper."""
+"""Tests for the PyPI metadata source."""
 
 from unittest.mock import patch, MagicMock
 
 import pytest
 
-from repoindex.providers.pypi import PyPIProvider, provider, _fetch_downloads
+from repoindex.sources.pypi import PyPISource, source, _fetch_downloads
 
 
-class TestPyPIProviderAttributes:
-    def test_registry(self):
-        assert provider.registry == "pypi"
+class TestPyPISourceAttributes:
+    def test_source_id(self):
+        assert source.source_id == "pypi"
 
     def test_name(self):
-        assert provider.name == "Python Package Index"
+        assert source.name == "Python Package Index"
+
+    def test_target(self):
+        assert source.target == "publications"
 
     def test_not_batch(self):
-        assert provider.batch is False
+        assert source.batch is False
 
     def test_is_instance(self):
-        assert isinstance(provider, PyPIProvider)
+        assert isinstance(source, PyPISource)
 
 
 class TestPyPIDetect:
@@ -29,13 +32,15 @@ class TestPyPIDetect:
 name = "my-package"
 version = "1.0.0"
 ''')
-        p = PyPIProvider()
-        assert p.detect(str(tmp_path)) == "my-package"
+        s = PyPISource()
+        assert s.detect(str(tmp_path)) is True
+        assert s._detect_name(str(tmp_path)) == "my-package"
 
     def test_detect_no_packaging_files(self, tmp_path):
-        """No packaging files → None."""
-        p = PyPIProvider()
-        assert p.detect(str(tmp_path)) is None
+        """No packaging files -> False."""
+        s = PyPISource()
+        assert s.detect(str(tmp_path)) is False
+        assert s._detect_name(str(tmp_path)) is None
 
     def test_detect_setup_py(self, tmp_path):
         """Detect from setup.py."""
@@ -43,8 +48,8 @@ version = "1.0.0"
 from setuptools import setup
 setup(name="legacy-pkg")
 ''')
-        p = PyPIProvider()
-        assert p.detect(str(tmp_path)) == "legacy-pkg"
+        s = PyPISource()
+        assert s._detect_name(str(tmp_path)) == "legacy-pkg"
 
 
 class TestFetchDownloads:
@@ -54,19 +59,19 @@ class TestFetchDownloads:
         mock_resp.json.return_value = {
             'data': {'last_day': 100, 'last_week': 700, 'last_month': 3000}
         }
-        with patch('repoindex.providers.pypi.requests.get', return_value=mock_resp):
+        with patch('repoindex.sources.pypi.requests.get', return_value=mock_resp):
             result = _fetch_downloads('repoindex')
         assert result == 3000
 
     def test_returns_none_on_404(self):
         mock_resp = MagicMock()
         mock_resp.status_code = 404
-        with patch('repoindex.providers.pypi.requests.get', return_value=mock_resp):
+        with patch('repoindex.sources.pypi.requests.get', return_value=mock_resp):
             result = _fetch_downloads('nonexistent')
         assert result is None
 
     def test_returns_none_on_error(self):
-        with patch('repoindex.providers.pypi.requests.get', side_effect=Exception("timeout")):
+        with patch('repoindex.sources.pypi.requests.get', side_effect=Exception("timeout")):
             result = _fetch_downloads('anything')
         assert result is None
 
@@ -74,7 +79,7 @@ class TestFetchDownloads:
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.json.return_value = {}
-        with patch('repoindex.providers.pypi.requests.get', return_value=mock_resp):
+        with patch('repoindex.sources.pypi.requests.get', return_value=mock_resp):
             result = _fetch_downloads('some-pkg')
         assert result is None
 
@@ -82,7 +87,7 @@ class TestFetchDownloads:
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.json.return_value = {'data': {'last_day': 100}}
-        with patch('repoindex.providers.pypi.requests.get', return_value=mock_resp):
+        with patch('repoindex.sources.pypi.requests.get', return_value=mock_resp):
             result = _fetch_downloads('some-pkg')
         assert result is None
 
@@ -90,7 +95,7 @@ class TestFetchDownloads:
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.json.return_value = {'data': {'last_month': 500}}
-        with patch('repoindex.providers.pypi.requests.get', return_value=mock_resp) as mock_get:
+        with patch('repoindex.sources.pypi.requests.get', return_value=mock_resp) as mock_get:
             _fetch_downloads('my-package')
         call_args = mock_get.call_args
         assert call_args[0][0] == 'https://pypistats.org/api/packages/my-package/recent'
@@ -99,7 +104,7 @@ class TestFetchDownloads:
 
 
 class TestPyPICheck:
-    @patch('repoindex.providers.pypi._fetch_downloads', return_value=4200)
+    @patch('repoindex.sources.pypi._fetch_downloads', return_value=4200)
     @patch('repoindex.pypi.check_pypi_package')
     def test_check_published(self, mock_check, mock_downloads):
         mock_check.return_value = {
@@ -108,8 +113,8 @@ class TestPyPICheck:
             'url': 'https://pypi.org/project/my-package/',
             'last_updated': '2025-01-01',
         }
-        p = PyPIProvider()
-        result = p.check("my-package")
+        s = PyPISource()
+        result = s.check("my-package")
         assert result is not None
         assert result.registry == "pypi"
         assert result.name == "my-package"
@@ -119,12 +124,12 @@ class TestPyPICheck:
         assert result.downloads is None  # lifetime total not available from PyPI
         mock_downloads.assert_called_once_with("my-package")
 
-    @patch('repoindex.providers.pypi._fetch_downloads')
+    @patch('repoindex.sources.pypi._fetch_downloads')
     @patch('repoindex.pypi.check_pypi_package')
     def test_check_not_found(self, mock_check, mock_downloads):
         mock_check.return_value = {'exists': False}
-        p = PyPIProvider()
-        result = p.check("nonexistent-pkg")
+        s = PyPISource()
+        result = s.check("nonexistent-pkg")
         assert result is not None
         assert result.published is False
         assert result.downloads is None
@@ -133,18 +138,18 @@ class TestPyPICheck:
     @patch('repoindex.pypi.check_pypi_package')
     def test_check_api_error(self, mock_check):
         mock_check.return_value = None
-        p = PyPIProvider()
-        result = p.check("error-pkg")
+        s = PyPISource()
+        result = s.check("error-pkg")
         assert result is None
 
     @patch('repoindex.pypi.check_pypi_package')
     def test_check_exception(self, mock_check):
         mock_check.side_effect = Exception("network error")
-        p = PyPIProvider()
-        result = p.check("broken-pkg")
+        s = PyPISource()
+        result = s.check("broken-pkg")
         assert result is None
 
-    @patch('repoindex.providers.pypi._fetch_downloads', return_value=None)
+    @patch('repoindex.sources.pypi._fetch_downloads', return_value=None)
     @patch('repoindex.pypi.check_pypi_package')
     def test_check_published_downloads_unavailable(self, mock_check, mock_downloads):
         """Published package but pypistats returns None."""
@@ -153,18 +158,18 @@ class TestPyPICheck:
             'version': '1.0.0',
             'url': 'https://pypi.org/project/pkg/',
         }
-        p = PyPIProvider()
-        result = p.check("pkg")
+        s = PyPISource()
+        result = s.check("pkg")
         assert result is not None
         assert result.published is True
         assert result.downloads_30d is None
         assert result.downloads is None
 
 
-class TestPyPIMatch:
+class TestPyPIFetch:
     @patch('repoindex.pypi.check_pypi_package')
-    def test_match_integration(self, mock_check, tmp_path):
-        """Full detect → check flow."""
+    def test_fetch_integration(self, mock_check, tmp_path):
+        """Full detect -> check flow via fetch()."""
         (tmp_path / "pyproject.toml").write_text('''
 [project]
 name = "test-pkg"
@@ -174,8 +179,13 @@ name = "test-pkg"
             'version': '1.0.0',
             'url': 'https://pypi.org/project/test-pkg/',
         }
-        p = PyPIProvider()
-        result = p.match(str(tmp_path))
+        s = PyPISource()
+        result = s.fetch(str(tmp_path))
         assert result is not None
-        assert result.name == "test-pkg"
-        assert result.published is True
+        assert result['name'] == "test-pkg"
+        assert result['published'] is True
+        assert result['registry'] == 'pypi'
+
+    def test_fetch_returns_none_without_detection(self, tmp_path):
+        s = PyPISource()
+        assert s.fetch(str(tmp_path)) is None

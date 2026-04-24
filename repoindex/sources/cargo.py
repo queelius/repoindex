@@ -1,5 +1,4 @@
-"""
-Cargo (crates.io) registry provider for repoindex.
+"""Cargo (crates.io) registry metadata source for repoindex.
 
 Detects Rust packages from Cargo.toml and checks crates.io.
 Note: crates.io API requires a User-Agent header.
@@ -12,18 +11,21 @@ from typing import Optional
 
 import requests
 
-from . import RegistryProvider, PackageMetadata
+from ..domain.repository import PackageMetadata
+from . import MetadataSource
 
 logger = logging.getLogger(__name__)
 
 
-class CargoProvider(RegistryProvider):
-    """Cargo (crates.io) registry provider."""
-    registry = "cargo"
+class CargoSource(MetadataSource):
+    """Cargo (crates.io) registry source."""
+
+    source_id = "cargo"
     name = "crates.io"
+    target = "publications"
     batch = False
 
-    def detect(self, repo_path: str, repo_record: Optional[dict] = None) -> Optional[str]:
+    def _detect_name(self, repo_path: str) -> Optional[str]:
         """Detect Rust crate name from Cargo.toml."""
         cargo_path = Path(repo_path) / 'Cargo.toml'
         if not cargo_path.exists():
@@ -47,6 +49,9 @@ class CargoProvider(RegistryProvider):
         except Exception as e:
             logger.debug(f"Cargo detect failed for {repo_path}: {e}")
         return None
+
+    def detect(self, repo_path: str, repo_record: Optional[dict] = None) -> bool:
+        return self._detect_name(repo_path) is not None
 
     def check(self, package_name: str, config: Optional[dict] = None) -> Optional[PackageMetadata]:
         """Check crates.io for package."""
@@ -76,5 +81,15 @@ class CargoProvider(RegistryProvider):
             logger.debug(f"Cargo check failed for {package_name}: {e}")
         return None
 
+    def fetch(self, repo_path: str, repo_record: Optional[dict] = None,
+              config: Optional[dict] = None) -> Optional[dict]:
+        name = self._detect_name(repo_path)
+        if not name:
+            return None
+        metadata = self.check(name, config)
+        if metadata is None:
+            return None
+        return metadata.to_dict()
 
-provider = CargoProvider()
+
+source = CargoSource()

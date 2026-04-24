@@ -1,29 +1,32 @@
-"""Tests for the CRAN provider wrapper."""
+"""Tests for the CRAN metadata source."""
 
 from unittest.mock import patch, MagicMock
 
 import pytest
 
-from repoindex.providers.cran import CRANProvider, _parse_description, provider
+from repoindex.sources.cran import CRANSource, _parse_description, source
 
 
 # ---------------------------------------------------------------------------
-# Provider attributes
+# Source attributes
 # ---------------------------------------------------------------------------
 
-class TestCRANProviderAttributes:
-    def test_registry(self):
-        assert provider.registry == "cran"
+class TestCRANSourceAttributes:
+    def test_source_id(self):
+        assert source.source_id == "cran"
 
     def test_name(self):
-        assert "CRAN" in provider.name
+        assert "CRAN" in source.name
+
+    def test_target(self):
+        assert source.target == "publications"
 
     def test_not_batch(self):
-        assert provider.batch is False
+        assert source.batch is False
 
 
 # ---------------------------------------------------------------------------
-# detect()
+# detect() / _detect_name()
 # ---------------------------------------------------------------------------
 
 class TestCRANDetect:
@@ -32,27 +35,28 @@ class TestCRANDetect:
         (tmp_path / "DESCRIPTION").write_text(
             "Package: myRpkg\nVersion: 0.1.0\nTitle: Test\n"
         )
-        p = CRANProvider()
-        assert p.detect(str(tmp_path)) == "myRpkg"
+        s = CRANSource()
+        assert s.detect(str(tmp_path)) is True
+        assert s._detect_name(str(tmp_path)) == "myRpkg"
 
     def test_detect_no_description(self, tmp_path):
-        """No DESCRIPTION -> None."""
-        p = CRANProvider()
-        assert p.detect(str(tmp_path)) is None
+        """No DESCRIPTION -> False."""
+        s = CRANSource()
+        assert s.detect(str(tmp_path)) is False
 
     def test_detect_non_r_description(self, tmp_path):
-        """DESCRIPTION without Package field -> None."""
+        """DESCRIPTION without Package field -> False."""
         (tmp_path / "DESCRIPTION").write_text("Title: Just a document\n")
-        p = CRANProvider()
-        assert p.detect(str(tmp_path)) is None
+        s = CRANSource()
+        assert s.detect(str(tmp_path)) is False
 
 
 # ---------------------------------------------------------------------------
-# check() — crandb JSON API
+# check() -- crandb JSON API
 # ---------------------------------------------------------------------------
 
 class TestCRANCheck:
-    @patch('repoindex.providers.cran.requests.get')
+    @patch('repoindex.sources.cran.requests.get')
     def test_check_published_on_cran(self, mock_get):
         """crandb returns 200 with JSON -> CRAN metadata."""
         mock_resp = MagicMock()
@@ -64,8 +68,8 @@ class TestCRANCheck:
         }
         mock_get.return_value = mock_resp
 
-        p = CRANProvider()
-        result = p.check("myRpkg")
+        s = CRANSource()
+        result = s.check("myRpkg")
 
         assert result is not None
         assert result.registry == "cran"
@@ -77,7 +81,7 @@ class TestCRANCheck:
         assert mock_get.call_count == 1
         assert 'crandb.r-pkg.org/myRpkg' in mock_get.call_args[0][0]
 
-    @patch('repoindex.providers.cran.requests.get')
+    @patch('repoindex.sources.cran.requests.get')
     def test_check_published_on_bioconductor(self, mock_get):
         """crandb 404, Bioconductor 200 -> Bioconductor metadata."""
         cran_resp = MagicMock()
@@ -88,8 +92,8 @@ class TestCRANCheck:
 
         mock_get.side_effect = [cran_resp, bioc_resp]
 
-        p = CRANProvider()
-        result = p.check("myBiocPkg")
+        s = CRANSource()
+        result = s.check("myBiocPkg")
 
         assert result is not None
         assert result.registry == "bioconductor"
@@ -98,7 +102,7 @@ class TestCRANCheck:
         assert "bioconductor.org" in result.url
         assert mock_get.call_count == 2
 
-    @patch('repoindex.providers.cran.requests.get')
+    @patch('repoindex.sources.cran.requests.get')
     def test_check_not_published(self, mock_get):
         """Both APIs return 404 -> PackageMetadata(published=False).
 
@@ -110,15 +114,15 @@ class TestCRANCheck:
         resp_404.status_code = 404
         mock_get.return_value = resp_404
 
-        p = CRANProvider()
-        result = p.check("unpublished-pkg")
+        s = CRANSource()
+        result = s.check("unpublished-pkg")
 
         assert result is not None
         assert result.published is False
         assert result.registry == 'cran'
         assert result.name == 'unpublished-pkg'
 
-    @patch('repoindex.providers.cran.requests.get')
+    @patch('repoindex.sources.cran.requests.get')
     def test_check_cran_exception_falls_through_to_bioc(self, mock_get):
         """Network error on crandb -> still tries Bioconductor."""
         bioc_resp = MagicMock()
@@ -126,24 +130,24 @@ class TestCRANCheck:
 
         mock_get.side_effect = [Exception("timeout"), bioc_resp]
 
-        p = CRANProvider()
-        result = p.check("myBiocPkg")
+        s = CRANSource()
+        result = s.check("myBiocPkg")
 
         assert result is not None
         assert result.registry == "bioconductor"
 
-    @patch('repoindex.providers.cran.requests.get')
+    @patch('repoindex.sources.cran.requests.get')
     def test_check_both_exception(self, mock_get):
         """Both APIs raise -> still returns unpublished record (not None)."""
         mock_get.side_effect = Exception("fail")
 
-        p = CRANProvider()
-        result = p.check("error-pkg")
+        s = CRANSource()
+        result = s.check("error-pkg")
 
         assert result is not None
         assert result.published is False
 
-    @patch('repoindex.providers.cran.requests.get')
+    @patch('repoindex.sources.cran.requests.get')
     def test_check_version_none_when_missing(self, mock_get):
         """crandb JSON missing Version key -> version=None."""
         mock_resp = MagicMock()
@@ -151,12 +155,38 @@ class TestCRANCheck:
         mock_resp.json.return_value = {'Package': 'bare'}
         mock_get.return_value = mock_resp
 
-        p = CRANProvider()
-        result = p.check("bare")
+        s = CRANSource()
+        result = s.check("bare")
 
         assert result is not None
         assert result.version is None
         assert result.published is True
+
+
+# ---------------------------------------------------------------------------
+# fetch() (integration)
+# ---------------------------------------------------------------------------
+
+class TestCRANFetch:
+    @patch('repoindex.sources.cran.requests.get')
+    def test_fetch_integration(self, mock_get, tmp_path):
+        (tmp_path / "DESCRIPTION").write_text(
+            "Package: testpkg\nVersion: 1.0.0\n"
+        )
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {'Package': 'testpkg', 'Version': '1.0.0'}
+        mock_get.return_value = mock_resp
+
+        s = CRANSource()
+        result = s.fetch(str(tmp_path))
+        assert result is not None
+        assert result['name'] == 'testpkg'
+        assert result['published'] is True
+
+    def test_fetch_returns_none_without_detection(self, tmp_path):
+        s = CRANSource()
+        assert s.fetch(str(tmp_path)) is None
 
 
 # ---------------------------------------------------------------------------

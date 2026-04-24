@@ -1,5 +1,4 @@
-"""
-RubyGems registry provider for repoindex.
+"""RubyGems registry metadata source for repoindex.
 
 Detects Ruby gems from .gemspec files and checks rubygems.org.
 """
@@ -11,18 +10,21 @@ from typing import Optional
 
 import requests
 
-from . import RegistryProvider, PackageMetadata
+from ..domain.repository import PackageMetadata
+from . import MetadataSource
 
 logger = logging.getLogger(__name__)
 
 
-class RubyGemsProvider(RegistryProvider):
-    """RubyGems.org registry provider."""
-    registry = "rubygems"
+class RubyGemsSource(MetadataSource):
+    """RubyGems.org registry source."""
+
+    source_id = "rubygems"
     name = "RubyGems"
+    target = "publications"
     batch = False
 
-    def detect(self, repo_path: str, repo_record: Optional[dict] = None) -> Optional[str]:
+    def _detect_name(self, repo_path: str) -> Optional[str]:
         """Detect gem name from .gemspec file."""
         repo = Path(repo_path)
 
@@ -43,6 +45,9 @@ class RubyGemsProvider(RegistryProvider):
 
         # Fallback: gemspec filename without extension
         return gemspecs[0].stem
+
+    def detect(self, repo_path: str, repo_record: Optional[dict] = None) -> bool:
+        return self._detect_name(repo_path) is not None
 
     def check(self, package_name: str, config: Optional[dict] = None) -> Optional[PackageMetadata]:
         """Check RubyGems.org for gem."""
@@ -70,5 +75,15 @@ class RubyGemsProvider(RegistryProvider):
             logger.debug(f"RubyGems check failed for {package_name}: {e}")
         return None
 
+    def fetch(self, repo_path: str, repo_record: Optional[dict] = None,
+              config: Optional[dict] = None) -> Optional[dict]:
+        name = self._detect_name(repo_path)
+        if not name:
+            return None
+        metadata = self.check(name, config)
+        if metadata is None:
+            return None
+        return metadata.to_dict()
 
-provider = RubyGemsProvider()
+
+source = RubyGemsSource()

@@ -1,5 +1,4 @@
-"""
-Conda (Anaconda/conda-forge) registry provider for repoindex.
+"""Conda (Anaconda/conda-forge) registry metadata source for repoindex.
 
 Detects conda recipes from meta.yaml and checks the Anaconda API.
 """
@@ -11,18 +10,21 @@ from typing import Optional
 
 import requests
 
-from . import RegistryProvider, PackageMetadata
+from ..domain.repository import PackageMetadata
+from . import MetadataSource
 
 logger = logging.getLogger(__name__)
 
 
-class CondaProvider(RegistryProvider):
-    """Conda-forge / Anaconda registry provider."""
-    registry = "conda"
+class CondaSource(MetadataSource):
+    """Conda-forge / Anaconda registry source."""
+
+    source_id = "conda"
     name = "conda-forge"
+    target = "publications"
     batch = False
 
-    def detect(self, repo_path: str, repo_record: Optional[dict] = None) -> Optional[str]:
+    def _detect_name(self, repo_path: str) -> Optional[str]:
         """Detect conda package from recipe/meta.yaml or meta.yaml."""
         candidates = [
             Path(repo_path) / 'recipe' / 'meta.yaml',
@@ -49,6 +51,9 @@ class CondaProvider(RegistryProvider):
                     logger.debug(f"Conda detect failed for {path}: {e}")
         return None
 
+    def detect(self, repo_path: str, repo_record: Optional[dict] = None) -> bool:
+        return self._detect_name(repo_path) is not None
+
     def check(self, package_name: str, config: Optional[dict] = None) -> Optional[PackageMetadata]:
         """Check Anaconda (conda-forge channel) for package."""
         try:
@@ -74,5 +79,15 @@ class CondaProvider(RegistryProvider):
             logger.debug(f"Conda check failed for {package_name}: {e}")
         return None
 
+    def fetch(self, repo_path: str, repo_record: Optional[dict] = None,
+              config: Optional[dict] = None) -> Optional[dict]:
+        name = self._detect_name(repo_path)
+        if not name:
+            return None
+        metadata = self.check(name, config)
+        if metadata is None:
+            return None
+        return metadata.to_dict()
 
-provider = CondaProvider()
+
+source = CondaSource()

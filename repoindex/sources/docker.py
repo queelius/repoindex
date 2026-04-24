@@ -1,5 +1,4 @@
-"""
-Docker Hub registry provider for repoindex.
+"""Docker Hub registry metadata source for repoindex.
 
 Detects Docker images from Dockerfile and checks Docker Hub.
 Requires owner information from repo_record for the Hub namespace.
@@ -11,18 +10,21 @@ from typing import Optional
 
 import requests
 
-from . import RegistryProvider, PackageMetadata
+from ..domain.repository import PackageMetadata
+from . import MetadataSource
 
 logger = logging.getLogger(__name__)
 
 
-class DockerProvider(RegistryProvider):
-    """Docker Hub registry provider."""
-    registry = "docker"
+class DockerSource(MetadataSource):
+    """Docker Hub registry source."""
+
+    source_id = "docker"
     name = "Docker Hub"
+    target = "publications"
     batch = False
 
-    def detect(self, repo_path: str, repo_record: Optional[dict] = None) -> Optional[str]:
+    def _detect_name(self, repo_path: str, repo_record: Optional[dict] = None) -> Optional[str]:
         """Detect Docker image from Dockerfile presence."""
         dockerfile = Path(repo_path) / 'Dockerfile'
         if not dockerfile.exists():
@@ -37,6 +39,9 @@ class DockerProvider(RegistryProvider):
         if owner:
             return f"{owner}/{repo_name}"
         return repo_name
+
+    def detect(self, repo_path: str, repo_record: Optional[dict] = None) -> bool:
+        return self._detect_name(repo_path, repo_record) is not None
 
     def check(self, package_name: str, config: Optional[dict] = None) -> Optional[PackageMetadata]:
         """Check Docker Hub for image."""
@@ -70,5 +75,15 @@ class DockerProvider(RegistryProvider):
             logger.debug(f"Docker check failed for {package_name}: {e}")
         return None
 
+    def fetch(self, repo_path: str, repo_record: Optional[dict] = None,
+              config: Optional[dict] = None) -> Optional[dict]:
+        name = self._detect_name(repo_path, repo_record)
+        if not name:
+            return None
+        metadata = self.check(name, config)
+        if metadata is None:
+            return None
+        return metadata.to_dict()
 
-provider = DockerProvider()
+
+source = DockerSource()

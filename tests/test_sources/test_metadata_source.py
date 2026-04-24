@@ -1,7 +1,5 @@
 """Tests for MetadataSource ABC and discovery."""
-import os
 import pytest
-from unittest.mock import MagicMock
 
 
 class TestMetadataSourceABC:
@@ -295,156 +293,8 @@ source = S()
         user_dir.mkdir()
         (user_dir / "wrong_type.py").write_text("source = 'not a MetadataSource'\n")
         result = discover_sources(user_dir=str(user_dir))
-        # Built-in adapters are still present; the wrong_type.py source is not
+        # Built-in sources are still present; the wrong_type.py source is not
         assert all(s.source_id != 'wrong_type' for s in result)
-
-    def test_backward_compat_providers_dir(self, tmp_path, monkeypatch):
-        """User sources in ~/.repoindex/providers/ with MetadataSource are discovered."""
-        from repoindex.sources import discover_sources
-        user_dir = tmp_path / "sources"
-        user_dir.mkdir()
-        providers_dir = tmp_path / "providers"
-        providers_dir.mkdir()
-        (providers_dir / "compat_source.py").write_text('''
-from repoindex.sources import MetadataSource
-
-class CompatSource(MetadataSource):
-    source_id = "compat"
-    name = "Compat"
-    def detect(self, repo_path, repo_record=None):
-        return False
-    def fetch(self, repo_path, repo_record=None, config=None):
-        return None
-
-source = CompatSource()
-''')
-        # Monkeypatch expanduser so providers dir is found
-        original_expanduser = os.path.expanduser
-        def fake_expanduser(path):
-            if path == '~/.repoindex/providers':
-                return str(providers_dir)
-            return original_expanduser(path)
-        monkeypatch.setattr(os.path, 'expanduser', fake_expanduser)
-
-        result = discover_sources(user_dir=str(user_dir))
-        ids = [s.source_id for s in result]
-        assert "compat" in ids
-
-    def test_backward_compat_provider_attr(self, tmp_path, monkeypatch):
-        """Old-style 'provider' attribute that is a MetadataSource is discovered."""
-        from repoindex.sources import discover_sources
-        user_dir = tmp_path / "sources"
-        user_dir.mkdir()
-        providers_dir = tmp_path / "providers"
-        providers_dir.mkdir()
-        (providers_dir / "old_provider.py").write_text('''
-from repoindex.sources import MetadataSource
-
-class OldProvider(MetadataSource):
-    source_id = "old_prov"
-    name = "Old Provider"
-    target = "publications"
-    def detect(self, repo_path, repo_record=None):
-        return False
-    def fetch(self, repo_path, repo_record=None, config=None):
-        return None
-
-provider = OldProvider()
-''')
-        original_expanduser = os.path.expanduser
-        def fake_expanduser(path):
-            if path == '~/.repoindex/providers':
-                return str(providers_dir)
-            return original_expanduser(path)
-        monkeypatch.setattr(os.path, 'expanduser', fake_expanduser)
-
-        result = discover_sources(user_dir=str(user_dir))
-        ids = [s.source_id for s in result]
-        assert "old_prov" in ids
-
-    def test_backward_compat_platform_attr(self, tmp_path, monkeypatch):
-        """Old-style 'platform' attribute that is a MetadataSource is discovered."""
-        from repoindex.sources import discover_sources
-        user_dir = tmp_path / "sources"
-        user_dir.mkdir()
-        providers_dir = tmp_path / "providers"
-        providers_dir.mkdir()
-        (providers_dir / "old_platform.py").write_text('''
-from repoindex.sources import MetadataSource
-
-class OldPlatform(MetadataSource):
-    source_id = "old_plat"
-    name = "Old Platform"
-    target = "repos"
-    def detect(self, repo_path, repo_record=None):
-        return False
-    def fetch(self, repo_path, repo_record=None, config=None):
-        return None
-
-platform = OldPlatform()
-''')
-        original_expanduser = os.path.expanduser
-        def fake_expanduser(path):
-            if path == '~/.repoindex/providers':
-                return str(providers_dir)
-            return original_expanduser(path)
-        monkeypatch.setattr(os.path, 'expanduser', fake_expanduser)
-
-        result = discover_sources(user_dir=str(user_dir))
-        ids = [s.source_id for s in result]
-        assert "old_plat" in ids
-
-    def test_only_filter_applies_to_all_sources(self, tmp_path, monkeypatch):
-        """The only filter applies to both user sources and backward compat providers."""
-        from repoindex.sources import discover_sources
-        user_dir = tmp_path / "sources"
-        user_dir.mkdir()
-        (user_dir / "s1.py").write_text('''
-from repoindex.sources import MetadataSource
-
-class S1(MetadataSource):
-    source_id = "s1"
-    name = "S1"
-    def detect(self, repo_path, repo_record=None):
-        return False
-    def fetch(self, repo_path, repo_record=None, config=None):
-        return None
-
-source = S1()
-''')
-        providers_dir = tmp_path / "providers"
-        providers_dir.mkdir()
-        (providers_dir / "s2.py").write_text('''
-from repoindex.sources import MetadataSource
-
-class S2(MetadataSource):
-    source_id = "s2"
-    name = "S2"
-    def detect(self, repo_path, repo_record=None):
-        return False
-    def fetch(self, repo_path, repo_record=None, config=None):
-        return None
-
-source = S2()
-''')
-        original_expanduser = os.path.expanduser
-        def fake_expanduser(path):
-            if path == '~/.repoindex/providers':
-                return str(providers_dir)
-            return original_expanduser(path)
-        monkeypatch.setattr(os.path, 'expanduser', fake_expanduser)
-
-        # Only s1
-        result = discover_sources(user_dir=str(user_dir), only=['s1'])
-        ids = [s.source_id for s in result]
-        assert 's1' in ids
-        assert 's2' not in ids
-
-        # Only s2
-        result = discover_sources(user_dir=str(user_dir), only=['s2'])
-        ids = [s.source_id for s in result]
-        assert 's2' in ids
-        assert 's1' not in ids
 
     def test_syntax_error_in_user_source_skipped(self, tmp_path):
         from repoindex.sources import discover_sources
@@ -461,7 +311,7 @@ source = S2()
         (user_dir / "readme.txt").write_text("not a source")
         (user_dir / "data.json").write_text("{}")
         result = discover_sources(user_dir=str(user_dir))
-        # Built-in adapters are present; non-.py files are not loaded as user sources
+        # Built-in sources are present; non-.py files are not loaded as user sources
         assert all(s.source_id != 'readme' for s in result)
 
 
@@ -560,129 +410,8 @@ source = S()
         assert ids == ["aa", "mm", "zz"]
 
 
-class TestRegistryProviderAdapter:
-    """Test the adapter that wraps RegistryProvider as MetadataSource."""
-
-    def test_wraps_registry_provider(self):
-        from repoindex.sources import _RegistryProviderAdapter, MetadataSource
-        mock_provider = MagicMock()
-        mock_provider.registry = "fakepkg"
-        mock_provider.name = "Fake Package Registry"
-        mock_provider.batch = False
-
-        adapter = _RegistryProviderAdapter(mock_provider)
-        assert isinstance(adapter, MetadataSource)
-        assert adapter.source_id == "fakepkg"
-        assert adapter.target == "publications"
-
-    def test_detect_delegates(self):
-        from repoindex.sources import _RegistryProviderAdapter
-        mock_provider = MagicMock()
-        mock_provider.registry = "test"
-        mock_provider.name = "Test"
-        mock_provider.batch = False
-        mock_provider.detect.return_value = "pkg-name"  # non-None = detected
-
-        adapter = _RegistryProviderAdapter(mock_provider)
-        assert adapter.detect("/repo", {}) is True
-
-    def test_detect_none_means_false(self):
-        from repoindex.sources import _RegistryProviderAdapter
-        mock_provider = MagicMock()
-        mock_provider.registry = "test"
-        mock_provider.name = "Test"
-        mock_provider.batch = False  # non-batch provider
-        mock_provider.detect.return_value = None
-
-        adapter = _RegistryProviderAdapter(mock_provider)
-        assert adapter.detect("/repo", {}) is False
-
-    def test_batch_provider_detect_always_true(self):
-        """Batch providers (Zenodo) always return True from detect."""
-        from repoindex.sources import _RegistryProviderAdapter
-        mock_provider = MagicMock()
-        mock_provider.registry = "zenodo"
-        mock_provider.name = "Zenodo"
-        mock_provider.batch = True
-        mock_provider.detect.return_value = None  # batch providers return None
-
-        adapter = _RegistryProviderAdapter(mock_provider)
-        assert adapter.detect("/repo", {}) is True
-
-    def test_fetch_delegates_to_match(self):
-        from repoindex.sources import _RegistryProviderAdapter
-        mock_metadata = MagicMock()
-        mock_metadata.to_dict.return_value = {'registry': 'test', 'name': 'pkg', 'published': True}
-
-        mock_provider = MagicMock()
-        mock_provider.registry = "test"
-        mock_provider.name = "Test"
-        mock_provider.match.return_value = mock_metadata
-
-        adapter = _RegistryProviderAdapter(mock_provider)
-        result = adapter.fetch("/repo", {}, {})
-        assert result == {'registry': 'test', 'name': 'pkg', 'published': True}
-
-    def test_fetch_returns_none_when_no_match(self):
-        from repoindex.sources import _RegistryProviderAdapter
-        mock_provider = MagicMock()
-        mock_provider.registry = "test"
-        mock_provider.name = "Test"
-        mock_provider.match.return_value = None
-
-        adapter = _RegistryProviderAdapter(mock_provider)
-        assert adapter.fetch("/repo", {}, {}) is None
-
-    def test_prefetch_delegates(self):
-        from repoindex.sources import _RegistryProviderAdapter
-        mock_provider = MagicMock()
-        mock_provider.registry = "test"
-        mock_provider.name = "Test"
-        mock_provider.batch = True
-
-        adapter = _RegistryProviderAdapter(mock_provider)
-        adapter.prefetch({'key': 'val'})
-        mock_provider.prefetch.assert_called_once_with({'key': 'val'})
-
-
-class TestPlatformProviderAdapter:
-    """Test the adapter that wraps PlatformProvider as MetadataSource."""
-
-    def test_wraps_platform_provider(self):
-        from repoindex.sources import _PlatformProviderAdapter, MetadataSource
-        mock_platform = MagicMock()
-        mock_platform.platform_id = "fakehost"
-        mock_platform.name = "Fake Host"
-
-        adapter = _PlatformProviderAdapter(mock_platform)
-        assert isinstance(adapter, MetadataSource)
-        assert adapter.source_id == "fakehost"
-        assert adapter.target == "repos"
-
-    def test_detect_delegates(self):
-        from repoindex.sources import _PlatformProviderAdapter
-        mock_platform = MagicMock()
-        mock_platform.platform_id = "test"
-        mock_platform.name = "Test"
-        mock_platform.detect.return_value = True
-
-        adapter = _PlatformProviderAdapter(mock_platform)
-        assert adapter.detect("/repo", {'remote_url': 'test.com'}) is True
-
-    def test_fetch_delegates_to_enrich(self):
-        from repoindex.sources import _PlatformProviderAdapter
-        mock_platform = MagicMock()
-        mock_platform.platform_id = "test"
-        mock_platform.name = "Test"
-        mock_platform.enrich.return_value = {'test_stars': 42}
-
-        adapter = _PlatformProviderAdapter(mock_platform)
-        result = adapter.fetch("/repo", {}, {})
-        assert result == {'test_stars': 42}
-
-
 class TestBuiltinSourcesDiscovery:
-    """Test that discover_sources() finds existing providers via adapters."""
+    """Test that discover_sources() finds built-in native sources."""
 
     def test_discovers_github_platform(self):
         from repoindex.sources import discover_sources

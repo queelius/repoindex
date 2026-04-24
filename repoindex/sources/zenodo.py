@@ -1,34 +1,29 @@
-"""
-Zenodo registry provider for repoindex.
+"""Zenodo registry metadata source for repoindex.
 
-Batch provider — fetches all records by ORCID in a single API call
-during prefetch(), then matches repos locally in match().
+Batch source -- fetches all records by ORCID in a single API call
+during prefetch(), then matches repos locally in fetch().
 """
 
 import logging
-from typing import Dict, List, Optional
+from pathlib import Path
+from typing import Optional
 
-from . import RegistryProvider, PackageMetadata
+from ..domain.repository import PackageMetadata
+from . import MetadataSource
 
 logger = logging.getLogger(__name__)
 
 
-class ZenodoProvider(RegistryProvider):
-    """Zenodo DOI archive provider (batch-fetch via ORCID)."""
-    registry = "zenodo"
+class ZenodoSource(MetadataSource):
+    """Zenodo DOI archive source (batch-fetch via ORCID)."""
+
+    source_id = "zenodo"
     name = "Zenodo"
+    target = "publications"
     batch = True
 
     def __init__(self):
         self._records: list = []
-
-    def detect(self, repo_path: str, repo_record: Optional[dict] = None) -> Optional[str]:
-        """Not used for batch providers — match() handles everything."""
-        return None
-
-    def check(self, package_name: str, config: Optional[dict] = None) -> Optional[PackageMetadata]:
-        """Not used for batch providers — match() handles everything."""
-        return None
 
     def prefetch(self, config: dict) -> None:
         """Batch-fetch all Zenodo records by ORCID."""
@@ -46,6 +41,11 @@ class ZenodoProvider(RegistryProvider):
             logger.warning(f"Zenodo prefetch failed: {e}")
             self._records = []
 
+    def detect(self, repo_path: str, repo_record: Optional[dict] = None) -> bool:
+        """Batch sources always return True from detect -- matching logic
+        lives in fetch() and returns None when nothing matches."""
+        return True
+
     def match(self, repo_path: str, repo_record: Optional[dict] = None,
               config: Optional[dict] = None) -> Optional[PackageMetadata]:
         """Match repo to a pre-fetched Zenodo record.
@@ -59,7 +59,6 @@ class ZenodoProvider(RegistryProvider):
             return None
 
         from ..infra.zenodo_client import _normalize_github_url
-        from pathlib import Path
 
         repo_name = Path(repo_path).name.lower()
 
@@ -98,6 +97,13 @@ class ZenodoProvider(RegistryProvider):
 
         return None
 
+    def fetch(self, repo_path: str, repo_record: Optional[dict] = None,
+              config: Optional[dict] = None) -> Optional[dict]:
+        metadata = self.match(repo_path, repo_record, config)
+        if metadata is None:
+            return None
+        return metadata.to_dict()
+
     @staticmethod
     def _to_metadata(record) -> PackageMetadata:
         """Convert a ZenodoRecord to PackageMetadata."""
@@ -111,4 +117,4 @@ class ZenodoProvider(RegistryProvider):
         )
 
 
-provider = ZenodoProvider()
+source = ZenodoSource()

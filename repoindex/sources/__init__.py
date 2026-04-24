@@ -17,15 +17,13 @@ import importlib.util
 import logging
 import os
 from abc import ABC, abstractmethod
-from pathlib import Path
-from typing import Dict, List, Literal, Optional
+from typing import List, Literal, Optional
 
 logger = logging.getLogger(__name__)
 
 __all__ = [
     'MetadataSource', 'discover_sources',
     'VALID_TARGETS',
-    '_RegistryProviderAdapter', '_PlatformProviderAdapter',
 ]
 
 # Valid values for MetadataSource.target. The discriminator drives where
@@ -34,6 +32,28 @@ __all__ = [
 # would silently no-op in the refresh dispatcher, so discover_sources()
 # validates against this set.
 VALID_TARGETS = frozenset({"repos", "publications"})
+
+# Built-in source module names (relative to repoindex.sources).
+# Order is stable for reproducibility; the first entries emit to 'repos',
+# the rest emit to 'publications'.
+_BUILTIN_SOURCE_MODULES = (
+    # target=repos
+    'citation_cff',
+    'keywords',
+    'local_assets',
+    'gitea',
+    'github',
+    # target=publications
+    'pypi',
+    'cran',
+    'zenodo',
+    'npm',
+    'cargo',
+    'conda',
+    'docker',
+    'rubygems',
+    'go',
+)
 
 
 class MetadataSource(ABC):
@@ -91,93 +111,34 @@ class MetadataSource(ABC):
         """Optional batch pre-fetch hook, called once per refresh."""
 
 
-class _RegistryProviderAdapter(MetadataSource):
-    """Adapts an old-style RegistryProvider to the MetadataSource interface."""
-
-    target = "publications"
-
-    def __init__(self, provider):
-        self._provider = provider
-        self.source_id = provider.registry
-        self.name = provider.name
-        self.batch = getattr(provider, 'batch', False)
-
-    def detect(self, repo_path, repo_record=None):
-        # Batch providers (Zenodo) don't use detect() — their matching logic
-        # is inside match(), which we call via fetch(). Always return True so
-        # _run_sources_parallel gives them a chance to match.
-        if self.batch:
-            return True
-        result = self._provider.detect(repo_path, repo_record)
-        return result is not None
-
-    def fetch(self, repo_path, repo_record=None, config=None):
-        result = self._provider.match(repo_path, repo_record, config)
-        if result is None:
-            return None
-        return result.to_dict()
-
-    def prefetch(self, config):
-        self._provider.prefetch(config)
-
-
-class _PlatformProviderAdapter(MetadataSource):
-    """Adapts an old-style PlatformProvider to the MetadataSource interface."""
-
-    target = "repos"
-
-    def __init__(self, platform):
-        self._platform = platform
-        self.source_id = platform.platform_id
-        self.name = platform.name
-
-    def detect(self, repo_path, repo_record=None):
-        return self._platform.detect(repo_path, repo_record)
-
-    def fetch(self, repo_path, repo_record=None, config=None):
-        return self._platform.enrich(repo_path, repo_record, config)
-
-
 def _build_builtin_sources() -> List[MetadataSource]:
-    """Build the list of built-in sources by wrapping existing providers."""
-    sources = []
+    """Build the list of built-in sources.
 
-    # Load built-in sources (local file scanners + remote platform sources)
-    # Built-in source failures are bugs -- log at WARNING so they aren't hidden.
-    for module_name in ('citation_cff', 'keywords', 'local_assets', 'gitea'):
+    Built-in source failures are bugs -- log at WARNING so they aren't hidden.
+    """
+    sources: List[MetadataSource] = []
+    for module_name in _BUILTIN_SOURCE_MODULES:
         try:
             mod = importlib.import_module(f'.{module_name}', package='repoindex.sources')
             src = getattr(mod, 'source', None)
             if src and isinstance(src, MetadataSource):
                 sources.append(src)
+            else:
+                logger.warning(
+                    "Built-in source module %s has no MetadataSource 'source' attribute",
+                    module_name,
+                )
         except Exception as e:
             logger.warning("Could not load built-in source %s: %s", module_name, e)
-
-    # Wrap registry providers (pypi, cran, zenodo, npm, cargo, etc.)
-    try:
-        from ..providers import discover_providers
-        for provider in discover_providers():
-            sources.append(_RegistryProviderAdapter(provider))
-    except Exception as e:
-        logger.warning("Could not load registry providers: %s", e)
-
-    # Wrap platform providers (github, etc.)
-    try:
-        from ..providers import discover_platforms
-        for platform in discover_platforms():
-            sources.append(_PlatformProviderAdapter(platform))
-    except Exception as e:
-        logger.warning("Could not load platform providers: %s", e)
-
     return sources
 
 
-# Lazy-initialized cache of built-in sources (adapting old providers)
+# Lazy-initialized cache of built-in sources
 _BUILTIN_SOURCES_CACHE: Optional[List[MetadataSource]] = None
 
 
 def _get_builtin_sources() -> List[MetadataSource]:
-    """Get built-in sources, building the adapter cache on first call."""
+    """Get built-in sources, building the cache on first call."""
     global _BUILTIN_SOURCES_CACHE
     if _BUILTIN_SOURCES_CACHE is None:
         _BUILTIN_SOURCES_CACHE = _build_builtin_sources()
@@ -243,11 +204,9 @@ def discover_sources(
     """
     Discover and load metadata sources.
 
-    Loads built-in sources from BUILTIN_SOURCES and user sources
-    from ~/.repoindex/sources/*.py (each exports a module-level `source` attribute).
-
-    Also loads from ~/.repoindex/providers/*.py for backward compatibility
-    (old provider/platform attributes are adapted if they're not MetadataSource instances).
+    Loads built-in sources from `_BUILTIN_SOURCE_MODULES` and user sources
+    from `~/.repoindex/sources/*.py` (each exports a module-level
+    `source` attribute).
 
     Args:
         user_dir: Override path for user sources (default: ~/.repoindex/sources/)
@@ -269,19 +228,6 @@ def discover_sources(
             attributes=['source'],
         )
     )
-
-    # Backward compatibility: also scan ~/.repoindex/providers/ for MetadataSource instances
-    # (old modules may export `source`, `provider`, or `platform` attributes that
-    # are MetadataSource instances if they've been migrated)
-    providers_dir = os.path.expanduser('~/.repoindex/providers')
-    if user_dir != providers_dir:
-        sources.extend(
-            _load_sources_from_directory(
-                providers_dir,
-                module_prefix='repoindex_user_provider_compat',
-                attributes=['source', 'provider', 'platform'],
-            )
-        )
 
     # Apply only filter
     if only is not None:
