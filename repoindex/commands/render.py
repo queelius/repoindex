@@ -21,7 +21,6 @@ from .ops import query_options, _get_repos_from_query
 
 @click.command('export')
 @click.argument('format_id', required=False, default=None)
-@click.argument('query_string', required=False, default='')
 @click.option('--output', '-o', 'output_file', type=click.Path(),
               help='Output directory (arkiv archive) or file (format export)')
 @click.option('--list-formats', is_flag=True, help='List available export formats')
@@ -29,7 +28,6 @@ from .ops import query_options, _get_repos_from_query
 @query_options
 def export_handler(
     format_id: str,
-    query_string: str,
     output_file: Optional[str],
     list_formats: bool,
     debug: bool,
@@ -45,10 +43,8 @@ def export_handler(
     Without FORMAT_ID, produces an arkiv archive directory containing
     JSONL data, schema, SQLite database, and an interactive HTML browser.
 
-    Repo selection is via the filter flags below. The optional QUERY
-    positional is retained for backward compatibility with MCP callers
-    and is currently ignored (the DSL query language was removed in
-    v0.16.0; use `repoindex sql` or flags instead).
+    Repo selection is via the filter flags below. For arbitrary filtering
+    not expressible through flags, use `repoindex sql` and post-process.
 
     With FORMAT_ID, uses the exporter plugin system (bibtex, csv, etc.).
     Use --list-formats to see available format plugins.
@@ -69,17 +65,6 @@ def export_handler(
         repoindex export --list-formats
     """
     from ..exporters import discover_exporters
-
-    # query_string is retained in the signature for MCP back-compat but
-    # has no effect now that the DSL has been removed. Warn so callers
-    # don't silently get unfiltered results.
-    if query_string:
-        click.echo(
-            f"warning: export no longer accepts a DSL query "
-            f"(got: {query_string!r}); use --language/--dirty/--tag/--recent "
-            f"flags instead.",
-            err=True,
-        )
 
     # List formats
     if list_formats:

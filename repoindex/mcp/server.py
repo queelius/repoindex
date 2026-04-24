@@ -299,14 +299,18 @@ def _tag_impl(repo: str, action: str, tag: str = "") -> dict:
         return {'status': 'error', 'error': _sanitize_error(str(e))}
 
 
-def _export_impl(output_dir: str, query: str = "") -> dict:
-    """Export repos as longecho-compliant arkiv archive."""
-    # Reject queries that would be parsed as CLI flags by Click.
-    if query.startswith('-'):
-        return {
-            'status': 'error',
-            'error': 'query must not start with "-" (would be parsed as a flag).',
-        }
+def _export_impl(
+    output_dir: str,
+    language: str = "",
+    dirty: bool = False,
+    tag: str = "",
+    recent: str = "",
+) -> dict:
+    """Export repos as longecho-compliant arkiv archive.
+
+    Filters map to the CLI's flag-based selection. Use SQL via run_sql
+    for arbitrary filtering; the archive is written to output_dir.
+    """
     # Validate output_dir before invoking the CLI to prevent clobbering.
     p = Path(output_dir).expanduser().resolve()
 
@@ -362,13 +366,22 @@ def _export_impl(output_dir: str, query: str = "") -> dict:
                     ),
                 }
 
-    # CLI signature: repoindex export [FORMAT_ID] [QUERY] -o DIR
-    # When query is present, we must pass 'arkiv' explicitly so click doesn't
-    # parse the query string as FORMAT_ID.
-    cmd = ['repoindex', 'export']
-    if query:
-        cmd.extend(['arkiv', query])
-    cmd.extend(['-o', str(p)])
+    # CLI signature: repoindex export [FORMAT_ID] -o DIR [FLAGS]
+    cmd = ['repoindex', 'export', '-o', str(p)]
+    if language:
+        if language.startswith('-'):
+            return {'status': 'error', 'error': 'language must not start with "-".'}
+        cmd.extend(['--language', language])
+    if dirty:
+        cmd.append('--dirty')
+    if tag:
+        if tag.startswith('-'):
+            return {'status': 'error', 'error': 'tag must not start with "-".'}
+        cmd.extend(['--tag', tag])
+    if recent:
+        if recent.startswith('-'):
+            return {'status': 'error', 'error': 'recent must not start with "-".'}
+        cmd.extend(['--recent', recent])
     return _run_cli(
         cmd,
         timeout=120,
@@ -442,10 +455,28 @@ def create_server():
         return _tag_impl(repo, action, tag)
 
     @mcp.tool()
-    def export(output_dir: str, query: str = "") -> dict:
+    def export(
+        output_dir: str,
+        language: str = "",
+        dirty: bool = False,
+        tag: str = "",
+        recent: str = "",
+    ) -> dict:
         """Export repos as longecho-compliant arkiv archive to output_dir.
+
         Includes JSONL data, schema, SQLite database, and HTML browser.
-        Optional query filters which repos are exported (DSL or @view)."""
-        return _export_impl(output_dir, query)
+
+        Optional filters: language (e.g. "Python"), dirty (uncommitted only),
+        tag (e.g. "work/active"; "*" wildcards allowed), recent (e.g. "7d",
+        "30d"). For arbitrary filtering, query via run_sql first to find
+        repo names, then invoke export unfiltered and post-process.
+        """
+        return _export_impl(
+            output_dir,
+            language=language,
+            dirty=dirty,
+            tag=tag,
+            recent=recent,
+        )
 
     return mcp

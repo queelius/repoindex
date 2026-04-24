@@ -402,18 +402,39 @@ class TestExport:
         cmd = mock_run.call_args[0][0]
         assert cmd == ['repoindex', 'export', '-o', str(target.resolve())]
 
-    def test_export_with_query(self, tmp_path):
+    def test_export_with_filters(self, tmp_path):
+        """Filter flags translate to matching CLI args."""
         from repoindex.mcp.server import _export_impl
         target = tmp_path / 'new_out'
         with patch('repoindex.mcp.server.subprocess.run') as mock_run:
             mock_run.return_value = MagicMock(returncode=0, stdout='Done', stderr='')
-            _export_impl(str(target), "language == 'Python'")
+            _export_impl(
+                str(target),
+                language='Python',
+                dirty=True,
+                tag='work/active',
+                recent='7d',
+            )
         cmd = mock_run.call_args[0][0]
-        # Must pass 'arkiv' explicitly so click doesn't parse query as FORMAT_ID
         assert cmd == [
-            'repoindex', 'export', 'arkiv', "language == 'Python'",
+            'repoindex', 'export',
             '-o', str(target.resolve()),
+            '--language', 'Python',
+            '--dirty',
+            '--tag', 'work/active',
+            '--recent', '7d',
         ]
+
+    def test_export_rejects_flag_like_filter_values(self, tmp_path):
+        """Filter values must not be parseable as CLI flags."""
+        from repoindex.mcp.server import _export_impl
+        target = tmp_path / 'new_out'
+        for kwargs in [{'language': '--help'}, {'tag': '-rm'}, {'recent': '--evil'}]:
+            with patch('repoindex.mcp.server.subprocess.run') as mock_run:
+                result = _export_impl(str(target), **kwargs)
+            assert result['status'] == 'error', kwargs
+            assert '-' in result['error']
+            mock_run.assert_not_called()
 
     def test_export_failure(self, tmp_path):
         from repoindex.mcp.server import _export_impl
@@ -511,18 +532,6 @@ class TestExport:
         result = _export_impl(str(target))
         assert result['status'] == 'error'
         assert 'readme' in result['error'].lower()
-
-    def test_export_rejects_flag_like_query(self, tmp_path):
-        """Query must not be parseable as a CLI flag by Click."""
-        from repoindex.mcp.server import _export_impl
-        target = tmp_path / 'new_out'
-        # Must reject before subprocess.run is called — assert it never runs.
-        with patch('repoindex.mcp.server.subprocess.run') as mock_run:
-            result = _export_impl(str(target), query='--help')
-        assert result['status'] == 'error'
-        assert '-' in result['error']
-        mock_run.assert_not_called()
-
 
 class TestSanitizeError:
     def test_sanitize_strips_home(self, monkeypatch, tmp_path):
