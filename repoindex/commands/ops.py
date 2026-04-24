@@ -1826,6 +1826,274 @@ def _wip_snapshot_output_json(snapshotted, skipped, failed, dry_run):
     }), flush=True)
 
 
+# ============================================================================
+# Mirror command
+# ============================================================================
+
+@ops_cmd.command('mirror')
+@click.option('--to', 'to_mirrors', multiple=True,
+              help='Name of a configured mirror to push to (repeatable)')
+@click.option('--all', 'all_mirrors', is_flag=True,
+              help='Push to every configured mirror')
+@click.option('--init', is_flag=True,
+              help='For file:// targets, init a bare repo if missing')
+@click.option('--force', is_flag=True,
+              help='Bypass fast-forward check (use with care)')
+@click.option('--dry-run', is_flag=True, help='Preview actions without pushing')
+@click.option('--json', 'output_json', is_flag=True, help='Output as JSONL')
+@click.option('--debug', is_flag=True, help='Enable debug logging')
+@query_options
+def mirror_handler(
+    to_mirrors: tuple,
+    all_mirrors: bool,
+    init: bool,
+    force: bool,
+    dry_run: bool,
+    output_json: bool,
+    debug: bool,
+    # Query flags
+    language: Optional[str],
+    dirty: bool,
+    tag: tuple,
+    recent: Optional[str],
+):
+    """Mirror repositories to configured redundancy targets.
+
+    Pushes every branch and tag (``git push --mirror``) to one or more
+    named mirrors defined in ``~/.repoindex/config.yaml``:
+
+        mirrors:
+          - name: codeberg
+            url_template: "https://codeberg.org/queelius/{repo}.git"
+          - name: gitea-gdrive
+            url_template: "file:///mnt/gdrive/git-mirrors/{repo}.git"
+
+    For each repo x mirror, the URL is resolved from an existing git
+    remote of the same name if present (user override wins), else added
+    from ``url_template``. Fast-forward is enforced by default; use
+    ``--force`` to overwrite. ``--init`` creates missing bare repos for
+    ``file://`` targets.
+
+    \b
+    Examples:
+        # Preview pushing every repo to Codeberg
+        repoindex ops mirror --to codeberg --dry-run
+        # Push all Python repos to every configured mirror
+        repoindex ops mirror --all --language python
+        # Mirror dirty repos to local Gitea, initializing bare repos
+        repoindex ops mirror --to gitea-gdrive --dirty --init
+        # Force push (overwrites diverged mirror branches)
+        repoindex ops mirror --to nas-backup --force
+    """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    from ..services.mirror_service import (
+        load_mirrors,
+        mirror_repo,
+        MirrorConfigError,
+        MirrorResult,
+    )
+
+    if debug:
+        import logging
+        logging.basicConfig(level=logging.DEBUG)
+
+    # --- Scoping: --to and --all are mutually exclusive -------------------
+    if all_mirrors and to_mirrors:
+        msg = "--to and --all are mutually exclusive"
+        if output_json:
+            print(json.dumps({"error": msg}), file=sys.stderr, flush=True)
+        else:
+            click.echo(f"Error: {msg}", err=True)
+        sys.exit(2)
+
+    if not all_mirrors and not to_mirrors:
+        msg = "Specify --to <name> or --all"
+        if output_json:
+            print(json.dumps({"error": msg}), file=sys.stderr, flush=True)
+        else:
+            click.echo(f"Error: {msg}", err=True)
+        sys.exit(2)
+
+    config = load_config()
+
+    try:
+        all_targets = load_mirrors(config)
+    except MirrorConfigError as e:
+        msg = f"invalid mirrors config: {e}"
+        if output_json:
+            print(json.dumps({"error": msg}), file=sys.stderr, flush=True)
+        else:
+            click.echo(f"Error: {msg}", err=True)
+        sys.exit(2)
+
+    if not all_targets:
+        msg = "no mirrors configured (add a 'mirrors:' section to config.yaml)"
+        if output_json:
+            print(json.dumps({"error": msg}), file=sys.stderr, flush=True)
+        else:
+            click.echo(f"Error: {msg}", err=True)
+        sys.exit(2)
+
+    if all_mirrors:
+        selected = list(all_targets)
+    else:
+        by_name = {m.name: m for m in all_targets}
+        selected = []
+        unknown = []
+        for name in to_mirrors:
+            if name in by_name:
+                selected.append(by_name[name])
+            else:
+                unknown.append(name)
+        if unknown:
+            known = ', '.join(sorted(by_name))
+            msg = (
+                f"unknown mirror(s): {', '.join(unknown)} "
+                f"(configured: {known or 'none'})"
+            )
+            if output_json:
+                print(json.dumps({"error": msg}), file=sys.stderr, flush=True)
+            else:
+                click.echo(f"Error: {msg}", err=True)
+            sys.exit(2)
+
+    # --- Resolve repos via standard flag-based query ----------------------
+    repos = _get_repos_from_query(
+        config, '', debug=debug,
+        language=language, dirty=dirty, tag=tag, recent=recent,
+    )
+    if not repos:
+        _no_repos_message(output_json)
+        return
+
+    if not output_json:
+        mode = "[DRY RUN] " if dry_run else ""
+        click.echo(
+            f"{mode}Mirroring {len(repos)} repo(s) to "
+            f"{len(selected)} target(s)...",
+            err=True,
+        )
+
+    def _mirror_one_repo(repo) -> list[MirrorResult]:
+        """Run all selected mirrors for ONE repo, sequentially.
+
+        Mirrors are kept sequential per repo to avoid server-side lock
+        contention when a host happens to back multiple mirror URLs.
+        Exceptions in mirror_repo are caught so one bad mirror doesn't
+        stop the others for the same repo.
+        """
+        results: list[MirrorResult] = []
+        for target in selected:
+            try:
+                results.append(mirror_repo(
+                    repo['path'], target,
+                    force=force, init=init, dry_run=dry_run,
+                ))
+            except Exception as e:
+                results.append(MirrorResult(
+                    repo_name=Path(repo['path']).name,
+                    repo_path=repo['path'],
+                    mirror_name=target.name,
+                    mirror_url=target.url_for(Path(repo['path']).name),
+                    status='failed',
+                    detail=f"unexpected: {type(e).__name__}: {e}",
+                ))
+        return results
+
+    all_results: list[MirrorResult] = []
+    with ThreadPoolExecutor(max_workers=8) as pool:
+        futures = {pool.submit(_mirror_one_repo, r): r for r in repos}
+        for future in as_completed(futures):
+            repo = futures[future]
+            try:
+                all_results.extend(future.result())
+            except Exception as e:
+                # Per-repo isolation: a failure in the worker must not
+                # discard results already collected for other repos.
+                for target in selected:
+                    all_results.append(MirrorResult(
+                        repo_name=Path(repo['path']).name,
+                        repo_path=repo['path'],
+                        mirror_name=target.name,
+                        mirror_url=target.url_for(Path(repo['path']).name),
+                        status='failed',
+                        detail=f"unexpected: {type(e).__name__}: {e}",
+                    ))
+
+    if output_json:
+        _mirror_output_json(all_results, dry_run)
+    else:
+        _mirror_output_pretty(all_results, dry_run)
+
+
+def _mirror_output_json(results, dry_run):
+    """JSONL output for ops mirror."""
+    for r in results:
+        print(json.dumps({
+            "status": r.status,
+            "repo": r.repo_name,
+            "path": r.repo_path,
+            "mirror": r.mirror_name,
+            "url": r.mirror_url,
+            "detail": r.detail,
+            "added_remote": r.added_remote,
+        }), flush=True)
+
+    mirrored = sum(1 for r in results if r.status in ('ok', 'init+pushed', 'dry-run'))
+    skipped = sum(1 for r in results if r.status == 'skipped')
+    failed = sum(1 for r in results if r.status == 'failed')
+    print(json.dumps({
+        "summary": {
+            "mirrored": mirrored,
+            "skipped": skipped,
+            "failed": failed,
+            "dry_run": dry_run,
+        }
+    }), flush=True)
+
+
+def _mirror_output_pretty(results, dry_run):
+    """Pretty terminal output for ops mirror."""
+    from rich.console import Console
+    from rich.table import Table
+
+    console = Console(stderr=True)
+    mode = "[bold yellow]DRY RUN[/bold yellow] " if dry_run else ""
+    console.print(f"\n{mode}[bold]Mirror[/bold]")
+
+    if results:
+        table = Table(show_header=True, show_lines=False)
+        table.add_column("Repo", style="cyan")
+        table.add_column("Mirror")
+        table.add_column("Status")
+        table.add_column("Detail", style="dim", overflow="fold")
+
+        status_style = {
+            'ok': 'green',
+            'init+pushed': 'green',
+            'dry-run': 'yellow',
+            'skipped': 'yellow',
+            'failed': 'red',
+        }
+        for r in sorted(results, key=lambda x: (x.repo_name, x.mirror_name)):
+            color = status_style.get(r.status, 'white')
+            table.add_row(
+                r.repo_name,
+                r.mirror_name,
+                f"[{color}]{r.status}[/{color}]",
+                r.detail,
+            )
+        console.print(table)
+
+    mirrored = sum(1 for r in results if r.status in ('ok', 'init+pushed', 'dry-run'))
+    skipped = sum(1 for r in results if r.status == 'skipped')
+    failed = sum(1 for r in results if r.status == 'failed')
+
+    console.print(
+        f"\nSummary: {mirrored} mirrored, {skipped} skipped, {failed} failed"
+    )
+
+
 def _wip_snapshot_output_pretty(snapshotted, skipped, failed, dry_run):
     """Pretty terminal output for wip-snapshot."""
     if snapshotted:
