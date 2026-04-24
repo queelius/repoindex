@@ -4,7 +4,7 @@
 
 **repoindex is a filesystem git catalog.** It indexes local git directories — the filesystem path IS the canonical identity. External platforms (GitHub, PyPI, CRAN) provide opt-in enrichment metadata, namespaced with prefixes (`github_stars`, `pypi_published`).
 
-**Version**: 0.15.0 | **Design**: [DESIGN.md](DESIGN.md)
+**Version**: 0.16.0 | **Design**: [DESIGN.md](DESIGN.md)
 
 ## Development Commands
 
@@ -21,7 +21,7 @@ pytest -k "test_status" -v                           # Pattern match
 pytest --cov=repoindex --cov-report=html             # Coverage (ALWAYS after changes)
 ```
 
-All `make` targets auto-activate `.venv/`. Test suite has **1600+ tests** in `tests/`.
+All `make` targets auto-activate `.venv/`. Test suite has **~2000 tests** in `tests/`.
 
 ## Architecture
 
@@ -33,10 +33,10 @@ commands/            services/    database/          domain/
                                   infra/
 ```
 
-- **Domain** (`domain/`): Frozen dataclasses — `Repository`, `Tag`, `Event`, `OperationDetail`, `AuditCheck`. No I/O.
-- **Database** (`database/`): SQLite via `Database` context manager, query compiler (DSL to SQL), schema migrations, CRUD. File: `~/.repoindex/index.db`.
+- **Domain** (`domain/`): Frozen dataclasses (`Repository`, `Tag`, `Event`, `OperationDetail`, `AuditCheck`). No I/O.
+- **Database** (`database/`): SQLite via `Database` context manager, schema migrations, CRUD, flag-to-SQL builder (`services/flag_query.py`). File: `~/.repoindex/index.db`.
 - **Infrastructure** (`infra/`): Git subprocess wrapper, GitHub API client, Zenodo client, file store.
-- **Services** (`services/`): Business logic — discovery, tags, events, auditing, git ops, copy, link, boilerplate, views.
+- **Services** (`services/`): Business logic (discovery, tags, events, auditing, git ops, copy, link, boilerplate, flag_query, tag_derivation).
 - **Commands** (`commands/`): Thin Click wrappers. Parse args, call services, format output (pretty tables default, `--json` for JSONL).
 
 ### Extension Systems
@@ -47,28 +47,30 @@ commands/            services/    database/          domain/
 
 Discovery: `discover_sources()` / `discover_exporters()`.
 
-**MCP Server** (`mcp/`): Provides LLM access to the database via 4 tools (`get_manifest`, `get_schema`, `run_sql`, `refresh`). Entry point: `repoindex mcp`. Requires `pip install repoindex[mcp]`.
+**MCP Server** (`mcp/`): Provides LLM access to the database via 6 tools (`get_manifest`, `get_schema`, `run_sql`, `refresh`, `tag`, `export`). Entry point: `repoindex mcp`. Requires `pip install repoindex[mcp]`.
 
 ### Database Usage
 
 ```python
-from repoindex.database import Database, compile_query, QueryCompileError
+from repoindex.database import Database
+from repoindex.services.flag_query import build_where_and_params, fetch_repos_by_flags
 
 with Database(config=config, read_only=True) as db:
     db.execute("SELECT name FROM repos WHERE language = ?", ("Python",))
 
-compiled = compile_query("language == 'Python' and github_stars > 10")
-# compiled.sql, compiled.params
+where, params = build_where_and_params(language='Python', dirty=True)
+repos = fetch_repos_by_flags(config, language='Python', recent='7d')
 ```
 
 Schema v5, migrations in `database/schema.py`. See **SQL Data Model** below for table details.
 
 ### Other Key Modules
 
-- `cli.py` — Entry point, registers all commands
-- `config.py` — YAML config loading with env var overrides
-- `events.py` — Stateless event scanning from git history
-- `query.py` — Query language parser with `rapidfuzz` fuzzy matching
+- `cli.py`: Entry point, registers all commands.
+- `config.py`: YAML config loading with env var overrides.
+- `events.py`: Stateless event scanning from git history.
+- `services/flag_query.py`: Direct flag-to-SQL builder (replaces the old DSL).
+- `services/tag_derivation.py`: Pure functions deriving tags from repo rows.
 
 ## Critical Patterns
 
@@ -84,17 +86,17 @@ mock_run_command.return_value = (None, 1)        # Failure
 
 ### Repo Resolution in Commands
 
-- `commands/query.py`: `_build_query_from_flags()` — converts CLI flags to query
-- `commands/ops.py`: `_resolve_repos()`, `_get_repos_from_query()` — fetch filtered repos from DB
-- `commands/ops.py`: `query_options` decorator — shared `--dirty`, `--language`, `--tag`, `--recent` flags (4 essential shorthands; other filters via DSL)
+- `services/flag_query.py`: `build_where_and_params()` and `fetch_repos_by_flags()` compile filter flags directly to SQL (no intermediate DSL).
+- `commands/ops.py`: `_resolve_repos()`, `_get_repos_from_query()` fetch filtered repos from DB via `flag_query`.
+- `commands/ops.py`: `query_options` decorator provides the four supported filter flags: `--dirty`, `--language`, `--tag`, `--recent`. For anything more expressive, use `repoindex sql` or the MCP `run_sql` tool.
 
 ### Output Contract
 
-- **Read commands** (`query`, `events`, `show`): Pretty tables by default, `--json` for JSONL
-- **Write commands** (`ops`, `copy`, `link`, `export`): Pretty output by default, `--json` for JSONL
-- Errors to stderr as JSON: `{"error": "msg", "type": "...", "context": {...}}`
-- `--brief` for repo names only (one per line)
-- Use `flush=True` on JSONL prints for streaming
+- **Read commands** (`events`, `show`, `status`, `digest`): Pretty tables by default, `--json` for JSONL.
+- **Write commands** (`ops`, `copy`, `link`, `export`): Pretty output by default, `--json` for JSONL.
+- Errors to stderr as JSON: `{"error": "msg", "type": "...", "context": {...}}`.
+- `--brief` for repo names only (one per line).
+- Use `flush=True` on JSONL prints for streaming.
 
 ### Adding New Commands
 
@@ -110,25 +112,24 @@ mock_run_command.return_value = (None, 1)        # Failure
 - Domain: direct instantiation, no mocking needed
 - `pyfakefs` available for complex filesystem scenarios
 
-## Commands (16 total)
+## Commands (12 total)
 
 ```
 repoindex
 ├── status    # Health dashboard
-├── query     # Filter repos (DSL expressions + 4 shorthand flags)
 ├── events    # Query git events from database
 ├── sql       # Raw SQL + DB maintenance (--info, --schema, --reset, --vacuum)
 ├── refresh   # Sync DB from filesystem (--github, --pypi, --cran, --external)
 ├── show      # Detailed single-repo view
 ├── digest    # Summarize recent activity (conventional commit breakdown)
 ├── export    # Longecho-compliant arkiv archive (default) or format plugins
-├── copy      # Copy repos with query filtering
+├── copy      # Copy repos (filter via --dirty/--language/--tag/--recent)
 ├── link      # Symlink tree management (tree/refresh/status)
 ├── ops       # Collection operations
-│   ├── git   # Multi-repo push/pull/status
-│   └── generate  # Boilerplate (codemeta, license, gitignore, etc.)
+│   ├── git          # Multi-repo push/pull/status
+│   ├── generate     # Boilerplate (codemeta, license, gitignore, etc.)
+│   └── wip-snapshot # Remote-recoverable snapshots of dirty working trees
 ├── tag       # Tag management (add/remove/list/tree)
-├── view      # Saved named queries
 ├── config    # Settings management
 ├── mcp       # MCP server (stdio transport, requires repoindex[mcp])
 └── shell     # Interactive VFS navigation
@@ -136,19 +137,25 @@ repoindex
 
 `db` command exists as hidden deprecated alias for `sql`.
 
-## Query DSL
+The old `query` and `view` commands were removed in v0.16.0 along with
+the DSL compiler and views.yaml machinery. Use filter flags on `copy`,
+`link`, `ops`, and `export`; drop to `repoindex sql` (or the MCP
+`run_sql` tool) for anything more expressive.
 
-Operators: `==`, `!=`, `~=` (fuzzy), `=~` (regex), `>`, `<`, `>=`, `<=`, `contains`, `in`
-Boolean: `and`, `or`, `not`. Dot notation: `license.key`. View refs: `@viewname`.
+## Filter Flags
+
+The four filter flags (`--dirty`, `--language`, `--tag`, `--recent`) are
+accepted by `copy`, `link`, `ops` subcommands, and `export`. They compose
+with implicit AND. Tag values support `*` wildcards. Recent accepts
+durations like `7d`, `30d`, `2w`, `6m`, `1y` or an ISO date. Example:
 
 ```
-"language == 'Python' and github_stars > 10"
-"language ~= 'pyton'"                         # fuzzy match
-"'ml' in github_topics"                       # list membership
-"@python-active and is_clean"                 # view reference
+repoindex ops wip-snapshot --language python --tag 'work/*' --recent 14d
+repoindex copy --dirty --language rust -d /mnt/backup
 ```
 
-Field mappings and compilation in `database/query_compiler.py`. In-memory matching in `query.py`.
+Compilation lives in `services/flag_query.py`. Any filter that flags
+can't express belongs in `repoindex sql` or an MCP `run_sql` query.
 
 ## SQL Data Model
 
@@ -175,12 +182,12 @@ Key sections: `repository_directories` (glob patterns), `github.token` (or `GITH
 
 ## Design Principles
 
-1. **Path is Identity** — filesystem path defines a repo, not remote URL
-2. **Database-First** — `refresh` populates SQLite; read commands query it (no live scanning)
-3. **Unix Philosophy** — compose via pipes, JSONL streams, errors to stderr
-4. **Namespaced Fields** — `github_stars`, `pypi_published`, `cran_version`
-5. **Three Query Layers** — DSL primary, 4 shorthand flags, raw SQL for power users
-6. **Pluggable Extensions** — provider/exporter ABCs with `~/.repoindex/` user directories
+1. **Path is Identity**. Filesystem path defines a repo, not remote URL.
+2. **Database-First**. `refresh` populates SQLite; read commands query it (no live scanning).
+3. **Unix Philosophy**. Compose via pipes, JSONL streams, errors to stderr.
+4. **Namespaced Fields**. `github_stars`, `pypi_published`, `cran_version`.
+5. **Two Query Layers**. Flags for humans at the terminal; SQL (direct or via MCP `run_sql`) for anything structured. The MCP is by far the dominant consumer.
+6. **Pluggable Extensions**. Single `MetadataSource` ABC and `Exporter` ABC, discovered from `~/.repoindex/sources/*.py` and `~/.repoindex/exporters/*.py`.
 
 ## Project Structure
 
