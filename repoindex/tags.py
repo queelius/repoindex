@@ -401,7 +401,7 @@ def auto_detect_tags(repo_path: str) -> List[str]:
 
 
 # ---------------------------------------------------------------------------
-# Legacy helpers used by tag.py, shell.py, and vfs_utils.py
+# Legacy helpers used by tag.py
 # ---------------------------------------------------------------------------
 #
 # These were previously in commands/catalog.py. They mix "derived from path"

@@ -112,7 +112,7 @@ mock_run_command.return_value = (None, 1)        # Failure
 - Domain: direct instantiation, no mocking needed
 - `pyfakefs` available for complex filesystem scenarios
 
-## Commands (12 total)
+## Commands (11 total)
 
 ```
 repoindex
@@ -131,8 +131,7 @@ repoindex
 │   └── wip-snapshot # Remote-recoverable snapshots of dirty working trees
 ├── tag       # Tag management (add/remove/list/tree)
 ├── config    # Settings management
-├── mcp       # MCP server (stdio transport, requires repoindex[mcp])
-└── shell     # Interactive VFS navigation
+└── mcp       # MCP server (stdio transport, requires repoindex[mcp])
 ```
 
 `db` command exists as hidden deprecated alias for `sql`.

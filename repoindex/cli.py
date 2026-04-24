@@ -5,7 +5,6 @@ import click
 from repoindex.commands.status import status_handler
 from repoindex.commands.config import config_cmd
 from repoindex.commands.tag import tag_cmd
-from repoindex.commands.shell import shell_handler
 from repoindex.commands.events import events_handler
 from repoindex.commands.refresh import refresh_handler, db_handler, sql_handler
 
@@ -49,7 +48,6 @@ cli.add_command(digest_handler, name='digest')
 cli.add_command(show_handler, name='show')
 cli.add_command(copy_handler, name='copy')
 cli.add_command(export_handler, name='export')
-cli.add_command(shell_handler, name='shell')
 
 # Command groups
 cli.add_command(tag_cmd)

@@ -37,7 +37,6 @@ nav:
   - Events: events.md
   - Ops & Audit: ops.md
   - Render Formats: render.md
-  - Shell: shell-vfs.md
 
 extra:
   social:
