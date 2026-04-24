@@ -4,35 +4,6 @@ repoindex - A collection-aware metadata index for git repositories.
 repoindex provides a unified view across all your repositories, enabling
 queries, organization, and integration with LLM tools like Claude Code.
 
-Quick Start:
-    import repoindex
-
-    # Create instance
-    ri = repoindex.RepoIndex()
-
-    # Or with explicit paths
-    ri = repoindex.RepoIndex(paths=["~/projects", "~/work/**"])
-
-    # Discover repositories
-    for repo in ri.repos():
-        print(repo.name, repo.language)
-
-    # Filter with queries
-    for repo in ri.repos(query="language == 'Python'"):
-        print(repo.name)
-
-    # Scan events (local by default - fast)
-    for event in ri.events(since="7d"):
-        print(event.type, event.repo_name)
-
-    # Include GitHub events (opt-in - uses API)
-    for event in ri.events(since="7d", github=True):
-        print(event.type, event.data)
-
-    # Tag management
-    ri.tag("myrepo", "work/active")
-    ri.untag("myrepo", "work/active")
-
 Domain Objects:
     Repository - Git repository with metadata
     Event - Something that happened (tag, commit, release, etc.)
@@ -54,9 +25,6 @@ Event Types:
 """
 
 __version__ = "0.16.0"
-
-# High-level API
-from .api import RepoIndex, create
 
 # Domain objects
 from .domain import (
@@ -91,9 +59,6 @@ from .config import load_config, save_config
 __all__ = [
     # Version
     "__version__",
-    # High-level API
-    "RepoIndex",
-    "create",
     # Domain objects
     "Repository",
     "Event",
