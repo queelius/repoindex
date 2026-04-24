@@ -1,6 +1,10 @@
 # Export
 
-The `export` command produces a **longecho-compliant arkiv archive** by default — a self-contained directory with JSONL data, metadata schema, SQLite database, and an interactive HTML browser. Format-based exports (CSV, BibTeX, etc.) are available via the exporter plugin system.
+The `export` command produces a **longecho-compliant arkiv archive** by
+default: a self-contained directory with JSONL data, metadata schema, a
+SQLite database, and an interactive HTML browser. Format-based exports
+(CSV, BibTeX, Markdown, OPML, JSON-LD) are available via the exporter
+plugin system.
 
 ## Quick Start
 
@@ -10,12 +14,12 @@ repoindex export -o ~/archives/repos/
 
 # Filtered archive
 repoindex export -o ~/archives/python/ --language python
-
-# With DSL query
-repoindex export -o ~/archives/starred/ "github_stars > 0"
+repoindex export -o ~/archives/dirty/ --dirty
+repoindex export -o ~/archives/work/ --tag "work/*"
+repoindex export -o ~/archives/recent/ --recent 30d
 
 # Format-based exports (via exporter plugins)
-repoindex export csv > repos.csv
+repoindex export csv -o repos.csv
 repoindex export bibtex --language python > refs.bib
 repoindex export --list-formats
 ```
@@ -28,7 +32,7 @@ When no format is specified, `export -o <dir>` produces:
 archive/
 ├── README.md             # longecho self-description (YAML frontmatter)
 ├── schema.yaml           # arkiv spec: types, counts, values per key
-├── repos.jsonl           # repository metadata (inode/directory records)
+├── repos.jsonl           # repository metadata (inode / directory records)
 ├── events.jsonl          # git events (text/plain records)
 ├── publications.jsonl    # package registry records (if any)
 ├── archive.db            # SQLite derived database (queryable)
@@ -37,10 +41,11 @@ archive/
 ```
 
 The archive is:
-- **longecho-compliant** — `longecho check <dir>` passes
-- **arkiv-spec compliant** — proper schema discovery, universal record format
-- **Queryable** — `sqlite3 archive.db "SELECT json_extract(metadata, '$.name') FROM records"`
-- **Browsable** — open `site/index.html` in any browser
+
+- **longecho-compliant**: `longecho check <dir>` passes
+- **arkiv-spec compliant**: proper schema discovery, universal record format
+- **Queryable**: `sqlite3 archive.db "SELECT json_extract(metadata, '$.name') FROM records"`
+- **Browsable**: open `site/index.html` in any browser
 
 ## Format Plugins
 
@@ -48,31 +53,34 @@ Stream-based exports for specific formats:
 
 | Format | ID | Description |
 |--------|----|-------------|
-| BibTeX | `bibtex` | Citation entries for LaTeX/academic use |
+| BibTeX | `bibtex` | Citation entries for LaTeX / academic use |
 | CSV | `csv` | Comma-separated values for spreadsheets |
 | Markdown | `markdown` | Markdown table of repositories |
 | OPML | `opml` | Outline format (feed readers, outliners) |
 | JSON-LD | `jsonld` | Linked data / structured metadata |
 | Arkiv | `arkiv` | Arkiv universal records (JSONL stream to stdout) |
 
-Use `repoindex query` to preview which repos will be exported.
+Use `repoindex export --list-formats` to list the currently available
+format IDs, including any user-installed exporters.
 
-## Query Filtering
+## Filter Flags
 
-Four shorthand flags plus the full DSL:
+Four shorthands, same as the other operation commands:
 
 ```bash
 repoindex export -o out/ --language python
 repoindex export -o out/ --dirty
 repoindex export -o out/ --tag "work/*"
 repoindex export -o out/ --recent 7d
-repoindex export -o out/ "has_doi and github_stars > 5"
-repoindex export -o out/ @python-active
 ```
+
+For anything more expressive, query the database via SQL first, then
+invoke export unfiltered and post-process. See `ops.md` for the general
+pattern.
 
 ## Custom Exporters
 
-Create custom formats by placing Python files in `~/.repoindex/exporters/`:
+Drop a Python file into `~/.repoindex/exporters/`:
 
 ```python
 # ~/.repoindex/exporters/my_format.py
@@ -91,14 +99,24 @@ class MyExporter(Exporter):
 exporter = MyExporter()
 ```
 
-Then use it: `repoindex export custom > output.txt`
-
-## MCP Server
-
-For LLM access to the database, use the MCP server instead:
+Then use it:
 
 ```bash
-repoindex mcp   # stdio transport, 4 tools: get_manifest, get_schema, run_sql, refresh
+repoindex export custom -o output.txt
 ```
 
-Requires: `pip install repoindex[mcp]`
+The `Exporter` ABC signature is part of the stable surface; see
+`STABILITY.md` section 6.
+
+## MCP
+
+The `export` tool on the MCP server produces the same longecho-compliant
+arkiv archive:
+
+```python
+export(output_dir="/tmp/myarchive", language="python")
+```
+
+Arguments mirror the filter flags. For arbitrary filtering, run `run_sql`
+first to find the repo names, then invoke `export` without filters and
+post-process.

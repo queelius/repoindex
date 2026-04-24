@@ -1,769 +1,382 @@
-# repoindex Design Specification
+# repoindex: Design
 
-**Version**: 0.10.0
-**Status**: Approved Specification
-**Last Updated**: 2026-01-07
+> **The filesystem is where your work lives. repoindex is where your work becomes legible.**
 
-This document captures design decisions, architecture, and requirements for repoindex based on detailed discussion and analysis.
+**Version**: 1.0 (design). Last refreshed 2026-04-24 for the v1.0 cut.
 
----
-
-## Philosophy
-
-### Tagline
-
-**"repoindex is a filesystem git catalog."**
-
-### Core Identity Statement
-
-repoindex indexes **local git directories** accessible via standard filesystem operations. The **filesystem path IS the canonical identity** of a repository — each local path is an independent entity regardless of remotes.
-
-External platforms (GitHub, GitLab, PyPI, CRAN) provide **optional enrichment metadata**, but repoindex has **no dependency on any single platform**. Platform-specific fields are namespaced (`github_stars`, `pypi_published`) to maintain clear provenance.
-
-Local git state (branch, is_clean, ahead/behind) is **inherently local** and never platform-specific.
-
-### Key Design Principles
-
-| Principle | Description |
-|-----------|-------------|
-| **Path is Identity** | Each filesystem path is a distinct indexed entity, even if multiple paths share a remote |
-| **Local-First** | Git directories on your filesystem are the primary objects being indexed |
-| **Platforms are Enrichment** | GitHub, PyPI, CRAN add metadata but don't define identity |
-| **No Platform Lock-in** | repoindex works fully offline; external APIs are opt-in |
-| **Explicit Provenance** | Platform fields are namespaced (github_*, pypi_*, cran_*) |
-| **No Deduplication by Remote** | ~/github/foo and ~/work/foo are separate entries even if same remote URL |
-
-### What repoindex Indexes
-
-**Primary Objects**: Local git directories accessible via filesystem operations
-
-**NOT Indexed**:
-- Remote-only repositories (things on GitHub you haven't cloned)
-- Non-git directories
-- Code content (we know *about* repos, not *inside* them)
+This document describes what repoindex is, why its pieces fit together the way
+they do, and where to extend it. For the operational surface (commands,
+flags, tables, configuration), see `CLAUDE.md`. For the backward-compatibility
+contract at v1.0, see `STABILITY.md`.
 
 ---
 
-## Vision
+## 1. What repoindex Is
 
-**repoindex provides a unified view across all your local repositories**, enabling queries, organization, and integration with LLM tools like Claude Code.
+repoindex is a catalog of the git repositories on your filesystem plus a
+disciplined set of external enrichment sources (GitHub, PyPI, CRAN, Zenodo, and
+several other registries). It exists so that an LLM (or a terminal user) can
+answer questions like:
 
-```
-Claude Code (deep work on ONE repo)
-         │
-         │ "What else do I have?"
-         │ "Which repos need X?"
-         ▼
-    repoindex (collection awareness)
-         │
-         ├── query       → filter and search
-         ├── status      → health dashboard
-         ├── events      → what happened
-         └── tags        → organization
-```
+- Which of my Python repos have uncommitted changes?
+- What did I tag or release in the last 30 days?
+- Which repos are published on PyPI but have no CITATION.cff?
+- What repos have GitHub stars above 10 but no license file?
+- Show me everything tagged `work/active` that is not archived on GitHub.
 
-### Target User
+It does not index the contents of repositories. It answers collection-level
+questions about them. Claude Code works inside one repo at a time; repoindex
+provides the awareness layer above that, so the assistant can decide which
+repo to open, notice which ones are neglected, and surface what moved.
 
-**Power developers** with CLI proficiency managing multiple repositories. Documentation tone and features should assume comfort with Unix tools, SQL, and git internals.
-
----
-
-## Core Principles
-
-### 1. Collection, Not Content
-
-repoindex knows *about* repositories, not *inside* them.
-
-- ✓ "You have 45 Python repos"
-- ✓ "12 are published on PyPI"
-- ✓ "3 repos have uncommitted changes"
-- ✗ "This function has a bug"
-- ✗ "Here's refactored code"
-
-### 2. SQLite as Materialized View
-
-The SQLite database is a **cache over git**, not a separate data store.
-
-- Git repositories are the source of truth
-- Database reflects what git shows at scan time
-- Events are append-only (INSERT OR IGNORE by event_id)
-- Old events persist even if source changes
-- Manual reset: `sql --reset` + `refresh --full` when needed
-
-### 3. Three Query Layers
-
-Different tools for different complexity levels:
-
-| Layer | Usage | Example |
-|-------|-------|---------|
-| **Flags (80%)** | Common filters, zero learning curve | `--dirty --language python` |
-| **DSL (15%)** | Complex logic, readable power | `has_event('commit', since='7d') and stars > 5` |
-| **SQL (5%)** | Full power, edge cases | `SELECT * FROM repos JOIN events...` |
-
-### 4. Unix Philosophy
-
-- Compose via pipes: JSONL output streams to jq, grep, etc.
-- Pretty output by default for interactive use
-- `--json` flag for machine-readable JSONL
-- Errors to stderr, data to stdout
+repoindex is deliberately not: a CI system, a GitHub mirror, a code search
+tool, a project management tool, or a replacement for `gh`. It observes. The
+only write operations it performs are on its own SQLite database, on symlink
+trees it explicitly owns, or through explicit `ops` subcommands (mirror,
+push/pull, generate boilerplate) that the user triggered.
 
 ---
 
-## Field Namespacing (v0.10.0)
+## 2. The Central Decision: Path is Identity
 
-All fields are categorized by their **source** and namespaced accordingly.
+Most tools that model collections of repositories key on a remote URL: they
+treat `github.com/queelius/repoindex` as the canonical identity and the clone
+on your disk as a cached pointer to it. repoindex inverts that model. The
+identity of a repository is its **absolute filesystem path**. A second clone
+at a different path is a separate entity. A repo with no remote is just as
+first-class as one with a remote. A repo whose remote is unreachable, renamed,
+or deleted does not break anything.
 
-### Local Fields (No Prefix)
+This reflects the reality of a working developer:
 
-These are derivable from the local filesystem and git repository:
+- Private, experimental, or archived work does not live on a hosting platform.
+- The same remote can be cloned twice, intentionally, for parallel work.
+- Ownership of a remote can change without your checkout moving.
+- A repo can move or be renamed on disk (`git mv`) without any remote changing.
+- You work from paths: `cd ~/github/foo`, not `cd remote:origin:...`.
 
-| Field | Description |
-|-------|-------------|
-| `name` | Repository directory name |
-| `path` | Absolute filesystem path (THE identity) |
-| `branch` | Current git branch |
-| `remote_url` | Git remote URL (just metadata, not identity) |
-| `owner` | Parsed from remote URL |
-| `is_clean` | No uncommitted changes |
-| `ahead`, `behind` | Commits ahead/behind upstream |
-| `has_upstream` | Has tracking branch configured |
-| `uncommitted_changes` | Has staged/unstaged changes |
-| `untracked_files` | Count of untracked files |
-| `language`, `languages` | Detected from file extensions |
-| `description` | From README or local source |
-| `readme_content` | Full README text |
-| `license_key`, `license_name`, `license_file` | Detected license |
-| `has_readme`, `has_license`, `has_ci` | Boolean feature flags |
-| `scanned_at` | When this repo was last scanned |
+Once the filesystem path is the primary key, several consequences cascade
+through the rest of the design:
 
-### GitHub Fields (`github_` Prefix)
+1. **Platform metadata is enrichment, not identity.** GitHub data,
+   PyPI records, and DOI assignments attach to the path-keyed record, not the
+   other way around. They are allowed to be missing. They are allowed to be
+   stale. They are allowed to disagree with local reality, and when they do,
+   local wins.
 
-All fields from GitHub API are prefixed:
+2. **Platform fields are namespaced.** `stars` is not a field on a repo.
+   `github_stars` is. `version` is not a field. `pypi_version` and
+   `cran_version` and `citation_version` are. Provenance is visible at the
+   column level so it cannot be forgotten.
 
-| Field | Description |
-|-------|-------------|
-| `github_owner`, `github_name` | GitHub owner/repo |
-| `github_description` | GitHub repo description |
-| `github_stars`, `github_forks`, `github_watchers` | Counts |
-| `github_is_fork`, `github_is_private`, `github_is_archived` | Flags |
-| `github_has_issues`, `github_has_wiki`, `github_has_pages` | Feature flags |
-| `github_open_issues` | Open issue count |
-| `github_topics` | JSON array of topics |
-| `github_created_at`, `github_updated_at`, `github_pushed_at` | Timestamps |
+3. **No deduplication by remote.** Two paths are two repos. If the user
+   wants them merged, they can write a SQL `GROUP BY remote_url`.
 
-### PyPI Fields (`pypi_` Prefix)
+4. **Refresh is a one-way enrichment.** The local filesystem and the local
+   git state are the ground truth. Refresh reads the filesystem, then reads
+   external APIs, and merges their output into the database as namespaced
+   columns. It never writes back to the filesystem or the remotes.
 
-| Field | Description |
-|-------|-------------|
-| `pypi_name` | Package name on PyPI |
-| `pypi_version` | Published version |
-| `pypi_published` | Is published on PyPI |
-| `pypi_url` | PyPI package URL |
+5. **Offline works.** Without network access or any configured platform
+   token, repoindex still answers every local question: what exists, what is
+   dirty, what has a README, what is Python. External enrichment simply
+   becomes NULL.
 
-### CRAN Fields (`cran_` Prefix)
-
-| Field | Description |
-|-------|-------------|
-| `cran_name` | Package name on CRAN |
-| `cran_version` | Published version |
-| `cran_published` | Is published on CRAN/Bioconductor |
-| `cran_url` | CRAN package URL |
-
-### NULL Semantics
-
-When querying platform fields on repos without that platform's metadata:
-- `github_stars > 0` → **excludes** repos with no GitHub metadata (NULL fails comparison)
-- Use `github_stars IS NOT NULL` to filter for repos with GitHub data
+This inversion is the reason repoindex is useful at all. It is what makes
+the tool correct for private work, for archaeology across years of
+directories, and for users who maintain anywhere from one to a thousand
+repositories without wanting a single platform's metadata to define their
+collection.
 
 ---
 
-## Architecture
+## 3. Architecture
 
-### Layered Structure
+repoindex is a layered CLI over a SQLite database, with external APIs and git
+treated as infrastructure. The layers are strict; higher layers depend on
+lower layers, never the other way.
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                    CLI Layer                         │
-│  repoindex/commands/*.py                            │
-│  - Parse arguments (Click)                          │
-│  - Call services                                    │
-│  - Format output (pretty or JSONL)                  │
-└─────────────────────────┬───────────────────────────┘
-                          │
-┌─────────────────────────▼───────────────────────────┐
-│                  Service Layer                       │
-│  repoindex/services/*.py                            │
-│  - RepositoryService: discover, status, filter      │
-│  - TagService: add, remove, query tags              │
-│  - EventService: scan events                        │
-└─────────────────────────┬───────────────────────────┘
-                          │
-┌─────────────────────────▼───────────────────────────┐
-│                  Domain Layer                        │
-│  repoindex/domain/*.py                              │
-│  - Repository, Tag, Event dataclasses               │
-│  - Pure functions, no I/O                           │
-└─────────────────────────┬───────────────────────────┘
-                          │
-┌─────────────────────────▼───────────────────────────┐
-│               Infrastructure Layer                   │
-│  repoindex/infra/*.py                               │
-│  - GitClient, GitHubClient                          │
-│  - FileStore, Database                              │
-└─────────────────────────────────────────────────────┘
+Commands (CLI, Click)
+  repoindex/commands/*.py, repoindex/cli.py
+         |
+         v
+Services (business logic)
+  repoindex/services/*.py
+         |
+         +---> Database (SQLite abstraction, schema migrations, queries)
+         |       repoindex/database/*.py
+         |
+         +---> Infrastructure (git subprocess, GitHub API, Zenodo API, files)
+         |       repoindex/infra/*.py
+         |
+         +---> Domain (frozen dataclasses: Repository, Tag, Event, ...)
+                 repoindex/domain/*.py
 ```
 
-### Database Schema
+**Domain** is the only layer allowed to have no I/O. Every dataclass is
+frozen. The layer holds the shape of the system: what a `Repository`, an
+`Event`, an `AuditCheck`, an `OperationDetail` are. Tests at this level need
+no mocks and no filesystem.
 
-Core tables with **changes from current**:
+**Database** wraps SQLite behind a `Database` context manager with a
+schema-version migration system and typed query helpers. The database file
+lives at `~/.repoindex/index.db`. Read-only connections are enforced at the
+SQLite level (via `mode=ro` URI parameter) so read paths cannot accidentally
+mutate. The schema is documented in `CLAUDE.md` and, more authoritatively,
+lives in `repoindex/database/schema.py`.
 
-```sql
--- KEEP: repos, tags, events, publications
--- REMOVE: dependencies (not implemented, out of scope)
--- REMOVE: repo_snapshots (abandoned feature)
--- ADD: scan_errors (track failed repos)
+**Infrastructure** holds git subprocess wrappers, the GitHub client, the
+Zenodo client, PyPI metadata fetch, and file-store helpers. Everything that
+reaches outside the process lives here. Services depend on these through
+their interfaces so tests mock exactly one layer.
 
-CREATE TABLE scan_errors (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    path TEXT NOT NULL,
-    error_type TEXT NOT NULL,
-    error_message TEXT,
-    scanned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-```
+**Services** hold business logic: repository discovery, tag manipulation,
+event scanning, auditing, git operations, copy, link tree maintenance,
+boilerplate generation, mirror coordination, WIP snapshots. A service takes
+a `config` object in its constructor, yields progress strings, and stores
+results on `self.last_*` attributes. Commands import services; services
+never import from commands.
 
-### Full-Text Search
+**Commands** are thin Click wrappers. They parse arguments, call a service,
+and render output. Two rules:
 
-Keep FTS5 index on repos with **full README content**:
+- Pretty output is the default for interactive human use.
+- `--json` produces newline-delimited JSON (JSONL) on stdout. Errors always
+  go to stderr as structured JSON: `{"error": "...", "type": "...", "context": {...}}`.
 
-```sql
-CREATE VIRTUAL TABLE repos_fts USING fts5(
-    name,
-    description,
-    readme_content,
-    content='repos',
-    content_rowid='id'
-);
-```
-
-Storage impact: ~1-5MB for 143 repos. Acceptable.
+Because the command layer is thin, a new feature almost always lives in a
+service; the command is a 50-line wrapper on top. This is deliberate: the
+MCP server is also a thin wrapper that reuses the same underlying code (it
+mostly calls services directly, or shells out to the CLI when the CLI
+formatting is what the user wants).
 
 ---
 
-## Commands (11 total)
+## 4. The Database as Materialized View
 
-### Core Commands
+repoindex uses a CQRS pattern. One command writes; all the others read.
 
-| Command | Purpose | Output Default |
-|---------|---------|----------------|
-| `status` | Health dashboard | Pretty table |
-| `query` | Filter repositories | Pretty table |
-| `events` | Query event history | Pretty table |
-| `sql` | Raw SQL + DB maintenance | Pretty table |
-| `refresh` | Sync database from git | Progress output |
+- `refresh` is the writer. It walks the configured `repository_directories`,
+  updates every repo's row, runs each enabled `MetadataSource` in parallel,
+  scans events out of the reflog and working tree, and populates the
+  `publications` and `scan_errors` and `refresh_log` tables. It is the
+  expensive operation, and it is the only one that costs real time.
+- Every other command reads from the database only. `status`, `show`,
+  `events`, `digest`, `export`, `copy`, `link`, `ops audit`, and the MCP
+  server's `run_sql`, `get_manifest`, `get_schema`, `export`, `tag` tools
+  all open the database in read-only mode.
 
-### Organization Commands
+The database is therefore a **materialized view** of the filesystem and
+external state. Like any materialized view, it is:
 
-| Command | Purpose |
-|---------|---------|
-| `tag add/remove/list/tree` | Manage tags |
-| `view list/show/create/delete` | Saved queries |
-| `config show/repos/init` | Configuration |
+- **Stale by design**, between refreshes. The trade-off is fast reads. A
+  `repoindex status` or `repoindex sql "..."` returns in milliseconds
+  against a local SQLite file, not against GitHub rate limits.
+- **Reproducible**. Two refreshes of the same tree converge on the same
+  state (minus event append-only history and external platform drift).
+- **Replaceable**. `repoindex sql --reset` drops it. `refresh --full`
+  rebuilds it. Nothing is ever stored only in the database that cannot be
+  recovered from the filesystem plus external APIs.
 
-### Integration Commands
+Events are the one table with append-only semantics. Events are scanned by
+stable `event_id` and deduplicated via `INSERT OR IGNORE`. Old events are
+kept even if the source branch or ref is gone. This makes `events` and
+`digest` function as a historical log, not a snapshot.
 
-| Command | Purpose |
-|---------|---------|
-| `claude install/uninstall/show` | Claude Code skill |
-| `shell` | Interactive VFS navigation |
-
-### Removed Commands
-
-- **MCP server**: Delete `repoindex/mcp/` entirely. CLI is sufficient for Claude Code integration via the skill.
-
----
-
-## Query System
-
-### Flag-Based Queries (Primary Interface)
-
-Flags are split into **local flags** (no prefix) and **platform flags** (prefixed).
-
-#### Local Flags (Unprefixed)
-
-```bash
-# Local git state - always available, no external API needed
-repoindex query --dirty              # Uncommitted changes
-repoindex query --clean              # Clean repos
-repoindex query --language python    # By detected language
-repoindex query --recent 7d          # Recent local commits
-repoindex query --tag "work/*"       # By user tag
-repoindex query --no-license         # Missing license file
-repoindex query --no-readme          # Missing README
-repoindex query --has-remote         # Has any remote URL configured
-```
-
-#### Platform Flags (Prefixed)
-
-```bash
-# GitHub-specific - requires --enrich-github during refresh
-repoindex query --github-private     # Private on GitHub
-repoindex query --github-public      # Public on GitHub (not github_is_private)
-repoindex query --github-starred     # Has GitHub stars > 0
-repoindex query --github-fork        # Is a fork on GitHub
-repoindex query --github-no-fork     # Not a fork (original repo)
-repoindex query --github-archived    # Archived on GitHub
-```
-
-#### Combining Flags (Implicit AND)
-
-```bash
-# All flags AND together
-repoindex query --dirty --language python --recent 7d
-repoindex query --github-private --language python
-```
-
-### DSL Queries (Power Users)
-
-DSL uses **namespaced field names** directly:
-
-```bash
-# Local fields (no prefix)
-repoindex query "language == 'Python' and is_clean"
-repoindex query "not is_clean"  # dirty repos
-repoindex query "has_license and has_readme"
-
-# GitHub fields (github_ prefix)
-repoindex query "github_stars > 10"
-repoindex query "github_is_private"
-repoindex query "not github_is_archived and github_stars > 0"
-
-# Mixed local + platform
-repoindex query "language == 'Python' and github_stars > 10"
-
-# Functions
-repoindex query "has_event('commit', since='30d')"
-repoindex query "tagged('work/*')"
-repoindex query "updated_since('7d')"
-
-# Ordering and limits (uses namespaced fields)
-repoindex query "language == 'Python' order by github_stars desc limit 10"
-
-# View references
-repoindex query "@python-active and is_clean"
-
-# Explain mode
-repoindex query --explain "language == 'Python' and github_stars > 10"
-# Shows: SQL: SELECT * FROM repos WHERE language = ? AND github_stars > ?
-#        Params: ['Python', 10]
-```
-
-### Raw SQL (Edge Cases)
-
-```bash
-# Direct queries
-repoindex sql "SELECT name, stars FROM repos ORDER BY stars DESC LIMIT 10"
-
-# Interactive shell
-repoindex sql -i
-
-# DB maintenance (NEW)
-repoindex sql --info       # Path, size, version
-repoindex sql --schema     # Show tables
-repoindex sql --stats      # Row counts, sizes
-repoindex sql --integrity  # Check for corruption
-repoindex sql --vacuum     # Optimize/compact
-repoindex sql --reset      # Drop and recreate
-```
+The `refresh_log` table records each refresh run, what sources were enabled,
+and how long it took, which is what `digest` and `status` use to tell the
+user whether their data is fresh.
 
 ---
 
-## Tag System
+## 5. Extension Points
 
-### Tag Sources
+There are two places where repoindex is designed to be extended by users.
+Both discover Python modules from fixed directories at import time.
 
-Tags come from three sources, all coexisting:
+### MetadataSource (read-side enrichment)
 
-| Source | Examples | Editable |
-|--------|----------|----------|
-| **User** (explicit) | `work/active`, `priority:high` | Yes |
-| **System** (implicit) | `lang:python`, `dir:github`, `repo:myproject` | No |
-| **Provider** (GitHub) | `topic:machine-learning`, `license:mit` | No |
+`repoindex/sources/__init__.py` defines a single abstract base class,
+`MetadataSource`, with two concrete methods:
 
-### Reserved Namespaces
+- `detect(repo_path, repo_record)` returns True if the source applies to
+  this repo.
+- `fetch(repo_path, repo_record, config)` returns a dict of metadata.
 
-System-only prefixes that users cannot create:
+Each source declares a `target`: either `"repos"` (merge fields into the
+repos table as namespaced columns, for platform enrichment like GitHub, or
+local file parsing like CITATION.cff) or `"publications"` (upsert into the
+publications table for registry discovery like PyPI, CRAN, npm, Cargo,
+Zenodo). Sources may also declare `batch = True`, which causes a one-shot
+`prefetch(config)` to run before per-repo iteration (Zenodo's ORCID search
+uses this).
 
-- `lang:` - Auto-detected language
-- `dir:` - Parent directory name
-- `repo:` - Repository name
-- `type:` - Project type (node, python, rust)
-- `ci:` - CI system detected
-- `has:` - Feature detection (readme, license, tests)
+Built-in sources live in `repoindex/sources/`:
 
-### Tag Operations
+- target=repos: `citation_cff`, `keywords`, `local_assets`, `gitea`, `github`
+- target=publications: `pypi`, `cran`, `zenodo`, `npm`, `cargo`, `conda`,
+  `docker`, `rubygems`, `go`
 
-```bash
-# Add/remove user tags
-repoindex tag add myproject work/active topic:ml
-repoindex tag remove myproject work/active
+User-provided sources are discovered from `~/.repoindex/sources/*.py` and
+must export a module-level `source` attribute that is a `MetadataSource`
+instance. The discovery function accepts an `only` filter, which is how the
+refresh command selects sources via `--source <id>` or `--external`.
 
-# Query by tag
-repoindex tag list                    # All tags
-repoindex tag list -t "work/*"        # Repos with tag
-repoindex tag tree                    # Hierarchical view
-```
+Source failures never kill a refresh. An error on one source for one repo
+logs and continues; the `scan_errors` table records what went wrong.
 
----
+### Exporter (write-side rendering)
 
-## Event System
+`repoindex/exporters/__init__.py` defines `Exporter` with one method:
+`export(repos, output, config)`. Each exporter declares a `format_id`, a
+`name`, and a default file `extension`.
 
-### Event Model
+Built-in exporters: `bibtex`, `csv`, `markdown`, `opml`, `jsonld`, `arkiv`.
+The default `repoindex export -o <dir>` command produces a
+longecho-compliant arkiv archive: a directory with JSONL data, a schema
+file, a queryable SQLite copy, and an interactive HTML browser based on
+sql.js.
 
-Events are **append-only observations** of git history:
+User-provided exporters are discovered from `~/.repoindex/exporters/*.py`
+and must export a module-level `exporter` attribute.
 
-- Scanned from git on `refresh`
-- Deduplicated by stable `event_id`
-- Never deleted (historical record)
-- Time-bounded by `--since` on refresh
+### Why exactly two ABCs
 
-### Event Types
-
-Currently implemented:
-- `git_tag` - Tag created
-- `commit` - Commit pushed
-
-### Event Queries
-
-```bash
-# Query events (pretty by default)
-repoindex events                      # Last 7 days
-repoindex events --since 30d          # Custom window
-repoindex events --type git_tag       # Filter by type
-repoindex events --repo myproject     # Filter by repo
-repoindex events --stats              # Summary statistics
-repoindex events --json               # JSONL for piping
-```
+The previous design had three: `PlatformProvider`, `RegistryProvider`, and
+`Exporter`, where platforms enriched repos and registries detected
+publications. That split was incidental, not essential: both sides
+fundamentally answered "is this relevant, and if so what data do I
+contribute?" Collapsing them into a single `MetadataSource` with a `target`
+discriminator removed a parallel implementation and let the refresh
+dispatcher treat them uniformly. The split exists now only where it
+matters, inside `fetch`, which returns a dict shaped for its target table.
 
 ---
 
-## Status Dashboard
+## 6. Two Query Layers
 
-The `status` command shows a **full dashboard** with:
+repoindex used to have three query layers: filter flags, a DSL, and raw
+SQL. The DSL has been removed. There are now two.
 
-### Counts
-- Total repositories, events, tags
-- Database size, last refresh time
+### Filter flags (for humans at a terminal)
 
-### Health Warnings
-- Repos with uncommitted changes (dirty)
-- Repos not scanned recently (stale)
-- Scan errors from last refresh
+Four flags, the common ones, available on every operation command:
 
-### Action Suggestions
-- "Run `refresh` to update database" if stale
-- "Run `refresh --github` to fetch GitHub metadata"
+- `--dirty` : repos with uncommitted or unpushed changes.
+- `--language <name>` : repos whose detected primary language matches.
+- `--tag <pattern>` : repos with a tag matching the glob pattern.
+- `--recent <duration>` : repos with commits within a `7d`/`30d`/`2w` window.
 
----
+These exist because they are the questions a human types frequently enough
+that having to write SQL for them is friction.
 
-## Refresh Behavior
+### SQL (for everything else)
 
-### Default (Smart Refresh)
+Anything more expressive uses `repoindex sql "..."` at the CLI, or
+`run_sql` on the MCP server. The database schema is documented and stable
+(see `STABILITY.md`), FTS5 is available on repo name/description/readme,
+and all the GitHub, PyPI, CRAN, and citation fields are namespaced and
+queryable.
 
-```bash
-repoindex refresh
-```
+### Why the DSL was removed
 
-- Scans repos where `.git/index` mtime changed since last scan
-- Inserts new events (INSERT OR IGNORE)
-- Updates repo metadata
+A DSL that is not SQL is almost always a worse SQL. The previous one
+parsed expressions like `language == 'Python' and github_stars > 10`,
+compiled them to SQL, and added fuzzy matching and view references on top.
+In practice:
 
-### Full Refresh
+- LLMs write SQL much better than they write a one-project DSL.
+- Users who wanted power used SQL directly.
+- Users who did not want power used the filter flags.
+- Maintaining the compiler, the fuzzy matcher, and the views system was
+  substantial weight for a narrow middle group.
 
-```bash
-repoindex refresh --full
-```
-
-- Rescans all repos regardless of mtime
-- Does NOT delete existing events
-
-### With External Enrichment
-
-External platform metadata is **opt-in** via `--enrich-*` flags:
-
-```bash
-# Explicit enrichment (config can set defaults)
-repoindex refresh --enrich-github  # Fetch GitHub metadata (stars, topics, etc.)
-repoindex refresh --enrich-pypi    # Check PyPI publication status
-repoindex refresh --enrich-cran    # Check CRAN publication status
-repoindex refresh --enrich-all     # Enable all external enrichment
-
-# Combined
-repoindex refresh --enrich-github --enrich-pypi --since 30d
-```
-
-**Note**: Without enrichment flags, only local git state is scanned. Platform-specific fields will be NULL.
-
-### Failure Behavior
-
-- **GitHub unreachable**: Fail fast if `--enrich-github` specified
-- **Individual repo errors**: Log warning, continue, track in `scan_errors` table
-- **Rate limit hit**: Proactive warning showing remaining quota
+Removing it simplified the codebase by thousands of lines, eliminated two
+command surfaces (`query` and `view`), and pushed every non-trivial
+question to SQL, where the documentation already lived.
 
 ---
 
-## Configuration
+## 7. LLM Integration via MCP
 
-### Format
+The MCP server (`repoindex/mcp/server.py`) exposes six tools over stdio:
 
-**YAML only** (remove JSON support for simplicity):
+- `get_manifest` : tables, row counts, last refresh, languages summary.
+- `get_schema(table?)` : SQL DDL for the whole database or one table, with
+  column details when a table is specified.
+- `run_sql(query)` : read-only SQL (SELECT and WITH only), returning up to
+  500 rows as JSON. Read-only is enforced by the SQLite connection mode.
+- `refresh(github?, pypi?, cran?, external?, full?)` : trigger a refresh.
+  Holds a file lock so concurrent refreshes cannot clobber each other.
+- `tag(repo, action, tag)` : add, remove, or list user tags on a repo.
+- `export(output_dir, language?, dirty?, tag?, recent?)` : produce a
+  longecho-compliant arkiv archive.
 
-```yaml
-# ~/.repoindex/config.yaml
+The design choice driving this surface is: **SQL is the API.** Rather than
+expose dozens of narrow tools ("list repos by language", "get repos with
+DOIs", "count events this week"), the MCP exposes schema introspection
+plus raw read-only SQL. This lets the assistant:
 
-general:
-  repository_directories:
-    - ~/github
-    - ~/projects/*/repos
+- Discover what tables exist without the server pre-deciding what matters.
+- Compose queries the tool designer did not anticipate.
+- Explain its work in a language (SQL) the user can verify.
 
-github:
-  token: ${GITHUB_TOKEN}  # Environment variable reference
-  rate_limit:
-    max_retries: 3
-    max_delay_seconds: 60
+The narrow tools (`refresh`, `tag`, `export`) exist only because their
+effect is a state change, which SQL by itself cannot express, or because
+the output (a full arkiv directory) is too large to return inline.
 
-refresh:
-  default_since: 30d
-  enable_pypi: false
-  enable_cran: false
-
-repository_tags:
-  /home/user/github/myproject:
-    - work/active
-    - priority:high
-```
-
-### Environment Variables
-
-- `REPOINDEX_CONFIG` - Config file path
-- `GITHUB_TOKEN` or `REPOINDEX_GITHUB_TOKEN` - GitHub API token
-
-### Path Handling
-
-- Non-existent paths: **Warn once**, continue
-- Glob patterns supported: `~/github/**`
+This makes the MCP server the dominant consumer of repoindex in practice.
+Every design decision should ask: can an LLM, with only schema and SQL,
+answer this? If yes, that is the shape. If no, add a tool.
 
 ---
 
-## Claude Code Integration
+## 8. Commitments and Non-Commitments
 
-Claude Code integration is provided via the **repoindex plugin** from the
-[queelius marketplace](https://github.com/queelius/claude-code-marketplace).
-Install with `/plugin install repoindex@queelius`.
+At v1.0 repoindex commits to a backward-compatibility contract over:
 
-The plugin provides:
-- **repoindex skill**: CLI reference and query patterns
-- **repo-polish skill**: Audit-driven release preparation workflow
-- **Commands**: Quick dashboard and repo exploration
-- **Agents**: Collection analysis automation
-- Include version number
-- Warn and confirm before overwriting existing skill
+- The **SQL schema** enumerated in `STABILITY.md` (repos, events, tags,
+  publications, scan_errors, refresh_log, repos_fts).
+- The **MCP tool names and argument shapes**.
+- The **CLI commands and filter flags** currently documented.
+- The **config file top-level keys**.
+- The **MetadataSource and Exporter ABC signatures**.
+- The **user-directory discovery contract** (`~/.repoindex/sources/*.py`,
+  `~/.repoindex/exporters/*.py`).
 
-### Skill Location
+It does not commit to:
 
-- Global: `~/.claude/commands/repoindex.md`
-- Local: `./.claude/commands/repoindex.md`
+- The Python API of `repoindex.services.*`. Services are internal.
+- Indexes, triggers, and FTS internals on top of the documented tables.
+- The exact text of log messages, warning text, or pretty (non-JSON) output.
+- Tag derivation heuristics. The set of implicit tags is expected to evolve.
 
----
-
-## Views Feature
-
-### Purpose
-
-Save named queries for reuse.
-
-### Storage
-
-Views store **DSL expressions** (not raw SQL):
-
-```bash
-repoindex view create python-active "language == 'Python' and has_event('commit', since='30d')"
-repoindex view list
-repoindex view show python-active
-repoindex view delete python-active
-```
-
-### Usage
-
-Reference views in queries with `@`:
-
-```bash
-repoindex query "@python-active and is_clean"
-```
-
-### Future Enhancement
-
-Consider making views composable (views referencing other views) and/or parameterized (view templates).
+Additions to any stable surface are minor releases. Removals are major
+bumps and will be preceded by at least one 1.x release with a runtime
+deprecation warning. See `STABILITY.md` for the details.
 
 ---
 
-## Shell (VFS Interface)
+## Appendix: Design Anti-Patterns to Keep Avoiding
 
-### Status
+A short list, written down so future changes do not regress:
 
-**Needs redesign** - keep but lower priority.
-
-### Current Concept
-
-Interactive navigation of repository collection:
-
-```
-/repos/           # All repositories
-/repos/myproject/ # Single repo metadata
-/tags/            # Tag hierarchy
-/events/          # Recent events
-```
-
-### Planned Improvements
-
-- Better navigation UX
-- Integration with query system
-- Possibly FUSE mount for filesystem access
-
----
-
-## Output Formats
-
-### Default: Pretty Tables
-
-```bash
-repoindex query --dirty
-# Shows formatted table with columns
-```
-
-### JSONL for Piping
-
-```bash
-repoindex query --json --dirty | jq '.name'
-```
-
-### Brief Mode
-
-```bash
-repoindex query --brief --dirty
-# Just repo names, one per line
-```
-
----
-
-## Error Handling
-
-### Scan Errors
-
-Tracked in `scan_errors` table:
-
-```sql
-CREATE TABLE scan_errors (
-    id INTEGER PRIMARY KEY,
-    path TEXT NOT NULL,
-    error_type TEXT NOT NULL,    -- 'permission', 'corrupt', 'not_git'
-    error_message TEXT,
-    scanned_at TIMESTAMP
-);
-```
-
-### Display
-
-- Show error count in `status` dashboard
-- List errors with `repoindex sql "SELECT * FROM scan_errors"`
-
----
-
-## Removed/Deprecated
-
-### Breaking Changes in v0.10.0
-
-| Change | Migration |
-|--------|-----------|
-| Schema field renaming | `stars` → `github_stars`, `is_private` → `github_is_private`, etc. |
-| CLI flag renaming | `--private` → `--github-private`, `--github` → `--enrich-github` |
-| Remote-based deduplication removed | Multiple checkouts of same remote now appear as separate entries |
-| DSL field names | Use `github_stars`, not `stars` in queries |
-
-**Migration**: Run `repoindex sql --reset` then `repoindex refresh --full` after upgrading.
-
-### Removed in v0.10.0
-
-| Item | Reason |
-|------|--------|
-| MCP server (`repoindex/mcp/`) | CLI sufficient, complexity not justified |
-| Dependencies table | Not implemented, out of scope |
-| Repo snapshots table | Abandoned feature |
-| JSON config support | YAML only for simplicity |
-| `--private`, `--starred` flags | Use `--github-private`, `--github-starred` |
-| `--github`, `--pypi` refresh flags | Use `--enrich-github`, `--enrich-pypi` |
-
-### Deprecated (Hidden)
-
-| Item | Replacement |
-|------|-------------|
-| `db` command | Use `sql --info`, `sql --reset`, etc. |
-
----
-
-## Development Guidelines
-
-### Testing
-
-- 604+ tests in `tests/` directory
-- Use pyfakefs for filesystem mocking
-- Run with coverage: `pytest --cov=repoindex --cov-report=html`
-- Target: >86% coverage
-
-### Adding Commands
-
-1. Create `repoindex/commands/your_command.py`
-2. Use service layer for business logic
-3. Register in `repoindex/cli.py`
-4. Write tests in `tests/test_your_command.py`
-5. Update skill content generation
-
-### Output Pattern
-
-```python
-@click.command()
-@click.option('--json', 'output_json', is_flag=True)
-def command(output_json):
-    results = service.get_data()
-
-    if output_json:
-        for item in results:
-            print(json.dumps(item), flush=True)
-    else:
-        render.table(list(results))
-```
-
----
-
-## Version History
-
-| Version | Changes |
-|---------|---------|
-| **0.10.0** | **Philosophy: "Filesystem git catalog"** - path is identity, namespaced fields, explicit platform flags, no remote dedup, MCP removed |
-| 0.9.2 | Documentation updates, pretty output default |
-| 0.9.1 | Bug fixes (status counts, events --pretty) |
-| 0.9.0 | CLI simplification, SQLite database |
-
----
-
-## Open Questions
-
-Items for future consideration:
-
-1. **View composition**: Allow views to reference other views?
-2. **View parameters**: Template-style views with `$1`, `$2` placeholders?
-3. **Shell redesign**: What would a better VFS interface look like?
-4. **FTS queries**: How to expose full-text search in DSL/flags?
-5. **Full table split**: Should platform metadata move to separate tables (github_metadata, pypi_metadata)?
-6. **Hierarchical event sources**: Should event source be `git.local` vs `github.api` instead of simple `git`, `github`?
-7. **Multi-platform support**: GitLab, Bitbucket, etc. - same namespacing pattern?
+- **Do not make remote URL the identity.** It is tempting when writing a
+  merge strategy. Resist it. Two paths with the same remote are two repos.
+- **Do not un-namespace platform fields.** Keep the `github_`, `pypi_`,
+  `cran_`, `gitea_`, `citation_` prefixes. Provenance at the column is
+  worth the extra characters.
+- **Do not add a new DSL.** If SQL is awkward for a specific use case, add
+  a view or a computed column to the schema, or a filter flag if it is
+  common enough. Do not invent a sublanguage.
+- **Do not split the schema into per-platform tables.** `github_metadata`,
+  `pypi_metadata`, and so on would make joins for common queries
+  ("stars + recent commits") harder for no real gain. The one wide `repos`
+  table with namespaced columns is the right shape.
+- **Do not add write operations to MCP without strong justification.**
+  `refresh`, `tag`, and `export` are the current carve-outs. Read-only SQL
+  is the main channel.
+- **Do not regress on offline operation.** Every read command must work
+  with no network and no tokens configured; external fields simply become
+  NULL.
