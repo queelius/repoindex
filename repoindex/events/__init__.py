@@ -52,9 +52,9 @@ import logging
 import hashlib
 import time
 
-from .utils import run_command, get_remote_url, parse_repo_url
+from ..infra.fs_utils import run_command, get_remote_url, parse_repo_url
 # Import Event from domain layer for backward compatibility
-from .domain.event import Event
+from ..domain.event import Event
 
 logger = logging.getLogger(__name__)
 
@@ -992,7 +992,7 @@ def scan_pypi_publishes(
     pyproject_path = Path(repo_path) / 'pyproject.toml'
     if pyproject_path.exists():
         try:
-            from .compat import tomllib
+            from ..compat import tomllib
             with open(pyproject_path, 'rb') as f:
                 pyproject = tomllib.load(f)
             package_name = pyproject.get('project', {}).get('name')
@@ -1325,7 +1325,7 @@ def scan_cargo_publishes(
     # Parse Cargo.toml for package name
     package_name = None
     try:
-        from .compat import tomllib
+        from ..compat import tomllib
         with open(cargo_path, 'rb') as f:
             cargo = tomllib.load(f)
         package_name = cargo.get('package', {}).get('name')

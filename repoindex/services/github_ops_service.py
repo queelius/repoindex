@@ -18,7 +18,7 @@ from ..domain.operation import (
     OperationStatus,
     OperationSummary,
 )
-from ..pypi import extract_project_metadata
+from ..infra.pypi_metadata import extract_project_metadata
 
 logger = logging.getLogger(__name__)
 

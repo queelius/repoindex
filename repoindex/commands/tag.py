@@ -14,8 +14,8 @@ from typing import List, Dict, Any, Optional
 from collections import defaultdict
 
 from ..config import load_config, save_config
-from ..utils import find_git_repos_from_config, is_git_repo
-from ..tags import get_repository_tags, is_protected_tag
+from ..infra.fs_utils import find_git_repos_from_config, is_git_repo
+from ..services.tag_helpers import get_repository_tags, is_protected_tag
 from ..database.connection import Database, get_db_path
 from ..database.repository import get_all_repos
 from ..services.tag_derivation import derive_implicit_tags
@@ -82,7 +82,7 @@ def get_all_tags_from_database(
     Returns:
         Dict mapping tag strings to list of repo paths
     """
-    from ..tags import filter_tags
+    from ..services.tag_helpers import filter_tags
 
     tag_repos = defaultdict(list)
 

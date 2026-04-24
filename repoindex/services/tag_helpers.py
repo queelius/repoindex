@@ -427,7 +427,7 @@ def get_implicit_tags(repo_path: str, repo_info: Optional[Dict[str, Any]] = None
         List of implicit tags
     """
     import os
-    from .pypi import extract_pypi_tags
+    from ..infra.pypi_metadata import extract_pypi_tags
 
     implicit_tags = []
 
@@ -513,7 +513,7 @@ def get_repository_tags(repo_path: str, repo_info: Optional[Dict[str, Any]] = No
     Returns:
         Combined list of explicit and implicit tags
     """
-    from .config import load_config
+    from ..config import load_config
 
     config = load_config()
 

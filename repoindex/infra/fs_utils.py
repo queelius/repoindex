@@ -6,7 +6,7 @@ import os
 from pathlib import Path
 import re
 import json
-from .config import logger
+from ..config import logger
 
 JsonValue = str | int | float | bool | None | dict[str, 'JsonValue'] | list['JsonValue']
 

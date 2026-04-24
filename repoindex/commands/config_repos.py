@@ -130,7 +130,7 @@ def repos_list(json_output):
             }))
     else:
         # Rich table output
-        from ..utils import find_git_repos_from_config
+        from ..infra.fs_utils import find_git_repos_from_config
 
         table = Table(show_header=True, header_style="bold cyan")
         table.add_column("#", style="dim", width=4)

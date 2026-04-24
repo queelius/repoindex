@@ -22,7 +22,7 @@ def detect_default_repo_dir() -> str:
 
     Returns the first directory that exists and contains git repos.
     """
-    from repoindex.utils import find_git_repos
+    from repoindex.infra.fs_utils import find_git_repos
 
     home = Path.home()
     candidates = [

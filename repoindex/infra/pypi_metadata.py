@@ -7,8 +7,8 @@ from typing import Any, Dict, List, Optional
 import requests
 import toml
 
-from .compat import tomllib
-from .config import logger
+from ..compat import tomllib
+from ..config import logger
 
 
 def find_packaging_files(repo_path: str) -> List[str]:

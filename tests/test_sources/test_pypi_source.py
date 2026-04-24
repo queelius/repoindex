@@ -105,7 +105,7 @@ class TestFetchDownloads:
 
 class TestPyPICheck:
     @patch('repoindex.sources.pypi._fetch_downloads', return_value=4200)
-    @patch('repoindex.pypi.check_pypi_package')
+    @patch('repoindex.infra.pypi_metadata.check_pypi_package')
     def test_check_published(self, mock_check, mock_downloads):
         mock_check.return_value = {
             'exists': True,
@@ -125,7 +125,7 @@ class TestPyPICheck:
         mock_downloads.assert_called_once_with("my-package")
 
     @patch('repoindex.sources.pypi._fetch_downloads')
-    @patch('repoindex.pypi.check_pypi_package')
+    @patch('repoindex.infra.pypi_metadata.check_pypi_package')
     def test_check_not_found(self, mock_check, mock_downloads):
         mock_check.return_value = {'exists': False}
         s = PyPISource()
@@ -135,14 +135,14 @@ class TestPyPICheck:
         assert result.downloads is None
         mock_downloads.assert_not_called()
 
-    @patch('repoindex.pypi.check_pypi_package')
+    @patch('repoindex.infra.pypi_metadata.check_pypi_package')
     def test_check_api_error(self, mock_check):
         mock_check.return_value = None
         s = PyPISource()
         result = s.check("error-pkg")
         assert result is None
 
-    @patch('repoindex.pypi.check_pypi_package')
+    @patch('repoindex.infra.pypi_metadata.check_pypi_package')
     def test_check_exception(self, mock_check):
         mock_check.side_effect = Exception("network error")
         s = PyPISource()
@@ -150,7 +150,7 @@ class TestPyPICheck:
         assert result is None
 
     @patch('repoindex.sources.pypi._fetch_downloads', return_value=None)
-    @patch('repoindex.pypi.check_pypi_package')
+    @patch('repoindex.infra.pypi_metadata.check_pypi_package')
     def test_check_published_downloads_unavailable(self, mock_check, mock_downloads):
         """Published package but pypistats returns None."""
         mock_check.return_value = {
@@ -167,7 +167,7 @@ class TestPyPICheck:
 
 
 class TestPyPIFetch:
-    @patch('repoindex.pypi.check_pypi_package')
+    @patch('repoindex.infra.pypi_metadata.check_pypi_package')
     def test_fetch_integration(self, mock_check, tmp_path):
         """Full detect -> check flow via fetch()."""
         (tmp_path / "pyproject.toml").write_text('''

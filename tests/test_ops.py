@@ -1179,7 +1179,7 @@ class TestExtractProjectMetadata:
 
     def test_full_pyproject(self, tmp_path):
         """Test extracting all fields from a full pyproject.toml."""
-        from repoindex.pypi import extract_project_metadata
+        from repoindex.infra.pypi_metadata import extract_project_metadata
 
         pyproject = tmp_path / 'pyproject.toml'
         pyproject.write_text('''
@@ -1210,7 +1210,7 @@ Repository = "https://github.com/user/my-tool"
 
     def test_minimal_pyproject(self, tmp_path):
         """Test extracting from a minimal pyproject.toml."""
-        from repoindex.pypi import extract_project_metadata
+        from repoindex.infra.pypi_metadata import extract_project_metadata
 
         pyproject = tmp_path / 'pyproject.toml'
         pyproject.write_text('''
@@ -1228,7 +1228,7 @@ version = "0.1.0"
 
     def test_no_pyproject(self, tmp_path):
         """Test when pyproject.toml doesn't exist."""
-        from repoindex.pypi import extract_project_metadata
+        from repoindex.infra.pypi_metadata import extract_project_metadata
 
         result = extract_project_metadata(str(tmp_path))
 
@@ -1238,7 +1238,7 @@ version = "0.1.0"
 
     def test_license_as_table(self, tmp_path):
         """Test extracting license when it's a table format."""
-        from repoindex.pypi import extract_project_metadata
+        from repoindex.infra.pypi_metadata import extract_project_metadata
 
         pyproject = tmp_path / 'pyproject.toml'
         pyproject.write_text('''
@@ -1253,7 +1253,7 @@ license = {text = "Apache-2.0"}
 
     def test_urls_with_various_keys(self, tmp_path):
         """Test URL extraction with different key conventions."""
-        from repoindex.pypi import extract_project_metadata
+        from repoindex.infra.pypi_metadata import extract_project_metadata
 
         pyproject = tmp_path / 'pyproject.toml'
         pyproject.write_text('''

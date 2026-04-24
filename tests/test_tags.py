@@ -5,7 +5,7 @@ import pytest
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-from repoindex.tags import (
+from repoindex.services.tag_helpers import (
     parse_tag,
     format_tag,
     parse_tags,

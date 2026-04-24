@@ -8,7 +8,7 @@ import shutil
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
-from repoindex.utils import (
+from repoindex.infra.fs_utils import (
     run_command, 
     find_git_repos, 
     get_git_status, 
@@ -117,7 +117,7 @@ class TestGetGitStatus(unittest.TestCase):
         os.chdir("/")
         shutil.rmtree(self.temp_dir)
 
-    @patch('repoindex.utils.run_command')
+    @patch('repoindex.infra.fs_utils.run_command')
     def test_get_git_status_clean_repo(self, mock_run_command):
         """Test get_git_status with clean repository"""
         mock_run_command.side_effect = [
@@ -131,7 +131,7 @@ class TestGetGitStatus(unittest.TestCase):
         self.assertEqual(result['status'], 'clean')
         self.assertEqual(result['current_branch'], 'main')
 
-    @patch('repoindex.utils.run_command')
+    @patch('repoindex.infra.fs_utils.run_command')
     def test_get_git_status_modified_files(self, mock_run_command):
         """Test get_git_status with modified files"""
         mock_run_command.side_effect = [
@@ -146,7 +146,7 @@ class TestGetGitStatus(unittest.TestCase):
         self.assertIn('modified', result['status'])
         self.assertIn('untracked', result['status'])
 
-    @patch('repoindex.utils.run_command')
+    @patch('repoindex.infra.fs_utils.run_command')
     def test_get_git_status_error(self, mock_run_command):
         """Test get_git_status with command failure"""
         mock_run_command.side_effect = Exception("Git command failed")
@@ -156,7 +156,7 @@ class TestGetGitStatus(unittest.TestCase):
         self.assertEqual(result['status'], 'error')
         self.assertEqual(result['current_branch'], 'unknown')
 
-    @patch('repoindex.utils.run_command')
+    @patch('repoindex.infra.fs_utils.run_command')
     def test_get_git_status_various_changes(self, mock_run_command):
         """Test get_git_status with various types of changes"""
         mock_run_command.side_effect = [
@@ -179,7 +179,7 @@ if __name__ == '__main__':
     unittest.main()
 
 import pytest
-from repoindex.utils import find_git_repos
+from repoindex.infra.fs_utils import find_git_repos
 
 
 @pytest.fixture
@@ -253,7 +253,7 @@ def test_find_git_repos_handles_string_and_list_input(mock_git_repos):
 # Tests for parse_repo_url
 # ============================================================================
 
-from repoindex.utils import parse_repo_url
+from repoindex.infra.fs_utils import parse_repo_url
 
 
 class TestParseRepoUrl:
@@ -312,34 +312,34 @@ class TestParseRepoUrl:
 # Tests for get_git_remote_url
 # ============================================================================
 
-from repoindex.utils import get_git_remote_url
+from repoindex.infra.fs_utils import get_git_remote_url
 
 
 class TestGetGitRemoteUrl:
     """Tests for get_git_remote_url function."""
 
-    @patch('repoindex.utils.run_command')
+    @patch('repoindex.infra.fs_utils.run_command')
     def test_returns_url_on_success(self, mock_run):
         """Returns remote URL when git command succeeds."""
         mock_run.return_value = ("https://github.com/user/repo.git", 0)
         url = get_git_remote_url("/path/to/repo")
         assert url == "https://github.com/user/repo.git"
 
-    @patch('repoindex.utils.run_command')
+    @patch('repoindex.infra.fs_utils.run_command')
     def test_returns_none_on_empty_result(self, mock_run):
         """Returns None when git command returns empty."""
         mock_run.return_value = ("", 0)
         url = get_git_remote_url("/path/to/repo")
         assert url is None
 
-    @patch('repoindex.utils.run_command')
+    @patch('repoindex.infra.fs_utils.run_command')
     def test_returns_none_on_exception(self, mock_run):
         """Returns None when git command raises exception."""
         mock_run.side_effect = Exception("Git error")
         url = get_git_remote_url("/path/to/repo")
         assert url is None
 
-    @patch('repoindex.utils.run_command')
+    @patch('repoindex.infra.fs_utils.run_command')
     def test_custom_remote_name(self, mock_run):
         """Works with custom remote name."""
         mock_run.return_value = ("https://github.com/upstream/repo.git", 0)
@@ -353,7 +353,7 @@ class TestGetGitRemoteUrl:
 # Tests for get_license_info
 # ============================================================================
 
-from repoindex.utils import get_license_info
+from repoindex.infra.fs_utils import get_license_info
 
 
 class TestGetLicenseInfo:
@@ -418,7 +418,7 @@ class TestGetLicenseInfo:
 # Tests for find_git_repos_from_config
 # ============================================================================
 
-from repoindex.utils import find_git_repos_from_config
+from repoindex.infra.fs_utils import find_git_repos_from_config
 
 
 class TestFindGitReposFromConfig:
@@ -569,13 +569,13 @@ class TestFindGitReposFromConfig:
 # Tests for detect_github_pages_locally
 # ============================================================================
 
-from repoindex.utils import detect_github_pages_locally
+from repoindex.infra.fs_utils import detect_github_pages_locally
 
 
 class TestDetectGithubPagesLocally:
     """Tests for detect_github_pages_locally function."""
 
-    @patch('repoindex.utils.run_command')
+    @patch('repoindex.infra.fs_utils.run_command')
     def test_gh_pages_branch(self, mock_run, fs):
         """Detects gh-pages branch."""
         fs.create_dir("/repo/.git")
@@ -589,7 +589,7 @@ class TestDetectGithubPagesLocally:
         """Detects Jekyll config file."""
         fs.create_dir("/repo/.git")
         fs.create_file("/repo/_config.yml", contents="title: My Site")
-        with patch('repoindex.utils.run_command', return_value=("", 0)):
+        with patch('repoindex.infra.fs_utils.run_command', return_value=("", 0)):
             result = detect_github_pages_locally("/repo")
         assert result is not None
         assert result['has_jekyll_config'] is True
@@ -599,7 +599,7 @@ class TestDetectGithubPagesLocally:
         """Docs folder alone doesn't enable Pages without other indicators."""
         fs.create_dir("/repo/.git")
         fs.create_file("/repo/docs/index.md", contents="# Docs")
-        with patch('repoindex.utils.run_command', return_value=("", 0)):
+        with patch('repoindex.infra.fs_utils.run_command', return_value=("", 0)):
             result = detect_github_pages_locally("/repo")
         # docs folder alone doesn't set likely_enabled (needs gh-pages, workflow, jekyll, or cname)
         assert result is None
@@ -608,7 +608,7 @@ class TestDetectGithubPagesLocally:
         """Detects CNAME file for custom domain."""
         fs.create_dir("/repo/.git")
         fs.create_file("/repo/CNAME", contents="example.com")
-        with patch('repoindex.utils.run_command', return_value=("", 0)):
+        with patch('repoindex.infra.fs_utils.run_command', return_value=("", 0)):
             result = detect_github_pages_locally("/repo")
         assert result is not None
         assert result['has_cname'] is True
@@ -619,7 +619,7 @@ class TestDetectGithubPagesLocally:
         fs.create_dir("/repo/.git")
         fs.create_file("/repo/.github/workflows/pages.yml",
                       contents="name: Deploy Pages\njobs:\n  deploy:")
-        with patch('repoindex.utils.run_command', return_value=("", 0)):
+        with patch('repoindex.infra.fs_utils.run_command', return_value=("", 0)):
             result = detect_github_pages_locally("/repo")
         assert result is not None
         assert result['has_pages_workflow'] is True
@@ -627,7 +627,7 @@ class TestDetectGithubPagesLocally:
     def test_no_pages_indicators(self, fs):
         """Returns None when no Pages indicators found."""
         fs.create_dir("/repo/.git")
-        with patch('repoindex.utils.run_command', return_value=("origin/main", 0)):
+        with patch('repoindex.infra.fs_utils.run_command', return_value=("origin/main", 0)):
             result = detect_github_pages_locally("/repo")
         assert result is None
 
@@ -636,13 +636,13 @@ class TestDetectGithubPagesLocally:
 # Tests for get_github_repo_info
 # ============================================================================
 
-from repoindex.utils import get_github_repo_info
+from repoindex.infra.fs_utils import get_github_repo_info
 
 
 class TestGetGithubRepoInfo:
     """Tests for get_github_repo_info function."""
 
-    @patch('repoindex.utils.run_command')
+    @patch('repoindex.infra.fs_utils.run_command')
     def test_returns_repo_info(self, mock_run):
         """Returns parsed repo info on success."""
         mock_run.return_value = ('{"name": "repo", "full_name": "user/repo", "stars": 42}', 0)
@@ -651,21 +651,21 @@ class TestGetGithubRepoInfo:
         assert result['name'] == "repo"
         assert result['stars'] == 42
 
-    @patch('repoindex.utils.run_command')
+    @patch('repoindex.infra.fs_utils.run_command')
     def test_returns_none_on_empty(self, mock_run):
         """Returns None when command returns empty."""
         mock_run.return_value = ("", 0)
         result = get_github_repo_info("user", "repo")
         assert result is None
 
-    @patch('repoindex.utils.run_command')
+    @patch('repoindex.infra.fs_utils.run_command')
     def test_returns_none_on_exception(self, mock_run):
         """Returns None when exception occurs."""
         mock_run.side_effect = Exception("API error")
         result = get_github_repo_info("user", "repo")
         assert result is None
 
-    @patch('repoindex.utils.run_command')
+    @patch('repoindex.infra.fs_utils.run_command')
     def test_returns_none_on_invalid_json(self, mock_run):
         """Returns None on invalid JSON response."""
         mock_run.return_value = ("not json", 0)

@@ -42,7 +42,7 @@ class PyPISource(MetadataSource):
     def _detect_name(self, repo_path: str) -> Optional[str]:
         """Detect Python package name from packaging files."""
         try:
-            from ..pypi import find_packaging_files, extract_package_name
+            from ..infra.pypi_metadata import find_packaging_files, extract_package_name
             packaging_files = find_packaging_files(repo_path)
             if not packaging_files:
                 return None
@@ -60,7 +60,7 @@ class PyPISource(MetadataSource):
     def check(self, package_name: str, config: Optional[dict] = None) -> Optional[PackageMetadata]:
         """Check PyPI for package."""
         try:
-            from ..pypi import check_pypi_package
+            from ..infra.pypi_metadata import check_pypi_package
             info = check_pypi_package(package_name)
             if not info:
                 return None

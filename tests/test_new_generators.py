@@ -15,7 +15,7 @@ import yaml
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from repoindex.pypi import extract_project_metadata
+from repoindex.infra.pypi_metadata import extract_project_metadata
 from repoindex.services.boilerplate_service import (
     AuthorInfo,
     BoilerplateService,
