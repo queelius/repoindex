@@ -19,11 +19,45 @@ from ..infra.zenodo_client import ZenodoRecord, _normalize_github_url
 logger = logging.getLogger(__name__)
 
 
-# Directories to exclude from repository discovery
+# Directory basenames excluded from repository discovery (matched anywhere in the tree).
 EXCLUDE_DIRS = {
     '_deps', 'build', 'node_modules', '.git', '__pycache__',
     'venv', '.venv', 'env', '.env', 'dist', 'target'
 }
+
+
+def _expand_exclude_subtrees(exclude_paths: List[str]) -> Set[str]:
+    """Expand user-supplied exclude paths into a set of resolved subtree roots.
+
+    Accepts ``~``-prefixed paths and globs (``~/github/archive*``). Trailing
+    ``/*`` and ``/**`` are stripped: callers want to name the root, not a
+    glob over its children. Non-existent paths are kept (they may match
+    later) but resolved to absolute form.
+    """
+    import glob as _glob
+    out: Set[str] = set()
+    for pattern in exclude_paths or []:
+        expanded = os.path.expanduser(pattern)
+        for suffix in ('/**', '/*'):
+            if expanded.endswith(suffix):
+                expanded = expanded[: -len(suffix)]
+                break
+        matches = _glob.glob(expanded)
+        if matches:
+            for match in matches:
+                out.add(str(Path(match).resolve()))
+        else:
+            # Keep the literal path so future appearance still excludes.
+            out.add(str(Path(expanded).resolve()))
+    return out
+
+
+def _is_under_subtree(path: str, subtrees: Set[str]) -> bool:
+    """True if path equals or lives inside any subtree root."""
+    if not subtrees:
+        return False
+    p = str(Path(path).resolve())
+    return any(p == root or p.startswith(root + os.sep) for root in subtrees)
 
 
 def _detect_local_assets(repo_path) -> dict:
@@ -133,24 +167,39 @@ class RepositoryService:
         self,
         paths: Optional[List[str]] = None,
         recursive: bool = True,
-        exclude_patterns: Optional[List[str]] = None
+        exclude_patterns: Optional[List[str]] = None,
+        exclude_paths: Optional[List[str]] = None,
     ) -> Generator[Repository, None, None]:
         """
         Discover git repositories from paths.
 
+        Two kinds of exclusions are honored:
+
+        - ``exclude_patterns``: directory **basenames** (e.g. ``node_modules``,
+          ``build``). Matched anywhere in the tree.
+        - ``exclude_paths``: absolute or ``~``-prefixed **paths or globs**
+          (e.g. ``~/github/archived``, ``~/scratch/*``). The named path and
+          everything beneath it is skipped. If ``None``, falls back to
+          ``config['exclude_directories']``.
+
         Args:
-            paths: Paths to search (uses config if None)
-            recursive: Search subdirectories
-            exclude_patterns: Patterns to exclude
+            paths: Paths to search (uses config['repository_directories'] if None).
+            recursive: Search subdirectories.
+            exclude_patterns: Directory basenames to skip.
+            exclude_paths: Path prefixes (subtrees) to skip.
 
         Yields:
-            Repository objects for each found repo
+            Repository objects for each found repo.
         """
         if paths is None:
             paths = self.config.get('repository_directories', [])
 
         exclude = set(exclude_patterns or [])
         exclude.update(EXCLUDE_DIRS)
+
+        if exclude_paths is None:
+            exclude_paths = self.config.get('exclude_directories', []) or []
+        excluded_subtrees = _expand_exclude_subtrees(exclude_paths)
 
         seen_paths: Set[str] = set()
 
@@ -162,11 +211,11 @@ class RepositoryService:
                 import glob
                 for expanded in glob.glob(path, recursive=True):
                     yield from self._discover_path(
-                        expanded, recursive, exclude, seen_paths
+                        expanded, recursive, exclude, excluded_subtrees, seen_paths
                     )
             else:
                 yield from self._discover_path(
-                    path, recursive, exclude, seen_paths
+                    path, recursive, exclude, excluded_subtrees, seen_paths
                 )
 
     def _discover_path(
@@ -174,21 +223,26 @@ class RepositoryService:
         path: str,
         recursive: bool,
         exclude: Set[str],
+        excluded_subtrees: Set[str],
         seen_paths: Set[str]
     ) -> Generator[Repository, None, None]:
         """
         Discover repos from a single path.
 
-        v0.10.0: Filesystem path IS the canonical identity. No remote-URL deduplication.
-        Each local path is an independent entry even if multiple paths point to same remote.
+        Filesystem path is the canonical identity. No remote-URL deduplication
+        at this layer; each local path is an independent entry.
         """
         path = str(Path(path).resolve())
 
         if not os.path.isdir(path):
             return
 
-        # Check if any path component matches exclude patterns
-        # This catches repos inside build/_deps/ when expanded by glob
+        # Subtree exclusion: skip the path itself and anything inside a
+        # configured excluded directory.
+        if _is_under_subtree(path, excluded_subtrees):
+            return
+
+        # Basename exclusion: catches repos nested inside build/_deps/ etc.
         path_parts = Path(path).parts
         if any(part in exclude for part in path_parts):
             return
@@ -217,7 +271,7 @@ class RepositoryService:
                     continue
 
                 yield from self._discover_path(
-                    entry.path, recursive, exclude, seen_paths
+                    entry.path, recursive, exclude, excluded_subtrees, seen_paths
                 )
         except PermissionError:
             logger.debug(f"Permission denied: {path}")
