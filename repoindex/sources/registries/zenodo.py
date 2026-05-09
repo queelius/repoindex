@@ -8,18 +8,17 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-from ..domain.repository import PackageMetadata
-from . import MetadataSource
+from ...domain.repository import PackageMetadata
+from .. import Registry
 
 logger = logging.getLogger(__name__)
 
 
-class ZenodoSource(MetadataSource):
+class ZenodoSource(Registry):
     """Zenodo DOI archive source (batch-fetch via ORCID)."""
 
     source_id = "zenodo"
     name = "Zenodo"
-    target = "publications"
     batch = True
 
     def __init__(self):
@@ -33,7 +32,7 @@ class ZenodoSource(MetadataSource):
             return
 
         try:
-            from ..infra.zenodo_client import ZenodoClient
+            from ...infra.zenodo_client import ZenodoClient
             client = ZenodoClient()
             self._records = client.search_by_orcid(orcid)
             logger.info(f"Zenodo: prefetched {len(self._records)} records for ORCID {orcid}")
@@ -58,7 +57,7 @@ class ZenodoSource(MetadataSource):
         if not self._records:
             return None
 
-        from ..infra.zenodo_client import _normalize_github_url
+        from ...infra.zenodo_client import _normalize_github_url
 
         repo_name = Path(repo_path).name.lower()
 
@@ -68,7 +67,7 @@ class ZenodoSource(MetadataSource):
             remote_url = repo_record.get('remote_url')
         if not remote_url:
             try:
-                from ..infra import GitClient
+                from ...infra import GitClient
                 git = GitClient()
                 remote_url = git.remote_url(repo_path)
             except Exception:

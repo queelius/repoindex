@@ -9,21 +9,70 @@ from repoindex.commands.refresh import (
     _update_repo_platform_fields,
     _LOCAL_SOURCE_IDS,
 )
-from repoindex.sources import MetadataSource
+from repoindex.sources import LocalScanner, GitForge, Registry, Source
 
 
 _SENTINEL = object()
 
-def _make_source(source_id, target="repos", batch=False,
+# Concrete-subclass-by-kind: refresh's dispatcher branches on isinstance(),
+# so MagicMock(spec=Source) wouldn't satisfy the routing. We build real
+# subclass instances and attach MagicMocks for detect/fetch.
+_KIND_MAP = {
+    'scanner': LocalScanner,
+    'forge': GitForge,
+    'registry': Registry,
+}
+
+
+def _make_source(source_id, kind='scanner', batch=False,
                  detect_val=True, fetch_val=_SENTINEL):
-    """Helper to create a mock MetadataSource."""
-    src = MagicMock(spec=MetadataSource)
+    """Build a real Source subclass instance with detect/fetch as MagicMocks.
+
+    The data-routing in _process_repo uses isinstance(source, ...), so
+    the concrete subclass is what matters, not the legacy ``target`` field.
+    """
+    base = _KIND_MAP[kind]
+
+    class _Mocked(base):
+        # Concrete stubs so the abstract methods are satisfied; the actual
+        # behavior is controlled by the MagicMock attributes attached below.
+        def detect(self, repo_path, repo_record=None):
+            return True
+
+        def fetch(self, repo_path, repo_record=None, config=None):
+            return None
+
+    src = _Mocked()
     src.source_id = source_id
     src.name = source_id.title()
-    src.target = target
     src.batch = batch
     src.detect = MagicMock(return_value=detect_val)
-    src.fetch = MagicMock(return_value={'test': True} if fetch_val is _SENTINEL else fetch_val)
+    src.fetch = MagicMock(
+        return_value={'test': True} if fetch_val is _SENTINEL else fetch_val
+    )
+    return src
+
+
+def _make_unknown_kind_source(source_id, detect_val=True, fetch_val=None):
+    """Build a Source subclass that is neither LocalScanner / GitForge / Registry.
+
+    The refresh dispatcher's defensive ``else`` arm logs a warning and
+    skips data routing for any such source. This helper exercises that
+    branch.
+    """
+    class _Bogus(Source):
+        def detect(self, repo_path, repo_record=None):
+            return True
+
+        def fetch(self, repo_path, repo_record=None, config=None):
+            return None
+
+    src = _Bogus()
+    src.source_id = source_id
+    src.name = source_id.title()
+    src.batch = False
+    src.detect = MagicMock(return_value=detect_val)
+    src.fetch = MagicMock(return_value=fetch_val)
     return src
 
 
@@ -46,8 +95,8 @@ class TestResolveActiveSources:
         """No flags = local sources only."""
         with patch('repoindex.commands.refresh.discover_sources') as mock_discover:
             mock_discover.return_value = [
-                _make_source('citation_cff'),
-                _make_source('keywords'),
+                _make_source('citation_cff', kind='scanner'),
+                _make_source('keywords', kind='scanner'),
             ]
             result = self._resolve()
             # discover_sources called with only=local source IDs
@@ -58,7 +107,7 @@ class TestResolveActiveSources:
     def test_source_github_activates_github(self):
         """--source github should request github + local sources."""
         with patch('repoindex.commands.refresh.discover_sources') as mock_discover:
-            mock_discover.return_value = [_make_source('github')]
+            mock_discover.return_value = [_make_source('github', kind='forge')]
             self._resolve(source_names=('github',))
             call_kwargs = mock_discover.call_args
             only = call_kwargs[1].get('only') if call_kwargs[1] else None
@@ -68,7 +117,7 @@ class TestResolveActiveSources:
     def test_provider_flag_activates_source(self):
         """Deprecated --provider flag should work like --source."""
         with patch('repoindex.commands.refresh.discover_sources') as mock_discover:
-            mock_discover.return_value = [_make_source('pypi', target='publications')]
+            mock_discover.return_value = [_make_source('pypi', kind='registry')]
             self._resolve(provider_names=('pypi',))
             call_kwargs = mock_discover.call_args
             only = call_kwargs[1].get('only') if call_kwargs[1] else None
@@ -78,7 +127,7 @@ class TestResolveActiveSources:
     def test_github_flag_activates_source(self):
         """--github flag should include github in requested sources."""
         with patch('repoindex.commands.refresh.discover_sources') as mock_discover:
-            mock_discover.return_value = [_make_source('github')]
+            mock_discover.return_value = [_make_source('github', kind='forge')]
             self._resolve(github=True)
             call_kwargs = mock_discover.call_args
             only = call_kwargs[1].get('only') if call_kwargs[1] else None
@@ -88,8 +137,8 @@ class TestResolveActiveSources:
     def test_no_github_excludes_github(self):
         """--no-github should exclude github even from --external."""
         with patch('repoindex.commands.refresh.discover_sources') as mock_discover:
-            github_src = _make_source('github')
-            pypi_src = _make_source('pypi', target='publications')
+            github_src = _make_source('github', kind='forge')
+            pypi_src = _make_source('pypi', kind='registry')
             mock_discover.return_value = [github_src, pypi_src]
             result = self._resolve(github=False, external=True)
             source_ids = [s.source_id for s in result]
@@ -100,9 +149,9 @@ class TestResolveActiveSources:
         """--external should return all sources."""
         with patch('repoindex.commands.refresh.discover_sources') as mock_discover:
             all_sources = [
-                _make_source('citation_cff'),
-                _make_source('github'),
-                _make_source('pypi', target='publications'),
+                _make_source('citation_cff', kind='scanner'),
+                _make_source('github', kind='forge'),
+                _make_source('pypi', kind='registry'),
             ]
             mock_discover.return_value = all_sources
             result = self._resolve(external=True)
@@ -114,7 +163,7 @@ class TestResolveActiveSources:
         """Config github: true should include github."""
         config = {'refresh': {'external_sources': {'github': True}, 'providers': {}}}
         with patch('repoindex.commands.refresh.discover_sources') as mock_discover:
-            mock_discover.return_value = [_make_source('github')]
+            mock_discover.return_value = [_make_source('github', kind='forge')]
             self._resolve(config=config)
             call_kwargs = mock_discover.call_args
             only = call_kwargs[1].get('only') if call_kwargs[1] else None
@@ -125,7 +174,7 @@ class TestResolveActiveSources:
         """Config providers: pypi: true should include pypi."""
         config = {'refresh': {'external_sources': {}, 'providers': {'pypi': True}}}
         with patch('repoindex.commands.refresh.discover_sources') as mock_discover:
-            mock_discover.return_value = [_make_source('pypi', target='publications')]
+            mock_discover.return_value = [_make_source('pypi', kind='registry')]
             self._resolve(config=config)
             call_kwargs = mock_discover.call_args
             only = call_kwargs[1].get('only') if call_kwargs[1] else None
@@ -147,7 +196,7 @@ class TestResolveActiveSources:
         """--no-github overrides config default github: true."""
         config = {'refresh': {'external_sources': {'github': True}, 'providers': {}}}
         with patch('repoindex.commands.refresh.discover_sources') as mock_discover:
-            mock_discover.return_value = [_make_source('citation_cff')]
+            mock_discover.return_value = [_make_source('citation_cff', kind='scanner')]
             result = self._resolve(github=False, config=config)
             call_kwargs = mock_discover.call_args
             only = call_kwargs[1].get('only') if call_kwargs[1] else None
@@ -241,8 +290,8 @@ class TestSourceWiring:
         from click.testing import CliRunner
         from repoindex.commands.refresh import refresh_handler
 
-        mock_github = _make_source('github')
-        mock_pypi = _make_source('pypi', target='publications')
+        mock_github = _make_source('github', kind='forge')
+        mock_pypi = _make_source('pypi', kind='registry')
 
         runner = CliRunner()
         with patch('repoindex.commands.refresh.load_config', return_value={
@@ -391,7 +440,7 @@ class TestProcessRepoWithSources:
     """Test that _process_repo integrates sources correctly."""
 
     def test_repos_target_source_updates_fields(self):
-        """Source with target='repos' should update repo fields via _update_repo_platform_fields."""
+        """A GitForge / LocalScanner should update repo fields via _update_repo_platform_fields."""
         from repoindex.commands.refresh import _process_repo
 
         mock_db = MagicMock()
@@ -409,7 +458,7 @@ class TestProcessRepoWithSources:
 
         stats = {'scanned': 0, 'updated': 0, 'skipped': 0, 'events_added': 0, 'errors': 0}
 
-        mock_source = _make_source('github', target='repos')
+        mock_source = _make_source('github', kind='forge')
         mock_source.detect.return_value = True
         mock_source.fetch.return_value = {'github_stars': 42}
 
@@ -428,7 +477,7 @@ class TestProcessRepoWithSources:
         mock_update.assert_called_once_with(mock_db, 1, {'github_stars': 42})
 
     def test_publications_target_source_upserts_publication(self):
-        """Source with target='publications' should upsert a publication record."""
+        """A Registry should upsert a publication record."""
         from repoindex.commands.refresh import _process_repo
 
         mock_db = MagicMock()
@@ -446,7 +495,7 @@ class TestProcessRepoWithSources:
 
         stats = {'scanned': 0, 'updated': 0, 'skipped': 0, 'events_added': 0, 'errors': 0}
 
-        mock_source = _make_source('pypi', target='publications')
+        mock_source = _make_source('pypi', kind='registry')
         mock_source.detect.return_value = True
         mock_source.fetch.return_value = {
             'registry': 'pypi', 'name': 'test-pkg',
@@ -525,7 +574,7 @@ class TestProcessRepoWithSources:
 
         stats = {'scanned': 0, 'updated': 0, 'skipped': 0, 'events_added': 0, 'errors': 0}
 
-        mock_source = _make_source('github')
+        mock_source = _make_source('github', kind='forge')
         mock_source.detect.side_effect = RuntimeError("API timeout")
 
         with patch('repoindex.commands.refresh.needs_refresh', return_value=True), \
@@ -611,13 +660,12 @@ class TestProcessRepoWithSources:
 
         mock_update.assert_not_called()
 
-    def test_unknown_target_logs_warning_and_skips(self, caplog):
-        """A source whose target is neither 'repos' nor 'publications' should
-        log a warning and skip, not silently drop the fetched data.
+    def test_unknown_kind_logs_warning_and_skips(self, caplog):
+        """A Source subclass that's not LocalScanner / GitForge / Registry
+        should log a warning and skip, not silently drop the fetched data.
 
-        discover_sources() already filters bad targets, but this defensive
-        else-arm catches the case where a source mutates self.target after
-        discovery, or is constructed and passed directly (bypassing discovery).
+        Defensive belt-and-suspenders for custom Source subclasses that
+        slip past the three role ABCs.
         """
         import logging
         from repoindex.commands.refresh import _process_repo
@@ -637,10 +685,8 @@ class TestProcessRepoWithSources:
 
         stats = {'scanned': 0, 'updated': 0, 'skipped': 0, 'events_added': 0, 'errors': 0}
 
-        # A source with a bogus target — bypasses the discover_sources()
-        # validation because we pass it directly.
-        mock_source = _make_source('weird', target='somewhere_else')
-        mock_source.detect.return_value = True
+        # A direct Source subclass (not LocalScanner / GitForge / Registry).
+        mock_source = _make_unknown_kind_source('weird')
         mock_source.fetch.return_value = {'arbitrary': 'data'}
 
         with patch('repoindex.commands.refresh.needs_refresh', return_value=True), \
@@ -660,10 +706,9 @@ class TestProcessRepoWithSources:
         # Neither dispatch branch should fire
         mock_update.assert_not_called()
         mock_upsert.assert_not_called()
-        # Warning surfaced with the source id and its bogus target
+        # Warning surfaced with the source id
         messages = ' '.join(r.message for r in caplog.records)
         assert 'weird' in messages
-        assert 'somewhere_else' in messages
         # Stats still reflect a successful update (source failure is non-fatal)
         assert stats['updated'] == 1
         assert stats['errors'] == 0

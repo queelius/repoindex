@@ -3,19 +3,18 @@ import json
 from pathlib import Path
 from typing import Optional
 
-from ..compat import tomllib
-from . import MetadataSource
+from ...compat import tomllib
+from .. import LocalScanner
 
 # Files checked for keywords, in priority order
 _KEYWORD_FILES = ('pyproject.toml', 'Cargo.toml', 'package.json')
 
 
-class KeywordsSource(MetadataSource):
+class KeywordsSource(LocalScanner):
     """Extract keywords from project metadata files (pyproject.toml, Cargo.toml, package.json)."""
 
     source_id = "keywords"
     name = "Project Keywords"
-    target = "repos"
 
     def detect(self, repo_path: str, repo_record: Optional[dict] = None) -> bool:
         p = Path(repo_path)

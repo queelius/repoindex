@@ -4,17 +4,16 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-from . import MetadataSource
+from .. import LocalScanner
 
 logger = logging.getLogger(__name__)
 
 
-class CitationCffSource(MetadataSource):
+class CitationCffSource(LocalScanner):
     """Parse CITATION.cff files for citation metadata."""
 
     source_id = "citation_cff"
     name = "CITATION.cff"
-    target = "repos"
 
     def detect(self, repo_path: str, repo_record: Optional[dict] = None) -> bool:
         return (Path(repo_path) / 'CITATION.cff').exists()

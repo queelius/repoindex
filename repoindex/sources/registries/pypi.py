@@ -5,8 +5,8 @@ from typing import Optional
 
 import requests
 
-from ..domain.repository import PackageMetadata
-from . import MetadataSource
+from ...domain.repository import PackageMetadata
+from .. import Registry
 
 logger = logging.getLogger(__name__)
 
@@ -31,18 +31,17 @@ def _fetch_downloads(package_name: str) -> Optional[int]:
     return None
 
 
-class PyPISource(MetadataSource):
+class PyPISource(Registry):
     """Python Package Index source."""
 
     source_id = "pypi"
     name = "Python Package Index"
-    target = "publications"
     batch = False
 
     def _detect_name(self, repo_path: str) -> Optional[str]:
         """Detect Python package name from packaging files."""
         try:
-            from ..infra.pypi_metadata import find_packaging_files, extract_package_name
+            from ...infra.pypi_metadata import find_packaging_files, extract_package_name
             packaging_files = find_packaging_files(repo_path)
             if not packaging_files:
                 return None
@@ -60,7 +59,7 @@ class PyPISource(MetadataSource):
     def check(self, package_name: str, config: Optional[dict] = None) -> Optional[PackageMetadata]:
         """Check PyPI for package."""
         try:
-            from ..infra.pypi_metadata import check_pypi_package
+            from ...infra.pypi_metadata import check_pypi_package
             info = check_pypi_package(package_name)
             if not info:
                 return None

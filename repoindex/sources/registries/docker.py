@@ -10,18 +10,17 @@ from typing import Optional
 
 import requests
 
-from ..domain.repository import PackageMetadata
-from . import MetadataSource
+from ...domain.repository import PackageMetadata
+from .. import Registry
 
 logger = logging.getLogger(__name__)
 
 
-class DockerSource(MetadataSource):
+class DockerSource(Registry):
     """Docker Hub registry source."""
 
     source_id = "docker"
     name = "Docker Hub"
-    target = "publications"
     batch = False
 
     def _detect_name(self, repo_path: str, repo_record: Optional[dict] = None) -> Optional[str]:

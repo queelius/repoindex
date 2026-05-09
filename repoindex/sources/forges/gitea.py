@@ -21,7 +21,7 @@ from urllib.parse import urlparse
 
 import requests
 
-from . import MetadataSource
+from .. import GitForge
 
 logger = logging.getLogger(__name__)
 
@@ -85,12 +85,11 @@ def _parse_gitea_remote(
     return host, owner, name
 
 
-class GiteaSource(MetadataSource):
+class GiteaSource(GitForge):
     """Metadata source for Gitea-based hosting platforms."""
 
     source_id = "gitea"
     name = "Gitea / Codeberg"
-    target = "repos"
 
     def __init__(self):
         # Session cache keyed by (host, token_or_None) for connection pooling

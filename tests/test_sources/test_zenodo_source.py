@@ -4,7 +4,7 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from repoindex.sources.zenodo import ZenodoSource, source
+from repoindex.sources.registries.zenodo import ZenodoSource, source
 from repoindex.infra.zenodo_client import ZenodoRecord
 
 
@@ -15,8 +15,9 @@ class TestZenodoSourceAttributes:
     def test_name(self):
         assert source.name == "Zenodo"
 
-    def test_target(self):
-        assert source.target == "publications"
+    def test_is_registry_instance(self):
+        from repoindex.sources import Registry
+        assert isinstance(source, Registry)
 
     def test_batch(self):
         assert source.batch is True

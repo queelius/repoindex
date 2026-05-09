@@ -4,7 +4,7 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from repoindex.sources.cran import CRANSource, _parse_description, source
+from repoindex.sources.registries.cran import CRANSource, _parse_description, source
 
 
 # ---------------------------------------------------------------------------
@@ -18,8 +18,9 @@ class TestCRANSourceAttributes:
     def test_name(self):
         assert "CRAN" in source.name
 
-    def test_target(self):
-        assert source.target == "publications"
+    def test_is_registry_instance(self):
+        from repoindex.sources import Registry
+        assert isinstance(source, Registry)
 
     def test_not_batch(self):
         assert source.batch is False
@@ -56,7 +57,7 @@ class TestCRANDetect:
 # ---------------------------------------------------------------------------
 
 class TestCRANCheck:
-    @patch('repoindex.sources.cran.requests.get')
+    @patch('repoindex.sources.registries.cran.requests.get')
     def test_check_published_on_cran(self, mock_get):
         """crandb returns 200 with JSON -> CRAN metadata."""
         mock_resp = MagicMock()
@@ -81,7 +82,7 @@ class TestCRANCheck:
         assert mock_get.call_count == 1
         assert 'crandb.r-pkg.org/myRpkg' in mock_get.call_args[0][0]
 
-    @patch('repoindex.sources.cran.requests.get')
+    @patch('repoindex.sources.registries.cran.requests.get')
     def test_check_published_on_bioconductor(self, mock_get):
         """crandb 404, Bioconductor 200 -> Bioconductor metadata."""
         cran_resp = MagicMock()
@@ -102,7 +103,7 @@ class TestCRANCheck:
         assert "bioconductor.org" in result.url
         assert mock_get.call_count == 2
 
-    @patch('repoindex.sources.cran.requests.get')
+    @patch('repoindex.sources.registries.cran.requests.get')
     def test_check_not_published(self, mock_get):
         """Both APIs return 404 -> PackageMetadata(published=False).
 
@@ -122,7 +123,7 @@ class TestCRANCheck:
         assert result.registry == 'cran'
         assert result.name == 'unpublished-pkg'
 
-    @patch('repoindex.sources.cran.requests.get')
+    @patch('repoindex.sources.registries.cran.requests.get')
     def test_check_cran_exception_falls_through_to_bioc(self, mock_get):
         """Network error on crandb -> still tries Bioconductor."""
         bioc_resp = MagicMock()
@@ -136,7 +137,7 @@ class TestCRANCheck:
         assert result is not None
         assert result.registry == "bioconductor"
 
-    @patch('repoindex.sources.cran.requests.get')
+    @patch('repoindex.sources.registries.cran.requests.get')
     def test_check_both_exception(self, mock_get):
         """Both APIs raise -> still returns unpublished record (not None)."""
         mock_get.side_effect = Exception("fail")
@@ -147,7 +148,7 @@ class TestCRANCheck:
         assert result is not None
         assert result.published is False
 
-    @patch('repoindex.sources.cran.requests.get')
+    @patch('repoindex.sources.registries.cran.requests.get')
     def test_check_version_none_when_missing(self, mock_get):
         """crandb JSON missing Version key -> version=None."""
         mock_resp = MagicMock()
@@ -168,7 +169,7 @@ class TestCRANCheck:
 # ---------------------------------------------------------------------------
 
 class TestCRANFetch:
-    @patch('repoindex.sources.cran.requests.get')
+    @patch('repoindex.sources.registries.cran.requests.get')
     def test_fetch_integration(self, mock_get, tmp_path):
         (tmp_path / "DESCRIPTION").write_text(
             "Package: testpkg\nVersion: 1.0.0\n"

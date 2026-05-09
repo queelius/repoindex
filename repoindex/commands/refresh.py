@@ -47,7 +47,7 @@ from ..database.events import insert_events
 from ..services.repository_service import RepositoryService
 from ..services.tag_derivation import derive_persistable_tags
 from ..events import scan_events
-from ..sources import discover_sources
+from ..sources import discover_sources, GitForge, LocalScanner, Registry
 
 
 def _resolve_active_sources(
@@ -58,7 +58,7 @@ def _resolve_active_sources(
     config: dict,
 ) -> list:
     """
-    Resolve the list of active MetadataSource instances.
+    Resolve the list of active Source instances.
 
     Merges:
     - Explicit --source flags (primary)
@@ -78,7 +78,7 @@ def _resolve_active_sources(
         config: Full config dict
 
     Returns:
-        List of MetadataSource instances to run
+        List of Source instances to run
     """
     ext_config = config.get('refresh', {}).get('external_sources', {})
     provider_config = config.get('refresh', {}).get('providers', {})
@@ -384,7 +384,7 @@ def _update_repo_platform_fields(db, repo_id, fields):
 
 
 def _run_sources_parallel(sources, repo_path, repo_dict, config, quiet=False):
-    """Run MetadataSource.fetch() calls in parallel.
+    """Run Source.fetch() calls in parallel.
 
     Returns list of (source, data) tuples for successful fetches.
     Each source's detect() is checked first; if it returns False, the
@@ -419,7 +419,7 @@ def _run_sources_parallel(sources, repo_path, repo_dict, config, quiet=False):
 def _derive_tags(db, repo_id, repo_record):
     """Derive tags from metadata fields and sync to tags table.
 
-    Runs after all MetadataSources have enriched a repo. Reads metadata
+    Runs after all sources have enriched a repo. Reads metadata
     columns and populates the tags table with source-attributed entries.
 
     User-assigned tags (source='user') are never touched.
@@ -547,9 +547,9 @@ def _process_repo(
                     sources, repo.path, repo_dict, config, quiet=quiet
                 )
                 for source, data in results:
-                    if source.target == 'repos':
+                    if isinstance(source, (LocalScanner, GitForge)):
                         _update_repo_platform_fields(db, repo_id, data)
-                    elif source.target == 'publications':
+                    elif isinstance(source, Registry):
                         from ..database.repository import _upsert_publication
                         from ..domain.repository import PackageMetadata
                         pkg = PackageMetadata(
@@ -565,14 +565,14 @@ def _process_repo(
                         )
                         _upsert_publication(db, repo_id, pkg)
                     else:
-                        # Belt-and-suspenders: discover_sources() already
-                        # filters unknown targets, but if something slips
-                        # through (e.g., a source mutates self.target after
-                        # discovery), surface it instead of silently dropping
-                        # the fetched data.
+                        # Defensive: a custom Source subclass that doesn't
+                        # extend LocalScanner / GitForge / Registry would
+                        # otherwise silently no-op. Surface it instead of
+                        # dropping the fetched data on the floor.
                         logger.warning(
-                            "Source %s has unknown target %r; skipping",
-                            source.source_id, source.target,
+                            "Source %s is not a LocalScanner, GitForge, or "
+                            "Registry (type=%s); skipping",
+                            source.source_id, type(source).__name__,
                         )
             except Exception as e:
                 if not quiet:

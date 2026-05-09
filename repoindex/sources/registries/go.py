@@ -11,8 +11,8 @@ from typing import Optional
 
 import requests
 
-from ..domain.repository import PackageMetadata
-from . import MetadataSource
+from ...domain.repository import PackageMetadata
+from .. import Registry
 
 logger = logging.getLogger(__name__)
 
@@ -33,12 +33,11 @@ def _encode_module_path(path: str) -> str:
     return ''.join(result)
 
 
-class GoSource(MetadataSource):
+class GoSource(Registry):
     """Go module proxy source."""
 
     source_id = "go"
     name = "Go Module Proxy"
-    target = "publications"
     batch = False
 
     def _detect_name(self, repo_path: str) -> Optional[str]:

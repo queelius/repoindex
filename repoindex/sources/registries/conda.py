@@ -10,18 +10,17 @@ from typing import Optional
 
 import requests
 
-from ..domain.repository import PackageMetadata
-from . import MetadataSource
+from ...domain.repository import PackageMetadata
+from .. import Registry
 
 logger = logging.getLogger(__name__)
 
 
-class CondaSource(MetadataSource):
+class CondaSource(Registry):
     """Conda-forge / Anaconda registry source."""
 
     source_id = "conda"
     name = "conda-forge"
-    target = "publications"
     batch = False
 
     def _detect_name(self, repo_path: str) -> Optional[str]:

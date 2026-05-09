@@ -9,16 +9,44 @@ import pytest
 from unittest.mock import patch, MagicMock
 
 from repoindex.commands.refresh import _resolve_active_sources, _LOCAL_SOURCE_IDS
-from repoindex.sources import MetadataSource
+from repoindex.sources import LocalScanner, GitForge, Registry
 
 
-def _make_source(source_id, target="repos"):
-    """Helper to create a mock MetadataSource."""
-    src = MagicMock(spec=MetadataSource)
+# Map "kind" -> (ABC, batch default) used by _make_source. Concrete
+# subclasses are required so refresh's isinstance() routing fires
+# correctly; MagicMock(spec=...) doesn't satisfy isinstance for the
+# spec class.
+_KIND_MAP = {
+    'scanner': LocalScanner,
+    'forge': GitForge,
+    'registry': Registry,
+}
+
+
+def _make_source(source_id, kind='scanner', batch=False):
+    """Build a real Source subclass instance with detect/fetch as MagicMocks.
+
+    Resolution paths:
+    - "scanner" -> LocalScanner (-> repos table)
+    - "forge"   -> GitForge     (-> repos table)
+    - "registry" -> Registry    (-> publications table)
+    """
+    base = _KIND_MAP[kind]
+
+    class _Mocked(base):
+        # Concrete stubs so the abstract methods are satisfied.
+        def detect(self, repo_path, repo_record=None):
+            return True
+
+        def fetch(self, repo_path, repo_record=None, config=None):
+            return None
+
+    src = _Mocked()
     src.source_id = source_id
     src.name = source_id.title()
-    src.target = target
-    src.batch = False
+    src.batch = batch
+    src.detect = MagicMock(return_value=True)
+    src.fetch = MagicMock(return_value={'test': True})
     return src
 
 
@@ -39,7 +67,7 @@ class TestResolveActiveSources:
     def test_github_true_includes_github(self):
         """--github includes github in requested sources."""
         with patch('repoindex.commands.refresh.discover_sources') as mock:
-            mock.return_value = [_make_source('github')]
+            mock.return_value = [_make_source('github', kind='forge')]
             self._resolve(github=True)
             only = mock.call_args[1].get('only')
             assert 'github' in only
@@ -47,8 +75,8 @@ class TestResolveActiveSources:
     def test_github_false_excludes_github_from_external(self):
         """--no-github excludes github even with --external."""
         with patch('repoindex.commands.refresh.discover_sources') as mock:
-            github_src = _make_source('github')
-            pypi_src = _make_source('pypi', target='publications')
+            github_src = _make_source('github', kind='forge')
+            pypi_src = _make_source('pypi', kind='registry')
             mock.return_value = [github_src, pypi_src]
             result = self._resolve(github=False, external=True)
             ids = [s.source_id for s in result]
@@ -93,14 +121,14 @@ class TestResolveActiveSources:
         """Test priority: explicit --no-github > --external > config."""
         # --no-github + --external: github excluded
         with patch('repoindex.commands.refresh.discover_sources') as mock:
-            mock.return_value = [_make_source('github'), _make_source('pypi')]
+            mock.return_value = [_make_source('github', kind='forge'), _make_source('pypi', kind='registry')]
             result = self._resolve(github=False, external=True)
             ids = [s.source_id for s in result]
             assert 'github' not in ids
 
         # --external alone: github included
         with patch('repoindex.commands.refresh.discover_sources') as mock:
-            mock.return_value = [_make_source('github'), _make_source('pypi')]
+            mock.return_value = [_make_source('github', kind='forge'), _make_source('pypi', kind='registry')]
             result = self._resolve(external=True)
             ids = [s.source_id for s in result]
             assert 'github' in ids

@@ -10,8 +10,8 @@ from typing import Dict, Optional
 
 import requests
 
-from ..domain.repository import PackageMetadata
-from . import MetadataSource
+from ...domain.repository import PackageMetadata
+from .. import Registry
 
 logger = logging.getLogger(__name__)
 
@@ -34,12 +34,11 @@ def _parse_description(desc_path: str) -> Dict[str, Optional[str]]:
     return {'package': None}
 
 
-class CRANSource(MetadataSource):
+class CRANSource(Registry):
     """Comprehensive R Archive Network source."""
 
     source_id = "cran"
     name = "CRAN / Bioconductor"
-    target = "publications"
     batch = False
 
     def _detect_name(self, repo_path: str) -> Optional[str]:

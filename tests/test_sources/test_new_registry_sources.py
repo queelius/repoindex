@@ -5,12 +5,12 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from repoindex.sources.npm import NpmSource
-from repoindex.sources.cargo import CargoSource
-from repoindex.sources.conda import CondaSource
-from repoindex.sources.docker import DockerSource
-from repoindex.sources.rubygems import RubyGemsSource
-from repoindex.sources.go import GoSource, _encode_module_path
+from repoindex.sources.registries.npm import NpmSource
+from repoindex.sources.registries.cargo import CargoSource
+from repoindex.sources.registries.conda import CondaSource
+from repoindex.sources.registries.docker import DockerSource
+from repoindex.sources.registries.rubygems import RubyGemsSource
+from repoindex.sources.registries.go import GoSource, _encode_module_path
 
 
 # ============================================================================
@@ -51,7 +51,7 @@ class TestNpmDetect:
 
 
 class TestNpmCheck:
-    @patch('repoindex.sources.npm.requests.get')
+    @patch('repoindex.sources.registries.npm.requests.get')
     def test_check_published(self, mock_get):
         mock_get.return_value = MagicMock(
             status_code=200,
@@ -63,14 +63,14 @@ class TestNpmCheck:
         assert result.version == "2.0.0"
         assert result.registry == "npm"
 
-    @patch('repoindex.sources.npm.requests.get')
+    @patch('repoindex.sources.registries.npm.requests.get')
     def test_check_not_found(self, mock_get):
         mock_get.return_value = MagicMock(status_code=404)
         s = NpmSource()
         result = s.check("nonexistent")
         assert result.published is False
 
-    @patch('repoindex.sources.npm.requests.get')
+    @patch('repoindex.sources.registries.npm.requests.get')
     def test_check_network_error(self, mock_get):
         mock_get.side_effect = Exception("timeout")
         s = NpmSource()
@@ -79,9 +79,10 @@ class TestNpmCheck:
 
 class TestNpmSourceAttributes:
     def test_attributes(self):
+        from repoindex.sources import Registry
         s = NpmSource()
         assert s.source_id == "npm"
-        assert s.target == "publications"
+        assert isinstance(s, Registry)
         assert s.batch is False
 
 
@@ -114,7 +115,7 @@ members = ["crate-a", "crate-b"]
 
 
 class TestCargoCheck:
-    @patch('repoindex.sources.cargo.requests.get')
+    @patch('repoindex.sources.registries.cargo.requests.get')
     def test_check_published(self, mock_get):
         mock_get.return_value = MagicMock(
             status_code=200,
@@ -126,7 +127,7 @@ class TestCargoCheck:
         assert result.version == "0.5.0"
         assert result.downloads == 1000
 
-    @patch('repoindex.sources.cargo.requests.get')
+    @patch('repoindex.sources.registries.cargo.requests.get')
     def test_check_with_user_agent(self, mock_get):
         mock_get.return_value = MagicMock(status_code=404)
         s = CargoSource()
@@ -138,9 +139,10 @@ class TestCargoCheck:
 
 class TestCargoSourceAttributes:
     def test_attributes(self):
+        from repoindex.sources import Registry
         s = CargoSource()
         assert s.source_id == "cargo"
-        assert s.target == "publications"
+        assert isinstance(s, Registry)
 
 
 # ============================================================================
@@ -177,7 +179,7 @@ package:
 
 
 class TestCondaCheck:
-    @patch('repoindex.sources.conda.requests.get')
+    @patch('repoindex.sources.registries.conda.requests.get')
     def test_check_published(self, mock_get):
         mock_get.return_value = MagicMock(
             status_code=200,
@@ -192,9 +194,10 @@ class TestCondaCheck:
 
 class TestCondaSourceAttributes:
     def test_attributes(self):
+        from repoindex.sources import Registry
         s = CondaSource()
         assert s.source_id == "conda"
-        assert s.target == "publications"
+        assert isinstance(s, Registry)
 
 
 # ============================================================================
@@ -220,7 +223,7 @@ class TestDockerDetect:
 
 
 class TestDockerCheck:
-    @patch('repoindex.sources.docker.requests.get')
+    @patch('repoindex.sources.registries.docker.requests.get')
     def test_check_published(self, mock_get):
         mock_get.return_value = MagicMock(
             status_code=200,
@@ -231,7 +234,7 @@ class TestDockerCheck:
         assert result.published is True
         assert result.downloads == 5000
 
-    @patch('repoindex.sources.docker.requests.get')
+    @patch('repoindex.sources.registries.docker.requests.get')
     def test_check_library_image(self, mock_get):
         mock_get.return_value = MagicMock(status_code=404)
         s = DockerSource()
@@ -241,9 +244,10 @@ class TestDockerCheck:
 
 class TestDockerSourceAttributes:
     def test_attributes(self):
+        from repoindex.sources import Registry
         s = DockerSource()
         assert s.source_id == "docker"
-        assert s.target == "publications"
+        assert isinstance(s, Registry)
 
 
 # ============================================================================
@@ -277,7 +281,7 @@ end
 
 
 class TestRubyGemsCheck:
-    @patch('repoindex.sources.rubygems.requests.get')
+    @patch('repoindex.sources.registries.rubygems.requests.get')
     def test_check_published(self, mock_get):
         mock_get.return_value = MagicMock(
             status_code=200,
@@ -292,9 +296,10 @@ class TestRubyGemsCheck:
 
 class TestRubyGemsSourceAttributes:
     def test_attributes(self):
+        from repoindex.sources import Registry
         s = RubyGemsSource()
         assert s.source_id == "rubygems"
-        assert s.target == "publications"
+        assert isinstance(s, Registry)
 
 
 # ============================================================================
@@ -324,7 +329,7 @@ class TestGoDetect:
 
 
 class TestGoCheck:
-    @patch('repoindex.sources.go.requests.get')
+    @patch('repoindex.sources.registries.go.requests.get')
     def test_check_published(self, mock_get):
         mock_get.return_value = MagicMock(
             status_code=200,
@@ -339,14 +344,14 @@ class TestGoCheck:
         called_url = mock_get.call_args[0][0]
         assert "proxy.golang.org" in called_url
 
-    @patch('repoindex.sources.go.requests.get')
+    @patch('repoindex.sources.registries.go.requests.get')
     def test_check_not_found(self, mock_get):
         mock_get.return_value = MagicMock(status_code=404)
         s = GoSource()
         result = s.check("github.com/user/nonexistent")
         assert result.published is False
 
-    @patch('repoindex.sources.go.requests.get')
+    @patch('repoindex.sources.registries.go.requests.get')
     def test_check_gone(self, mock_get):
         """410 Gone is also a valid "not published" response."""
         mock_get.return_value = MagicMock(status_code=410)
@@ -357,9 +362,10 @@ class TestGoCheck:
 
 class TestGoSourceAttributes:
     def test_attributes(self):
+        from repoindex.sources import Registry
         s = GoSource()
         assert s.source_id == "go"
-        assert s.target == "publications"
+        assert isinstance(s, Registry)
 
 
 # ============================================================================
@@ -367,7 +373,7 @@ class TestGoSourceAttributes:
 # ============================================================================
 
 class TestFetchIntegration:
-    @patch('repoindex.sources.npm.requests.get')
+    @patch('repoindex.sources.registries.npm.requests.get')
     def test_npm_fetch(self, mock_get, tmp_path):
         (tmp_path / "package.json").write_text(json.dumps({"name": "my-lib"}))
         mock_get.return_value = MagicMock(
@@ -385,7 +391,7 @@ class TestFetchIntegration:
         s = NpmSource()
         assert s.fetch(str(tmp_path)) is None
 
-    @patch('repoindex.sources.cargo.requests.get')
+    @patch('repoindex.sources.registries.cargo.requests.get')
     def test_cargo_fetch(self, mock_get, tmp_path):
         (tmp_path / "Cargo.toml").write_text('[package]\nname = "my-crate"\n')
         mock_get.return_value = MagicMock(
@@ -397,7 +403,7 @@ class TestFetchIntegration:
         assert result is not None
         assert result['registry'] == 'cargo'
 
-    @patch('repoindex.sources.go.requests.get')
+    @patch('repoindex.sources.registries.go.requests.get')
     def test_go_fetch(self, mock_get, tmp_path):
         (tmp_path / "go.mod").write_text("module github.com/user/mod\n")
         mock_get.return_value = MagicMock(

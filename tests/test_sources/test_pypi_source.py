@@ -4,7 +4,7 @@ from unittest.mock import patch, MagicMock
 
 import pytest
 
-from repoindex.sources.pypi import PyPISource, source, _fetch_downloads
+from repoindex.sources.registries.pypi import PyPISource, source, _fetch_downloads
 
 
 class TestPyPISourceAttributes:
@@ -14,8 +14,9 @@ class TestPyPISourceAttributes:
     def test_name(self):
         assert source.name == "Python Package Index"
 
-    def test_target(self):
-        assert source.target == "publications"
+    def test_is_registry_instance(self):
+        from repoindex.sources import Registry
+        assert isinstance(source, Registry)
 
     def test_not_batch(self):
         assert source.batch is False
@@ -59,19 +60,19 @@ class TestFetchDownloads:
         mock_resp.json.return_value = {
             'data': {'last_day': 100, 'last_week': 700, 'last_month': 3000}
         }
-        with patch('repoindex.sources.pypi.requests.get', return_value=mock_resp):
+        with patch('repoindex.sources.registries.pypi.requests.get', return_value=mock_resp):
             result = _fetch_downloads('repoindex')
         assert result == 3000
 
     def test_returns_none_on_404(self):
         mock_resp = MagicMock()
         mock_resp.status_code = 404
-        with patch('repoindex.sources.pypi.requests.get', return_value=mock_resp):
+        with patch('repoindex.sources.registries.pypi.requests.get', return_value=mock_resp):
             result = _fetch_downloads('nonexistent')
         assert result is None
 
     def test_returns_none_on_error(self):
-        with patch('repoindex.sources.pypi.requests.get', side_effect=Exception("timeout")):
+        with patch('repoindex.sources.registries.pypi.requests.get', side_effect=Exception("timeout")):
             result = _fetch_downloads('anything')
         assert result is None
 
@@ -79,7 +80,7 @@ class TestFetchDownloads:
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.json.return_value = {}
-        with patch('repoindex.sources.pypi.requests.get', return_value=mock_resp):
+        with patch('repoindex.sources.registries.pypi.requests.get', return_value=mock_resp):
             result = _fetch_downloads('some-pkg')
         assert result is None
 
@@ -87,7 +88,7 @@ class TestFetchDownloads:
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.json.return_value = {'data': {'last_day': 100}}
-        with patch('repoindex.sources.pypi.requests.get', return_value=mock_resp):
+        with patch('repoindex.sources.registries.pypi.requests.get', return_value=mock_resp):
             result = _fetch_downloads('some-pkg')
         assert result is None
 
@@ -95,7 +96,7 @@ class TestFetchDownloads:
         mock_resp = MagicMock()
         mock_resp.status_code = 200
         mock_resp.json.return_value = {'data': {'last_month': 500}}
-        with patch('repoindex.sources.pypi.requests.get', return_value=mock_resp) as mock_get:
+        with patch('repoindex.sources.registries.pypi.requests.get', return_value=mock_resp) as mock_get:
             _fetch_downloads('my-package')
         call_args = mock_get.call_args
         assert call_args[0][0] == 'https://pypistats.org/api/packages/my-package/recent'
@@ -104,7 +105,7 @@ class TestFetchDownloads:
 
 
 class TestPyPICheck:
-    @patch('repoindex.sources.pypi._fetch_downloads', return_value=4200)
+    @patch('repoindex.sources.registries.pypi._fetch_downloads', return_value=4200)
     @patch('repoindex.infra.pypi_metadata.check_pypi_package')
     def test_check_published(self, mock_check, mock_downloads):
         mock_check.return_value = {
@@ -124,7 +125,7 @@ class TestPyPICheck:
         assert result.downloads is None  # lifetime total not available from PyPI
         mock_downloads.assert_called_once_with("my-package")
 
-    @patch('repoindex.sources.pypi._fetch_downloads')
+    @patch('repoindex.sources.registries.pypi._fetch_downloads')
     @patch('repoindex.infra.pypi_metadata.check_pypi_package')
     def test_check_not_found(self, mock_check, mock_downloads):
         mock_check.return_value = {'exists': False}
@@ -149,7 +150,7 @@ class TestPyPICheck:
         result = s.check("broken-pkg")
         assert result is None
 
-    @patch('repoindex.sources.pypi._fetch_downloads', return_value=None)
+    @patch('repoindex.sources.registries.pypi._fetch_downloads', return_value=None)
     @patch('repoindex.infra.pypi_metadata.check_pypi_package')
     def test_check_published_downloads_unavailable(self, mock_check, mock_downloads):
         """Published package but pypistats returns None."""

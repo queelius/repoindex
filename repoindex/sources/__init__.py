@@ -1,131 +1,293 @@
 """
-Unified metadata source system for repoindex.
+Source type hierarchy for repoindex (introduced in v2.0 / Wave V2.A).
 
-MetadataSource is the single ABC for all external metadata enrichment.
-Each source detects whether it applies to a repo, then fetches metadata.
-The 'target' field determines where the data is stored:
-- "repos": merge fields into the repos table (platform enrichment, local file parsing)
-- "publications": upsert into the publications table (registry detection)
+The ``Source`` ABC is the marker base for everything in
+``~/.repoindex/sources/**/*.py``. Three concrete subclass roles capture
+the three substantively different concepts that previously shared the
+flattened ``MetadataSource`` ABC:
 
-Sources can be remote (GitHub API, PyPI API) or local (CITATION.cff, pyproject.toml).
-User-provided sources can be dropped into ~/.repoindex/sources/*.py,
-each exporting a module-level `source` attribute.
+- ``LocalScanner`` reads files inside the local repository. No network,
+  no auth. Output goes to the ``repos`` table.
+- ``GitForge`` (a ``RemoteSource``) hosts git repositories. It exposes
+  read metadata via fetch() and a set of optional write capabilities
+  (set_topics, set_archived, etc.). Output goes to the ``repos`` table.
+- ``Registry`` (a ``RemoteSource``) is a package registry. Output goes
+  to the ``publications`` table.
+
+The data destination is now implicit in the subclass; the old
+``target: Literal["repos", "publications"]`` discriminator is gone.
+The refresh dispatcher uses ``isinstance`` to route fetch() output.
+
+User-provided sources can be dropped into:
+
+- ``~/.repoindex/sources/scanners/*.py``
+- ``~/.repoindex/sources/forges/*.py``
+- ``~/.repoindex/sources/registries/*.py``
+
+Each user module exports a module-level ``source`` attribute that is an
+instance of the right subclass.
 """
+
+from __future__ import annotations
 
 import importlib
 import importlib.util
 import logging
 import os
 from abc import ABC, abstractmethod
-from typing import List, Literal, Optional
+from dataclasses import dataclass
+from typing import Iterator, List, Optional
 
 logger = logging.getLogger(__name__)
 
 __all__ = [
-    'MetadataSource', 'discover_sources',
-    'VALID_TARGETS',
+    'Source',
+    'LocalScanner',
+    'RemoteSource',
+    'GitForge',
+    'Registry',
+    'RemoteRepo',
+    'RemotePackage',
+    'discover_sources',
 ]
 
-# Valid values for MetadataSource.target. The discriminator drives where
-# fetch() output is merged: "repos" rows (platform enrichment, local file
-# parsing) vs "publications" rows (registry detection). Any other value
-# would silently no-op in the refresh dispatcher, so discover_sources()
-# validates against this set.
-VALID_TARGETS = frozenset({"repos", "publications"})
 
-# Built-in source module names (relative to repoindex.sources).
-# Order is stable for reproducibility; the first entries emit to 'repos',
-# the rest emit to 'publications'.
-_BUILTIN_SOURCE_MODULES = (
-    # target=repos
-    'citation_cff',
-    'keywords',
-    'local_assets',
-    'gitea',
-    'github',
-    # target=publications
-    'pypi',
-    'cran',
-    'zenodo',
-    'npm',
-    'cargo',
-    'conda',
-    'docker',
-    'rubygems',
-    'go',
-)
+# ---------------------------------------------------------------------------
+# Source-extension API value objects
+# ---------------------------------------------------------------------------
 
+@dataclass(frozen=True)
+class RemoteRepo:
+    """A repository as seen by a GitForge enumerate_user_repos() call.
 
-class MetadataSource(ABC):
+    Used by the (future) ``ops sync`` command to clone forge-hosted repos
+    that aren't yet present locally. The shape is intentionally minimal:
+    everything else can be fetched via the forge's normal fetch() once a
+    repo lands on disk.
     """
-    Abstract base class for metadata sources.
 
-    Each source detects whether it applies to a repo and fetches
-    metadata as a dict. Sources can be remote (API calls) or local
-    (file parsing).
+    name: str
+    clone_url: str
+    default_branch: Optional[str] = None
+    is_archived: bool = False
+    description: Optional[str] = None
+
+
+@dataclass(frozen=True)
+class RemotePackage:
+    """A package as seen by a Registry enumerate_user_packages() call."""
+
+    name: str
+    version: Optional[str] = None
+    url: Optional[str] = None
+
+
+# ---------------------------------------------------------------------------
+# ABC hierarchy
+# ---------------------------------------------------------------------------
+
+class Source(ABC):
+    """Marker base for everything in ``~/.repoindex/sources/**/*.py``.
+
+    Subclass one of ``LocalScanner``, ``GitForge``, or ``Registry`` rather
+    than ``Source`` directly; the refresh dispatcher routes data using
+    ``isinstance`` against those three roles.
 
     Attributes:
-        source_id: Short identifier (e.g., "github", "pypi", "citation_cff")
-        name: Human-readable name (e.g., "GitHub", "CITATION.cff")
-        target: Where data goes: "repos" or "publications". Typed as a
-            Literal so IDEs and type checkers catch typos; runtime
-            validation in discover_sources() enforces the same contract.
-        batch: True if this source uses batch pre-fetch (e.g., Zenodo ORCID lookup)
+        source_id: Short identifier (e.g., "github", "pypi", "citation_cff").
+        name: Human-readable name (e.g., "GitHub", "CITATION.cff").
+        batch: Whether the source uses a one-off ``prefetch()`` round-trip
+            and matches per-repo in-memory during ``fetch()``. Default
+            ``False`` (per-repo network calls). Currently only set by
+            Zenodo (an ORCID -> all-records lookup).
     """
+
     source_id: str = ""
     name: str = ""
-    target: Literal["repos", "publications"] = "repos"
     batch: bool = False
 
     @abstractmethod
     def detect(self, repo_path: str, repo_record: Optional[dict] = None) -> bool:
-        """
-        Detect whether this source applies to this repo.
+        """Detect whether this source applies to this repo.
 
         Args:
-            repo_path: Filesystem path to the repository
-            repo_record: Optional dict of repo metadata from database
+            repo_path: Filesystem path to the repository.
+            repo_record: Optional dict of repo metadata from the database.
 
         Returns:
-            True if this source can provide metadata for this repo
+            True if this source can provide metadata for this repo.
         """
 
     @abstractmethod
     def fetch(self, repo_path: str, repo_record: Optional[dict] = None,
               config: Optional[dict] = None) -> Optional[dict]:
-        """
-        Fetch metadata from this source.
+        """Fetch metadata from this source.
 
         Args:
-            repo_path: Filesystem path to the repository
-            repo_record: Optional dict of repo metadata
-            config: Optional configuration dict
+            repo_path: Filesystem path to the repository.
+            repo_record: Optional dict of repo metadata.
+            config: Optional configuration dict.
 
         Returns:
             Dict of metadata fields, or None if nothing available.
-            For target="repos": keys are column names (github_stars, keywords, etc.)
-            For target="publications": keys are registry, name, version, published, url, etc.
+            For LocalScanner/GitForge: keys are repos-table column names.
+            For Registry: keys are registry/name/version/published/url/etc.
         """
 
     def prefetch(self, config: dict) -> None:
-        """Optional batch pre-fetch hook, called once per refresh."""
+        """Optional batch pre-fetch hook, called once per refresh.
+
+        Default is a no-op. Override on sources that benefit from a
+        single network round-trip across all repos (e.g., Zenodo's
+        ORCID lookup).
+        """
 
 
-def _build_builtin_sources() -> List[MetadataSource]:
+class LocalScanner(Source):
+    """Reads files inside the local repository. No network, no auth.
+
+    Output of fetch() is merged into the ``repos`` table.
+    """
+
+
+class RemoteSource(Source):
+    """Network-backed source with auth.
+
+    Subclassed by ``GitForge`` (writes to ``repos``) and ``Registry``
+    (writes to ``publications``). Don't subclass ``RemoteSource``
+    directly; the refresh dispatcher only knows about the two leaf
+    roles.
+    """
+
+
+class GitForge(RemoteSource):
+    """Hosts git repositories. Provides API for both metadata and actions.
+
+    Output of fetch() is merged into the ``repos`` table; a forge
+    populates fields like ``forge_id``, ``topics``, ``is_archived``, etc.
+    (those unified columns land in Wave V2.B; today this is still the
+    per-platform ``github_*`` / ``gitea_*`` set.)
+
+    All write capabilities are optional. The default implementations
+    raise ``NotImplementedError``. Wave V2.C wires these up on the
+    GitHub and Gitea sources and exposes them via ``ops set-*`` commands.
+    """
+
+    def enumerate_user_repos(self, config: dict) -> Iterator[RemoteRepo]:
+        """List all repos owned by the configured user on this forge.
+
+        Yields RemoteRepo records for the future ``ops sync`` command
+        to clone any not-yet-local repositories.
+        """
+        raise NotImplementedError(
+            f"{self.source_id} does not support enumerate_user_repos"
+        )
+
+    def set_topics(self, repo_record: dict, topics: list, config: dict) -> None:
+        """Set topics on the forge for this repo."""
+        raise NotImplementedError(
+            f"{self.source_id} does not support set_topics"
+        )
+
+    def set_description(self, repo_record: dict, description: str,
+                        config: dict) -> None:
+        """Set the forge-side description for this repo."""
+        raise NotImplementedError(
+            f"{self.source_id} does not support set_description"
+        )
+
+    def set_archived(self, repo_record: dict, archived: bool,
+                     config: dict) -> None:
+        """Archive or unarchive the repo on the forge."""
+        raise NotImplementedError(
+            f"{self.source_id} does not support set_archived"
+        )
+
+    def set_visibility(self, repo_record: dict, public: bool,
+                       config: dict) -> None:
+        """Toggle public/private visibility on the forge."""
+        raise NotImplementedError(
+            f"{self.source_id} does not support set_visibility"
+        )
+
+    def set_default_branch(self, repo_record: dict, branch: str,
+                           config: dict) -> None:
+        """Change the default branch on the forge."""
+        raise NotImplementedError(
+            f"{self.source_id} does not support set_default_branch"
+        )
+
+    def enable_pages(self, repo_record: dict, branch: str, path: str,
+                     config: dict) -> None:
+        """Enable Pages-style static-site hosting for this repo."""
+        raise NotImplementedError(
+            f"{self.source_id} does not support enable_pages"
+        )
+
+
+class Registry(RemoteSource):
+    """Package registry. Publishes artifacts; doesn't host source code.
+
+    Output of fetch() is upserted into the ``publications`` table. Set
+    ``batch = True`` if the source benefits from a single prefetch()
+    call to populate per-repo data via match-in-memory in fetch().
+    """
+
+    def enumerate_user_packages(self, config: dict) -> Iterator[RemotePackage]:
+        """List all packages owned by the configured user on this registry."""
+        raise NotImplementedError(
+            f"{self.source_id} does not support enumerate_user_packages"
+        )
+
+
+# ---------------------------------------------------------------------------
+# Built-in source loading
+# ---------------------------------------------------------------------------
+
+# Built-in source module paths relative to repoindex.sources, grouped by
+# subclass role. Order is stable for reproducibility.
+_BUILTIN_SOURCE_MODULES = (
+    # LocalScanner
+    'scanners.citation_cff',
+    'scanners.keywords',
+    'scanners.local_assets',
+    # GitForge
+    'forges.gitea',
+    'forges.github',
+    # Registry
+    'registries.pypi',
+    'registries.cran',
+    'registries.zenodo',
+    'registries.npm',
+    'registries.cargo',
+    'registries.conda',
+    'registries.docker',
+    'registries.rubygems',
+    'registries.go',
+)
+
+# Subdirectories scanned for user-provided sources under
+# ~/.repoindex/sources/. Each subdir corresponds to one Source role.
+_USER_SOURCE_SUBDIRS = ('scanners', 'forges', 'registries')
+
+
+def _build_builtin_sources() -> List[Source]:
     """Build the list of built-in sources.
 
-    Built-in source failures are bugs -- log at WARNING so they aren't hidden.
+    Built-in source failures are bugs, log at WARNING so they aren't hidden.
     """
-    sources: List[MetadataSource] = []
+    sources: List[Source] = []
     for module_name in _BUILTIN_SOURCE_MODULES:
         try:
-            mod = importlib.import_module(f'.{module_name}', package='repoindex.sources')
+            mod = importlib.import_module(
+                f'.{module_name}', package='repoindex.sources'
+            )
             src = getattr(mod, 'source', None)
-            if src and isinstance(src, MetadataSource):
+            if src and isinstance(src, Source):
                 sources.append(src)
             else:
                 logger.warning(
-                    "Built-in source module %s has no MetadataSource 'source' attribute",
+                    "Built-in source module %s has no Source 'source' attribute",
                     module_name,
                 )
         except Exception as e:
@@ -133,11 +295,11 @@ def _build_builtin_sources() -> List[MetadataSource]:
     return sources
 
 
-# Lazy-initialized cache of built-in sources
-_BUILTIN_SOURCES_CACHE: Optional[List[MetadataSource]] = None
+# Lazy-initialized cache of built-in sources.
+_BUILTIN_SOURCES_CACHE: Optional[List[Source]] = None
 
 
-def _get_builtin_sources() -> List[MetadataSource]:
+def _get_builtin_sources() -> List[Source]:
     """Get built-in sources, building the cache on first call."""
     global _BUILTIN_SOURCES_CACHE
     if _BUILTIN_SOURCES_CACHE is None:
@@ -149,22 +311,21 @@ def _load_sources_from_directory(
     directory: str,
     module_prefix: str,
     attributes: List[str],
-) -> List[MetadataSource]:
-    """
-    Load MetadataSource instances from Python files in a directory.
+) -> List[Source]:
+    """Load Source instances from .py files directly in ``directory``.
 
     Scans .py files (skipping underscore-prefixed), imports each, and
-    checks for module-level attributes that are MetadataSource instances.
+    checks for module-level attributes that are Source instances.
 
     Args:
-        directory: Filesystem path to scan
-        module_prefix: Prefix for generated module names (avoids collisions)
-        attributes: Ordered list of attribute names to check on each module
+        directory: Filesystem path to scan.
+        module_prefix: Prefix for generated module names (avoids collisions).
+        attributes: Ordered list of attribute names to check on each module.
 
     Returns:
-        List of discovered MetadataSource instances
+        List of discovered Source instances.
     """
-    sources: List[MetadataSource] = []
+    sources: List[Source] = []
 
     if not os.path.isdir(directory):
         return sources
@@ -185,7 +346,7 @@ def _load_sources_from_directory(
                 spec.loader.exec_module(mod)
                 for attr_name in attributes:
                     obj = getattr(mod, attr_name, None)
-                    if obj and isinstance(obj, MetadataSource):
+                    if obj and isinstance(obj, Source):
                         sources.append(obj)
                         logger.info(
                             "Loaded source: %s from %s", obj.source_id, filepath
@@ -200,53 +361,41 @@ def _load_sources_from_directory(
 def discover_sources(
     user_dir: Optional[str] = None,
     only: Optional[List[str]] = None,
-) -> List[MetadataSource]:
-    """
-    Discover and load metadata sources.
+) -> List[Source]:
+    """Discover and load metadata sources.
 
-    Loads built-in sources from `_BUILTIN_SOURCE_MODULES` and user sources
-    from `~/.repoindex/sources/*.py` (each exports a module-level
-    `source` attribute).
+    Loads built-in sources from ``_BUILTIN_SOURCE_MODULES`` and user
+    sources from the role subdirectories under ``~/.repoindex/sources/``
+    (each user module exports a module-level ``source`` attribute).
 
     Args:
-        user_dir: Override path for user sources (default: ~/.repoindex/sources/)
-        only: If set, only load sources whose source_id is in this list
+        user_dir: Override path for user sources
+            (default: ``~/.repoindex/sources``). The function still
+            descends into the role subdirs (scanners/, forges/,
+            registries/).
+        only: If set, only load sources whose source_id is in this list.
 
     Returns:
-        List of MetadataSource instances
+        List of Source instances.
     """
-    sources: List[MetadataSource] = list(_get_builtin_sources())
+    sources: List[Source] = list(_get_builtin_sources())
 
-    # Load user sources from ~/.repoindex/sources/
+    # Load user sources from ~/.repoindex/sources/{scanners,forges,registries}/
     if user_dir is None:
         user_dir = os.path.expanduser('~/.repoindex/sources')
 
-    sources.extend(
-        _load_sources_from_directory(
-            user_dir,
-            module_prefix='repoindex_user_source',
-            attributes=['source'],
+    for subdir in _USER_SOURCE_SUBDIRS:
+        sources.extend(
+            _load_sources_from_directory(
+                os.path.join(user_dir, subdir),
+                module_prefix=f'repoindex_user_source_{subdir}',
+                attributes=['source'],
+            )
         )
-    )
 
     # Apply only filter
     if only is not None:
         only_set = set(only)
         sources = [s for s in sources if s.source_id in only_set]
 
-    # Validate source.target against known values. Any source with an unknown
-    # target would silently no-op in the refresh dispatcher (neither the
-    # 'repos' nor 'publications' branch would fire), so catch typos here and
-    # skip the offending source rather than letting a user-provided source
-    # with target='repo' vanish into thin air.
-    validated: List[MetadataSource] = []
-    for s in sources:
-        if s.target not in VALID_TARGETS:
-            logger.warning(
-                "Source %r has invalid target %r (expected one of %s); skipping",
-                s.source_id, s.target, sorted(VALID_TARGETS),
-            )
-            continue
-        validated.append(s)
-
-    return validated
+    return sources

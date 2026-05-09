@@ -10,8 +10,8 @@ import os
 import re
 from typing import Optional, Tuple
 
-from ..infra.github_client import GitHubClient
-from . import MetadataSource
+from ...infra.github_client import GitHubClient
+from .. import GitForge
 
 logger = logging.getLogger(__name__)
 
@@ -35,12 +35,11 @@ def _parse_github_remote(url: Optional[str]) -> Tuple[Optional[str], Optional[st
     return None, None
 
 
-class GitHubSource(MetadataSource):
+class GitHubSource(GitForge):
     """GitHub hosting platform source."""
 
     source_id = "github"
     name = "GitHub"
-    target = "repos"
     batch = False
 
     def __init__(self):

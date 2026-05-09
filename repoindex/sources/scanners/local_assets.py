@@ -2,7 +2,7 @@
 from pathlib import Path
 from typing import Optional
 
-from . import MetadataSource
+from .. import LocalScanner
 
 # Asset checks: (result_key, candidate_paths)
 _ASSET_CHECKS = (
@@ -14,12 +14,11 @@ _ASSET_CHECKS = (
 )
 
 
-class LocalAssetsSource(MetadataSource):
+class LocalAssetsSource(LocalScanner):
     """Detect presence of common project asset files."""
 
     source_id = "local_assets"
     name = "Local Asset Files"
-    target = "repos"
 
     def detect(self, repo_path: str, repo_record: Optional[dict] = None) -> bool:
         # Always applies: every repo can be checked for asset files

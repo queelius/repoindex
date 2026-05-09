@@ -3,15 +3,36 @@ import time
 from unittest.mock import MagicMock
 import pytest
 
-from repoindex.sources import MetadataSource
+from repoindex.sources import LocalScanner, GitForge, Registry
 
 
-def _make_source(source_id, target="repos", detect_val=True, fetch_val=None, detect_fn=None, fetch_fn=None):
-    """Helper to create a mock MetadataSource with desired behavior."""
-    src = MagicMock(spec=MetadataSource)
+_KIND_MAP = {
+    'scanner': LocalScanner,
+    'forge': GitForge,
+    'registry': Registry,
+}
+
+
+def _make_source(source_id, kind='scanner', detect_val=True, fetch_val=None,
+                 detect_fn=None, fetch_fn=None):
+    """Build a real Source subclass instance with detect/fetch as MagicMocks.
+
+    `_run_sources_parallel` doesn't care about isinstance, but downstream
+    tests in this file mix scanners and registries via `kind=`.
+    """
+    base = _KIND_MAP[kind]
+
+    class _Mocked(base):
+        # Concrete stubs so the abstract methods are satisfied.
+        def detect(self, repo_path, repo_record=None):
+            return True
+
+        def fetch(self, repo_path, repo_record=None, config=None):
+            return None
+
+    src = _Mocked()
     src.source_id = source_id
     src.name = source_id.title()
-    src.target = target
     src.batch = False
 
     if detect_fn:
@@ -93,14 +114,14 @@ class TestRunSourcesParallel:
         assert returned_source.source_id == 'test'
         assert returned_data == {'stars': 42}
 
-    def test_mixed_targets(self):
-        """Sources with different targets both run correctly."""
+    def test_mixed_kinds(self):
+        """Sources of different kinds both run correctly."""
         from repoindex.commands.refresh import _run_sources_parallel
-        repo_src = _make_source('github', target='repos', detect_val=True,
-                                fetch_val={'github_stars': 10})
-        pub_src = _make_source('pypi', target='publications', detect_val=True,
+        forge_src = _make_source('github', kind='forge', detect_val=True,
+                                 fetch_val={'github_stars': 10})
+        reg_src = _make_source('pypi', kind='registry', detect_val=True,
                                fetch_val={'registry': 'pypi', 'name': 'pkg'})
-        results = _run_sources_parallel([repo_src, pub_src], '/fake', {}, {})
+        results = _run_sources_parallel([forge_src, reg_src], '/fake', {}, {})
         assert len(results) == 2
-        targets = {r[0].target for r in results}
-        assert targets == {'repos', 'publications'}
+        kinds = {type(r[0]).__bases__[0].__name__ for r in results}
+        assert kinds == {'GitForge', 'Registry'}

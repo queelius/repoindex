@@ -11,18 +11,17 @@ from typing import Optional
 
 import requests
 
-from ..domain.repository import PackageMetadata
-from . import MetadataSource
+from ...domain.repository import PackageMetadata
+from .. import Registry
 
 logger = logging.getLogger(__name__)
 
 
-class NpmSource(MetadataSource):
+class NpmSource(Registry):
     """npm (Node.js) registry source."""
 
     source_id = "npm"
     name = "npm Registry"
-    target = "publications"
     batch = False
 
     def _detect_name(self, repo_path: str) -> Optional[str]:
