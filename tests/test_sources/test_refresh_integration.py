@@ -440,7 +440,12 @@ class TestProcessRepoWithSources:
     """Test that _process_repo integrates sources correctly."""
 
     def test_repos_target_source_updates_fields(self):
-        """A GitForge / LocalScanner should update repo fields via _update_repo_platform_fields."""
+        """A GitForge / LocalScanner should update repo fields via _update_repo_platform_fields.
+
+        Wave V2.B: the dispatcher also writes forge_id/forge_host based on
+        the resolved remote_url, so the helper is called twice: once for
+        provenance, once for the source's metadata.
+        """
         from repoindex.commands.refresh import _process_repo
 
         mock_db = MagicMock()
@@ -460,7 +465,7 @@ class TestProcessRepoWithSources:
 
         mock_source = _make_source('github', kind='forge')
         mock_source.detect.return_value = True
-        mock_source.fetch.return_value = {'github_stars': 42}
+        mock_source.fetch.return_value = {'stars': 42}
 
         with patch('repoindex.commands.refresh.needs_refresh', return_value=True), \
              patch('repoindex.commands.refresh.upsert_repo', return_value=1), \
@@ -474,7 +479,11 @@ class TestProcessRepoWithSources:
                 config={}, dry_run=False, quiet=True,
             )
 
-        mock_update.assert_called_once_with(mock_db, 1, {'github_stars': 42})
+        # Two calls: provenance (forge_id/forge_host) + source's metadata.
+        assert mock_update.call_count == 2
+        call_payloads = [c.args[2] for c in mock_update.call_args_list]
+        assert {'forge_id': 'github', 'forge_host': 'github.com'} in call_payloads
+        assert {'stars': 42} in call_payloads
 
     def test_publications_target_source_upserts_publication(self):
         """A Registry should upsert a publication record."""
@@ -624,8 +633,14 @@ class TestProcessRepoWithSources:
         # get_status should be called with just repo, no fetch_github
         mock_service.get_status.assert_called_once_with(mock_repo)
 
-    def test_source_fetch_null_result_skips_update(self):
-        """When fetch() returns None, no DB update should happen."""
+    def test_source_fetch_null_result_only_writes_provenance(self):
+        """When fetch() returns None, only the forge provenance is written.
+
+        Wave V2.B: the dispatcher always records forge_id/forge_host based on
+        the resolved remote_url (so consumers see provenance even for repos
+        whose forge fetch fails or yields nothing). The source's own
+        fetch-returns-None continues to skip the per-source update.
+        """
         from repoindex.commands.refresh import _process_repo
 
         mock_db = MagicMock()
@@ -658,7 +673,11 @@ class TestProcessRepoWithSources:
                 config={}, dry_run=False, quiet=True,
             )
 
-        mock_update.assert_not_called()
+        # Only the provenance update happens; no per-source update.
+        assert mock_update.call_count == 1
+        assert mock_update.call_args.args[2] == {
+            'forge_id': 'github', 'forge_host': 'github.com',
+        }
 
     def test_unknown_kind_logs_warning_and_skips(self, caplog):
         """A Source subclass that's not LocalScanner / GitForge / Registry

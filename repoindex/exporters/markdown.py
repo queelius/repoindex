@@ -38,9 +38,9 @@ class MarkdownExporter(Exporter):
             name = repo.get('name', '')
             url = repo.get('remote_url') or ''
             language = _md_escape(repo.get('language') or '')
-            stars = repo.get('github_stars') or ''
+            stars = repo.get('stars') or ''
             license_key = _md_escape(repo.get('license_key') or '')
-            desc = _md_escape(repo.get('description') or repo.get('github_description') or '')
+            desc = _md_escape(repo.get('description') or repo.get('forge_description') or '')
 
             # Truncate long descriptions
             if len(desc) > 80:

@@ -38,20 +38,31 @@ class TestDerivePersistableTags:
     def test_language_non_string_ignored(self):
         assert derive_persistable_tags({'language': 42}) == []
 
-    def test_github_topics_normalized(self):
-        tags = derive_persistable_tags(
-            {'github_topics': json.dumps(['Python', '  CLI ', 'Web-Framework'])}
-        )
+    def test_topics_normalized_with_github_provenance(self):
+        """Wave V2.B: topics live in the unified ``topics`` column;
+        provenance comes from ``forge_id``."""
+        tags = derive_persistable_tags({
+            'forge_id': 'github',
+            'topics': json.dumps(['Python', '  CLI ', 'Web-Framework']),
+        })
         assert ('topic:python', 'github') in tags
         assert ('topic:cli', 'github') in tags
         assert ('topic:web-framework', 'github') in tags
 
-    def test_gitea_topics_attribution(self):
-        tags = derive_persistable_tags(
-            {'gitea_topics': json.dumps(['rust', 'wasm'])}
-        )
+    def test_topics_with_gitea_provenance(self):
+        tags = derive_persistable_tags({
+            'forge_id': 'gitea',
+            'topics': json.dumps(['rust', 'wasm']),
+        })
         assert ('topic:rust', 'gitea') in tags
         assert ('topic:wasm', 'gitea') in tags
+
+    def test_topics_without_forge_id_use_generic_label(self):
+        """Topics still emit even when forge_id is missing; use 'forge'."""
+        tags = derive_persistable_tags(
+            {'topics': json.dumps(['rust'])}
+        )
+        assert ('topic:rust', 'forge') in tags
 
     def test_keywords_attribution(self):
         tags = derive_persistable_tags(
@@ -61,7 +72,7 @@ class TestDerivePersistableTags:
         assert ('keyword:indexer', 'pyproject') in tags
 
     def test_malformed_topics_json_ignored(self):
-        tags = derive_persistable_tags({'github_topics': 'not valid json'})
+        tags = derive_persistable_tags({'topics': 'not valid json'})
         assert tags == []
 
     def test_malformed_keywords_json_ignored(self):
@@ -75,14 +86,15 @@ class TestDerivePersistableTags:
 
     def test_topics_accepts_list_input(self):
         """Sometimes the column is already decoded (e.g., from Python code)."""
-        tags = derive_persistable_tags({'github_topics': ['ml', 'data']})
+        tags = derive_persistable_tags({'forge_id': 'github', 'topics': ['ml', 'data']})
         assert ('topic:ml', 'github') in tags
         assert ('topic:data', 'github') in tags
 
     def test_non_string_topic_items_skipped(self):
-        tags = derive_persistable_tags(
-            {'github_topics': json.dumps(['python', 42, None, True, ''])}
-        )
+        tags = derive_persistable_tags({
+            'forge_id': 'github',
+            'topics': json.dumps(['python', 42, None, True, '']),
+        })
         assert tags == [('topic:python', 'github')]
 
     def test_all_has_flags(self):
@@ -121,7 +133,8 @@ class TestDerivePersistableTags:
         """
         row = {
             'language': 'Python',
-            'github_topics': json.dumps(['ml', 'cli']),
+            'forge_id': 'github',
+            'topics': json.dumps(['ml', 'cli']),
             'keywords': json.dumps(['science']),
             'has_readme': 1,
         }
@@ -170,31 +183,31 @@ class TestDeriveImplicitTags:
         tags = derive_implicit_tags({})
         assert not any(t.startswith('status:') for t in tags)
 
-    def test_github_visibility_public(self):
+    def test_forge_visibility_public(self):
         tags = derive_implicit_tags(
-            {'github_owner': 'me', 'github_is_private': 0}
+            {'forge_id': 'github', 'is_private': 0}
         )
         assert 'visibility:public' in tags
 
-    def test_github_visibility_private(self):
+    def test_forge_visibility_private(self):
         tags = derive_implicit_tags(
-            {'github_owner': 'me', 'github_is_private': 1}
+            {'forge_id': 'github', 'is_private': 1}
         )
         assert 'visibility:private' in tags
 
-    def test_github_fork(self):
+    def test_forge_fork(self):
         tags = derive_implicit_tags(
-            {'github_owner': 'me', 'github_is_fork': 1}
+            {'forge_id': 'github', 'is_fork': 1}
         )
         assert 'source:fork' in tags
 
-    def test_github_archived(self):
+    def test_forge_archived(self):
         tags = derive_implicit_tags(
-            {'github_owner': 'me', 'github_is_archived': 1}
+            {'forge_id': 'github', 'is_archived': 1}
         )
         assert 'archived:true' in tags
 
-    def test_github_stars_buckets(self):
+    def test_forge_stars_buckets(self):
         """Stars fall into inclusive lower-bucket tags."""
         for stars, expected in [
             (9, None), (10, 'stars:10+'), (99, 'stars:10+'),
@@ -202,7 +215,7 @@ class TestDeriveImplicitTags:
             (1000, 'stars:1000+'), (50000, 'stars:1000+'),
         ]:
             tags = derive_implicit_tags(
-                {'github_owner': 'me', 'github_stars': stars}
+                {'forge_id': 'github', 'stars': stars}
             )
             star_tags = [t for t in tags if t.startswith('stars:')]
             if expected is None:
@@ -210,15 +223,15 @@ class TestDeriveImplicitTags:
             else:
                 assert star_tags == [expected]
 
-    def test_no_github_owner_no_github_tags(self):
-        """If github_owner is missing, no github_* tags are emitted.
+    def test_no_forge_id_no_forge_tags(self):
+        """If forge_id is missing, no forge-derived tags are emitted.
 
-        Otherwise a non-GitHub repo would get phantom visibility:public.
+        Otherwise a non-forge repo would get phantom visibility:public.
         """
         tags = derive_implicit_tags({
             'name': 'test',
-            'github_is_private': 0,   # stray field, not from GitHub
-            'github_stars': 42,
+            'is_private': 0,   # stray field, not from forge
+            'stars': 42,
         })
         assert not any(t.startswith('visibility:') for t in tags)
         assert not any(t.startswith('stars:') for t in tags)
@@ -226,8 +239,8 @@ class TestDeriveImplicitTags:
     def test_topics_lowercased(self):
         """Topics must be lowercased just like in derive_persistable_tags."""
         tags = derive_implicit_tags({
-            'github_owner': 'me',
-            'github_topics': json.dumps(['JavaScript', 'CLI']),
+            'forge_id': 'github',
+            'topics': json.dumps(['JavaScript', 'CLI']),
         })
         assert 'topic:javascript' in tags
         assert 'topic:cli' in tags
@@ -250,10 +263,10 @@ class TestConsistencyAcrossCallSites:
             'name': 'test',
             'path': '/a/b/test',
             'language': 'Python',
-            'github_topics': json.dumps(['ML', 'Data']),
+            'forge_id': 'github',
+            'topics': json.dumps(['ML', 'Data']),
             'keywords': json.dumps(['Science']),
             'has_readme': 1,
-            'github_owner': 'me',
         }
 
         # Refresh-style: tag strings in the persistable set
@@ -278,10 +291,10 @@ class TestConsistencyAcrossCallSites:
             'owner': 'alex',
             'license_key': 'mit',
             'is_clean': 1,
-            'github_owner': 'alex',
-            'github_is_private': 0,
-            'github_stars': 42,
-            'github_topics': json.dumps(['Cli', 'Tool']),
+            'forge_id': 'github',
+            'is_private': 0,
+            'stars': 42,
+            'topics': json.dumps(['Cli', 'Tool']),
         }
 
         wrapper = get_implicit_tags_from_row(row)
@@ -299,11 +312,11 @@ class TestConsistencyAcrossCallSites:
             'name': 'test',
             'path': '/a/b/test',
             'language': 'JavaScript',
-            'github_topics': json.dumps(['React', 'Typescript']),
+            'forge_id': 'github',
+            'topics': json.dumps(['React', 'Typescript']),
             'keywords': json.dumps(['web', 'frontend']),
             'has_readme': 1,
             'has_license': 1,
-            'github_owner': 'me',
         }
 
         persistable = {t for t, _ in derive_persistable_tags(row)}
@@ -320,8 +333,8 @@ class TestConsistencyAcrossCallSites:
     def test_whitespace_trimmed_consistently(self):
         """Whitespace around topics is trimmed in both derivations."""
         row = {
-            'github_topics': json.dumps(['  spaced  ', ' another ']),
-            'github_owner': 'me',
+            'forge_id': 'github',
+            'topics': json.dumps(['  spaced  ', ' another ']),
         }
 
         persistable = {t for t, _ in derive_persistable_tags(row)}
@@ -343,9 +356,9 @@ class TestConsistencyAcrossCallSites:
         """
         row = {
             'language': 'JavaScript',
-            'github_topics': json.dumps(['React', 'Redux']),
+            'forge_id': 'github',
+            'topics': json.dumps(['React', 'Redux']),
             'keywords': json.dumps(['Web']),
-            'github_owner': 'me',
         }
 
         persistable = {t for t, _ in derive_persistable_tags(row)}
@@ -385,7 +398,8 @@ class TestBackwardCompatibility:
                 id INTEGER PRIMARY KEY,
                 name TEXT,
                 language TEXT,
-                github_topics TEXT,
+                forge_id TEXT,
+                topics TEXT,
                 keywords TEXT,
                 has_readme INTEGER DEFAULT 0
             )
@@ -409,8 +423,8 @@ class TestBackwardCompatibility:
             )
         """)
         conn.execute(
-            "INSERT INTO repos (id, name, language, github_topics, keywords, has_readme) "
-            "VALUES (1, 'test', 'Python', ?, ?, 1)",
+            "INSERT INTO repos (id, name, language, forge_id, topics, keywords, has_readme) "
+            "VALUES (1, 'test', 'Python', 'github', ?, ?, 1)",
             (json.dumps(['ml']), json.dumps(['cli'])),
         )
         conn.execute(

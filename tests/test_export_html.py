@@ -11,7 +11,7 @@ def sample_db(tmp_path):
     conn.executescript("""
         CREATE TABLE repos (id INTEGER PRIMARY KEY, name TEXT, path TEXT,
             language TEXT, description TEXT, branch TEXT, is_clean BOOLEAN,
-            github_stars INTEGER, scanned_at TEXT, license_key TEXT,
+            stars INTEGER, scanned_at TEXT, license_key TEXT,
             has_readme BOOLEAN, has_license BOOLEAN, has_ci BOOLEAN);
         INSERT INTO repos VALUES (1, 'myrepo', '/home/user/myrepo', 'Python',
             'A test repo', 'main', 1, 5, '2026-02-28', 'MIT', 1, 1, 0);

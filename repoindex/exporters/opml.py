@@ -45,7 +45,7 @@ class OPMLExporter(Exporter):
             for repo in sorted(by_lang[lang], key=lambda r: r.get('name', '')):
                 name = repo.get('name', '')
                 url = repo.get('remote_url') or ''
-                desc = repo.get('description') or repo.get('github_description') or ''
+                desc = repo.get('description') or repo.get('forge_description') or ''
 
                 attrs = f'text={quoteattr(name)}'
                 if url:

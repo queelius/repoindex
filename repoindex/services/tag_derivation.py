@@ -16,7 +16,9 @@ attribution or flatten to just the tag strings.
 Source labels mirror what the `tags` table stores in its `source` column:
 - 'implicit' — derived from intrinsic repo state (language, has_* flags,
   is_clean, etc.)
-- 'github', 'gitea' — platform-provided topics
+- the active forge_id (e.g., 'github', 'gitea') — forge-provided topics.
+  Wave V2.B: topics live in the unified ``topics`` column; provenance is
+  read from the ``forge_id`` column.
 - 'pyproject' — keywords from a local file (pyproject.toml / package.json)
 - '<registry>' — the registry name itself, for `published:<registry>` tags
 """
@@ -102,17 +104,16 @@ def derive_persistable_tags(
     """
     derived: List[DerivedTag] = []
 
-    # Platform topics (github / gitea)
-    for field, source_name in (
-        ('github_topics', 'github'),
-        ('gitea_topics', 'gitea'),
-    ):
-        topics = _load_json_list(repo_row.get(field))
-        if topics:
-            for topic in topics:
-                norm = _normalize_topic(topic)
-                if norm:
-                    derived.append((f'topic:{norm}', source_name))
+    # Forge topics (Wave V2.B: unified ``topics`` column, provenance via
+    # ``forge_id``). When forge_id is absent we still emit the topics but
+    # attribute them to the generic 'forge' label so the tag is preserved.
+    topics = _load_json_list(repo_row.get('topics'))
+    if topics:
+        forge_label = repo_row.get('forge_id') or 'forge'
+        for topic in topics:
+            norm = _normalize_topic(topic)
+            if norm:
+                derived.append((f'topic:{norm}', forge_label))
 
     # Project keywords (pyproject.toml / package.json)
     keywords = _load_json_list(repo_row.get('keywords'))
@@ -197,22 +198,22 @@ def derive_implicit_tags(repo_row: Mapping[str, Any]) -> List[str]:
     if is_clean is not None:
         tags.append(f"status:{'clean' if is_clean else 'dirty'}")
 
-    # GitHub-specific implicit tags (guarded on github_owner presence
-    # because the github_* columns are all nullable and a non-GitHub repo
-    # would otherwise get a phantom visibility:public)
-    if repo_row.get('github_owner'):
-        if repo_row.get('github_is_private'):
+    # Forge-derived implicit tags (Wave V2.B: read from unified columns,
+    # gated on the presence of forge_id so a repo without resolved forge
+    # provenance doesn't get phantom visibility tags).
+    if repo_row.get('forge_id'):
+        if repo_row.get('is_private'):
             tags.append("visibility:private")
         else:
             tags.append("visibility:public")
 
-        if repo_row.get('github_is_fork'):
+        if repo_row.get('is_fork'):
             tags.append("source:fork")
 
-        if repo_row.get('github_is_archived'):
+        if repo_row.get('is_archived'):
             tags.append("archived:true")
 
-        stars = repo_row.get('github_stars') or 0
+        stars = repo_row.get('stars') or 0
         if stars >= 1000:
             tags.append("stars:1000+")
         elif stars >= 100:

@@ -276,7 +276,8 @@ class TestGiteaSourceFetch:
         mock_resp.json.return_value = data
         return mock_resp
 
-    def test_fetch_returns_prefixed_fields(self):
+    def test_fetch_returns_unified_fields(self):
+        """Wave V2.B: fetch returns generic forge fields (not gitea_*)."""
         from repoindex.sources.forges.gitea import source
         mock_resp = self._make_api_response()
         with patch('repoindex.sources.forges.gitea.requests.Session.get', return_value=mock_resp):
@@ -285,13 +286,13 @@ class TestGiteaSourceFetch:
                 {'remote_url': 'https://codeberg.org/user/repo.git'},
                 config={'gitea': {'hosts': ['codeberg.org']}},
             )
-        assert result['gitea_stars'] == 10
-        assert result['gitea_forks'] == 2
-        assert result['gitea_watchers'] == 5
-        assert result['gitea_open_issues'] == 1
-        assert result['gitea_owner'] == 'user'
-        assert result['gitea_name'] == 'repo'
-        assert result['gitea_host'] == 'codeberg.org'
+        assert result['stars'] == 10
+        assert result['forks_count'] == 2
+        assert result['watchers'] == 5
+        assert result['open_issues'] == 1
+        assert result['forge_owner'] == 'user'
+        assert result['forge_name'] == 'repo'
+        # Wave V2.B: forge_host is set by the dispatcher, not by the source.
 
     def test_fetch_description_also_sets_top_level(self):
         from repoindex.sources.forges.gitea import source
@@ -303,7 +304,7 @@ class TestGiteaSourceFetch:
                 config={'gitea': {'hosts': ['codeberg.org']}},
             )
         assert result['description'] == 'A cool project'
-        assert result['gitea_description'] == 'A cool project'
+        assert result['forge_description'] == 'A cool project'
 
     def test_fetch_empty_description(self):
         from repoindex.sources.forges.gitea import source
@@ -314,7 +315,7 @@ class TestGiteaSourceFetch:
                 {'remote_url': 'https://codeberg.org/user/repo.git'},
                 config={'gitea': {'hosts': ['codeberg.org']}},
             )
-        assert result['gitea_description'] == ''
+        assert result['forge_description'] == ''
         assert 'description' not in result  # not set when empty
 
     def test_fetch_null_description(self):
@@ -326,7 +327,7 @@ class TestGiteaSourceFetch:
                 {'remote_url': 'https://codeberg.org/user/repo.git'},
                 config={'gitea': {'hosts': ['codeberg.org']}},
             )
-        assert result['gitea_description'] == ''
+        assert result['forge_description'] == ''
         assert 'description' not in result
 
     def test_fetch_topics_json_serialized(self):
@@ -338,7 +339,7 @@ class TestGiteaSourceFetch:
                 {'remote_url': 'https://codeberg.org/user/repo.git'},
                 config={'gitea': {'hosts': ['codeberg.org']}},
             )
-        parsed = json.loads(result['gitea_topics'])
+        parsed = json.loads(result['topics'])
         assert parsed == ['python', 'tool']
 
     def test_fetch_no_topics(self):
@@ -350,7 +351,7 @@ class TestGiteaSourceFetch:
                 {'remote_url': 'https://codeberg.org/user/repo.git'},
                 config={'gitea': {'hosts': ['codeberg.org']}},
             )
-        assert 'gitea_topics' not in result
+        assert 'topics' not in result
 
     def test_fetch_empty_topics_list(self):
         from repoindex.sources.forges.gitea import source
@@ -361,9 +362,10 @@ class TestGiteaSourceFetch:
                 {'remote_url': 'https://codeberg.org/user/repo.git'},
                 config={'gitea': {'hosts': ['codeberg.org']}},
             )
-        assert 'gitea_topics' not in result
+        assert 'topics' not in result
 
     def test_fetch_boolean_flags(self):
+        """Wave V2.B: has_pull_requests was dropped (not all forges expose it)."""
         from repoindex.sources.forges.gitea import source
         mock_resp = self._make_api_response(
             fork=True, private=True, archived=True,
@@ -375,12 +377,13 @@ class TestGiteaSourceFetch:
                 {'remote_url': 'https://codeberg.org/user/repo.git'},
                 config={'gitea': {'hosts': ['codeberg.org']}},
             )
-        assert result['gitea_is_fork'] == 1
-        assert result['gitea_is_private'] == 1
-        assert result['gitea_is_archived'] == 1
-        assert result['gitea_has_issues'] == 0
-        assert result['gitea_has_wiki'] == 0
-        assert result['gitea_has_pull_requests'] == 0
+        assert result['is_fork'] == 1
+        assert result['is_private'] == 1
+        assert result['is_archived'] == 1
+        assert result['has_issues'] == 0
+        assert result['has_wiki'] == 0
+        # has_pull_requests is dropped in Wave V2.B
+        assert 'has_pull_requests' not in result
 
     def test_fetch_timestamps(self):
         from repoindex.sources.forges.gitea import source
@@ -394,8 +397,8 @@ class TestGiteaSourceFetch:
                 {'remote_url': 'https://codeberg.org/user/repo.git'},
                 config={'gitea': {'hosts': ['codeberg.org']}},
             )
-        assert result['gitea_created_at'] == '2025-01-01T00:00:00Z'
-        assert result['gitea_updated_at'] == '2026-03-15T12:30:00Z'
+        assert result['forge_created_at'] == '2025-01-01T00:00:00Z'
+        assert result['forge_updated_at'] == '2026-03-15T12:30:00Z'
 
     def test_fetch_api_404(self):
         from repoindex.sources.forges.gitea import source
@@ -511,7 +514,8 @@ class TestGiteaSourceFetch:
                 config={'gitea': {'hosts': ['git.custom.org']}},
             )
         assert result is not None
-        assert result['gitea_host'] == 'git.custom.org'
+        # Wave V2.B: forge_host comes from the dispatcher, not the source.
+        assert result['forge_owner'] == 'user'
 
     def test_fetch_default_hosts_when_no_config(self):
         """fetch() uses default hosts when config is None."""
@@ -524,7 +528,7 @@ class TestGiteaSourceFetch:
                 config=None,
             )
         assert result is not None
-        assert result['gitea_host'] == 'codeberg.org'
+        assert result['forge_owner'] == 'user'
 
     def test_fetch_sparse_api_response(self):
         """fetch() handles an API response with minimal fields."""
@@ -539,10 +543,10 @@ class TestGiteaSourceFetch:
                 config={'gitea': {'hosts': ['codeberg.org']}},
             )
         assert result is not None
-        assert result['gitea_stars'] == 0
-        assert result['gitea_forks'] == 0
-        assert result['gitea_is_fork'] == 0
-        assert result['gitea_description'] == ''
+        assert result['stars'] == 0
+        assert result['forks_count'] == 0
+        assert result['is_fork'] == 0
+        assert result['forge_description'] == ''
 
     def test_fetch_timeout_parameter(self):
         from repoindex.sources.forges.gitea import source
@@ -630,37 +634,47 @@ class TestGiteaSourceDiscovery:
             sources_mod._BUILTIN_SOURCES_CACHE = None
 
 
-class TestGiteaSchemaColumns:
-    """Test that the database schema includes gitea columns."""
+class TestUnifiedForgeSchemaColumns:
+    """Wave V2.B: schema uses unified forge_* / generic columns instead of gitea_*."""
 
-    def test_schema_has_gitea_columns(self):
+    def test_schema_has_unified_columns(self):
         from repoindex.database.schema import SCHEMA_V1
-        gitea_cols = [
-            'gitea_owner', 'gitea_name', 'gitea_host',
-            'gitea_stars', 'gitea_forks', 'gitea_watchers',
-            'gitea_open_issues', 'gitea_is_fork', 'gitea_is_private',
-            'gitea_is_archived', 'gitea_description', 'gitea_topics',
-            'gitea_created_at', 'gitea_updated_at',
-            'gitea_has_issues', 'gitea_has_wiki', 'gitea_has_pull_requests',
+        unified_cols = [
+            'forge_id', 'forge_host', 'forge_owner', 'forge_name',
+            'forge_description', 'topics', 'is_archived', 'is_fork',
+            'is_private', 'pages_url', 'default_branch',
+            'stars', 'forks_count', 'watchers', 'open_issues',
+            'forge_created_at', 'forge_updated_at', 'forge_pushed_at',
+            'has_issues', 'has_wiki', 'has_pages',
         ]
-        for col in gitea_cols:
+        for col in unified_cols:
             assert col in SCHEMA_V1, f"Column {col} not found in schema"
+
+    def test_schema_drops_old_gitea_columns(self):
+        from repoindex.database.schema import SCHEMA_V1
+        for old_col in (
+            'gitea_owner', 'gitea_stars', 'gitea_topics',
+            'gitea_has_pull_requests',
+        ):
+            assert old_col not in SCHEMA_V1, f"Old column {old_col} still in schema"
 
     def test_schema_version_bumped(self):
         from repoindex.database.schema import CURRENT_VERSION
-        assert CURRENT_VERSION >= 8
+        assert CURRENT_VERSION >= 9
 
-    def test_schema_creates_table_with_gitea_columns(self):
+    def test_schema_creates_table_with_unified_columns(self):
         """Verify the schema can be applied to a real SQLite database."""
         import sqlite3
         from repoindex.database.schema import apply_schema
         conn = sqlite3.connect(':memory:')
         apply_schema(conn)
-        # Check that gitea columns exist
         cursor = conn.execute("PRAGMA table_info(repos)")
         columns = {row[1] for row in cursor.fetchall()}
-        assert 'gitea_stars' in columns
-        assert 'gitea_host' in columns
-        assert 'gitea_topics' in columns
-        assert 'gitea_has_pull_requests' in columns
+        assert 'forge_id' in columns
+        assert 'forge_host' in columns
+        assert 'topics' in columns
+        assert 'stars' in columns
+        # Old columns should be gone
+        assert 'gitea_stars' not in columns
+        assert 'github_stars' not in columns
         conn.close()

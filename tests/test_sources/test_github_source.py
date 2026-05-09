@@ -115,7 +115,8 @@ class TestGitHubSource:
         assert not source.detect('/repo', {})
         assert not source.detect('/repo', None)
 
-    def test_fetch_returns_prefixed_fields(self):
+    def test_fetch_returns_unified_fields(self):
+        """Wave V2.B: fetch returns generic forge fields (not github_*)."""
         from repoindex.sources.forges.github import source
         from repoindex.infra.github_client import GitHubRepo
 
@@ -138,22 +139,23 @@ class TestGitHubSource:
                 config={'github': {'token': 'fake'}},
             )
 
-        assert result['github_stars'] == 42
-        assert result['github_forks'] == 3
-        assert result['github_watchers'] == 5
-        assert result['github_open_issues'] == 2
-        assert result['github_is_fork'] == 0
-        assert result['github_is_private'] == 0
-        assert result['github_is_archived'] == 0
-        assert result['github_description'] == 'A test repo'
-        assert result['github_created_at'] == '2024-01-01T00:00:00Z'
-        assert result['github_updated_at'] == '2026-03-14T00:00:00Z'
-        assert '"python"' in result['github_topics']
-        assert '"cli"' in result['github_topics']
-        assert result['github_pushed_at'] == '2026-03-14T00:00:00Z'
-        assert result['github_has_issues'] == 1
-        assert result['github_has_wiki'] == 1
-        assert result['github_has_pages'] == 0
+        assert result['stars'] == 42
+        assert result['forks_count'] == 3
+        assert result['watchers'] == 5
+        assert result['open_issues'] == 2
+        assert result['is_fork'] == 0
+        assert result['is_private'] == 0
+        assert result['is_archived'] == 0
+        assert result['forge_description'] == 'A test repo'
+        assert result['forge_created_at'] == '2024-01-01T00:00:00Z'
+        assert result['forge_updated_at'] == '2026-03-14T00:00:00Z'
+        assert '"python"' in result['topics']
+        assert '"cli"' in result['topics']
+        assert result['forge_pushed_at'] == '2026-03-14T00:00:00Z'
+        assert result['has_issues'] == 1
+        assert result['has_wiki'] == 1
+        assert result['has_pages'] == 0
+        assert result['default_branch'] == 'main'
 
     def test_fetch_returns_none_for_non_github(self):
         from repoindex.sources.forges.github import source
@@ -192,9 +194,9 @@ class TestGitHubSource:
                 config={'github': {'token': 'fake'}},
             )
 
-        assert 'github_topics' not in result
-        assert 'github_pushed_at' not in result
-        assert result['github_description'] == ''
+        assert 'topics' not in result
+        assert 'forge_pushed_at' not in result
+        assert result['forge_description'] == ''
 
     def test_fetch_token_from_config(self):
         from repoindex.sources.forges.github import source
@@ -254,10 +256,11 @@ class TestGitHubSource:
         assert result is None
 
     def test_fetch_writes_owner_name_and_description(self):
-        """Fetch must populate github_owner, github_name, and top-level description.
+        """Fetch must populate forge_owner, forge_name, and top-level description.
 
-        record_to_domain() gates GitHubMetadata construction on github_owner,
-        and FTS5 search uses the top-level description column.
+        record_to_domain() gates ForgeMetadata construction on a forge
+        identity column being set; FTS5 search uses the top-level
+        description column.
         """
         from repoindex.sources.forges.github import source
         from repoindex.infra.github_client import GitHubRepo
@@ -280,12 +283,12 @@ class TestGitHubSource:
                 config={'github': {'token': 'fake'}},
             )
 
-        assert result['github_owner'] == 'queelius'
-        assert result['github_name'] == 'three.js'
+        assert result['forge_owner'] == 'queelius'
+        assert result['forge_name'] == 'three.js'
         assert result['description'] == 'A 3D JS library'
 
     def test_fetch_no_description_omits_toplevel_description(self):
-        """When GitHub description is empty, don't overwrite top-level description."""
+        """When forge description is empty, don't overwrite top-level description."""
         from repoindex.sources.forges.github import source
         from repoindex.infra.github_client import GitHubRepo
 
@@ -307,8 +310,8 @@ class TestGitHubSource:
                 config={'github': {'token': 'fake'}},
             )
 
-        # github_owner/name still set, but description NOT in result (won't clobber local)
-        assert result['github_owner'] == 'user'
+        # forge_owner/name still set, but description NOT in result (won't clobber local)
+        assert result['forge_owner'] == 'user'
         assert 'description' not in result
 
     def test_fetch_reuses_client_across_calls(self):

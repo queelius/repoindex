@@ -119,23 +119,31 @@ def _output_pretty(repo: dict, tags: list, publications: list, events: list):
 
     console.print(table)
 
-    # GitHub metadata
-    has_github = repo.get('github_owner') or repo.get('github_stars') is not None
-    if has_github:
+    # Forge metadata (Wave V2.B). Section header reflects the resolved
+    # forge_id so users see "GitHub" vs "Gitea" automatically; falls back
+    # to the generic "Forge" if forge_id is absent but other fields are.
+    forge_id = repo.get('forge_id')
+    has_forge = (
+        forge_id
+        or repo.get('forge_owner')
+        or repo.get('stars') is not None
+    )
+    if has_forge:
         console.print()
-        console.print("  [bold]GitHub[/bold]")
+        title = (forge_id or 'forge').title() if forge_id else 'Forge'
+        console.print(f"  [bold]{title}[/bold]")
         parts = []
-        stars = repo.get('github_stars', 0) or 0
-        forks = repo.get('github_forks', 0) or 0
+        stars = repo.get('stars', 0) or 0
+        forks = repo.get('forks_count', 0) or 0
         parts.append(f"Stars: {stars}")
         parts.append(f"Forks: {forks}")
-        if repo.get('github_is_private'):
+        if repo.get('is_private'):
             parts.append("Private: [yellow]Yes[/yellow]")
         else:
             parts.append("Private: No")
-        if repo.get('github_is_archived'):
+        if repo.get('is_archived'):
             parts.append("[red]Archived[/red]")
-        if repo.get('github_is_fork'):
+        if repo.get('is_fork'):
             parts.append("Fork: Yes")
         console.print(f"    {  '  '.join(parts)}")
 

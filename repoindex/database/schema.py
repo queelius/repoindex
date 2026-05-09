@@ -22,7 +22,11 @@ from typing import List, Tuple
 # v6: Added keywords column (JSON array extracted from project manifests)
 # v7: Added local asset detection columns (has_codemeta, has_funding, has_contributors, has_changelog)
 # v8: Added Gitea/Codeberg/Forgejo metadata columns (gitea_*)
-CURRENT_VERSION = 8
+# v9: Wave V2.B: unified forge schema. Dropped github_*/gitea_* columns,
+#     added generic forge_id/forge_host/topics/is_archived/stars/etc.
+#     Hard-drop migration: old columns are dropped, new columns start NULL.
+#     Run `repoindex refresh --external` after upgrade to repopulate.
+CURRENT_VERSION = 9
 
 # Schema definition as SQL statements
 SCHEMA_V1 = """
@@ -63,23 +67,33 @@ CREATE TABLE IF NOT EXISTS repos (
     license_name TEXT,
     license_file TEXT,
 
-    -- GitHub metadata (nullable, fetched via --enrich-github)
-    -- All fields prefixed with github_ for explicit provenance
-    github_owner TEXT,
-    github_name TEXT,
-    github_description TEXT,
-    github_stars INTEGER DEFAULT 0,
-    github_forks INTEGER DEFAULT 0,
-    github_watchers INTEGER DEFAULT 0,
-    github_open_issues INTEGER DEFAULT 0,
-    github_is_fork BOOLEAN DEFAULT 0,
-    github_is_private BOOLEAN DEFAULT 0,
-    github_is_archived BOOLEAN DEFAULT 0,
-    github_has_issues BOOLEAN DEFAULT 1,
-    github_has_wiki BOOLEAN DEFAULT 1,
-    github_has_pages BOOLEAN DEFAULT 0,
-    github_pages_url TEXT,
-    github_topics TEXT,  -- JSON array
+    -- Forge metadata (nullable, fetched via the matching GitForge source).
+    -- Wave V2.B unifies the per-platform github_*/gitea_* columns into a
+    -- single generic set. forge_id records which platform owns the repo
+    -- (resolved from remote_url at refresh time); forge_host disambiguates
+    -- multiple instances of the same forge family (codeberg.org vs a
+    -- self-hosted gitea, github.com vs ghe.example.com).
+    forge_id TEXT,                       -- 'github', 'gitea', etc.
+    forge_host TEXT,                     -- 'github.com', 'codeberg.org', ...
+    forge_owner TEXT,                    -- owner / organization on the forge
+    forge_name TEXT,                     -- repo name on the forge
+    forge_description TEXT,              -- description as set on the forge
+    topics TEXT,                         -- JSON array of topics
+    is_archived BOOLEAN,
+    is_fork BOOLEAN,
+    is_private BOOLEAN,
+    pages_url TEXT,
+    default_branch TEXT,
+    stars INTEGER,
+    forks_count INTEGER,
+    watchers INTEGER,
+    open_issues INTEGER,
+    forge_created_at TEXT,
+    forge_updated_at TEXT,
+    forge_pushed_at TEXT,
+    has_issues BOOLEAN,
+    has_wiki BOOLEAN,
+    has_pages BOOLEAN,
 
     -- Project keywords (JSON array from pyproject.toml / Cargo.toml / package.json)
     keywords TEXT,
@@ -106,30 +120,6 @@ CREATE TABLE IF NOT EXISTS repos (
     citation_version TEXT,       -- Version from citation file
     citation_repository TEXT,    -- Repository URL from citation file
     citation_license TEXT,       -- License from citation file
-
-    -- GitHub timestamps (nullable, fetched via --enrich-github)
-    github_created_at TIMESTAMP,
-    github_updated_at TIMESTAMP,
-    github_pushed_at TIMESTAMP,
-
-    -- Gitea/Codeberg/Forgejo metadata (nullable, fetched via gitea source)
-    gitea_owner TEXT,
-    gitea_name TEXT,
-    gitea_host TEXT,
-    gitea_stars INTEGER DEFAULT 0,
-    gitea_forks INTEGER DEFAULT 0,
-    gitea_watchers INTEGER DEFAULT 0,
-    gitea_open_issues INTEGER DEFAULT 0,
-    gitea_is_fork BOOLEAN DEFAULT 0,
-    gitea_is_private BOOLEAN DEFAULT 0,
-    gitea_is_archived BOOLEAN DEFAULT 0,
-    gitea_description TEXT,
-    gitea_topics TEXT,
-    gitea_created_at TEXT,
-    gitea_updated_at TEXT,
-    gitea_has_issues BOOLEAN DEFAULT 1,
-    gitea_has_wiki BOOLEAN DEFAULT 1,
-    gitea_has_pull_requests BOOLEAN DEFAULT 1,
 
     -- Local scan timestamp
     scanned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -194,8 +184,9 @@ CREATE TABLE IF NOT EXISTS scan_errors (
 CREATE INDEX IF NOT EXISTS idx_repos_name ON repos(name);
 CREATE INDEX IF NOT EXISTS idx_repos_language ON repos(language);
 CREATE INDEX IF NOT EXISTS idx_repos_owner ON repos(owner);
-CREATE INDEX IF NOT EXISTS idx_repos_github_updated ON repos(github_updated_at);
-CREATE INDEX IF NOT EXISTS idx_repos_github_stars ON repos(github_stars);
+CREATE INDEX IF NOT EXISTS idx_repos_forge_id ON repos(forge_id);
+CREATE INDEX IF NOT EXISTS idx_repos_forge_updated ON repos(forge_updated_at);
+CREATE INDEX IF NOT EXISTS idx_repos_stars ON repos(stars);
 CREATE INDEX IF NOT EXISTS idx_repos_scanned ON repos(scanned_at);
 CREATE INDEX IF NOT EXISTS idx_repos_citation_doi ON repos(citation_doi);
 
@@ -290,8 +281,8 @@ SELECT
     r.id as repo_id,
     r.name,
     r.language,
-    r.github_stars,
-    r.github_forks,
+    r.stars,
+    r.forks_count,
     COALESCE(commits_30d.cnt, 0) as commits_30d,
     COALESCE(commits_90d.cnt, 0) as commits_90d,
     COALESCE(tags_90d.cnt, 0) as tags_90d,
@@ -372,7 +363,7 @@ def apply_schema(conn: sqlite3.Connection, version: int = CURRENT_VERSION) -> No
     conn.executescript(SCHEMA_V1)
     conn.execute(
         "INSERT OR REPLACE INTO _schema_info (version, description) VALUES (?, ?)",
-        (CURRENT_VERSION, "v0.13.0: Added Gitea/Codeberg/Forgejo metadata columns")
+        (CURRENT_VERSION, "v2.0 (Wave V2.B): unified forge schema (forge_id + generic columns)")
     )
 
     conn.commit()

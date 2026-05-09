@@ -140,8 +140,8 @@ let db = null;
 
 const BOOL_COLS = new Set([
   'is_clean', 'has_readme', 'has_license', 'has_ci', 'has_citation',
-  'github_is_fork', 'github_is_private', 'github_is_archived',
-  'github_has_issues', 'github_has_wiki', 'github_has_pages', 'published'
+  'is_fork', 'is_private', 'is_archived',
+  'has_issues', 'has_wiki', 'has_pages', 'published'
 ]);
 
 async function init() {
@@ -177,7 +177,7 @@ function showStats() {
 }
 
 const TAB_QUERIES = {
-  repos: `SELECT name, path, language, branch, is_clean, github_stars,
+  repos: `SELECT name, path, language, branch, is_clean, stars,
           description, license_key, has_readme, has_license, has_ci
           FROM repos ORDER BY name`,
   events: `SELECT e.id, r.name as repo, e.type, e.timestamp, e.ref,

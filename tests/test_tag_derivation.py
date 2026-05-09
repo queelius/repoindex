@@ -49,8 +49,8 @@ def _create_db(tmp_path):
             name TEXT,
             path TEXT,
             language TEXT,
-            github_topics TEXT,
-            gitea_topics TEXT,
+            forge_id TEXT,
+            topics TEXT,
             keywords TEXT,
             has_readme INTEGER DEFAULT 0,
             has_license INTEGER DEFAULT 0,
@@ -103,10 +103,10 @@ def _get_record(db, repo_id):
 class TestDeriveTags:
     """Tests for _derive_tags function."""
 
-    def test_github_topics(self, tmp_path):
+    def test_topics_with_github_provenance(self, tmp_path):
         db = _create_db(tmp_path)
         db.conn.execute(
-            "INSERT INTO repos (id, name, github_topics) VALUES (1, 'test', ?)",
+            "INSERT INTO repos (id, name, forge_id, topics) VALUES (1, 'test', 'github', ?)",
             (json.dumps(['python', 'cli', 'metadata']),)
         )
         db.conn.commit()
@@ -119,10 +119,10 @@ class TestDeriveTags:
         assert tags['topic:cli'] == 'github'
         assert tags['topic:metadata'] == 'github'
 
-    def test_gitea_topics(self, tmp_path):
+    def test_topics_with_gitea_provenance(self, tmp_path):
         db = _create_db(tmp_path)
         db.conn.execute(
-            "INSERT INTO repos (id, name, gitea_topics) VALUES (1, 'test', ?)",
+            "INSERT INTO repos (id, name, forge_id, topics) VALUES (1, 'test', 'gitea', ?)",
             (json.dumps(['rust', 'wasm']),)
         )
         db.conn.commit()
@@ -245,7 +245,7 @@ class TestDeriveTags:
     def test_invalid_json_topics_skipped(self, tmp_path):
         db = _create_db(tmp_path)
         db.conn.execute(
-            "INSERT INTO repos (id, name, github_topics) VALUES (1, 'test', 'not valid json')"
+            "INSERT INTO repos (id, name, topics) VALUES (1, 'test', 'not valid json')"
         )
         db.conn.commit()
 
@@ -272,7 +272,8 @@ class TestDeriveTags:
     def test_tags_lowercased(self, tmp_path):
         db = _create_db(tmp_path)
         db.conn.execute(
-            "INSERT INTO repos (id, name, language, github_topics) VALUES (1, 'test', 'JavaScript', ?)",
+            "INSERT INTO repos (id, name, language, forge_id, topics) "
+            "VALUES (1, 'test', 'JavaScript', 'github', ?)",
             (json.dumps(['React', 'TypeScript']),)
         )
         db.conn.commit()
@@ -291,7 +292,7 @@ class TestDeriveTags:
     def test_whitespace_in_topics_trimmed(self, tmp_path):
         db = _create_db(tmp_path)
         db.conn.execute(
-            "INSERT INTO repos (id, name, github_topics) VALUES (1, 'test', ?)",
+            "INSERT INTO repos (id, name, forge_id, topics) VALUES (1, 'test', 'github', ?)",
             (json.dumps(['  python  ', ' cli ']),)
         )
         db.conn.commit()
@@ -306,7 +307,7 @@ class TestDeriveTags:
     def test_empty_topic_strings_skipped(self, tmp_path):
         db = _create_db(tmp_path)
         db.conn.execute(
-            "INSERT INTO repos (id, name, github_topics) VALUES (1, 'test', ?)",
+            "INSERT INTO repos (id, name, forge_id, topics) VALUES (1, 'test', 'github', ?)",
             (json.dumps(['python', '', '  ']),)
         )
         db.conn.commit()
@@ -321,7 +322,7 @@ class TestDeriveTags:
     def test_non_string_topics_skipped(self, tmp_path):
         db = _create_db(tmp_path)
         db.conn.execute(
-            "INSERT INTO repos (id, name, github_topics) VALUES (1, 'test', ?)",
+            "INSERT INTO repos (id, name, forge_id, topics) VALUES (1, 'test', 'github', ?)",
             (json.dumps(['python', 42, None, True]),)
         )
         db.conn.commit()
@@ -336,8 +337,8 @@ class TestDeriveTags:
         """Test that all metadata sources work together."""
         db = _create_db(tmp_path)
         db.conn.execute(
-            "INSERT INTO repos (id, name, language, github_topics, keywords, "
-            "has_readme, has_license, has_ci) VALUES (1, 'test', 'Python', ?, ?, 1, 1, 1)",
+            "INSERT INTO repos (id, name, language, forge_id, topics, keywords, "
+            "has_readme, has_license, has_ci) VALUES (1, 'test', 'Python', 'github', ?, ?, 1, 1, 1)",
             (json.dumps(['ml', 'data']), json.dumps(['machine-learning', 'pandas']))
         )
         db.conn.execute(
@@ -472,8 +473,8 @@ class TestSyncDerivedTags:
         """Running derive_tags twice produces the same result."""
         db = _create_db(tmp_path)
         db.conn.execute(
-            "INSERT INTO repos (id, name, language, github_topics, has_readme) "
-            "VALUES (1, 'test', 'Python', ?, 1)",
+            "INSERT INTO repos (id, name, language, forge_id, topics, has_readme) "
+            "VALUES (1, 'test', 'Python', 'github', ?, 1)",
             (json.dumps(['ml']),)
         )
         db.conn.commit()
@@ -808,8 +809,8 @@ class TestLowercaseConsistency:
         repo = {
             'name': 'test',
             'path': '/p/test',
-            'github_owner': 'someone',
-            'github_topics': json.dumps(['JavaScript', 'CLI', 'web-framework']),
+            'forge_id': 'github',
+            'topics': json.dumps(['JavaScript', 'CLI', 'web-framework']),
         }
         tags = get_implicit_tags_from_row(repo)
 
@@ -829,8 +830,8 @@ class TestLowercaseConsistency:
         repo = {
             'name': 'test',
             'path': '/p/test',
-            'github_owner': 'someone',
-            'github_topics': json.dumps(['  python  ', ' CLI ']),
+            'forge_id': 'github',
+            'topics': json.dumps(['  python  ', ' CLI ']),
         }
         tags = get_implicit_tags_from_row(repo)
         assert 'topic:python' in tags
@@ -843,8 +844,8 @@ class TestLowercaseConsistency:
         repo = {
             'name': 'test',
             'path': '/p/test',
-            'github_owner': 'someone',
-            'github_topics': json.dumps(['python', '', '   ', 42, None]),
+            'forge_id': 'github',
+            'topics': json.dumps(['python', '', '   ', 42, None]),
         }
         tags = get_implicit_tags_from_row(repo)
         topic_tags = [t for t in tags if t.startswith('topic:')]

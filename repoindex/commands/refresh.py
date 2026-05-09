@@ -48,6 +48,7 @@ from ..services.repository_service import RepositoryService
 from ..services.tag_derivation import derive_persistable_tags
 from ..events import scan_events
 from ..sources import discover_sources, GitForge, LocalScanner, Registry
+from ..sources.forge_resolution import resolve_forge
 
 
 def _resolve_active_sources(
@@ -383,6 +384,36 @@ def _update_repo_platform_fields(db, repo_id, fields):
     db.execute(f"UPDATE repos SET {set_clauses} WHERE id = ?", tuple(params))
 
 
+def _filter_sources_for_repo(sources, forge_resolution):
+    """Narrow a source list to those that should run for a single repo.
+
+    Wave V2.B behavior change: GitForges no longer all run against every
+    repo. Instead the repo's forge_id is resolved from its remote_url
+    (via ``resolve_forge``), and only the matching GitForge runs. Other
+    forges are skipped. LocalScanners and Registries always run.
+
+    Args:
+        sources: Iterable of Source instances.
+        forge_resolution: ``(forge_id, host)`` tuple, or None if the repo
+            has no recognized forge (e.g., bare local repo, unknown
+            host). When None, all GitForges are skipped.
+
+    Returns:
+        Filtered list of Source instances.
+    """
+    forge_id = forge_resolution[0] if forge_resolution else None
+    out = []
+    for src in sources:
+        if isinstance(src, GitForge):
+            # Run only the GitForge that owns this repo (or none).
+            if forge_id and src.source_id == forge_id:
+                out.append(src)
+            # else: skip this forge for this repo
+        else:
+            out.append(src)
+    return out
+
+
 def _run_sources_parallel(sources, repo_path, repo_dict, config, quiet=False):
     """Run Source.fetch() calls in parallel.
 
@@ -543,8 +574,22 @@ def _process_repo(
                     'name': enriched.name,
                     'owner': getattr(enriched, 'owner', None),
                 }
+
+                # Wave V2.B: resolve the repo's forge from its remote URL
+                # and narrow the GitForge sources to the matching one.
+                # The dispatcher records forge_id and forge_host on the
+                # repo record (so consumers see provenance even when the
+                # forge fetch fails or returns nothing).
+                forge_res = resolve_forge(enriched.remote_url, config)
+                if forge_res:
+                    _update_repo_platform_fields(db, repo_id, {
+                        'forge_id': forge_res[0],
+                        'forge_host': forge_res[1],
+                    })
+
+                applicable = _filter_sources_for_repo(sources, forge_res)
                 results = _run_sources_parallel(
-                    sources, repo.path, repo_dict, config, quiet=quiet
+                    applicable, repo.path, repo_dict, config, quiet=quiet
                 )
                 for source, data in results:
                     if isinstance(source, (LocalScanner, GitForge)):

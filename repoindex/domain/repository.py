@@ -34,52 +34,58 @@ class GitStatus:
 
 
 @dataclass(frozen=True)
-class GitHubMetadata:
-    """GitHub-specific repository metadata."""
-    owner: str
-    name: str
+class ForgeMetadata:
+    """Metadata about a repo as known by its hosting forge.
+
+    Wave V2.B unifies the per-platform metadata classes into a single
+    structure. The ``forge_id`` field discriminates which forge owns the
+    repo (resolved from the remote_url at refresh time); ``host``
+    distinguishes multiple instances of the same forge family. Boolean
+    and integer fields default to falsey values so that an unfetched
+    repo serializes cleanly.
+    """
+    forge_id: Optional[str] = None       # 'github', 'gitea', etc.
+    host: Optional[str] = None           # 'github.com', 'codeberg.org'
+    owner: Optional[str] = None
+    name: Optional[str] = None
     description: Optional[str] = None
-    homepage: Optional[str] = None
-    stars: int = 0
-    forks: int = 0
-    watchers: int = 0
+    topics: tuple = ()
+    is_archived: bool = False
     is_fork: bool = False
     is_private: bool = False
-    is_archived: bool = False
-    default_branch: str = "main"
-    topics: tuple = ()  # Immutable tuple instead of list
-    language: Optional[str] = None
-    license_key: Optional[str] = None
-    has_issues: bool = True
-    has_wiki: bool = True
-    has_pages: bool = False
     pages_url: Optional[str] = None
-    open_issues_count: int = 0
+    default_branch: Optional[str] = None
+    stars: int = 0
+    forks_count: int = 0
+    watchers: int = 0
+    open_issues: int = 0
+    has_issues: bool = False
+    has_wiki: bool = False
+    has_pages: bool = False
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
     pushed_at: Optional[str] = None
 
     def to_dict(self) -> Dict[str, Any]:
         return {
+            'forge_id': self.forge_id,
+            'host': self.host,
             'owner': self.owner,
             'name': self.name,
             'description': self.description,
-            'homepage': self.homepage,
-            'stars': self.stars,
-            'forks': self.forks,
-            'watchers': self.watchers,
+            'topics': list(self.topics),
+            'is_archived': self.is_archived,
             'is_fork': self.is_fork,
             'is_private': self.is_private,
-            'is_archived': self.is_archived,
+            'pages_url': self.pages_url,
             'default_branch': self.default_branch,
-            'topics': list(self.topics),
-            'language': self.language,
-            'license_key': self.license_key,
+            'stars': self.stars,
+            'forks_count': self.forks_count,
+            'watchers': self.watchers,
+            'open_issues': self.open_issues,
             'has_issues': self.has_issues,
             'has_wiki': self.has_wiki,
             'has_pages': self.has_pages,
-            'pages_url': self.pages_url,
-            'open_issues_count': self.open_issues_count,
             'created_at': self.created_at,
             'updated_at': self.updated_at,
             'pushed_at': self.pushed_at,
@@ -154,7 +160,7 @@ class Repository:
 
     Example:
         repo = Repository.from_path("/path/to/repo")
-        repo_with_github = dataclasses.replace(repo, github=github_metadata)
+        repo_with_forge = dataclasses.replace(repo, forge=forge_metadata)
     """
 
     # Required fields
@@ -175,7 +181,7 @@ class Repository:
     tags: FrozenSet[str] = field(default_factory=frozenset)
 
     # External metadata (optional, fetched on demand)
-    github: Optional[GitHubMetadata] = None
+    forge: Optional[ForgeMetadata] = None
     package: Optional[PackageMetadata] = None
 
     # Timestamps
@@ -187,7 +193,7 @@ class Repository:
         Create a minimal Repository from a filesystem path.
 
         This creates a Repository with only the path and name set.
-        Use RepositoryService to enrich with status, GitHub data, etc.
+        Use RepositoryService to enrich with status, forge metadata, etc.
 
         Args:
             path: Absolute path to the git repository
@@ -205,10 +211,10 @@ class Repository:
         from dataclasses import replace
         return replace(self, status=status)
 
-    def with_github(self, github: GitHubMetadata) -> 'Repository':
-        """Create a new Repository with GitHub metadata."""
+    def with_forge(self, forge: ForgeMetadata) -> 'Repository':
+        """Create a new Repository with forge metadata."""
         from dataclasses import replace
-        return replace(self, github=github)
+        return replace(self, forge=forge)
 
     def with_tags(self, tags: FrozenSet[str]) -> 'Repository':
         """Create a new Repository with updated tags."""
@@ -231,7 +237,7 @@ class Repository:
             'tags': list(self.tags),
             'status': self.status.to_dict() if self.status else None,
             'license': self.license.to_dict() if self.license else None,
-            'github': self.github.to_dict() if self.github else None,
+            'forge': self.forge.to_dict() if self.forge else None,
             'package': self.package.to_dict() if self.package else None,
             'last_updated': self.last_updated,
         }

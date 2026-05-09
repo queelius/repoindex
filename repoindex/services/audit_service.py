@@ -278,9 +278,9 @@ class AuditService:
         if cid == 'synced':
             return repo.get('ahead', 0) == 0
         if cid == 'description':
-            return bool(repo.get('github_description') or repo.get('description'))
+            return bool(repo.get('forge_description') or repo.get('description'))
         if cid == 'topics':
-            topics = repo.get('github_topics')
+            topics = repo.get('topics')
             return bool(topics and topics != '[]')
         if cid == 'citation':
             return bool(repo.get('has_citation'))

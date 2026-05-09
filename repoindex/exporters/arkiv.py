@@ -92,30 +92,37 @@ def _repo_to_arkiv(repo: dict) -> dict:
     if citation:
         meta['citation'] = citation
 
-    # GitHub metadata (nested for provenance)
-    github = {}
-    github_fields = {
-        'github_stars': 'stars', 'github_forks': 'forks',
-        'github_watchers': 'watchers', 'github_open_issues': 'open_issues',
-        'github_is_fork': 'is_fork', 'github_is_private': 'is_private',
-        'github_is_archived': 'is_archived',
-        'github_description': 'description',
-        'github_created_at': 'created_at', 'github_updated_at': 'updated_at',
+    # Forge metadata (Wave V2.B: nested under 'forge' for provenance,
+    # discriminated by forge_id). Replaces the old 'github' nesting.
+    forge = {}
+    forge_fields = {
+        'forge_id': 'forge_id', 'forge_host': 'host',
+        'forge_owner': 'owner', 'forge_name': 'name',
+        'forge_description': 'description',
+        'stars': 'stars', 'forks_count': 'forks',
+        'watchers': 'watchers', 'open_issues': 'open_issues',
+        'is_fork': 'is_fork', 'is_private': 'is_private',
+        'is_archived': 'is_archived',
+        'pages_url': 'pages_url',
+        'default_branch': 'default_branch',
+        'forge_created_at': 'created_at',
+        'forge_updated_at': 'updated_at',
+        'forge_pushed_at': 'pushed_at',
     }
-    for db_key, arkiv_key in github_fields.items():
+    for db_key, arkiv_key in forge_fields.items():
         val = repo.get(db_key)
         if val is not None and val != '':
-            github[arkiv_key] = val
-    topics = repo.get('github_topics')
+            forge[arkiv_key] = val
+    topics = repo.get('topics')
     if topics:
         try:
             parsed = json.loads(topics) if isinstance(topics, str) else topics
             if isinstance(parsed, list) and parsed:
-                github['topics'] = parsed
+                forge['topics'] = parsed
         except (json.JSONDecodeError, TypeError):
             pass
-    if github:
-        meta['github'] = github
+    if forge:
+        meta['forge'] = forge
 
     return record
 

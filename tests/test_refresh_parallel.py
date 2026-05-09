@@ -118,7 +118,7 @@ class TestRunSourcesParallel:
         """Sources of different kinds both run correctly."""
         from repoindex.commands.refresh import _run_sources_parallel
         forge_src = _make_source('github', kind='forge', detect_val=True,
-                                 fetch_val={'github_stars': 10})
+                                 fetch_val={'stars': 10})
         reg_src = _make_source('pypi', kind='registry', detect_val=True,
                                fetch_val={'registry': 'pypi', 'name': 'pkg'})
         results = _run_sources_parallel([forge_src, reg_src], '/fake', {}, {})

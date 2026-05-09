@@ -30,14 +30,18 @@ SAMPLE_REPO = {
     'has_ci': 0,
     'has_citation': 1,
     'readme_content': '# Alpha Lib\n\nA test library.',
-    'github_stars': 42,
-    'github_forks': 3,
-    'github_is_private': 0,
-    'github_is_fork': 0,
-    'github_is_archived': 0,
-    'github_topics': json.dumps(['python', 'library']),
-    'github_created_at': '2024-01-01T00:00:00Z',
-    'github_updated_at': '2026-02-15T14:32:07Z',
+    'forge_id': 'github',
+    'forge_host': 'github.com',
+    'forge_owner': 'user',
+    'forge_name': 'alpha-lib',
+    'stars': 42,
+    'forks_count': 3,
+    'is_private': 0,
+    'is_fork': 0,
+    'is_archived': 0,
+    'topics': json.dumps(['python', 'library']),
+    'forge_created_at': '2024-01-01T00:00:00Z',
+    'forge_updated_at': '2026-02-15T14:32:07Z',
     'citation_doi': '10.5281/zenodo.12345',
     'citation_title': 'Alpha Library',
     'citation_authors': json.dumps([
@@ -139,13 +143,16 @@ class TestRepoToArkiv:
         record = _repo_to_arkiv(SAMPLE_REPO)
         assert record['metadata']['readme'] == '# Alpha Lib\n\nA test library.'
 
-    def test_github_nested(self):
+    def test_forge_nested(self):
+        """Wave V2.B: forge metadata is nested under 'forge', not 'github'."""
         record = _repo_to_arkiv(SAMPLE_REPO)
-        gh = record['metadata']['github']
-        assert gh['stars'] == 42
-        assert gh['forks'] == 3
-        assert gh['topics'] == ['python', 'library']
-        assert gh['created_at'] == '2024-01-01T00:00:00Z'
+        forge = record['metadata']['forge']
+        assert forge['forge_id'] == 'github'
+        assert forge['host'] == 'github.com'
+        assert forge['stars'] == 42
+        assert forge['forks'] == 3
+        assert forge['topics'] == ['python', 'library']
+        assert forge['created_at'] == '2024-01-01T00:00:00Z'
 
     def test_citation_nested(self):
         record = _repo_to_arkiv(SAMPLE_REPO)
@@ -162,8 +169,8 @@ class TestRepoToArkiv:
         assert 'content' not in record
         assert 'timestamp' not in record
         assert record['metadata']['name'] == 'bare-repo'
-        # No github, citation, etc.
-        assert 'github' not in record['metadata']
+        # No forge, citation, etc.
+        assert 'forge' not in record['metadata']
         assert 'citation' not in record['metadata']
         assert 'readme' not in record['metadata']
 
@@ -179,11 +186,11 @@ class TestRepoToArkiv:
         record = _repo_to_arkiv(repo)
         assert record['metadata']['languages'] == ['Go', 'Rust']
 
-    def test_github_topics_as_list(self):
-        """Topics already parsed as list."""
-        repo = {'name': 'test', 'path': '/test', 'github_topics': ['a', 'b']}
+    def test_topics_as_list(self):
+        """Topics already parsed as list (Wave V2.B unified column)."""
+        repo = {'name': 'test', 'path': '/test', 'forge_id': 'github', 'topics': ['a', 'b']}
         record = _repo_to_arkiv(repo)
-        assert record['metadata']['github']['topics'] == ['a', 'b']
+        assert record['metadata']['forge']['topics'] == ['a', 'b']
 
     def test_invalid_json_languages_skipped(self):
         repo = {'name': 'test', 'path': '/test', 'languages': 'not json'}

@@ -266,8 +266,8 @@ class TestAuditServiceDBChecks:
             'has_readme': 0, 'has_license': 0, 'has_ci': 0,
             'has_citation': 0, 'citation_doi': None,
             'remote_url': None, 'is_clean': 0, 'ahead': 0,
-            'github_description': None, 'description': None,
-            'github_topics': None,
+            'forge_description': None, 'description': None,
+            'topics': None,
         }
         base.update(overrides)
         return base
@@ -316,8 +316,9 @@ class TestAuditServiceDBChecks:
         doi = next(r for r in result.results if r.check_id == 'doi')
         assert doi.passed is True
 
-    def test_description_github(self):
-        repo = self._make_repo(github_description='A cool project')
+    def test_description_forge(self):
+        """Wave V2.B: forge-side description lives in forge_description."""
+        repo = self._make_repo(forge_description='A cool project')
         result = self._audit_single(repo)
         desc = next(r for r in result.results if r.check_id == 'description')
         assert desc.passed is True
@@ -329,13 +330,14 @@ class TestAuditServiceDBChecks:
         assert desc.passed is True
 
     def test_topics_check(self):
-        repo = self._make_repo(github_topics='["python", "cli"]')
+        """Wave V2.B: topics lives in the unified ``topics`` column."""
+        repo = self._make_repo(topics='["python", "cli"]')
         result = self._audit_single(repo)
         topics = next(r for r in result.results if r.check_id == 'topics')
         assert topics.passed is True
 
     def test_topics_empty_list(self):
-        repo = self._make_repo(github_topics='[]')
+        repo = self._make_repo(topics='[]')
         result = self._audit_single(repo)
         topics = next(r for r in result.results if r.check_id == 'topics')
         assert topics.passed is False
@@ -374,8 +376,8 @@ class TestAuditServiceFSChecks:
             'has_readme': 1, 'has_license': 1, 'has_ci': 0,
             'has_citation': 0, 'citation_doi': None,
             'remote_url': 'https://example.com', 'is_clean': 1, 'ahead': 0,
-            'github_description': 'desc', 'description': None,
-            'github_topics': '["test"]',
+            'forge_description': 'desc', 'description': None,
+            'topics': '["test"]',
         }
         base.update(overrides)
         return base
@@ -511,8 +513,8 @@ class TestAuditServicePublishedCheck:
             'has_readme': 1, 'has_license': 1, 'has_ci': 0,
             'has_citation': 0, 'citation_doi': None,
             'remote_url': 'https://example.com', 'is_clean': 1, 'ahead': 0,
-            'github_description': 'desc', 'description': None,
-            'github_topics': '["test"]',
+            'forge_description': 'desc', 'description': None,
+            'topics': '["test"]',
         }
         service = AuditService()
         result = service._audit_single_repo(repo, CHECKS, published_ids={42})
@@ -526,8 +528,8 @@ class TestAuditServicePublishedCheck:
             'has_readme': 1, 'has_license': 1, 'has_ci': 0,
             'has_citation': 0, 'citation_doi': None,
             'remote_url': 'https://example.com', 'is_clean': 1, 'ahead': 0,
-            'github_description': 'desc', 'description': None,
-            'github_topics': '["test"]',
+            'forge_description': 'desc', 'description': None,
+            'topics': '["test"]',
         }
         service = AuditService()
         result = service._audit_single_repo(repo, CHECKS, published_ids=set())
@@ -541,8 +543,8 @@ class TestAuditServicePublishedCheck:
             'has_readme': 1, 'has_license': 1, 'has_ci': 0,
             'has_citation': 0, 'citation_doi': None,
             'remote_url': 'https://example.com', 'is_clean': 1, 'ahead': 0,
-            'github_description': 'desc', 'description': None,
-            'github_topics': '["test"]',
+            'forge_description': 'desc', 'description': None,
+            'topics': '["test"]',
         }
         service = AuditService()
         result = service._audit_single_repo(repo, CHECKS, published_ids=set())
@@ -559,8 +561,8 @@ class TestAuditServiceMissingPath:
             'has_readme': 0, 'has_license': 0, 'has_ci': 0,
             'has_citation': 0, 'citation_doi': None,
             'remote_url': None, 'is_clean': 0, 'ahead': 0,
-            'github_description': None, 'description': None,
-            'github_topics': None,
+            'forge_description': None, 'description': None,
+            'topics': None,
         }
         service = AuditService()
         result = service._audit_single_repo(repo, CHECKS, published_ids=set())
@@ -594,9 +596,9 @@ class TestAuditServiceFullAudit:
             'has_citation': 1, 'citation_doi': '10.5281/zenodo.123',
             'remote_url': 'https://github.com/user/repo',
             'is_clean': 1, 'ahead': 0,
-            'github_description': 'A great repo',
+            'forge_description': 'A great repo',
             'description': None,
-            'github_topics': '["python"]',
+            'topics': '["python"]',
         }
 
         service = AuditService()
@@ -619,8 +621,8 @@ class TestAuditServiceFullAudit:
             'has_readme': 0, 'has_license': 0, 'has_ci': 0,
             'has_citation': 0, 'citation_doi': None,
             'remote_url': None, 'is_clean': 0, 'ahead': 5,
-            'github_description': None, 'description': None,
-            'github_topics': None,
+            'forge_description': None, 'description': None,
+            'topics': None,
         }
 
         service = AuditService()
@@ -637,8 +639,8 @@ class TestAuditServiceFullAudit:
             'has_readme': 1, 'has_license': 1, 'has_ci': 0,
             'has_citation': 0, 'citation_doi': None,
             'remote_url': None, 'is_clean': 1, 'ahead': 0,
-            'github_description': None, 'description': None,
-            'github_topics': None,
+            'forge_description': None, 'description': None,
+            'topics': None,
         }
 
         service = AuditService()
@@ -653,8 +655,8 @@ class TestAuditServiceFullAudit:
             'has_readme': 1, 'has_license': 0, 'has_ci': 0,
             'has_citation': 0, 'citation_doi': None,
             'remote_url': None, 'is_clean': 1, 'ahead': 0,
-            'github_description': None, 'description': None,
-            'github_topics': None,
+            'forge_description': None, 'description': None,
+            'topics': None,
         }
 
         service = AuditService()
@@ -670,8 +672,8 @@ class TestAuditServiceFullAudit:
             'has_readme': 1, 'has_license': 1, 'has_ci': 0,
             'has_citation': 0, 'citation_doi': None,
             'remote_url': 'https://example.com', 'is_clean': 1, 'ahead': 0,
-            'github_description': None, 'description': None,
-            'github_topics': None,
+            'forge_description': None, 'description': None,
+            'topics': None,
         }
 
         service = AuditService()
@@ -691,8 +693,8 @@ class TestAuditServiceFullAudit:
             'has_readme': 1, 'has_license': 0, 'has_ci': 0,
             'has_citation': 0, 'citation_doi': None,
             'remote_url': None, 'is_clean': 1, 'ahead': 0,
-            'github_description': None, 'description': None,
-            'github_topics': None,
+            'forge_description': None, 'description': None,
+            'topics': None,
         }
 
         service = AuditService()
@@ -710,8 +712,8 @@ class TestAuditServiceFullAudit:
             'has_readme': 1, 'has_license': 1, 'has_ci': 0,
             'has_citation': 0, 'citation_doi': None,
             'remote_url': None, 'is_clean': 1, 'ahead': 0,
-            'github_description': None, 'description': None,
-            'github_topics': None,
+            'forge_description': None, 'description': None,
+            'topics': None,
         }
 
         service = AuditService()
@@ -729,8 +731,8 @@ class TestAuditServiceFullAudit:
             'has_readme': 1, 'has_license': 0, 'has_ci': 0,
             'has_citation': 0, 'citation_doi': None,
             'remote_url': None, 'is_clean': 1, 'ahead': 0,
-            'github_description': None, 'description': None,
-            'github_topics': None,
+            'forge_description': None, 'description': None,
+            'topics': None,
         }
 
         service = AuditService()
@@ -750,8 +752,8 @@ class TestAuditServiceFullAudit:
                 'has_readme': 1, 'has_license': 1 if i == 0 else 0, 'has_ci': 0,
                 'has_citation': 0, 'citation_doi': None,
                 'remote_url': None, 'is_clean': 1, 'ahead': 0,
-                'github_description': None, 'description': None,
-                'github_topics': None,
+                'forge_description': None, 'description': None,
+                'topics': None,
             })
 
         service = AuditService()
@@ -804,8 +806,8 @@ class TestAuditServiceIdentityChecks:
             'has_readme': 1, 'has_license': 1, 'has_ci': 0,
             'has_citation': 0, 'citation_doi': None, 'citation_authors': None,
             'remote_url': 'https://example.com', 'is_clean': 1, 'ahead': 0,
-            'github_description': 'desc', 'description': None,
-            'github_topics': '["test"]', 'readme_content': '',
+            'forge_description': 'desc', 'description': None,
+            'topics': '["test"]', 'readme_content': '',
         }
         base.update(overrides)
         return base
@@ -1059,8 +1061,8 @@ class TestAuditServiceIdentityChecks:
             'has_readme': 0, 'has_license': 0, 'has_ci': 0,
             'has_citation': 0, 'citation_doi': None, 'citation_authors': None,
             'remote_url': None, 'is_clean': 1, 'ahead': 0,
-            'github_description': None, 'description': None,
-            'github_topics': None, 'readme_content': '',
+            'forge_description': None, 'description': None,
+            'topics': None, 'readme_content': '',
         }
         service = AuditService(config=self.AUTHOR_CONFIG)
         checks = [c for c in CHECKS if c.category == Category.IDENTITY]
@@ -1088,8 +1090,8 @@ class TestAuditCLI:
                 'has_readme': 1, 'has_license': 0, 'has_ci': 0,
                 'has_citation': 0, 'citation_doi': None,
                 'remote_url': None, 'is_clean': 1, 'ahead': 0,
-                'github_description': None, 'description': None,
-                'github_topics': None,
+                'forge_description': None, 'description': None,
+                'topics': None,
             }]
 
         runner = CliRunner()
@@ -1166,8 +1168,8 @@ class TestAuditCLI:
             'has_readme': 1, 'has_license': 1, 'has_ci': 0,
             'has_citation': 0, 'citation_doi': None,
             'remote_url': None, 'is_clean': 1, 'ahead': 0,
-            'github_description': None, 'description': None,
-            'github_topics': None,
+            'forge_description': None, 'description': None,
+            'topics': None,
         }]
 
         runner = CliRunner()

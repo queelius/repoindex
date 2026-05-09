@@ -17,7 +17,7 @@ MOCK_REPOS = [
         'branch': 'main',
         'is_clean': True,
         'remote_url': 'https://github.com/user/test-repo',
-        'github_stars': 10,
+        'stars': 10,
         'license_key': 'mit',
         'description': 'Test repository',
     },

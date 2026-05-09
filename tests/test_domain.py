@@ -3,7 +3,7 @@
 import pytest
 from datetime import datetime
 from repoindex.domain import Repository, Tag, TagSource, Event
-from repoindex.domain.repository import GitStatus, GitHubMetadata, PackageMetadata, LicenseInfo
+from repoindex.domain.repository import GitStatus, ForgeMetadata, PackageMetadata, LicenseInfo
 
 
 class TestTag:
@@ -103,7 +103,7 @@ class TestRepository:
         """Test that None values are excluded from dict."""
         repo = Repository(path="/path", name="repo")
         d = repo.to_dict()
-        assert 'github' not in d
+        assert 'forge' not in d
         assert 'package' not in d
 
     def test_has_tag(self):
@@ -174,30 +174,38 @@ class TestGitStatus:
         assert d['behind'] == 1
 
 
-class TestGitHubMetadata:
-    """Tests for GitHubMetadata domain object."""
+class TestForgeMetadata:
+    """Tests for ForgeMetadata domain object (Wave V2.B unified replacement)."""
 
     def test_creation(self):
-        """Test creating GitHub metadata."""
-        gh = GitHubMetadata(
+        """Test creating forge metadata."""
+        forge = ForgeMetadata(
+            forge_id='github',
+            host='github.com',
             owner="user",
             name="repo",
             description="A test repo",
             stars=42,
             is_fork=False
         )
-        assert gh.owner == "user"
-        assert gh.name == "repo"
-        assert gh.stars == 42
+        assert forge.forge_id == 'github'
+        assert forge.host == 'github.com'
+        assert forge.owner == "user"
+        assert forge.name == "repo"
+        assert forge.stars == 42
 
     def test_to_dict(self):
         """Test serialization."""
-        gh = GitHubMetadata(
+        forge = ForgeMetadata(
+            forge_id='gitea',
+            host='codeberg.org',
             owner="user",
             name="repo",
             topics=("ml", "python")
         )
-        d = gh.to_dict()
+        d = forge.to_dict()
+        assert d['forge_id'] == 'gitea'
+        assert d['host'] == 'codeberg.org'
         assert d['owner'] == "user"
         assert d['topics'] == ["ml", "python"]  # Tuple converted to list
 

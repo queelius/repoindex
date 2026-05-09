@@ -16,11 +16,13 @@ MOCK_REPOS = [
         'tags': '["topic/cli"]',
         'citation_doi': None, 'citation_title': None, 'citation_version': None,
         'citation_repository': None, 'citation_license': None, 'citation_authors': None,
-        'github_stars': 5, 'github_forks': 1, 'github_watchers': 3,
-        'github_open_issues': 2, 'github_is_fork': 0, 'github_is_private': 0,
-        'github_is_archived': 0, 'github_description': 'A repo index tool',
-        'github_created_at': '2025-01-01', 'github_updated_at': '2026-02-28',
-        'github_topics': '["cli", "git"]',
+        'forge_id': 'github', 'forge_host': 'github.com',
+        'forge_owner': 'user', 'forge_name': 'myrepo',
+        'stars': 5, 'forks_count': 1, 'watchers': 3,
+        'open_issues': 2, 'is_fork': 0, 'is_private': 0,
+        'is_archived': 0, 'forge_description': 'A repo index tool',
+        'forge_created_at': '2025-01-01', 'forge_updated_at': '2026-02-28',
+        'topics': '["cli", "git"]',
     },
 ]
 
@@ -86,11 +88,12 @@ class TestExportArchive:
         repo_keys = schema['repos']['metadata_keys']
         assert repo_keys['name']['type'] == 'string'
         assert repo_keys['name']['count'] == 1
-        assert repo_keys['github.stars']['type'] == 'number'
+        # Wave V2.B: 'forge.stars' under unified nesting (was github.stars).
+        assert repo_keys['forge.stars']['type'] == 'number'
         assert repo_keys['is_clean']['type'] == 'boolean'
         assert repo_keys['languages']['type'] == 'array'
         # Parent keys should not appear — only leaf keys
-        assert 'github' not in repo_keys
+        assert 'forge' not in repo_keys
         assert 'citation' not in repo_keys
         # Event schema
         event_keys = schema['events']['metadata_keys']

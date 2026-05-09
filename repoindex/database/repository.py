@@ -10,7 +10,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, Optional, Generator
 
-from ..domain.repository import Repository, GitStatus, GitHubMetadata, LicenseInfo
+from ..domain.repository import Repository, GitStatus, ForgeMetadata, LicenseInfo
 from ..citation import parse_citation_file
 from .connection import Database
 
@@ -86,28 +86,31 @@ def _repo_to_record(repo: Repository) -> Dict[str, Any]:
             'has_license': True,
         })
 
-    # GitHub metadata (all fields prefixed with github_ for explicit provenance)
-    if repo.github:
+    # Forge metadata (Wave V2.B unified columns; forge_id discriminates platform)
+    if repo.forge:
         record.update({
-            'github_owner': repo.github.owner,
-            'github_name': repo.github.name,
-            'github_description': repo.github.description,
-            'description': repo.github.description,  # Also set main description
-            'github_stars': repo.github.stars,
-            'github_forks': repo.github.forks,
-            'github_watchers': repo.github.watchers,
-            'github_open_issues': repo.github.open_issues_count,
-            'github_is_fork': repo.github.is_fork,
-            'github_is_private': repo.github.is_private,
-            'github_is_archived': repo.github.is_archived,
-            'github_has_issues': repo.github.has_issues,
-            'github_has_wiki': repo.github.has_wiki,
-            'github_has_pages': repo.github.has_pages,
-            'github_pages_url': repo.github.pages_url,
-            'github_topics': json.dumps(list(repo.github.topics)) if repo.github.topics else None,
-            'github_created_at': repo.github.created_at,
-            'github_updated_at': repo.github.updated_at,
-            'github_pushed_at': repo.github.pushed_at,
+            'forge_id': repo.forge.forge_id,
+            'forge_host': repo.forge.host,
+            'forge_owner': repo.forge.owner,
+            'forge_name': repo.forge.name,
+            'forge_description': repo.forge.description,
+            'description': repo.forge.description,  # Also set main description
+            'stars': repo.forge.stars,
+            'forks_count': repo.forge.forks_count,
+            'watchers': repo.forge.watchers,
+            'open_issues': repo.forge.open_issues,
+            'is_fork': repo.forge.is_fork,
+            'is_private': repo.forge.is_private,
+            'is_archived': repo.forge.is_archived,
+            'has_issues': repo.forge.has_issues,
+            'has_wiki': repo.forge.has_wiki,
+            'has_pages': repo.forge.has_pages,
+            'pages_url': repo.forge.pages_url,
+            'default_branch': repo.forge.default_branch,
+            'topics': json.dumps(list(repo.forge.topics)) if repo.forge.topics else None,
+            'forge_created_at': repo.forge.created_at,
+            'forge_updated_at': repo.forge.updated_at,
+            'forge_pushed_at': repo.forge.pushed_at,
         })
 
     # Git index mtime for smart refresh
@@ -429,7 +432,7 @@ def get_repos_by_language(
 ) -> Generator[Dict[str, Any], None, None]:
     """Get repositories by primary language."""
     db.execute(
-        "SELECT * FROM repos WHERE language = ? ORDER BY github_stars DESC",
+        "SELECT * FROM repos WHERE language = ? ORDER BY stars DESC",
         (language,)
     )
     for row in db.fetchall():
@@ -504,35 +507,45 @@ def record_to_domain(record: Dict[str, Any]) -> Repository:
             file=record.get('license_file'),
         )
 
-    # Parse GitHub metadata (all fields use github_ prefix)
-    github = None
-    if record.get('github_owner'):
+    # Parse forge metadata (Wave V2.B unified columns).
+    # We construct ForgeMetadata if any platform-side identity field is
+    # set; this mirrors the old gating on the platform owner column.
+    forge = None
+    has_forge_data = (
+        record.get('forge_id')
+        or record.get('forge_owner')
+        or record.get('forge_host')
+    )
+    if has_forge_data:
         topics: tuple[Any, ...] = ()
-        if record.get('github_topics'):
+        if record.get('topics'):
             try:
-                topics = tuple(json.loads(record['github_topics']))
+                topics = tuple(json.loads(record['topics']))
             except (json.JSONDecodeError, TypeError):
                 pass
 
-        github = GitHubMetadata(
-            owner=record['github_owner'],
-            name=record.get('github_name', record['name']),
-            description=record.get('github_description'),
-            stars=record.get('github_stars', 0),
-            forks=record.get('github_forks', 0),
-            watchers=record.get('github_watchers', 0),
-            is_fork=bool(record.get('github_is_fork', False)),
-            is_private=bool(record.get('github_is_private', False)),
-            is_archived=bool(record.get('github_is_archived', False)),
+        forge = ForgeMetadata(
+            forge_id=record.get('forge_id'),
+            host=record.get('forge_host'),
+            owner=record.get('forge_owner'),
+            name=record.get('forge_name', record['name']),
+            description=record.get('forge_description'),
+            stars=record.get('stars') or 0,
+            forks_count=record.get('forks_count') or 0,
+            watchers=record.get('watchers') or 0,
+            open_issues=record.get('open_issues') or 0,
+            is_fork=bool(record.get('is_fork') or False),
+            is_private=bool(record.get('is_private') or False),
+            is_archived=bool(record.get('is_archived') or False),
             topics=topics,
-            has_issues=bool(record.get('github_has_issues', True)),
-            has_wiki=bool(record.get('github_has_wiki', True)),
-            has_pages=bool(record.get('github_has_pages', False)),
-            pages_url=record.get('github_pages_url'),
-            open_issues_count=record.get('github_open_issues', 0),
-            created_at=record.get('github_created_at'),
-            updated_at=record.get('github_updated_at'),
-            pushed_at=record.get('github_pushed_at'),
+            has_issues=bool(record.get('has_issues') or False),
+            has_wiki=bool(record.get('has_wiki') or False),
+            has_pages=bool(record.get('has_pages') or False),
+            pages_url=record.get('pages_url'),
+            default_branch=record.get('default_branch'),
+            created_at=record.get('forge_created_at'),
+            updated_at=record.get('forge_updated_at'),
+            pushed_at=record.get('forge_pushed_at'),
         )
 
     # Parse languages
@@ -561,6 +574,6 @@ def record_to_domain(record: Dict[str, Any]) -> Repository:
         languages=languages,
         license=license_info,
         tags=tags,
-        github=github,
-        last_updated=record.get('github_updated_at'),
+        forge=forge,
+        last_updated=record.get('forge_updated_at'),
     )

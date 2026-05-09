@@ -60,7 +60,12 @@ class GitHubSource(GitForge):
 
     def fetch(self, repo_path: str, repo_record: Optional[dict] = None,
               config: Optional[dict] = None) -> Optional[dict]:
-        """Fetch GitHub metadata and return prefixed fields."""
+        """Fetch GitHub metadata and return generic forge fields.
+
+        The dispatcher in ``commands/refresh.py`` adds ``forge_id`` and
+        ``forge_host`` based on the repo's remote_url; this method returns
+        only the per-platform fields in their unified form.
+        """
         url = (repo_record or {}).get('remote_url', '')
         owner, name = _parse_github_remote(url)
         if not owner or not name:
@@ -76,35 +81,43 @@ class GitHubSource(GitForge):
         if not repo:
             return None
 
-        # Always include identity fields so record_to_domain() can reconstruct
-        # GitHubMetadata (it gates on the presence of github_owner).
+        # Generic forge fields (Wave V2.B). The dispatcher fills in
+        # forge_id and forge_host from the remote URL.
         result = {
-            'github_owner': owner,
-            'github_name': name,
-            'github_stars': repo.stars,
-            'github_forks': repo.forks,
-            'github_watchers': repo.watchers,
-            'github_open_issues': repo.open_issues,
-            'github_is_fork': int(repo.is_fork),
-            'github_is_private': int(repo.is_private),
-            'github_is_archived': int(repo.is_archived),
-            'github_description': repo.description or '',
-            'github_created_at': repo.created_at,
-            'github_updated_at': repo.updated_at,
+            'forge_owner': owner,
+            'forge_name': name,
+            'stars': repo.stars,
+            'forks_count': repo.forks,
+            'watchers': repo.watchers,
+            'open_issues': repo.open_issues,
+            'is_fork': int(repo.is_fork),
+            'is_private': int(repo.is_private),
+            'is_archived': int(repo.is_archived),
+            'forge_description': repo.description or '',
+            'forge_created_at': repo.created_at,
+            'forge_updated_at': repo.updated_at,
         }
 
-        # Also populate the top-level description column (used for FTS5 search)
+        # Default branch and pages_url come straight from the API.
+        default_branch = getattr(repo, 'default_branch', None)
+        if default_branch:
+            result['default_branch'] = default_branch
+        pages_url = getattr(repo, 'pages_url', None)
+        if pages_url:
+            result['pages_url'] = pages_url
+
+        # Also populate the top-level description column (used for FTS5 search).
         if repo.description:
             result['description'] = repo.description
 
         if repo.topics:
-            result['github_topics'] = json.dumps(repo.topics)
+            result['topics'] = json.dumps(repo.topics)
 
         if repo.pushed_at:
-            result['github_pushed_at'] = repo.pushed_at
+            result['forge_pushed_at'] = repo.pushed_at
 
         for attr in ('has_issues', 'has_wiki', 'has_pages'):
-            result[f'github_{attr}'] = int(getattr(repo, attr, False))
+            result[attr] = int(getattr(repo, attr, False))
 
         return result
 

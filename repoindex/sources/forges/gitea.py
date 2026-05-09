@@ -127,6 +127,12 @@ class GiteaSource(GitForge):
         return True
 
     def fetch(self, repo_path, repo_record=None, config=None):
+        """Fetch Gitea metadata and return generic forge fields.
+
+        The dispatcher in ``commands/refresh.py`` fills in ``forge_id`` and
+        ``forge_host`` from the resolved remote URL; this method returns
+        only the per-platform fields in their unified form.
+        """
         url = (repo_record or {}).get('remote_url', '')
         hosts = self._get_hosts(config)
         host, owner, name = _parse_gitea_remote(url, hosts)
@@ -150,33 +156,39 @@ class GiteaSource(GitForge):
             logger.debug("Gitea API request failed for %s/%s: %s", owner, name, e)
             return None
 
+        # Generic forge fields (Wave V2.B). Note: Gitea's
+        # has_pull_requests collapses into the generic has_issues concept;
+        # not every forge family exposes a separate flag.
         result = {
-            'gitea_owner': owner,
-            'gitea_name': name,
-            'gitea_host': host,
-            'gitea_stars': data.get('stars_count', 0),
-            'gitea_forks': data.get('forks_count', 0),
-            'gitea_watchers': data.get('watchers_count', 0),
-            'gitea_open_issues': data.get('open_issues_count', 0),
-            'gitea_is_fork': int(bool(data.get('fork', False))),
-            'gitea_is_private': int(bool(data.get('private', False))),
-            'gitea_is_archived': int(bool(data.get('archived', False))),
-            'gitea_description': data.get('description') or '',
-            'gitea_created_at': data.get('created_at'),
-            'gitea_updated_at': data.get('updated_at'),
+            'forge_owner': owner,
+            'forge_name': name,
+            'stars': data.get('stars_count', 0),
+            'forks_count': data.get('forks_count', 0),
+            'watchers': data.get('watchers_count', 0),
+            'open_issues': data.get('open_issues_count', 0),
+            'is_fork': int(bool(data.get('fork', False))),
+            'is_private': int(bool(data.get('private', False))),
+            'is_archived': int(bool(data.get('archived', False))),
+            'forge_description': data.get('description') or '',
+            'forge_created_at': data.get('created_at'),
+            'forge_updated_at': data.get('updated_at'),
         }
+
+        default_branch = data.get('default_branch')
+        if default_branch:
+            result['default_branch'] = default_branch
 
         if data.get('description'):
             result['description'] = data['description']
 
         topics = data.get('topics')
         if topics and isinstance(topics, list):
-            result['gitea_topics'] = json.dumps(topics)
+            result['topics'] = json.dumps(topics)
 
-        for key in ('has_issues', 'has_wiki', 'has_pull_requests'):
+        for key in ('has_issues', 'has_wiki'):
             val = data.get(key)
             if val is not None:
-                result[f'gitea_{key}'] = int(bool(val))
+                result[key] = int(bool(val))
 
         return result
 

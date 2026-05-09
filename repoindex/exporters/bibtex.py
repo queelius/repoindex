@@ -85,7 +85,7 @@ class BibTeXExporter(Exporter):
             # Author: prefer citation_authors, fallback to owner
             author = _format_authors(repo.get('citation_authors'))
             if not author:
-                author = repo.get('owner') or repo.get('github_owner') or ''
+                author = repo.get('owner') or repo.get('forge_owner') or ''
 
             # Version
             version = repo.get('citation_version') or repo.get('current_version') or ''

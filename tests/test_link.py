@@ -559,14 +559,14 @@ class TestImplicitTagsInLinkTree:
             'language': 'Python',
             'owner': 'testuser',
             'is_clean': True,
-            'github_topics': '["machine-learning", "deep-learning"]',
-            'github_owner': 'testuser',
-            'github_is_private': False,
+            'forge_id': 'github',
+            'topics': '["machine-learning", "deep-learning"]',
+            'is_private': False,
             'license_key': 'mit',
             'tags': ['work/active'],  # explicit tag
         })
 
-        # Repo without GitHub topics but with other metadata
+        # Repo without forge topics but with other metadata
         repo2_path = tmp_path / 'source' / 'web-app'
         repo2_path.mkdir(parents=True)
         (repo2_path / '.git').mkdir()
@@ -577,8 +577,8 @@ class TestImplicitTagsInLinkTree:
             'language': 'JavaScript',
             'owner': 'testuser',
             'is_clean': False,
-            'github_topics': None,
-            'github_owner': None,
+            'forge_id': None,
+            'topics': None,
             'license_key': 'apache-2.0',
             'tags': ['personal'],  # explicit tag
         })
@@ -592,7 +592,7 @@ class TestImplicitTagsInLinkTree:
         repo = setup_repos_with_implicit_tags[0]
         implicit_tags = get_implicit_tags_from_row(repo)
 
-        # Should include topic:* from github_topics
+        # Should include topic:* from forge topics
         assert 'topic:machine-learning' in implicit_tags
         assert 'topic:deep-learning' in implicit_tags
 

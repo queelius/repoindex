@@ -252,7 +252,7 @@ class LinkService:
 
         elif organize_by == OrganizeBy.CREATED_YEAR:
             # Use first commit date if available
-            created_at = repo.get('created_at') or repo.get('github_created_at')
+            created_at = repo.get('created_at') or repo.get('forge_created_at')
             if created_at:
                 year = str(created_at)[:4]
                 paths.append(Path(year))
@@ -261,7 +261,7 @@ class LinkService:
 
         elif organize_by == OrganizeBy.MODIFIED_YEAR:
             # Use last commit date if available
-            updated_at = repo.get('updated_at') or repo.get('github_pushed_at')
+            updated_at = repo.get('updated_at') or repo.get('forge_pushed_at')
             if updated_at:
                 year = str(updated_at)[:4]
                 paths.append(Path(year))

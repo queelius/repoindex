@@ -33,7 +33,7 @@ from .domain import (
     Tag,
     TagSource,
     GitStatus,
-    GitHubMetadata,
+    ForgeMetadata,
     PackageMetadata,
 )
 
@@ -65,7 +65,7 @@ __all__ = [
     "Tag",
     "TagSource",
     "GitStatus",
-    "GitHubMetadata",
+    "ForgeMetadata",
     "PackageMetadata",
     # Services
     "RepositoryService",

@@ -70,11 +70,11 @@ class TestGetImplicitTagsFromRow:
         row = {
             'name': 'myproject',
             'path': '/home/user/myproject',
-            'github_owner': 'torvalds',
-            'github_is_private': False,
-            'github_is_fork': False,
-            'github_is_archived': False,
-            'github_stars': 150,
+            'forge_id': 'torvalds',
+            'is_private': False,
+            'is_fork': False,
+            'is_archived': False,
+            'stars': 150,
         }
         tags = get_implicit_tags_from_row(row)
 
@@ -89,11 +89,11 @@ class TestGetImplicitTagsFromRow:
         row = {
             'name': 'myproject',
             'path': '/home/user/myproject',
-            'github_owner': 'user',
-            'github_is_private': True,
-            'github_is_fork': True,
-            'github_is_archived': True,
-            'github_stars': 0,
+            'forge_id': 'user',
+            'is_private': True,
+            'is_fork': True,
+            'is_archived': True,
+            'stars': 0,
         }
         tags = get_implicit_tags_from_row(row)
 
@@ -105,24 +105,24 @@ class TestGetImplicitTagsFromRow:
     def test_stars_buckets(self):
         """Test star count bucket tags."""
         # No stars
-        row = {'name': 'a', 'path': '/a', 'github_owner': 'x', 'github_stars': 0}
+        row = {'name': 'a', 'path': '/a', 'forge_id': 'x', 'stars': 0}
         tags = get_implicit_tags_from_row(row)
         assert not any(t.startswith('stars:') for t in tags)
 
         # 10+ stars
-        row = {'name': 'b', 'path': '/b', 'github_owner': 'x', 'github_stars': 15}
+        row = {'name': 'b', 'path': '/b', 'forge_id': 'x', 'stars': 15}
         tags = get_implicit_tags_from_row(row)
         assert 'stars:10+' in tags
         assert 'stars:100+' not in tags
 
         # 100+ stars
-        row = {'name': 'c', 'path': '/c', 'github_owner': 'x', 'github_stars': 500}
+        row = {'name': 'c', 'path': '/c', 'forge_id': 'x', 'stars': 500}
         tags = get_implicit_tags_from_row(row)
         assert 'stars:100+' in tags
         assert 'stars:1000+' not in tags
 
         # 1000+ stars
-        row = {'name': 'd', 'path': '/d', 'github_owner': 'x', 'github_stars': 5000}
+        row = {'name': 'd', 'path': '/d', 'forge_id': 'x', 'stars': 5000}
         tags = get_implicit_tags_from_row(row)
         assert 'stars:1000+' in tags
 
@@ -131,8 +131,8 @@ class TestGetImplicitTagsFromRow:
         row = {
             'name': 'myproject',
             'path': '/home/user/myproject',
-            'github_owner': 'user',
-            'github_topics': json.dumps(['machine-learning', 'python', 'deep-learning']),
+            'forge_id': 'user',
+            'topics': json.dumps(['machine-learning', 'python', 'deep-learning']),
         }
         tags = get_implicit_tags_from_row(row)
 
@@ -145,8 +145,8 @@ class TestGetImplicitTagsFromRow:
         row = {
             'name': 'myproject',
             'path': '/home/user/myproject',
-            'github_owner': 'user',
-            'github_topics': json.dumps([]),
+            'forge_id': 'user',
+            'topics': json.dumps([]),
         }
         tags = get_implicit_tags_from_row(row)
 
@@ -158,8 +158,8 @@ class TestGetImplicitTagsFromRow:
         row = {
             'name': 'myproject',
             'path': '/home/user/myproject',
-            'github_owner': 'user',
-            'github_topics': None,
+            'forge_id': 'user',
+            'topics': None,
         }
         tags = get_implicit_tags_from_row(row)
 
@@ -171,8 +171,8 @@ class TestGetImplicitTagsFromRow:
         row = {
             'name': 'myproject',
             'path': '/home/user/myproject',
-            'github_owner': 'user',
-            'github_topics': 'not valid json',
+            'forge_id': 'user',
+            'topics': 'not valid json',
         }
         tags = get_implicit_tags_from_row(row)
 
@@ -213,8 +213,8 @@ class TestGetAllTagsFromDatabase:
                 'path': '/path/to/repo1',
                 'language': 'Python',
                 'is_clean': True,
-                'github_owner': 'user',
-                'github_topics': json.dumps(['ml', 'ai']),
+                'forge_id': 'user',
+                'topics': json.dumps(['ml', 'ai']),
             }
         ]
 
@@ -278,8 +278,8 @@ class TestGetAllTagsFromDatabase:
                 'name': 'repo1',
                 'path': '/path/to/repo1',
                 'language': 'Python',
-                'github_owner': 'user',
-                'github_topics': json.dumps(['ml', 'web']),
+                'forge_id': 'user',
+                'topics': json.dumps(['ml', 'web']),
             }
         ]
 
@@ -324,8 +324,8 @@ class TestGetRepoTagsFromDatabase:
                 'path': '/path/to/repo1',
                 'language': 'Python',
                 'is_clean': True,
-                'github_owner': 'user',
-                'github_topics': json.dumps(['ml']),
+                'forge_id': 'user',
+                'topics': json.dumps(['ml']),
             }
         ]
 
@@ -488,8 +488,8 @@ class TestGitHubTopicsIntegration:
                 'name': 'ml-project',
                 'path': '/path/to/ml-project',
                 'language': 'Python',
-                'github_owner': 'user',
-                'github_topics': json.dumps(['machine-learning', 'tensorflow', 'keras']),
+                'forge_id': 'user',
+                'topics': json.dumps(['machine-learning', 'tensorflow', 'keras']),
             }
         ]
 

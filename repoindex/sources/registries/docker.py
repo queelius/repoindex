@@ -33,7 +33,7 @@ class DockerSource(Registry):
         repo_name = Path(repo_path).name
         owner = None
         if repo_record:
-            owner = repo_record.get('owner') or repo_record.get('github_owner')
+            owner = repo_record.get('owner') or repo_record.get('forge_owner')
 
         if owner:
             return f"{owner}/{repo_name}"

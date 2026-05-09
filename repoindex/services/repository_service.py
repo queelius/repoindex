@@ -11,7 +11,7 @@ import logging
 import os
 import re
 
-from ..domain import Repository, GitStatus, GitHubMetadata, PackageMetadata
+from ..domain import Repository, GitStatus, ForgeMetadata, PackageMetadata
 from ..domain.repository import LicenseInfo
 from ..infra import GitClient, GitHubClient
 from ..infra.zenodo_client import ZenodoRecord, _normalize_github_url
@@ -359,11 +359,15 @@ class RepositoryService:
             languages=tuple(languages)
         )
 
-        # Fetch GitHub metadata if requested
+        # Fetch GitHub metadata if requested. Wave V2.B: surfaced as
+        # ForgeMetadata on Repository.forge so the upstream consumer
+        # writes generic forge_* columns; the dispatcher in refresh.py
+        # would normally fill in forge_id and forge_host but this
+        # convenience path is GitHub-only.
         if fetch_github and repo.owner and repo.name:
-            github_metadata = self._fetch_github_metadata(repo.owner, repo.name)
-            if github_metadata:
-                updated = replace(updated, github=github_metadata)
+            forge_metadata = self._fetch_github_metadata(repo.owner, repo.name)
+            if forge_metadata:
+                updated = replace(updated, forge=forge_metadata)
 
         return updated
 
@@ -461,31 +465,30 @@ class RepositoryService:
 
         return primary, all_langs
 
-    def _fetch_github_metadata(self, owner: str, name: str) -> Optional[GitHubMetadata]:
-        """Fetch GitHub metadata for repository."""
+    def _fetch_github_metadata(self, owner: str, name: str) -> Optional[ForgeMetadata]:
+        """Fetch GitHub metadata as a ForgeMetadata (Wave V2.B unified domain)."""
         repo_data = self.github.get_repo(owner, name)
         if not repo_data:
             return None
 
-        return GitHubMetadata(
+        return ForgeMetadata(
+            forge_id='github',
+            host='github.com',
             owner=repo_data.owner,
             name=repo_data.name,
             description=repo_data.description,
-            homepage=repo_data.homepage,
             stars=repo_data.stars,
-            forks=repo_data.forks,
+            forks_count=repo_data.forks,
             watchers=repo_data.watchers,
             is_fork=repo_data.is_fork,
             is_private=repo_data.is_private,
             is_archived=repo_data.is_archived,
             default_branch=repo_data.default_branch,
             topics=tuple(repo_data.topics),
-            language=repo_data.language,
-            license_key=repo_data.license_key,
             has_issues=repo_data.has_issues,
             has_wiki=repo_data.has_wiki,
             has_pages=repo_data.has_pages,
-            open_issues_count=repo_data.open_issues,
+            open_issues=repo_data.open_issues,
             created_at=repo_data.created_at,
             updated_at=repo_data.updated_at,
             pushed_at=repo_data.pushed_at,

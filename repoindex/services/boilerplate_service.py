@@ -387,7 +387,7 @@ class BoilerplateService:
     ) -> str:
         """Generate codemeta.json content."""
         name = repo.get('name', 'Unknown')
-        description = repo.get('description') or repo.get('github_description', '')
+        description = repo.get('description') or repo.get('forge_description', '')
         remote_url = repo.get('remote_url', '')
         version = repo.get('version') or repo.get('pypi_version', '')
         language = repo.get('language', '')
@@ -491,7 +491,7 @@ class BoilerplateService:
         proj = extract_project_metadata(repo_path) if repo_path else {}
         proj_name = proj.get('name') or name
         version = proj.get('version') or repo.get('version') or repo.get('pypi_version', '')
-        description = proj.get('description') or repo.get('description') or repo.get('github_description', '')
+        description = proj.get('description') or repo.get('description') or repo.get('forge_description', '')
         license_id = proj.get('license') or repo.get('license') or repo.get('license_key', '')
         keywords = proj.get('keywords', [])
         remote_url = repo.get('remote_url', '')
@@ -589,7 +589,7 @@ class BoilerplateService:
         # Read pyproject.toml for richer metadata
         proj = extract_project_metadata(repo_path) if repo_path else {}
         proj_name = proj.get('name') or name
-        description = proj.get('description') or repo.get('description') or repo.get('github_description', '')
+        description = proj.get('description') or repo.get('description') or repo.get('forge_description', '')
         version = proj.get('version') or repo.get('version') or repo.get('pypi_version', '')
         license_id = proj.get('license') or repo.get('license') or repo.get('license_key', '')
         keywords = proj.get('keywords', [])
@@ -679,7 +679,7 @@ class BoilerplateService:
 
         repo_path = repo.get('path', '')
         name = repo.get('name', 'Unknown')
-        description = repo.get('description') or repo.get('github_description', '')
+        description = repo.get('description') or repo.get('forge_description', '')
         remote_url = repo.get('remote_url', '')
 
         proj = extract_project_metadata(repo_path) if repo_path else {}

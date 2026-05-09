@@ -12,7 +12,7 @@ These objects are immutable where possible and provide
 serialization methods for JSONL output.
 """
 
-from .repository import Repository, GitStatus, GitHubMetadata, PackageMetadata
+from .repository import Repository, GitStatus, ForgeMetadata, PackageMetadata
 from .tag import Tag, TagSource
 from .event import Event
 from .operation import (
@@ -36,7 +36,7 @@ from .audit import (
 __all__ = [
     'Repository',
     'GitStatus',
-    'GitHubMetadata',
+    'ForgeMetadata',
     'PackageMetadata',
     'Tag',
     'TagSource',

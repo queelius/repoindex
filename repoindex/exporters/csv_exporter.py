@@ -11,7 +11,7 @@ from . import Exporter
 
 DEFAULT_COLUMNS = [
     'name', 'path', 'language', 'branch', 'is_clean',
-    'remote_url', 'github_stars', 'license_key', 'description',
+    'remote_url', 'stars', 'license_key', 'description',
 ]
 
 

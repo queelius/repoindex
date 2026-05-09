@@ -22,7 +22,7 @@ def _repo_to_jsonld(repo: dict) -> dict:
     if url:
         obj["codeRepository"] = url
 
-    desc = repo.get('description') or repo.get('github_description')
+    desc = repo.get('description') or repo.get('forge_description')
     if desc:
         obj["description"] = desc
 
