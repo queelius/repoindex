@@ -7,6 +7,7 @@ Provides collection-level write operations:
 """
 
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Optional
@@ -24,7 +25,7 @@ from ..services.boilerplate_service import (
 )
 from ..services.flag_query import fetch_repos_by_flags
 from ..services.git_ops_service import GitOpsOptions, GitOpsService
-from ..services.github_ops_service import GitHubOpsOptions, GitHubOpsService
+from ..sources import GitForge, discover_sources
 
 # ============================================================================
 # Main ops command group
@@ -693,141 +694,6 @@ def _git_status_pretty(service: GitOpsService, repos: list, options: GitOpsOptio
 # ============================================================================
 # GitHub operations subgroup
 # ============================================================================
-
-@ops_cmd.group('github')
-def github_cmd():
-    """GitHub write operations across multiple repositories.
-
-    Set topics, descriptions, and other GitHub settings.
-    Requires the gh CLI to be installed and authenticated.
-
-    \b
-    Examples:
-        # Sync pyproject.toml keywords as GitHub topics
-        repoindex ops github set-topics --from-pyproject --language python --dry-run
-        # Set specific topics
-        repoindex ops github set-topics --topics python,cli,tools --dry-run
-        # Set description from pyproject.toml
-        repoindex ops github set-description --from-pyproject --dry-run
-    """
-    pass
-
-
-@github_cmd.command('set-topics')
-@click.argument('query_string', required=False, default='')
-@click.option('--json', 'output_json', is_flag=True, help='Output as JSONL')
-@click.option('--dry-run', is_flag=True, help='Preview without setting topics')
-@click.option('--topics', help='Comma-separated list of topics to set')
-@click.option('--from-pyproject', is_flag=True, help='Read keywords from pyproject.toml')
-@click.option('--debug', is_flag=True, help='Enable debug logging')
-@query_options
-def github_set_topics_handler(
-    query_string: str,
-    output_json: bool,
-    dry_run: bool,
-    topics: Optional[str],
-    from_pyproject: bool,
-    debug: bool,
-    # Query flags
-    language: Optional[str],
-    dirty: bool,
-    tag: tuple,
-    recent: Optional[str],
-):
-    """
-    Set GitHub topics for repositories.
-
-    Sets repository topics on GitHub. Topics can come from an explicit
-    list or be synced from pyproject.toml keywords.
-
-    \b
-    Examples:
-        # Sync from pyproject.toml keywords
-        repoindex ops github set-topics --from-pyproject --language python --dry-run
-        # Set specific topics for all repos
-        repoindex ops github set-topics --topics python,cli,tools --dry-run
-        # Combine: pyproject keywords + extra topics
-        repoindex ops github set-topics --from-pyproject --topics extra-topic --dry-run
-    """
-    if not topics and not from_pyproject:
-        click.echo("Error: specify --topics or --from-pyproject", err=True)
-        return
-
-    result = _resolve_repos(
-        output_json, debug, query_string,
-        language=language, dirty=dirty, tag=tag, recent=recent,
-    )
-    if result is None:
-        return
-    config, repos = result
-
-    topic_list = [t.strip() for t in topics.split(',')] if topics else None
-    options = GitHubOpsOptions(dry_run=dry_run)
-    service = GitHubOpsService(config=config)
-
-    progress_iter = service.set_topics(repos, options, topics=topic_list, from_pyproject=from_pyproject)
-    if output_json:
-        _ops_output_json(service, progress_iter, options)
-    else:
-        _ops_output_pretty(service, progress_iter, options, "Set GitHub Topics", len(repos))
-
-
-@github_cmd.command('set-description')
-@click.argument('query_string', required=False, default='')
-@click.option('--json', 'output_json', is_flag=True, help='Output as JSONL')
-@click.option('--dry-run', is_flag=True, help='Preview without setting description')
-@click.option('--text', help='Description text to set')
-@click.option('--from-pyproject', is_flag=True, help='Read description from pyproject.toml')
-@click.option('--debug', is_flag=True, help='Enable debug logging')
-@query_options
-def github_set_description_handler(
-    query_string: str,
-    output_json: bool,
-    dry_run: bool,
-    text: Optional[str],
-    from_pyproject: bool,
-    debug: bool,
-    # Query flags
-    language: Optional[str],
-    dirty: bool,
-    tag: tuple,
-    recent: Optional[str],
-):
-    """
-    Set GitHub description for repositories.
-
-    Sets the repository description on GitHub. Description can be
-    explicit text or synced from pyproject.toml.
-
-    \b
-    Examples:
-        # Sync from pyproject.toml
-        repoindex ops github set-description --from-pyproject --language python --dry-run
-        # Set explicit description
-        repoindex ops github set-description --text "My project" "name == 'my-repo'" --dry-run
-    """
-    if not text and not from_pyproject:
-        click.echo("Error: specify --text or --from-pyproject", err=True)
-        return
-
-    result = _resolve_repos(
-        output_json, debug, query_string,
-        language=language, dirty=dirty, tag=tag, recent=recent,
-    )
-    if result is None:
-        return
-    config, repos = result
-
-    options = GitHubOpsOptions(dry_run=dry_run)
-    service = GitHubOpsService(config=config)
-
-    progress_iter = service.set_description(repos, options, text=text, from_pyproject=from_pyproject)
-    if output_json:
-        _ops_output_json(service, progress_iter, options)
-    else:
-        _ops_output_pretty(service, progress_iter, options, "Set GitHub Description", len(repos))
-
-
 
 # ============================================================================
 # Helper functions
@@ -1623,64 +1489,6 @@ def generate_mkdocs_handler(
 # Generate gh-pages command
 # ============================================================================
 
-@generate_cmd.command('gh-pages')
-@click.argument('query_string', required=False, default='')
-@click.option('--json', 'output_json', is_flag=True, help='Output as JSONL')
-@click.option('--dry-run', is_flag=True, help='Preview without writing files')
-@click.option('--force', is_flag=True, help='Overwrite existing workflow files')
-@click.option('--debug', is_flag=True, help='Enable debug logging')
-@query_options
-def generate_gh_pages_handler(
-    query_string: str,
-    output_json: bool,
-    dry_run: bool,
-    force: bool,
-    debug: bool,
-    # Query flags
-    language: Optional[str],
-    dirty: bool,
-    tag: tuple,
-    recent: Optional[str],
-):
-    """
-    Generate GitHub Pages deployment workflow for repositories.
-
-    Creates .github/workflows/deploy-docs.yml for deploying
-    MkDocs sites to GitHub Pages via GitHub Actions.
-
-    \b
-    Examples:
-        # Generate for Python repos
-        repoindex ops generate gh-pages --language python --dry-run
-        # Force overwrite existing workflow
-        repoindex ops generate gh-pages --force --dry-run
-    """
-    result = _resolve_repos(
-        output_json, debug, query_string,
-        language=language, dirty=dirty, tag=tag, recent=recent,
-    )
-    if result is None:
-        return
-    config, repos = result
-
-    options = GenerationOptions(
-        dry_run=dry_run,
-        force=force,
-    )
-
-    service = BoilerplateService(config=config)
-    file_label = "deploy-docs.yml files"
-
-    progress_iter = service.generate_gh_pages_workflow(repos, options)
-    if output_json:
-        _ops_output_json(service, progress_iter, options)
-    else:
-        _ops_output_pretty(service, progress_iter, options,
-                           "Generate deploy-docs.yml", len(repos),
-                           success_label="Generated",
-                           success_msg="Generated {count} " + file_label)
-
-
 # ============================================================================
 # WIP Snapshot command
 # ============================================================================
@@ -2120,3 +1928,960 @@ def _wip_snapshot_output_pretty(snapshotted, skipped, failed, dry_run):
         f"\nSummary: {len(snapshotted)} snapshotted, {len(skipped)} skipped, {len(failed)} failed",
         err=True,
     )
+
+
+# ============================================================================
+# Cross-forge actions (Wave V2.C): ops set-topics / set-description /
+# set-archived / set-visibility / set-default-branch / set-pages
+#
+# Each command resolves the target repo's GitForge via forge_id and
+# dispatches to the matching source instance's write method. The shared
+# helpers below keep handler bodies short while preserving per-repo
+# exception isolation (the same pattern as wip-snapshot and mirror).
+# ============================================================================
+
+def _resolve_set_repos(
+    repo_name: Optional[str],
+    apply_all: bool,
+    output_json: bool,
+    debug: bool,
+    language: Optional[str],
+    dirty: bool,
+    tag: tuple,
+    recent: Optional[str],
+):
+    """Resolve repos for a set-* action.
+
+    Single-repo mode: positional ``repo_name`` selects exactly one repo
+    by ``repos.name`` (path uniqueness is irrelevant; we want the local
+    name the user typed). Bulk mode (``--all``) uses the filter flags.
+    Without either, the command errors out to prevent mass-mutation by
+    accident.
+
+    Returns ``(config, repos)`` or ``None`` after printing an error.
+    """
+    if debug:
+        import logging
+        logging.basicConfig(level=logging.DEBUG)
+
+    config = load_config()
+
+    if repo_name and apply_all:
+        msg = "REPO and --all are mutually exclusive"
+        if output_json:
+            print(json.dumps({"error": msg}), file=sys.stderr, flush=True)
+        else:
+            click.echo(f"Error: {msg}", err=True)
+        sys.exit(2)
+
+    if not repo_name and not apply_all:
+        msg = (
+            "specify a single REPO (with no --all) or --all "
+            "plus filter flags for bulk operation"
+        )
+        if output_json:
+            print(json.dumps({"error": msg}), file=sys.stderr, flush=True)
+        else:
+            click.echo(f"Error: {msg}", err=True)
+        sys.exit(2)
+
+    if repo_name:
+        # Look up by name. Single match preferred; ambiguity is a hard error.
+        from ..database.repository import get_repo_by_name
+        with Database(config=config, read_only=True) as db:
+            row = get_repo_by_name(db, repo_name)
+        if not row:
+            msg = f"repo not found: {repo_name}"
+            if output_json:
+                print(json.dumps({"error": msg}), file=sys.stderr, flush=True)
+            else:
+                click.echo(f"Error: {msg}", err=True)
+            sys.exit(1)
+        return config, [row]
+
+    # Bulk mode
+    repos = _get_repos_from_query(
+        config, '', debug=debug,
+        language=language, dirty=dirty, tag=tag, recent=recent,
+    )
+    if not repos:
+        _no_repos_message(output_json)
+        return None
+    return config, repos
+
+
+def _dispatch_set_action(
+    repos: list,
+    config: dict,
+    action_name: str,
+    invoke,
+    dry_run: bool,
+    output_json: bool,
+):
+    """Run a write action across ``repos`` with per-repo isolation.
+
+    Args:
+        repos: List of repo dicts (DB rows).
+        config: Loaded configuration.
+        action_name: Short label (``"set_topics"``, ``"set_pages"``, ...).
+        invoke: Callable ``(forge, repo) -> str`` that performs the API call
+            and returns a human-readable detail message. Should raise on
+            failure; ``NotImplementedError`` is treated as "skipped: forge
+            does not support this action".
+        dry_run: If True, no invocation is made; emits "would" rows.
+        output_json: Output format.
+    """
+    from ..services.forge_actions import lookup_repo_forge
+
+    results: list[dict] = []
+
+    for repo in repos:
+        name = repo.get('name', '')
+        path = repo.get('path', '')
+        forge_id = repo.get('forge_id')
+
+        if not forge_id:
+            results.append({
+                'status': 'skipped',
+                'repo': name,
+                'path': path,
+                'forge': None,
+                'detail': 'no forge_id (run repoindex refresh --external)',
+            })
+            continue
+
+        forge = lookup_repo_forge(repo, config)
+        if forge is None:
+            results.append({
+                'status': 'skipped',
+                'repo': name,
+                'path': path,
+                'forge': forge_id,
+                'detail': f'no GitForge source for forge_id={forge_id}',
+            })
+            continue
+
+        if dry_run:
+            results.append({
+                'status': 'dry-run',
+                'repo': name,
+                'path': path,
+                'forge': forge_id,
+                'detail': f'would invoke {action_name}',
+            })
+            continue
+
+        try:
+            detail = invoke(forge, repo)
+            results.append({
+                'status': 'ok',
+                'repo': name,
+                'path': path,
+                'forge': forge_id,
+                'detail': detail or action_name,
+            })
+        except NotImplementedError as e:
+            results.append({
+                'status': 'skipped',
+                'repo': name,
+                'path': path,
+                'forge': forge_id,
+                'detail': f'forge does not support {action_name}: {e}',
+            })
+        except Exception as e:
+            results.append({
+                'status': 'failed',
+                'repo': name,
+                'path': path,
+                'forge': forge_id,
+                'detail': f'{type(e).__name__}: {e}',
+            })
+
+    _set_action_output(results, action_name, dry_run, output_json)
+
+
+def _set_action_output(results, action_name, dry_run, output_json):
+    """Emit per-repo rows and a summary for a set-* dispatch."""
+    if output_json:
+        for r in results:
+            print(json.dumps(r), flush=True)
+        ok = sum(1 for r in results if r['status'] in ('ok', 'dry-run'))
+        skipped = sum(1 for r in results if r['status'] == 'skipped')
+        failed = sum(1 for r in results if r['status'] == 'failed')
+        print(json.dumps({
+            'summary': {
+                'action': action_name,
+                'ok': ok,
+                'skipped': skipped,
+                'failed': failed,
+                'dry_run': dry_run,
+            }
+        }), flush=True)
+        if failed:
+            sys.exit(1)
+        return
+
+    from rich.console import Console
+    from rich.table import Table
+
+    console = Console(stderr=True)
+    mode = "[bold yellow]DRY RUN[/bold yellow] " if dry_run else ""
+    console.print(f"\n{mode}[bold]{action_name}[/bold]")
+
+    if results:
+        table = Table(show_header=True, show_lines=False)
+        table.add_column("Repo", style="cyan")
+        table.add_column("Forge")
+        table.add_column("Status")
+        table.add_column("Detail", style="dim", overflow="fold")
+        style = {'ok': 'green', 'dry-run': 'yellow',
+                 'skipped': 'yellow', 'failed': 'red'}
+        for r in sorted(results, key=lambda x: x['repo']):
+            color = style.get(r['status'], 'white')
+            table.add_row(
+                r['repo'],
+                r.get('forge') or '-',
+                f"[{color}]{r['status']}[/{color}]",
+                r['detail'],
+            )
+        console.print(table)
+
+    ok = sum(1 for r in results if r['status'] in ('ok', 'dry-run'))
+    skipped = sum(1 for r in results if r['status'] == 'skipped')
+    failed = sum(1 for r in results if r['status'] == 'failed')
+    console.print(f"\nSummary: {ok} ok, {skipped} skipped, {failed} failed")
+    if failed:
+        sys.exit(1)
+
+
+@ops_cmd.command('set-topics')
+@click.argument('repo_name', required=False, metavar='REPO')
+@click.argument('topics', nargs=-1)
+@click.option('--all', 'apply_all', is_flag=True,
+              help='Apply to all repos matching filters (bulk mode)')
+@click.option('--dry-run', is_flag=True,
+              help='Preview without making API calls')
+@click.option('--json', 'output_json', is_flag=True, help='Output as JSONL')
+@click.option('--debug', is_flag=True, help='Enable debug logging')
+@query_options
+def set_topics_handler(
+    repo_name: Optional[str],
+    topics: tuple,
+    apply_all: bool,
+    dry_run: bool,
+    output_json: bool,
+    debug: bool,
+    language: Optional[str],
+    dirty: bool,
+    tag: tuple,
+    recent: Optional[str],
+):
+    """Set topics on a forge-hosted repo (cross-platform).
+
+    Dispatches to the GitForge claiming the repo's ``forge_id``. Topics
+    are passed as positional args after REPO; pass them once and the
+    forge replaces its full topic list.
+
+    \b
+    Examples:
+        # Single repo
+        repoindex ops set-topics myrepo python cli unix
+        # All Python repos (no REPO, all positionals are topics)
+        repoindex ops set-topics --all --language python python cli --dry-run
+    """
+    # In --all mode there's no REPO; what Click parsed as REPO is
+    # actually the first topic. Re-bind so the bulk path sees all topics.
+    if apply_all and repo_name:
+        topics = (repo_name, *topics)
+        repo_name = None
+
+    if not topics:
+        click.echo("Error: provide one or more topics after REPO", err=True)
+        sys.exit(2)
+
+    resolved = _resolve_set_repos(
+        repo_name, apply_all, output_json, debug,
+        language, dirty, tag, recent,
+    )
+    if resolved is None:
+        return
+    config, repos = resolved
+
+    topic_list = list(topics)
+
+    def invoke(forge, repo):
+        forge.set_topics(repo, topic_list, config)
+        return f"topics={','.join(topic_list)}"
+
+    _dispatch_set_action(
+        repos, config, 'set_topics', invoke, dry_run, output_json,
+    )
+
+
+@ops_cmd.command('set-description')
+@click.argument('repo_name', required=False, metavar='REPO')
+@click.argument('description', required=False)
+@click.option('--all', 'apply_all', is_flag=True,
+              help='Apply to all repos matching filters (bulk mode)')
+@click.option('--dry-run', is_flag=True,
+              help='Preview without making API calls')
+@click.option('--json', 'output_json', is_flag=True, help='Output as JSONL')
+@click.option('--debug', is_flag=True, help='Enable debug logging')
+@query_options
+def set_description_handler(
+    repo_name: Optional[str],
+    description: Optional[str],
+    apply_all: bool,
+    dry_run: bool,
+    output_json: bool,
+    debug: bool,
+    language: Optional[str],
+    dirty: bool,
+    tag: tuple,
+    recent: Optional[str],
+):
+    """Set the forge-side description on a repo.
+
+    \b
+    Examples:
+        # Single repo
+        repoindex ops set-description myrepo "A short description"
+        # Bulk (sets all matching repos to the same text)
+        repoindex ops set-description --all --language python "Python tools" --dry-run
+    """
+    # In --all mode the user omits REPO; the first positional is the
+    # description. Re-bind so the bulk path sees the right value.
+    if apply_all and repo_name and not description:
+        description = repo_name
+        repo_name = None
+
+    if not description:
+        click.echo("Error: provide DESCRIPTION text", err=True)
+        sys.exit(2)
+
+    resolved = _resolve_set_repos(
+        repo_name, apply_all, output_json, debug,
+        language, dirty, tag, recent,
+    )
+    if resolved is None:
+        return
+    config, repos = resolved
+
+    def invoke(forge, repo):
+        forge.set_description(repo, description, config)
+        return f"description set ({len(description)} chars)"
+
+    _dispatch_set_action(
+        repos, config, 'set_description', invoke, dry_run, output_json,
+    )
+
+
+@ops_cmd.command('set-archived')
+@click.argument('repo_name', required=False, metavar='REPO')
+@click.argument('value', required=False,
+                type=click.Choice(['true', 'false'], case_sensitive=False))
+@click.option('--all', 'apply_all', is_flag=True,
+              help='Apply to all repos matching filters (bulk mode)')
+@click.option('--dry-run', is_flag=True,
+              help='Preview without making API calls')
+@click.option('--json', 'output_json', is_flag=True, help='Output as JSONL')
+@click.option('--debug', is_flag=True, help='Enable debug logging')
+@query_options
+def set_archived_handler(
+    repo_name: Optional[str],
+    value: Optional[str],
+    apply_all: bool,
+    dry_run: bool,
+    output_json: bool,
+    debug: bool,
+    language: Optional[str],
+    dirty: bool,
+    tag: tuple,
+    recent: Optional[str],
+):
+    """Archive or unarchive a repo on its forge.
+
+    \b
+    Examples:
+        repoindex ops set-archived old-repo true
+        repoindex ops set-archived --all --tag work/legacy true --dry-run
+    """
+    # In --all mode REPO is omitted; what Click parsed as REPO is the
+    # boolean value. Re-bind.
+    if apply_all and repo_name and value is None:
+        if repo_name.lower() in ('true', 'false'):
+            value = repo_name
+            repo_name = None
+
+    if value is None:
+        click.echo("Error: provide a value of true or false", err=True)
+        sys.exit(2)
+
+    resolved = _resolve_set_repos(
+        repo_name, apply_all, output_json, debug,
+        language, dirty, tag, recent,
+    )
+    if resolved is None:
+        return
+    config, repos = resolved
+
+    archived = value.lower() == 'true'
+
+    def invoke(forge, repo):
+        forge.set_archived(repo, archived, config)
+        return f"archived={archived}"
+
+    _dispatch_set_action(
+        repos, config, 'set_archived', invoke, dry_run, output_json,
+    )
+
+
+@ops_cmd.command('set-visibility')
+@click.argument('repo_name', required=False, metavar='REPO')
+@click.argument('value', required=False,
+                type=click.Choice(['public', 'private'], case_sensitive=False))
+@click.option('--all', 'apply_all', is_flag=True,
+              help='Apply to all repos matching filters (bulk mode)')
+@click.option('--dry-run', is_flag=True,
+              help='Preview without making API calls')
+@click.option('--json', 'output_json', is_flag=True, help='Output as JSONL')
+@click.option('--debug', is_flag=True, help='Enable debug logging')
+@query_options
+def set_visibility_handler(
+    repo_name: Optional[str],
+    value: Optional[str],
+    apply_all: bool,
+    dry_run: bool,
+    output_json: bool,
+    debug: bool,
+    language: Optional[str],
+    dirty: bool,
+    tag: tuple,
+    recent: Optional[str],
+):
+    """Toggle public/private visibility on a forge.
+
+    \b
+    Examples:
+        repoindex ops set-visibility myrepo public
+        repoindex ops set-visibility --all --tag work/internal private --dry-run
+    """
+    if apply_all and repo_name and value is None:
+        if repo_name.lower() in ('public', 'private'):
+            value = repo_name
+            repo_name = None
+
+    if value is None:
+        click.echo("Error: provide a value of public or private", err=True)
+        sys.exit(2)
+
+    resolved = _resolve_set_repos(
+        repo_name, apply_all, output_json, debug,
+        language, dirty, tag, recent,
+    )
+    if resolved is None:
+        return
+    config, repos = resolved
+
+    public = value.lower() == 'public'
+
+    def invoke(forge, repo):
+        forge.set_visibility(repo, public, config)
+        return f"public={public}"
+
+    _dispatch_set_action(
+        repos, config, 'set_visibility', invoke, dry_run, output_json,
+    )
+
+
+@ops_cmd.command('set-default-branch')
+@click.argument('repo_name', required=False, metavar='REPO')
+@click.argument('branch', required=False)
+@click.option('--all', 'apply_all', is_flag=True,
+              help='Apply to all repos matching filters (bulk mode)')
+@click.option('--dry-run', is_flag=True,
+              help='Preview without making API calls')
+@click.option('--json', 'output_json', is_flag=True, help='Output as JSONL')
+@click.option('--debug', is_flag=True, help='Enable debug logging')
+@query_options
+def set_default_branch_handler(
+    repo_name: Optional[str],
+    branch: Optional[str],
+    apply_all: bool,
+    dry_run: bool,
+    output_json: bool,
+    debug: bool,
+    language: Optional[str],
+    dirty: bool,
+    tag: tuple,
+    recent: Optional[str],
+):
+    """Change the default branch on a forge.
+
+    \b
+    Examples:
+        repoindex ops set-default-branch myrepo main
+        repoindex ops set-default-branch --all main --dry-run
+    """
+    if apply_all and repo_name and not branch:
+        branch = repo_name
+        repo_name = None
+
+    if not branch:
+        click.echo("Error: provide the new branch name", err=True)
+        sys.exit(2)
+
+    resolved = _resolve_set_repos(
+        repo_name, apply_all, output_json, debug,
+        language, dirty, tag, recent,
+    )
+    if resolved is None:
+        return
+    config, repos = resolved
+
+    def invoke(forge, repo):
+        forge.set_default_branch(repo, branch, config)
+        return f"default_branch={branch}"
+
+    _dispatch_set_action(
+        repos, config, 'set_default_branch', invoke, dry_run, output_json,
+    )
+
+
+@ops_cmd.command('set-pages')
+@click.argument('repo_name', metavar='REPO')
+@click.option('--branch', required=True, help='Source branch for Pages')
+@click.option('--path', default='/', show_default=True,
+              help='Subdirectory inside the branch')
+@click.option('--dry-run', is_flag=True,
+              help='Preview without making API calls')
+@click.option('--json', 'output_json', is_flag=True, help='Output as JSONL')
+@click.option('--debug', is_flag=True, help='Enable debug logging')
+def set_pages_handler(
+    repo_name: str,
+    branch: str,
+    path: str,
+    dry_run: bool,
+    output_json: bool,
+    debug: bool,
+):
+    """Enable Pages on a forge-hosted repo (per-repo, no --all).
+
+    Pages source is forge-specific: GitHub supports POST/PUT
+    ``/repos/{owner}/{repo}/pages``. Gitea instances vary; the gitea
+    source surfaces a clean "not supported" error.
+
+    \b
+    Examples:
+        repoindex ops set-pages my-site --branch gh-pages --path /
+        repoindex ops set-pages docs-repo --branch main --path /docs
+    """
+    resolved = _resolve_set_repos(
+        repo_name, apply_all=False, output_json=output_json, debug=debug,
+        language=None, dirty=False, tag=(), recent=None,
+    )
+    if resolved is None:
+        return
+    config, repos = resolved
+
+    def invoke(forge, repo):
+        forge.enable_pages(repo, branch, path, config)
+        return f"pages enabled on {branch}:{path}"
+
+    _dispatch_set_action(
+        repos, config, 'set_pages', invoke, dry_run, output_json,
+    )
+
+
+# ============================================================================
+# ops sync (Wave V2.C): clone repos owned on enumerable forges that
+# aren't present locally.
+# ============================================================================
+
+@ops_cmd.command('sync')
+@click.option('--from', 'from_forges', multiple=True,
+              help='Sync from specific forge (repeatable, e.g. --from github)')
+@click.option('--all', 'all_forges', is_flag=True,
+              help='Sync from every enumerable forge')
+@click.option('--into', 'into_path', type=click.Path(),
+              help='Override clone destination root')
+@click.option('--dry-run', is_flag=True, help='Preview without cloning')
+@click.option('--include-archived', is_flag=True,
+              help='Include archived repos (skipped by default)')
+@click.option('--filter', 'name_filter', metavar='PATTERN',
+              help='Glob pattern on repo name (fnmatch)')
+@click.option('--json', 'output_json', is_flag=True, help='Output as JSONL')
+@click.option('--debug', is_flag=True, help='Enable debug logging')
+def sync_handler(
+    from_forges: tuple,
+    all_forges: bool,
+    into_path: Optional[str],
+    dry_run: bool,
+    include_archived: bool,
+    name_filter: Optional[str],
+    output_json: bool,
+    debug: bool,
+):
+    """Clone repos you own on configured forges that aren't present locally.
+
+    For each selected GitForge, enumerates the authenticated user's owned
+    repos. Skips repos already in the local DB (matched by normalized
+    ``remote_url``). Skips archived repos unless ``--include-archived``.
+    Optionally filters by repo name via ``--filter`` (fnmatch).
+
+    Destination resolution:
+        --into PATH                   {PATH}/{forge_id}/{repo_name}
+        forges.<id>.sync_into in config
+        default                       ~/github/imported/{forge_id}/{repo_name}
+
+    Use ``repoindex refresh`` afterwards to index the new clones.
+
+    \b
+    Examples:
+        # Preview what'd be cloned from every enumerable forge
+        repoindex ops sync --all --dry-run
+        # Sync only from GitHub, filtered by name
+        repoindex ops sync --from github --filter 'lib-*'
+        # Custom destination root
+        repoindex ops sync --all --into /mnt/extra/imports
+    """
+    import fnmatch
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    if debug:
+        import logging
+        logging.basicConfig(level=logging.DEBUG)
+
+    if from_forges and all_forges:
+        msg = "--from and --all are mutually exclusive"
+        if output_json:
+            print(json.dumps({"error": msg}), file=sys.stderr, flush=True)
+        else:
+            click.echo(f"Error: {msg}", err=True)
+        sys.exit(2)
+
+    if not from_forges and not all_forges:
+        msg = "specify --from <name> (repeatable) or --all"
+        if output_json:
+            print(json.dumps({"error": msg}), file=sys.stderr, flush=True)
+        else:
+            click.echo(f"Error: {msg}", err=True)
+        sys.exit(2)
+
+    config = load_config()
+
+    # Select forges
+    forges = [s for s in discover_sources() if isinstance(s, GitForge)]
+    if from_forges:
+        wanted = set(from_forges)
+        forges = [f for f in forges if f.source_id in wanted]
+        if not forges:
+            msg = (
+                f"no GitForge matches --from {list(from_forges)}; "
+                f"available: {[f.source_id for f in discover_sources() if isinstance(f, GitForge)]}"
+            )
+            if output_json:
+                print(json.dumps({"error": msg}), file=sys.stderr, flush=True)
+            else:
+                click.echo(f"Error: {msg}", err=True)
+            sys.exit(2)
+
+    # Load existing remote_urls for dedup
+    existing_urls = _load_existing_remote_urls(config)
+
+    # Enumerate
+    to_clone: list[dict] = []
+    enumerate_errors: list[dict] = []
+
+    for forge in forges:
+        try:
+            for remote in forge.enumerate_user_repos(config):
+                norm = _normalize_remote(remote.clone_url)
+                if norm in existing_urls:
+                    to_clone.append({
+                        'forge': forge.source_id,
+                        'name': remote.name,
+                        'clone_url': remote.clone_url,
+                        'status': 'already-have',
+                    })
+                    continue
+                if remote.is_archived and not include_archived:
+                    to_clone.append({
+                        'forge': forge.source_id,
+                        'name': remote.name,
+                        'clone_url': remote.clone_url,
+                        'status': 'skipped-archived',
+                    })
+                    continue
+                if name_filter and not fnmatch.fnmatch(remote.name, name_filter):
+                    to_clone.append({
+                        'forge': forge.source_id,
+                        'name': remote.name,
+                        'clone_url': remote.clone_url,
+                        'status': 'skipped-filter',
+                    })
+                    continue
+
+                dest = _resolve_sync_destination(
+                    forge.source_id, remote.name, into_path, config,
+                )
+                to_clone.append({
+                    'forge': forge.source_id,
+                    'name': remote.name,
+                    'clone_url': remote.clone_url,
+                    'status': 'pending',
+                    'destination': dest,
+                })
+        except NotImplementedError as e:
+            enumerate_errors.append({
+                'forge': forge.source_id,
+                'error': f'enumerate not supported: {e}',
+            })
+        except Exception as e:
+            enumerate_errors.append({
+                'forge': forge.source_id,
+                'error': f'{type(e).__name__}: {e}',
+            })
+
+    # Dry-run reporting before any clones
+    pending = [r for r in to_clone if r['status'] == 'pending']
+
+    if dry_run:
+        _sync_output(to_clone, enumerate_errors, dry_run=True,
+                     output_json=output_json)
+        return
+
+    # Clone the pending ones
+    if pending:
+        if not output_json:
+            click.echo(
+                f"Cloning {len(pending)} repo(s) from "
+                f"{len(forges)} forge(s)...", err=True,
+            )
+
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            futures = {
+                pool.submit(_clone_one, r['clone_url'], r['destination']): r
+                for r in pending
+            }
+            for future in as_completed(futures):
+                r = futures[future]
+                try:
+                    success, detail = future.result()
+                except Exception as e:
+                    success, detail = False, f'{type(e).__name__}: {e}'
+                r['status'] = 'cloned' if success else 'failed'
+                r['detail'] = detail
+
+    _sync_output(to_clone, enumerate_errors, dry_run=False,
+                 output_json=output_json)
+
+
+def _load_existing_remote_urls(config) -> set:
+    """Load and normalize ``remote_url`` columns from the repos table.
+
+    Returns a set of normalized URLs for dedup matching during sync. The
+    normalization collapses SSH and HTTPS variants of the same canonical
+    remote so we don't re-clone a repo that's already local under either
+    form.
+    """
+    urls: set = set()
+    with Database(config=config, read_only=True) as db:
+        db.execute("SELECT remote_url FROM repos WHERE remote_url IS NOT NULL")
+        for row in db.fetchall():
+            url = row['remote_url'] if isinstance(row, dict) else row[0]
+            if url:
+                urls.add(_normalize_remote(url))
+    return urls
+
+
+def _normalize_remote(url: str) -> str:
+    """Normalize a git remote URL for dedup matching.
+
+    Collapses SSH (``git@host:owner/repo.git``) and HTTPS
+    (``https://host/owner/repo.git``) to a single canonical form
+    ``host/owner/repo``. Strips trailing ``.git`` and trailing slashes.
+    """
+    if not url:
+        return ''
+    s = url.strip()
+
+    # https:// or ssh:// scheme
+    if s.startswith(('http://', 'https://', 'ssh://', 'git://')):
+        from urllib.parse import urlparse
+        try:
+            parsed = urlparse(s)
+            host = parsed.hostname or ''
+            path = parsed.path.lstrip('/')
+        except Exception:
+            return s.lower()
+    else:
+        # SSH form git@host:owner/repo[.git]
+        m = re.match(r'^(?:[^@]+@)?([^:/\s]+):(.+?)$', s)
+        if not m:
+            return s.lower()
+        host = m.group(1)
+        path = m.group(2)
+
+    # Strip .git and trailing slash
+    path = re.sub(r'\.git/?$', '', path).rstrip('/')
+    return f"{host.lower()}/{path}".lower()
+
+
+def _resolve_sync_destination(
+    forge_id: str,
+    repo_name: str,
+    into_path: Optional[str],
+    config: dict,
+) -> str:
+    """Compute the local clone destination for a sync target.
+
+    Precedence:
+        1. ``--into PATH`` (CLI override): ``PATH/forge_id/repo_name``.
+        2. ``forges.<forge_id>.sync_into`` in config: appended with repo_name.
+        3. Default: ``~/github/imported/<forge_id>/<repo_name>``.
+    """
+    if into_path:
+        return str(Path(into_path).expanduser() / forge_id / repo_name)
+
+    forges_config = (config or {}).get('forges') or {}
+    entry = None
+    if isinstance(forges_config, dict):
+        entry = forges_config.get(forge_id)
+    elif isinstance(forges_config, list):
+        for e in forges_config:
+            if isinstance(e, dict) and e.get('source_id') == forge_id:
+                entry = e
+                break
+            if isinstance(e, dict) and e.get('name') == forge_id:
+                entry = e
+                break
+    sync_into = entry.get('sync_into') if isinstance(entry, dict) else None
+    if sync_into:
+        return str(Path(sync_into).expanduser() / repo_name)
+
+    return str(Path('~/github/imported').expanduser() / forge_id / repo_name)
+
+
+def _clone_one(clone_url: str, destination: str) -> tuple[bool, str]:
+    """Clone ``clone_url`` into ``destination`` with a 5-minute timeout."""
+    import subprocess
+    dest_path = Path(destination).expanduser()
+    if dest_path.exists():
+        return False, f'destination already exists: {dest_path}'
+    dest_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        proc = subprocess.run(
+            ['git', 'clone', clone_url, str(dest_path)],
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+    except subprocess.TimeoutExpired:
+        return False, 'git clone timed out (>5min)'
+    except FileNotFoundError:
+        return False, 'git executable not found'
+    if proc.returncode != 0:
+        err = (proc.stderr or proc.stdout or '').strip().splitlines()
+        return False, err[-1] if err else f'git clone exited {proc.returncode}'
+    return True, str(dest_path)
+
+
+def _sync_output(results, enumerate_errors, dry_run, output_json):
+    """Emit per-repo rows, enumeration errors, and a summary for ops sync."""
+    if output_json:
+        for r in results:
+            print(json.dumps(r), flush=True)
+        for e in enumerate_errors:
+            print(json.dumps({'status': 'forge-error', **e}), flush=True)
+        pending = sum(1 for r in results if r['status'] == 'pending')
+        cloned = sum(1 for r in results if r['status'] == 'cloned')
+        failed = sum(1 for r in results if r['status'] == 'failed')
+        already = sum(1 for r in results if r['status'] == 'already-have')
+        skipped = sum(
+            1 for r in results
+            if r['status'] in ('skipped-archived', 'skipped-filter')
+        )
+        print(json.dumps({
+            'summary': {
+                'pending': pending,
+                'cloned': cloned,
+                'failed': failed,
+                'already_have': already,
+                'skipped': skipped,
+                'forge_errors': len(enumerate_errors),
+                'dry_run': dry_run,
+            },
+        }), flush=True)
+        if not dry_run and (cloned > 0):
+            print(json.dumps({
+                'hint': 'run "repoindex refresh" to index newly cloned repos',
+            }), flush=True)
+        if failed:
+            sys.exit(1)
+        return
+
+    from rich.console import Console
+    from rich.table import Table
+
+    console = Console(stderr=True)
+    mode = "[bold yellow]DRY RUN[/bold yellow] " if dry_run else ""
+    console.print(f"\n{mode}[bold]Sync[/bold]")
+
+    if enumerate_errors:
+        console.print("\n[red]Forge enumeration errors:[/red]")
+        for e in enumerate_errors:
+            console.print(f"  [red]{e['forge']}[/red]: {e['error']}")
+
+    if results:
+        table = Table(show_header=True, show_lines=False)
+        table.add_column("Forge", style="cyan")
+        table.add_column("Repo")
+        table.add_column("Status")
+        table.add_column("Detail", style="dim", overflow="fold")
+        style = {
+            'pending': 'yellow',
+            'cloned': 'green',
+            'failed': 'red',
+            'already-have': 'dim',
+            'skipped-archived': 'yellow',
+            'skipped-filter': 'yellow',
+        }
+        for r in sorted(results, key=lambda x: (x['forge'], x['name'])):
+            color = style.get(r['status'], 'white')
+            detail = r.get('detail') or r.get('destination') or r['clone_url']
+            table.add_row(
+                r['forge'], r['name'],
+                f"[{color}]{r['status']}[/{color}]",
+                detail,
+            )
+        console.print(table)
+
+    pending = sum(1 for r in results if r['status'] == 'pending')
+    cloned = sum(1 for r in results if r['status'] == 'cloned')
+    failed = sum(1 for r in results if r['status'] == 'failed')
+    already = sum(1 for r in results if r['status'] == 'already-have')
+    skipped = sum(
+        1 for r in results
+        if r['status'] in ('skipped-archived', 'skipped-filter')
+    )
+
+    if dry_run:
+        console.print(
+            f"\nSummary: {pending} would-clone, {already} already-have, "
+            f"{skipped} skipped, {len(enumerate_errors)} forge errors"
+        )
+    else:
+        console.print(
+            f"\nSummary: {cloned} cloned, {failed} failed, "
+            f"{already} already-have, {skipped} skipped, "
+            f"{len(enumerate_errors)} forge errors"
+        )
+        if cloned > 0:
+            console.print(
+                "\n[dim]Hint: run [cyan]repoindex refresh[/cyan] to index "
+                "the new clones.[/dim]"
+            )
+
+    if failed:
+        sys.exit(1)

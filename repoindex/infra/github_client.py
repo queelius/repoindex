@@ -13,7 +13,7 @@ import os
 import time
 import logging
 from dataclasses import dataclass
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
@@ -410,3 +410,196 @@ class GitHubClient:
             Pages info dict or None if not enabled
         """
         return self._api(f"repos/{owner}/{name}/pages")
+
+    # ------------------------------------------------------------------
+    # Write API (Wave V2.C)
+    # ------------------------------------------------------------------
+
+    def _request(
+        self,
+        method: str,
+        endpoint: str,
+        payload: Optional[Dict[str, Any]] = None,
+    ) -> Tuple[int, Optional[Dict[str, Any]]]:
+        """Issue an authenticated HTTP request and return (status, json).
+
+        Uses requests directly (not the gh CLI) to keep the JSON body path
+        uniform across PATCH/PUT/POST. Status code is always returned even
+        on non-2xx so callers can surface forge error messages cleanly.
+        """
+        try:
+            import requests
+        except ImportError:
+            logger.warning("requests library not available for GitHub API")
+            return 0, None
+
+        url = f"https://api.github.com/{endpoint.lstrip('/')}"
+        headers = {
+            'Accept': 'application/vnd.github+json',
+            'X-GitHub-Api-Version': '2022-11-28',
+            'User-Agent': 'repoindex',
+        }
+        if self.token:
+            headers['Authorization'] = f'token {self.token}'
+
+        try:
+            response = requests.request(
+                method,
+                url,
+                headers=headers,
+                json=payload,
+                timeout=30,
+            )
+        except requests.RequestException as e:
+            logger.warning("GitHub API %s %s failed: %s", method, endpoint, e)
+            return 0, None
+
+        self._update_rate_limit_from_headers(response.headers)
+
+        body: Optional[Dict[str, Any]]
+        try:
+            body = response.json() if response.text else None
+        except ValueError:
+            body = None
+        return response.status_code, body
+
+    def set_repo_field(
+        self,
+        owner: str,
+        name: str,
+        field: str,
+        value: Any,
+    ) -> Tuple[bool, Optional[str]]:
+        """PATCH /repos/{owner}/{name} with a single field.
+
+        Returns (ok, error_message). On success, error_message is None.
+        """
+        status, body = self._request(
+            'PATCH', f"repos/{owner}/{name}", {field: value}
+        )
+        if 200 <= status < 300:
+            return True, None
+        msg = (body or {}).get('message') if isinstance(body, dict) else None
+        return False, msg or f"HTTP {status}"
+
+    def replace_topics(
+        self,
+        owner: str,
+        name: str,
+        topics: List[str],
+    ) -> Tuple[bool, Optional[str]]:
+        """PUT /repos/{owner}/{name}/topics with the full topic list."""
+        status, body = self._request(
+            'PUT', f"repos/{owner}/{name}/topics", {'names': topics}
+        )
+        if 200 <= status < 300:
+            return True, None
+        msg = (body or {}).get('message') if isinstance(body, dict) else None
+        return False, msg or f"HTTP {status}"
+
+    def create_pages_site(
+        self,
+        owner: str,
+        name: str,
+        branch: str,
+        path: str = '/',
+    ) -> Tuple[bool, Optional[str]]:
+        """POST /repos/{owner}/{name}/pages to enable Pages on a branch.
+
+        If Pages is already enabled, fall back to PUT to update the source.
+        """
+        payload = {'source': {'branch': branch, 'path': path}}
+        status, body = self._request(
+            'POST', f"repos/{owner}/{name}/pages", payload
+        )
+        if 200 <= status < 300:
+            return True, None
+        # 409 Conflict means Pages already configured; update via PUT instead.
+        if status == 409:
+            status, body = self._request(
+                'PUT', f"repos/{owner}/{name}/pages", payload
+            )
+            if 200 <= status < 300:
+                return True, None
+        msg = (body or {}).get('message') if isinstance(body, dict) else None
+        return False, msg or f"HTTP {status}"
+
+    def iter_user_repos(
+        self,
+        owner: Optional[str] = None,
+        per_page: int = 100,
+    ) -> List[Dict[str, Any]]:
+        """GET /user/repos paginated. Returns the raw API dicts.
+
+        Args:
+            owner: If set, filter to repos whose ``owner.login`` matches.
+                (The /user/repos endpoint returns collaborator repos too.)
+            per_page: Page size (max 100).
+        """
+        try:
+            import requests
+        except ImportError:
+            logger.warning("requests library not available for GitHub API")
+            return []
+
+        url: Optional[str] = (
+            f"https://api.github.com/user/repos?per_page={per_page}&affiliation=owner"
+        )
+        headers = {
+            'Accept': 'application/vnd.github+json',
+            'X-GitHub-Api-Version': '2022-11-28',
+            'User-Agent': 'repoindex',
+        }
+        if self.token:
+            headers['Authorization'] = f'token {self.token}'
+
+        out: List[Dict[str, Any]] = []
+        while url:
+            try:
+                resp = requests.get(url, headers=headers, timeout=30)
+            except requests.RequestException as e:
+                logger.warning("GitHub /user/repos failed: %s", e)
+                break
+
+            self._update_rate_limit_from_headers(resp.headers)
+            if resp.status_code != 200:
+                logger.warning(
+                    "GitHub /user/repos returned %d: %s",
+                    resp.status_code, resp.text[:200],
+                )
+                break
+
+            try:
+                page = resp.json()
+            except ValueError:
+                break
+
+            if isinstance(page, list):
+                for repo in page:
+                    if not isinstance(repo, dict):
+                        continue
+                    if owner:
+                        login = (repo.get('owner') or {}).get('login')
+                        if login != owner:
+                            continue
+                    out.append(repo)
+
+            # Follow Link rel="next"
+            url = _parse_next_link(resp.headers.get('Link'))
+
+        return out
+
+
+def _parse_next_link(link_header: Optional[str]) -> Optional[str]:
+    """Extract the next-page URL from a GitHub Link header."""
+    if not link_header:
+        return None
+    for chunk in link_header.split(','):
+        parts = chunk.strip().split(';')
+        if len(parts) < 2:
+            continue
+        url_part = parts[0].strip()
+        rel_part = ';'.join(parts[1:]).strip()
+        if 'rel="next"' in rel_part and url_part.startswith('<') and url_part.endswith('>'):
+            return url_part[1:-1]
+    return None

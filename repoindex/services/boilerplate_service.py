@@ -2,9 +2,9 @@
 Boilerplate file generator service for repoindex.
 
 Generates boilerplate files: LICENSE, codemeta.json, CITATION.cff,
-.zenodo.json, mkdocs.yml, deploy-docs.yml, .gitignore,
-CODE_OF_CONDUCT.md, and CONTRIBUTING.md for repositories.
-Used by the `repoindex ops generate` command group.
+.zenodo.json, mkdocs.yml, .gitignore, CODE_OF_CONDUCT.md, and
+CONTRIBUTING.md for repositories. Used by the
+``repoindex ops generate`` command group.
 """
 
 import json
@@ -745,73 +745,6 @@ class BoilerplateService:
         mkdocs['nav'] = nav
 
         return yaml.dump(mkdocs, default_flow_style=False, sort_keys=False, allow_unicode=True)
-
-    # ========================================================================
-    # GitHub Pages workflow generation
-    # ========================================================================
-
-    def generate_gh_pages_workflow(
-        self,
-        repos: List[Dict[str, Any]],
-        options: GenerationOptions
-    ) -> Generator[str, None, OperationSummary]:
-        """
-        Generate .github/workflows/deploy-docs.yml for repositories.
-
-        Scaffolds a GitHub Actions workflow for deploying MkDocs to GitHub Pages.
-
-        Yields:
-            Progress messages
-
-        Returns:
-            OperationSummary with results
-        """
-        return (yield from self._generate_files(
-            repos, options,
-            operation_name="generate_gh_pages",
-            filename=".github/workflows/deploy-docs.yml",
-            file_type="gh_pages_workflow",
-            display_name="deploy-docs.yml",
-            content_fn=lambda repo, name: self._generate_gh_pages_content(),
-        ))
-
-    def _generate_gh_pages_content(self) -> str:
-        """Generate GitHub Actions workflow for MkDocs deployment."""
-        return """name: Deploy docs
-
-on:
-  push:
-    branches: [main, master]
-  workflow_dispatch:
-
-permissions:
-  contents: read
-  pages: write
-  id-token: write
-
-concurrency:
-  group: "pages"
-  cancel-in-progress: false
-
-jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.x'
-      - run: pip install mkdocs-material
-      - run: mkdocs build
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: site
-      - id: deployment
-        uses: actions/deploy-pages@v4
-"""
 
     def generate_license(
         self,

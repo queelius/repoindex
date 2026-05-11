@@ -6,7 +6,6 @@ Tests cover:
 - BoilerplateService.generate_citation_cff()
 - BoilerplateService.generate_zenodo_json()
 - BoilerplateService.generate_mkdocs()
-- BoilerplateService.generate_gh_pages_workflow()
 """
 
 import json
@@ -389,78 +388,7 @@ class TestGenerateMkdocs:
 
 
 # ============================================================================
-# GitHub Pages Workflow Tests
+# (TestGenerateGhPages was removed in Wave V2.C; the gh-pages generator was
+# replaced by the cross-forge ``ops set-pages`` command which calls the
+# forge's Pages API directly. See tests/test_commands/test_set_actions.py.)
 # ============================================================================
-
-class TestGenerateGhPages:
-    """Test BoilerplateService.generate_gh_pages_workflow()."""
-
-    def _make_repo(self, tmp_path, name='myproject'):
-        return {
-            'name': name,
-            'path': str(tmp_path),
-            'remote_url': 'https://github.com/user/myproject.git',
-        }
-
-    def test_generates_workflow(self, tmp_path):
-        repo = self._make_repo(tmp_path)
-        service = BoilerplateService(config={})
-        options = GenerationOptions(dry_run=False)
-
-        messages = list(service.generate_gh_pages_workflow([repo], options))
-        result = service.last_result
-        assert result.successful == 1
-
-        workflow_path = tmp_path / '.github' / 'workflows' / 'deploy-docs.yml'
-        assert workflow_path.exists()
-        content = workflow_path.read_text()
-        assert 'mkdocs build' in content
-        assert 'deploy-pages' in content
-
-    def test_creates_directories(self, tmp_path):
-        """Should create .github/workflows/ directories if they don't exist."""
-        repo = self._make_repo(tmp_path)
-        service = BoilerplateService(config={})
-        options = GenerationOptions(dry_run=False)
-
-        messages = list(service.generate_gh_pages_workflow([repo], options))
-        assert (tmp_path / '.github' / 'workflows').is_dir()
-
-    def test_dry_run(self, tmp_path):
-        repo = self._make_repo(tmp_path)
-        service = BoilerplateService(config={})
-        options = GenerationOptions(dry_run=True)
-
-        messages = list(service.generate_gh_pages_workflow([repo], options))
-        result = service.last_result
-        assert result.total == 1
-        assert result.details[0].status == OperationStatus.DRY_RUN
-        # File should NOT be created in dry-run
-        assert not (tmp_path / '.github' / 'workflows' / 'deploy-docs.yml').exists()
-
-    def test_skips_existing(self, tmp_path):
-        workflow_dir = tmp_path / '.github' / 'workflows'
-        workflow_dir.mkdir(parents=True)
-        (workflow_dir / 'deploy-docs.yml').write_text('existing workflow')
-
-        repo = self._make_repo(tmp_path)
-        service = BoilerplateService(config={})
-        options = GenerationOptions(dry_run=False, force=False)
-
-        messages = list(service.generate_gh_pages_workflow([repo], options))
-        result = service.last_result
-        assert result.skipped == 1
-
-    def test_workflow_content(self, tmp_path):
-        """Verify workflow has correct triggers and steps."""
-        repo = self._make_repo(tmp_path)
-        service = BoilerplateService(config={})
-        options = GenerationOptions(dry_run=False)
-
-        messages = list(service.generate_gh_pages_workflow([repo], options))
-        content = (tmp_path / '.github' / 'workflows' / 'deploy-docs.yml').read_text()
-        # Should trigger on push to main/master
-        assert 'main' in content
-        assert 'master' in content
-        # Should install mkdocs-material
-        assert 'mkdocs-material' in content

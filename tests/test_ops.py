@@ -866,16 +866,22 @@ class TestOpsCommands:
         assert 'citation' in commands
         assert 'zenodo' in commands
         assert 'mkdocs' in commands
-        assert 'gh-pages' in commands
+        # gh-pages removed in Wave V2.C; use ops set-pages instead
+        assert 'gh-pages' not in commands
 
-    def test_github_subgroup_exists(self):
-        """Test that github subgroup exists."""
-        from repoindex.commands.ops import github_cmd
-        assert github_cmd is not None
-
-        commands = list(github_cmd.commands.keys())
+    def test_set_action_commands_exist(self):
+        """Wave V2.C: ops gains set-topics/description/archived/visibility/default-branch/pages."""
+        from repoindex.commands.ops import ops_cmd
+        commands = list(ops_cmd.commands.keys())
         assert 'set-topics' in commands
         assert 'set-description' in commands
+        assert 'set-archived' in commands
+        assert 'set-visibility' in commands
+        assert 'set-default-branch' in commands
+        assert 'set-pages' in commands
+        assert 'sync' in commands
+        # Old github subgroup removed
+        assert 'github' not in commands
 
     def test_audit_command_exists(self):
         """Test that audit command exists."""
@@ -1624,189 +1630,6 @@ name = "nav-repo"
         assert 'Home' in nav_titles
         assert 'Api Reference' in nav_titles
         assert 'Getting Started' in nav_titles
-
-
-# ============================================================================
-# GitHub Pages Workflow Generation Tests
-# ============================================================================
-
-class TestGhPagesGeneration:
-    """Tests for deploy-docs.yml workflow generation."""
-
-    def test_generates_workflow(self, tmp_path):
-        """Test that deploy-docs.yml is created in .github/workflows/."""
-        repo_path = tmp_path / 'gh-pages-repo'
-        repo_path.mkdir()
-
-        repos = [{'path': str(repo_path), 'name': 'gh-pages-repo', 'remote_url': ''}]
-        service = BoilerplateService(config={})
-        options = GenerationOptions()
-
-        list(service.generate_gh_pages_workflow(repos, options))
-        result = service.last_result
-
-        assert result.successful == 1
-        workflow_path = repo_path / '.github' / 'workflows' / 'deploy-docs.yml'
-        assert workflow_path.exists()
-        content = workflow_path.read_text()
-        assert 'mkdocs build' in content
-        assert 'actions/deploy-pages' in content
-        assert 'github-pages' in content
-
-
-# ============================================================================
-# GitHub Operations Service Tests
-# ============================================================================
-
-class TestGitHubOpsService:
-    """Tests for GitHubOpsService."""
-
-    @pytest.fixture
-    def sample_repos(self, tmp_path):
-        """Create repos with GitHub remotes and pyproject.toml."""
-        repos = []
-        for name in ['gh-repo-a', 'gh-repo-b']:
-            repo_path = tmp_path / name
-            repo_path.mkdir()
-            (repo_path / 'pyproject.toml').write_text(f'''
-[project]
-name = "{name}"
-description = "Description for {name}"
-keywords = ["python", "tool"]
-''')
-            repos.append({
-                'path': str(repo_path),
-                'name': name,
-                'remote_url': f'https://github.com/user/{name}',
-            })
-        return repos
-
-    def test_get_repo_nwo_https(self):
-        """Test NWO extraction from HTTPS URL."""
-        from repoindex.services.github_ops_service import GitHubOpsService
-        service = GitHubOpsService(config={})
-        repo = {'remote_url': 'https://github.com/user/repo.git'}
-        assert service._get_repo_nwo(repo) == 'user/repo'
-
-    def test_get_repo_nwo_ssh(self):
-        """Test NWO extraction from SSH URL."""
-        from repoindex.services.github_ops_service import GitHubOpsService
-        service = GitHubOpsService(config={})
-        repo = {'remote_url': 'git@github.com:user/repo.git'}
-        assert service._get_repo_nwo(repo) == 'user/repo'
-
-    def test_get_repo_nwo_no_remote(self):
-        """Test NWO extraction with no remote."""
-        from repoindex.services.github_ops_service import GitHubOpsService
-        service = GitHubOpsService(config={})
-        repo = {'remote_url': ''}
-        assert service._get_repo_nwo(repo) is None
-
-    def test_set_topics_dry_run(self, sample_repos):
-        """Test set_topics in dry run mode."""
-        from repoindex.services.github_ops_service import GitHubOpsService, GitHubOpsOptions
-        service = GitHubOpsService(config={})
-        options = GitHubOpsOptions(dry_run=True)
-
-        messages = list(service.set_topics(
-            sample_repos, options, topics=['python', 'cli'],
-        ))
-        result = service.last_result
-
-        assert result.successful == 2
-        assert result.dry_run is True
-
-    def test_set_topics_from_pyproject_dry_run(self, sample_repos):
-        """Test syncing topics from pyproject.toml keywords."""
-        from repoindex.services.github_ops_service import GitHubOpsService, GitHubOpsOptions
-        service = GitHubOpsService(config={})
-        options = GitHubOpsOptions(dry_run=True)
-
-        messages = list(service.set_topics(
-            sample_repos, options, from_pyproject=True,
-        ))
-        result = service.last_result
-
-        assert result.successful == 2
-        # Check that topics were read from pyproject.toml
-        for detail in result.details:
-            topics = detail.metadata.get('topics', [])
-            assert 'python' in topics
-            assert 'tool' in topics
-
-    def test_set_topics_skips_no_remote(self):
-        """Test that repos without GitHub remote are skipped."""
-        from repoindex.services.github_ops_service import GitHubOpsService, GitHubOpsOptions
-        service = GitHubOpsService(config={})
-        options = GitHubOpsOptions(dry_run=True)
-
-        repos = [{'path': '/tmp/test', 'name': 'no-remote', 'remote_url': ''}]
-        messages = list(service.set_topics(repos, options, topics=['test']))
-        result = service.last_result
-
-        assert result.skipped == 1
-
-    @patch('repoindex.services.github_ops_service.subprocess.run')
-    def test_set_topics_actual_call(self, mock_run, sample_repos):
-        """Test that actual gh CLI call is made correctly."""
-        from repoindex.services.github_ops_service import GitHubOpsService, GitHubOpsOptions
-        mock_run.return_value = MagicMock(returncode=0, stderr='')
-
-        service = GitHubOpsService(config={})
-        options = GitHubOpsOptions(dry_run=False)
-
-        messages = list(service.set_topics(
-            sample_repos[:1], options, topics=['python', 'cli'],
-        ))
-        result = service.last_result
-
-        assert result.successful == 1
-        mock_run.assert_called_once()
-        call_args = mock_run.call_args[0][0]
-        assert 'gh' in call_args
-        assert '--add-topic' in call_args
-        assert 'python' in call_args
-
-    def test_set_description_dry_run(self, sample_repos):
-        """Test set_description in dry run mode."""
-        from repoindex.services.github_ops_service import GitHubOpsService, GitHubOpsOptions
-        service = GitHubOpsService(config={})
-        options = GitHubOpsOptions(dry_run=True)
-
-        messages = list(service.set_description(
-            sample_repos, options, text='New description',
-        ))
-        result = service.last_result
-
-        assert result.successful == 2
-
-    def test_set_description_from_pyproject_dry_run(self, sample_repos):
-        """Test syncing description from pyproject.toml."""
-        from repoindex.services.github_ops_service import GitHubOpsService, GitHubOpsOptions
-        service = GitHubOpsService(config={})
-        options = GitHubOpsOptions(dry_run=True)
-
-        messages = list(service.set_description(
-            sample_repos, options, from_pyproject=True,
-        ))
-        result = service.last_result
-
-        assert result.successful == 2
-
-    def test_set_description_truncates_long_text(self, sample_repos):
-        """Test that long descriptions are truncated to 350 chars."""
-        from repoindex.services.github_ops_service import GitHubOpsService, GitHubOpsOptions
-        service = GitHubOpsService(config={})
-        options = GitHubOpsOptions(dry_run=True)
-
-        long_desc = 'x' * 500
-        messages = list(service.set_description(
-            sample_repos[:1], options, text=long_desc,
-        ))
-        result = service.last_result
-
-        detail = result.details[0]
-        assert len(detail.metadata['description']) <= 350
 
 
 # ============================================================================
