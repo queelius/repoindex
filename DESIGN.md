@@ -2,12 +2,12 @@
 
 > **The filesystem is where your work lives. repoindex is where your work becomes legible.**
 
-**Version**: 1.0 (design). Last refreshed 2026-04-24 for the v1.0 cut.
+**Version**: 2.0 (design). Refreshed 2026-05-11 for the v2.0 cut.
 
 This document describes what repoindex is, why its pieces fit together the way
 they do, and where to extend it. For the operational surface (commands,
 flags, tables, configuration), see `CLAUDE.md`. For the backward-compatibility
-contract at v1.0, see `STABILITY.md`.
+contract at v2.0, see `STABILITY.md`.
 
 ---
 
@@ -64,10 +64,13 @@ through the rest of the design:
    stale. They are allowed to disagree with local reality, and when they do,
    local wins.
 
-2. **Platform fields are namespaced.** `stars` is not a field on a repo.
-   `github_stars` is. `version` is not a field. `pypi_version` and
-   `cran_version` and `citation_version` are. Provenance is visible at the
-   column level so it cannot be forgotten.
+2. **Forge metadata is unified, with provenance carried in `forge_id`.**
+   A repo has one `stars` column, one `topics` column, one `is_archived`
+   flag, populated by whichever GitForge owns its `remote_url`. Provenance
+   is carried in `forge_id` (and `forge_host` for self-hosted instances).
+   Registry-side fields stay namespaced: `pypi_version`, `cran_version`,
+   `citation_version`, because a single repo can publish to many registries
+   simultaneously while it can only live on one canonical forge.
 
 3. **No deduplication by remote.** Two paths are two repos. If the user
    wants them merged, they can write a SQL `GROUP BY remote_url`.
@@ -158,10 +161,11 @@ formatting is what the user wants).
 repoindex uses a CQRS pattern. One command writes; all the others read.
 
 - `refresh` is the writer. It walks the configured `repository_directories`,
-  updates every repo's row, runs each enabled `MetadataSource` in parallel,
-  scans events out of the reflog and working tree, and populates the
-  `publications` and `scan_errors` and `refresh_log` tables. It is the
-  expensive operation, and it is the only one that costs real time.
+  updates every repo's row, resolves each repo's `forge_id` from its remote
+  URL, runs each enabled `Source` in parallel, scans events out of the
+  reflog and working tree, and populates the `publications`, `scan_errors`,
+  and `refresh_log` tables. It is the expensive operation, and it is the
+  only one that costs real time.
 - Every other command reads from the database only. `status`, `show`,
   `events`, `digest`, `export`, `copy`, `link`, `ops audit`, and the MCP
   server's `run_sql`, `get_manifest`, `get_schema`, `export`, `tag` tools
@@ -192,39 +196,77 @@ user whether their data is fresh.
 
 ## 5. Extension Points
 
-There are two places where repoindex is designed to be extended by users.
-Both discover Python modules from fixed directories at import time.
+There are two extension points: `Source` (read-side enrichment, plus
+write actions on git forges) and `Exporter` (write-side rendering). Both
+discover Python modules from fixed directories at import time.
 
-### MetadataSource (read-side enrichment)
+### The Source hierarchy
 
-`repoindex/sources/__init__.py` defines a single abstract base class,
-`MetadataSource`, with two concrete methods:
+`repoindex/sources/__init__.py` defines a three-level type tree:
+
+```
+Source                              abstract base; declares detect() and fetch()
+├── LocalScanner                    no network, no auth; output to repos table
+└── RemoteSource                    network-backed, has auth
+    ├── GitForge                    hosts the git repo; output to repos table
+    └── Registry                    publishes packaged artifacts; output to publications
+```
+
+Every concrete source overrides two methods:
 
 - `detect(repo_path, repo_record)` returns True if the source applies to
-  this repo.
-- `fetch(repo_path, repo_record, config)` returns a dict of metadata.
+  this repo. (For batch sources, this returns True unconditionally; the
+  actual matching happens inside `fetch`.)
+- `fetch(repo_path, repo_record, config)` returns a dict of metadata, or
+  `None` when there is nothing to contribute.
 
-Each source declares a `target`: either `"repos"` (merge fields into the
-repos table as namespaced columns, for platform enrichment like GitHub, or
-local file parsing like CITATION.cff) or `"publications"` (upsert into the
-publications table for registry discovery like PyPI, CRAN, npm, Cargo,
-Zenodo). Sources may also declare `batch = True`, which causes a one-shot
-`prefetch(config)` to run before per-repo iteration (Zenodo's ORCID search
-uses this).
+Where the data lands is determined by the subclass, not by a discriminator
+field. `LocalScanner` and `GitForge` populate the `repos` table; `Registry`
+populates the `publications` table. The refresh dispatcher uses `isinstance`
+to route the dict to the right writer.
 
-Built-in sources live in `repoindex/sources/`:
+Built-in sources live in three subdirectories:
 
-- target=repos: `citation_cff`, `keywords`, `local_assets`, `gitea`, `github`
-- target=publications: `pypi`, `cran`, `zenodo`, `npm`, `cargo`, `conda`,
-  `docker`, `rubygems`, `go`
+- `sources/scanners/`: `citation_cff`, `keywords`, `local_assets`.
+- `sources/forges/`: `github`, `gitea` (also drives Codeberg, Forgejo).
+- `sources/registries/`: `pypi`, `cran`, `zenodo`, `npm`, `cargo`, `conda`,
+  `docker`, `rubygems`, `go`.
 
-User-provided sources are discovered from `~/.repoindex/sources/*.py` and
-must export a module-level `source` attribute that is a `MetadataSource`
-instance. The discovery function accepts an `only` filter, which is how the
-refresh command selects sources via `--source <id>` or `--external`.
+`Registry` carries a `batch` flag for sources that prefetch in bulk; Zenodo
+sets it. Their `prefetch(config)` runs once before per-repo iteration.
+
+User extensions follow the same shape:
+`~/.repoindex/sources/scanners/*.py`,
+`~/.repoindex/sources/forges/*.py`,
+`~/.repoindex/sources/registries/*.py`. Each module exports a module-level
+`source` attribute that is an instance of the appropriate subclass.
 
 Source failures never kill a refresh. An error on one source for one repo
 logs and continues; the `scan_errors` table records what went wrong.
+
+### GitForge optional capabilities
+
+`GitForge` declares optional write methods that default to raising
+`NotImplementedError`. Each implementation overrides whichever methods the
+platform supports:
+
+- `enumerate_user_repos(config)`: paginated listing of the user's repos.
+- `set_topics(repo_record, topics, config)`: replace the topic list.
+- `set_description(repo_record, description, config)`
+- `set_archived(repo_record, archived, config)`
+- `set_visibility(repo_record, public, config)`
+- `set_default_branch(repo_record, branch, config)`
+- `enable_pages(repo_record, branch, path, config)`
+
+The `ops set-*` commands look up a repo's `forge_id`, find the GitForge
+with the matching `source_id`, and dispatch. Gitea (which drives Codeberg)
+declines `enable_pages` because Pages support varies per Gitea instance.
+The CLI surfaces the `NotImplementedError` cleanly: "this forge does not
+support enable_pages".
+
+`ops sync` is the read-side dual of `ops mirror`. It calls
+`enumerate_user_repos` on each forge configured in `forges:`, then clones
+any repos not already present locally.
 
 ### Exporter (write-side rendering)
 
@@ -241,16 +283,25 @@ sql.js.
 User-provided exporters are discovered from `~/.repoindex/exporters/*.py`
 and must export a module-level `exporter` attribute.
 
-### Why exactly two ABCs
+### Why a hierarchy instead of a flat ABC
 
-The previous design had three: `PlatformProvider`, `RegistryProvider`, and
-`Exporter`, where platforms enriched repos and registries detected
-publications. That split was incidental, not essential: both sides
-fundamentally answered "is this relevant, and if so what data do I
-contribute?" Collapsing them into a single `MetadataSource` with a `target`
-discriminator removed a parallel implementation and let the refresh
-dispatcher treat them uniformly. The split exists now only where it
-matters, inside `fetch`, which returns a dict shaped for its target table.
+The v1.0 design had a single `MetadataSource` ABC with a `target: str`
+discriminator. Three different concerns (read-only file scanners, git
+hosting platforms, package registries) were collapsed into one shape, and
+the differences leaked through `target` checks and conditional branches.
+
+Git forges have write capabilities (topics, archived flag, visibility) that
+registries and scanners do not. The flat ABC could not express that without
+stub methods raising on every non-forge source. v2.0 promotes the
+distinction into the type system: `GitForge` carries the cross-platform
+write surface as proper methods, scanners stay simple, registries stay
+narrow.
+
+The schema benefits too. v1.0 had `github_*` and `gitea_*` per-platform
+columns. v2.0 has `forge_id` plus generic `topics`, `is_archived`, `stars`,
+`pages_url`, populated by whichever GitForge owns the repo. Adding GitLab
+or Sourcehut is now a single new file in `sources/forges/`, with no schema
+churn and no special cases.
 
 ---
 
@@ -278,6 +329,30 @@ Anything more expressive uses `repoindex sql "..."` at the CLI, or
 (see `STABILITY.md`), FTS5 is available on repo name/description/readme,
 and all the GitHub, PyPI, CRAN, and citation fields are namespaced and
 queryable.
+
+### Forge config and mirrors
+
+Forge auth, host overrides, and redundancy targets all live in one
+top-level config section, `forges:`. Each entry has a `role`:
+
+- `primary` (default): the canonical forge for repos whose `remote_url`
+  resolves to its host. `forge_id` resolution discovers these passively
+  from the URL.
+- `mirror`: a redundancy destination. `ops mirror` walks these, fetches,
+  fast-forward-checks, then pushes `--mirror` to each.
+
+Both roles share the same configuration shape (token_env, host,
+url_template, source_id). A forge entry can serve as both a metadata
+source and a mirror target; the role is orthogonal to read ability.
+
+`url_template` is a `str.format()` template with a single `{repo}`
+placeholder. Mirror push uses it to compute the destination URL when the
+local repo doesn't already have a remote with the forge's name; if it
+does, the existing remote URL wins and the template is informational.
+
+This collapses what used to be two parallel config sections (`mirrors:`
+and per-source auth blocks) into one. It also future-proofs `role:
+archive` for read-only snapshots without needing yet another section.
 
 ### Why the DSL was removed
 
@@ -334,16 +409,24 @@ answer this? If yes, that is the shape. If no, add a tool.
 
 ## 8. Commitments and Non-Commitments
 
-At v1.0 repoindex commits to a backward-compatibility contract over:
+At v2.0 repoindex commits to a backward-compatibility contract over:
 
-- The **SQL schema** enumerated in `STABILITY.md` (repos, events, tags,
-  publications, scan_errors, refresh_log, repos_fts).
-- The **MCP tool names and argument shapes**.
-- The **CLI commands and filter flags** currently documented.
-- The **config file top-level keys**.
-- The **MetadataSource and Exporter ABC signatures**.
-- The **user-directory discovery contract** (`~/.repoindex/sources/*.py`,
-  `~/.repoindex/exporters/*.py`).
+- The **SQL schema v9** enumerated in `STABILITY.md` (repos with unified
+  `forge_*` columns, events, tags, publications, scan_errors,
+  refresh_log, repos_fts).
+- The **MCP tool names and argument shapes** (six tools, unchanged from
+  v1.x).
+- The **CLI commands and filter flags** currently documented, including
+  the cross-platform `ops set-*` and `ops sync` surface added in v2.0.
+- The **config file top-level keys**, including the unified `forges:`
+  section.
+- The **Source / LocalScanner / GitForge / Registry ABC signatures** and
+  the **Exporter ABC signature**. `GitForge` optional capability methods
+  have stable signatures; `NotImplementedError` is a valid response from
+  a forge that doesn't support a given capability.
+- The **user-directory discovery contract** for
+  `~/.repoindex/sources/{scanners,forges,registries}/*.py` and
+  `~/.repoindex/exporters/*.py`.
 
 It does not commit to:
 
@@ -353,7 +436,7 @@ It does not commit to:
 - Tag derivation heuristics. The set of implicit tags is expected to evolve.
 
 Additions to any stable surface are minor releases. Removals are major
-bumps and will be preceded by at least one 1.x release with a runtime
+bumps and will be preceded by at least one 2.x release with a runtime
 deprecation warning. See `STABILITY.md` for the details.
 
 ---
@@ -364,19 +447,25 @@ A short list, written down so future changes do not regress:
 
 - **Do not make remote URL the identity.** It is tempting when writing a
   merge strategy. Resist it. Two paths with the same remote are two repos.
-- **Do not un-namespace platform fields.** Keep the `github_`, `pypi_`,
-  `cran_`, `gitea_`, `citation_` prefixes. Provenance at the column is
-  worth the extra characters.
+- **Do not re-namespace forge fields by platform.** v2.0 collapsed the
+  parallel `github_*` and `gitea_*` columns into unified `forge_*` columns
+  with `forge_id` carrying provenance. Adding a third platform should be
+  a new GitForge subclass, not a new column family. Registry fields stay
+  namespaced (one repo can publish to many registries simultaneously); the
+  forge analog does not apply (one repo lives on one canonical forge).
 - **Do not add a new DSL.** If SQL is awkward for a specific use case, add
   a view or a computed column to the schema, or a filter flag if it is
   common enough. Do not invent a sublanguage.
 - **Do not split the schema into per-platform tables.** `github_metadata`,
-  `pypi_metadata`, and so on would make joins for common queries
+  `gitlab_metadata`, and so on would make joins for common queries
   ("stars + recent commits") harder for no real gain. The one wide `repos`
-  table with namespaced columns is the right shape.
+  table with unified forge columns is the right shape.
 - **Do not add write operations to MCP without strong justification.**
   `refresh`, `tag`, and `export` are the current carve-outs. Read-only SQL
   is the main channel.
 - **Do not regress on offline operation.** Every read command must work
   with no network and no tokens configured; external fields simply become
   NULL.
+- **Do not hardcode a GitForge implementation in command logic.** All
+  cross-platform actions dispatch through `forge_id` and the GitForge ABC.
+  `ops github` was the v1.x violation of this; v2.0 deleted it.

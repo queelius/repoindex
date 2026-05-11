@@ -1,6 +1,6 @@
 # v2.0 Plan: Source Hierarchy Refactor
 
-**Status**: in-progress (design approved 2026-05-09)
+**Status**: completed in v2.0 (commits 379ea2c through 6ef08e6).
 **Target version**: 2.0.0
 **Estimated scope**: 5 waves, 2-3 weeks of subagent work
 

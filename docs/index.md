@@ -3,10 +3,12 @@
 **A filesystem git catalog for your repository collection.**
 
 repoindex indexes local git directories. The filesystem path IS the canonical
-identity. External platforms (GitHub, PyPI, CRAN, npm, Cargo, Zenodo, and
-more) provide opt-in enrichment as namespaced columns (`github_stars`,
-`pypi_version`). The SQLite database at `~/.repoindex/index.db` is a
-materialized view over the filesystem plus external state.
+identity. External platforms (GitHub, Gitea, PyPI, CRAN, npm, Cargo, Zenodo,
+and more) provide opt-in enrichment. Forge fields are unified
+(`stars`, `topics`, `is_archived`, `pages_url`, ...) with `forge_id` carrying
+provenance; registry fields stay namespaced (`pypi_version`, `cran_version`).
+The SQLite database at `~/.repoindex/index.db` is a materialized view over
+the filesystem plus external state.
 
 The primary consumer is an LLM using the MCP server. The CLI is the human
 secondary interface.
@@ -57,7 +59,7 @@ assistant composes whatever query it needs.
 | `export` | Longecho-compliant arkiv archive (default) or format plugins |
 | `copy` | Copy repos with filtering (backup or redundancy) |
 | `link` | Symlink tree management (`tree`, `refresh`, `status`) |
-| `ops` | Collection operations (`git`, `generate`, `github`, `audit`, `mirror`, `wip-snapshot`) |
+| `ops` | Collection operations (`audit`, `git`, `generate`, `mirror`, `sync`, `wip-snapshot`, `set-topics`, `set-description`, `set-archived`, `set-visibility`, `set-default-branch`, `set-pages`) |
 | `tag` | Tag management (`add`, `remove`, `list`, `tree`, `move`) |
 | `config` | Settings management (`show`, `get`, `set`, `unset`, `init`, `repos`) |
 | `mcp` | Start the MCP server (stdio transport) |
@@ -81,7 +83,7 @@ For anything more expressive, use SQL.
 ## SQL for Everything Else
 
 ```bash
-repoindex sql "SELECT name, github_stars FROM repos WHERE github_stars > 0 ORDER BY github_stars DESC LIMIT 10"
+repoindex sql "SELECT name, forge_id, stars FROM repos WHERE stars > 0 ORDER BY stars DESC LIMIT 10"
 repoindex sql "SELECT r.name FROM publications p JOIN repos r ON p.repo_id=r.id WHERE p.registry='pypi' AND p.published=1"
 repoindex sql --info
 repoindex sql --schema
@@ -104,8 +106,11 @@ Built-in metadata sources: GitHub, Gitea, CITATION.cff, project keywords,
 local asset detection, PyPI, CRAN, npm, Cargo, Conda, Docker, RubyGems, Go,
 Zenodo.
 
-User sources: drop a Python file in `~/.repoindex/sources/` exporting a
-module-level `source = MetadataSource(...)`.
+User sources: drop a Python file under
+`~/.repoindex/sources/scanners/`, `~/.repoindex/sources/forges/`, or
+`~/.repoindex/sources/registries/` exporting a module-level
+`source = <Subclass>(...)` instance of `LocalScanner`, `GitForge`, or
+`Registry`.
 
 ## Configuration
 
@@ -118,8 +123,15 @@ repository_directories:
 github:
   token: ghp_...
 
-mirrors:
-  - name: codeberg
+forges:
+  github:
+    token_env: GITHUB_TOKEN
+    role: primary
+  codeberg:
+    source_id: gitea
+    host: codeberg.org
+    role: mirror
+    token_env: CODEBERG_TOKEN
     url_template: "https://codeberg.org/queelius/{repo}.git"
 
 author:

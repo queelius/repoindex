@@ -10,9 +10,11 @@
 > becomes legible.
 
 repoindex indexes local git directories. The filesystem path IS the
-canonical identity. External platforms (GitHub, PyPI, CRAN, Zenodo, npm,
-Cargo, and others) provide opt-in enrichment as namespaced columns
-(`github_stars`, `pypi_version`, `citation_doi`). The SQLite database at
+canonical identity. External platforms (GitHub, Gitea, PyPI, CRAN, Zenodo,
+npm, Cargo, and others) provide opt-in enrichment. Forge fields are
+unified (`stars`, `topics`, `is_archived`, ...) with `forge_id` carrying
+provenance; registry fields stay namespaced (`pypi_version`,
+`cran_version`, `citation_doi`). The SQLite database at
 `~/.repoindex/index.db` is a materialized view of the filesystem plus
 external state. `refresh` is the only writer; every other command reads.
 
@@ -109,7 +111,7 @@ For anything more expressive, use SQL.
 ### SQL for Everything Else
 
 ```bash
-repoindex sql "SELECT name, github_stars FROM repos WHERE github_stars > 0 ORDER BY github_stars DESC LIMIT 10"
+repoindex sql "SELECT name, forge_id, stars FROM repos WHERE stars > 0 ORDER BY stars DESC LIMIT 10"
 repoindex sql "SELECT r.name, p.package_name, p.current_version
                FROM publications p JOIN repos r ON p.repo_id = r.id
                WHERE p.registry = 'pypi' AND p.published = 1"
@@ -118,7 +120,7 @@ repoindex sql --schema
 ```
 
 Schema documented in `CLAUDE.md` and inline via `repoindex sql --schema`.
-The schema is part of the 1.x stable surface; see `STABILITY.md`.
+The schema is part of the 2.x stable surface; see `STABILITY.md`.
 
 ### Events
 
@@ -147,10 +149,15 @@ repoindex ops generate license --license mit --dry-run
 repoindex ops generate codemeta --language python --dry-run
 repoindex ops generate gitignore --lang python --dry-run
 
-# GitHub operations (requires gh CLI)
-repoindex ops github set-topics --from-pyproject --language python --dry-run
+# Cross-platform forge actions (works on GitHub, Gitea, Codeberg, ...)
+repoindex ops set-topics dreamlog python logic prolog
+repoindex ops set-description dreamlog "Prolog in S-expressions"
+repoindex ops set-archived old-experiment true --dry-run
 
-# Redundancy
+# Pull repos you own on configured forges
+repoindex ops sync --all --dry-run
+
+# Redundancy (push --mirror to forges with role: mirror)
 repoindex ops mirror --to codeberg --language python --dry-run
 
 # Dirty-tree snapshots
@@ -187,9 +194,11 @@ Built-in metadata sources: GitHub, Gitea, CITATION.cff, project keywords,
 local asset detection, PyPI, CRAN, npm, Cargo, Conda, Docker, RubyGems,
 Go, Zenodo.
 
-Add your own: drop a Python file in `~/.repoindex/sources/` exporting a
-module-level `source = MetadataSource(...)`. The `MetadataSource` ABC is
-part of the stable surface.
+Add your own: drop a Python file under
+`~/.repoindex/sources/scanners/`, `~/.repoindex/sources/forges/`, or
+`~/.repoindex/sources/registries/` exporting a module-level
+`source = <Subclass>(...)`. The `Source` family (`LocalScanner`,
+`GitForge`, `Registry`) is part of the stable surface.
 
 ## Configuration
 
@@ -203,8 +212,15 @@ repository_directories:
 github:
   token: ghp_...
 
-mirrors:
-  - name: codeberg
+forges:
+  github:
+    token_env: GITHUB_TOKEN
+    role: primary
+  codeberg:
+    source_id: gitea
+    host: codeberg.org
+    role: mirror
+    token_env: CODEBERG_TOKEN
     url_template: "https://codeberg.org/queelius/{repo}.git"
 
 author:
@@ -264,13 +280,13 @@ pytest --cov=repoindex     # With coverage
 make build                 # Wheel and sdist
 ```
 
-1700+ tests in `tests/`. Target coverage above 86%.
+1800+ tests in `tests/`. Target coverage above 86%.
 
 ## Documentation
 
 - `CLAUDE.md`: current architecture and operational reference
 - `DESIGN.md`: philosophy and architecture rationale
-- `STABILITY.md`: v1.0 backward-compatibility contract
+- `STABILITY.md`: v2.0 backward-compatibility contract
 - `docs/index.md`: docs landing page
 - `docs/events.md`, `docs/export.md`, `docs/ops.md`: per-command references
 

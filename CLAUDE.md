@@ -2,9 +2,9 @@
 
 ## Project Overview
 
-**repoindex is a filesystem git catalog.** It indexes local git directories — the filesystem path IS the canonical identity. External platforms (GitHub, PyPI, CRAN) provide opt-in enrichment metadata, namespaced with prefixes (`github_stars`, `pypi_published`).
+**repoindex is a filesystem git catalog.** It indexes local git directories: the filesystem path IS the canonical identity. External platforms (GitHub, Gitea, PyPI, CRAN, Zenodo) provide opt-in enrichment metadata.
 
-**Version**: 1.0.0 | **Design**: [DESIGN.md](DESIGN.md) | **Stability**: [STABILITY.md](STABILITY.md)
+**Version**: 2.0.0 | **Design**: [DESIGN.md](DESIGN.md) | **Stability**: [STABILITY.md](STABILITY.md)
 
 ## Development Commands
 
@@ -21,7 +21,7 @@ pytest -k "test_status" -v                           # Pattern match
 pytest --cov=repoindex --cov-report=html             # Coverage (ALWAYS after changes)
 ```
 
-All `make` targets auto-activate `.venv/`. Test suite has **~2000 tests** in `tests/`.
+All `make` targets auto-activate `.venv/`. Test suite has **~1840 tests** in `tests/`.
 
 ## Architecture
 
@@ -41,7 +41,27 @@ commands/            services/    database/          domain/
 
 ### Extension Systems
 
-**Sources** (`sources/`): Single ABC (`MetadataSource`) for all external metadata, discovered from `~/.repoindex/sources/*.py` (module-level `source` attribute). Each source has a `target` of `"repos"` (merged into the `repos` table: github, gitea, citation_cff, keywords, local_assets) or `"publications"` (upserted into the `publications` table: pypi, cran, zenodo, npm, cargo, conda, docker, rubygems, go). Batch sources (zenodo) implement `prefetch()` and return `True` from `detect()` unconditionally. All 14 built-in sources are native `MetadataSource` subclasses; adapters and the old `providers/` package are gone. Sources run in parallel via `ThreadPoolExecutor` during refresh.
+**Sources** (`sources/`): Three-level type hierarchy rooted at `Source`:
+
+```
+Source (ABC)
+├── LocalScanner       reads files in the repo; populates repos table
+└── RemoteSource       network-backed, has auth
+    ├── GitForge       hosts git repos; populates repos table; has write actions
+    └── Registry       package registry; populates publications table
+```
+
+Source modules live in three subdirectories:
+
+* `sources/scanners/`: citation_cff, keywords, local_assets.
+* `sources/forges/`: github, gitea.
+* `sources/registries/`: pypi, cran, zenodo, npm, cargo, conda, docker, rubygems, go.
+
+User extension dirs follow the same shape: `~/.repoindex/sources/scanners/*.py`, `~/.repoindex/sources/forges/*.py`, `~/.repoindex/sources/registries/*.py`. Each module exports a module-level `source` attribute that is a subclass instance.
+
+`GitForge` carries optional capability methods (default raises `NotImplementedError`): `enumerate_user_repos`, `set_topics`, `set_description`, `set_archived`, `set_visibility`, `set_default_branch`, `enable_pages`. The cross-platform `ops set-*` commands look up a repo's `forge_id` and dispatch to the matching GitForge.
+
+Batch sources (zenodo) implement `prefetch()` and return `True` from `detect()` unconditionally. Sources run in parallel via `ThreadPoolExecutor` during refresh.
 
 **Exporters** (`exporters/`): Output renderers via `Exporter` ABC (`export(repos, output, config)`). Built-in: bibtex, csv, markdown, opml, jsonld, arkiv. User extensions: `~/.repoindex/exporters/*.py` with module-level `exporter` attribute. The `export` command defaults to longecho-compliant arkiv archives; format-based exports are secondary.
 
@@ -62,7 +82,7 @@ where, params = build_where_and_params(language='Python', dirty=True)
 repos = fetch_repos_by_flags(config, language='Python', recent='7d')
 ```
 
-Schema v8, migrations in `database/schema.py`. See **SQL Data Model** below for table details.
+Schema v9, migrations in `database/schema.py`. See **SQL Data Model** below for table details.
 
 ### Other Key Modules
 
@@ -108,38 +128,44 @@ mock_run_command.return_value = (None, 1)        # Failure
 ### Testing Patterns
 
 - Services: mock infrastructure with `MagicMock`, use `tmp_path` for filesystem
-- CLI: `click.testing.CliRunner` — mock `_resolve_repos` to skip DB
+- CLI: `click.testing.CliRunner`, mock `_resolve_repos` to skip DB
 - Domain: direct instantiation, no mocking needed
 - `pyfakefs` available for complex filesystem scenarios
 
-## Commands (11 total)
+## Commands (13 total)
 
 ```
 repoindex
-├── status    # Health dashboard
-├── events    # Query git events from database
-├── sql       # Raw SQL + DB maintenance (--info, --schema, --reset, --vacuum)
-├── refresh   # Sync DB from filesystem (--github, --pypi, --cran, --external)
-├── show      # Detailed single-repo view
-├── digest    # Summarize recent activity (conventional commit breakdown)
-├── export    # Longecho-compliant arkiv archive (default) or format plugins
-├── copy      # Copy repos (filter via --dirty/--language/--tag/--recent)
-├── link      # Symlink tree management (tree/refresh/status)
-├── ops       # Collection operations
-│   ├── git          # Multi-repo push/pull/status
-│   ├── generate     # Boilerplate (codemeta, license, gitignore, etc.)
-│   └── wip-snapshot # Remote-recoverable snapshots of dirty working trees
-├── tag       # Tag management (add/remove/list/tree)
-├── config    # Settings management
-└── mcp       # MCP server (stdio transport, requires repoindex[mcp])
+├── status             Health dashboard
+├── events             Query git events from database
+├── sql                Raw SQL + DB maintenance (--info, --schema, --reset, --vacuum)
+├── refresh            Sync DB from filesystem (--github, --pypi, --cran, --external)
+├── show               Detailed single-repo view
+├── digest             Summarize recent activity (conventional commit breakdown)
+├── export             Longecho-compliant arkiv archive (default) or format plugins
+├── copy               Copy repos (filter via --dirty/--language/--tag/--recent)
+├── link               Symlink tree management (tree/refresh/status)
+├── ops                Collection operations
+│   ├── audit              Quality / metadata audit
+│   ├── git                Multi-repo push/pull/status
+│   ├── generate           Boilerplate (codemeta, license, gitignore, etc.)
+│   ├── wip-snapshot       Remote-recoverable snapshots of dirty working trees
+│   ├── mirror             Push --mirror to forges with role: mirror
+│   ├── sync               Clone repos you own on enumerable forges
+│   ├── set-topics         Cross-platform topic setter (GitForge dispatch)
+│   ├── set-description    Cross-platform description setter
+│   ├── set-archived       Cross-platform archived flag
+│   ├── set-visibility     Cross-platform public/private toggle
+│   ├── set-default-branch Cross-platform default branch
+│   └── set-pages          Cross-platform Pages enable
+├── tag                Tag management (add/remove/list/tree/move)
+├── config             Settings management
+└── mcp                MCP server (stdio transport, requires repoindex[mcp])
 ```
 
 `db` command exists as hidden deprecated alias for `sql`.
 
-The old `query` and `view` commands were removed in v0.16.0 along with
-the DSL compiler and views.yaml machinery. Use filter flags on `copy`,
-`link`, `ops`, and `export`; drop to `repoindex sql` (or the MCP
-`run_sql` tool) for anything more expressive.
+The `query` and `view` commands were removed in v0.16.0 (DSL and views.yaml machinery). The `ops github` subgroup and `ops generate gh-pages` were removed in v2.0.0; use the cross-platform `ops set-*` commands instead, which dispatch via `forge_id` to whichever GitForge owns the repo.
 
 ## Filter Flags
 
@@ -158,37 +184,53 @@ can't express belongs in `repoindex sql` or an MCP `run_sql` query.
 
 ## SQL Data Model
 
-- **repos**: Identity (`path` UNIQUE), git status, metadata, license, citation, GitHub fields (`github_*` prefixed).
+- **repos**: Identity (`path` UNIQUE), git status, metadata, license, citation, plus unified forge fields populated by the active GitForge: `forge_id`, `forge_host`, `forge_owner`, `forge_name`, `forge_description`, `topics` (JSON array as TEXT), `is_archived`, `is_fork`, `is_private`, `pages_url`, `default_branch`, `stars`, `forks_count`, `watchers`, `open_issues`, `has_issues`, `has_wiki`, `has_pages`, `forge_created_at`, `forge_updated_at`, `forge_pushed_at`.
 - **events**: `repo_id` FK, `event_id` UNIQUE, type (`git_tag`/`commit`/`branch`/`merge`), timestamp, ref, message, author, metadata JSON.
-- **tags**: `repo_id` FK, tag, source (`user`/`implicit`/`github`).
-- **publications**: `repo_id` FK CASCADE, registry (`pypi`/`cran`/`zenodo`/`npm`/`cargo`/`docker`), package_name (may differ from repo name), version, published flag, downloads, doi.
+- **tags**: `repo_id` FK, tag, source (`user`/`implicit`/`forge`/`pyproject`/`pypi`/`cran`/`zenodo`/...).
+- **publications**: `repo_id` FK CASCADE, registry (`pypi`/`cran`/`zenodo`/`npm`/`cargo`/`docker`/...), package_name (may differ from repo name), version, published flag, downloads, doi.
 - **scan_errors**: Failed repos during refresh.
 - **refresh_log**: Tracks refresh runs for digest/staleness.
 - **repos_fts**: FTS5 index on name, description, readme_content.
 
 Common SQL patterns (`repoindex sql "..."`):
 ```sql
-SELECT name, github_stars FROM repos WHERE github_stars > 0 ORDER BY github_stars DESC LIMIT 10
+SELECT name, forge_id, stars FROM repos WHERE stars > 0 ORDER BY stars DESC LIMIT 10
 SELECT r.name, COUNT(*) n FROM events e JOIN repos r ON e.repo_id=r.id WHERE e.type='commit' AND e.timestamp > datetime('now','-30 days') GROUP BY r.id ORDER BY n DESC
 SELECT r.name, p.registry, p.package_name FROM publications p JOIN repos r ON p.repo_id=r.id WHERE p.published=1
+SELECT name, forge_id, is_archived FROM repos WHERE is_archived = 1
 ```
 
 ## Configuration
 
 YAML only (`~/.repoindex/config.yaml`; legacy JSON auto-migrated). Override path with `REPOINDEX_CONFIG`.
 
-Key sections: `repository_directories` (glob patterns), `github.token` (or `GITHUB_TOKEN`), `repository_tags`, `author` (name, alias, email, orcid, github — used by audit and boilerplate).
+Key sections: `repository_directories` (glob patterns), `exclude_directories` (subtree exclusion list), `forges` (per-platform config: source_id, host, role, token_env, url_template, user, sync_into), `repository_tags`, `author` (name, alias, email, orcid, github; used by audit and boilerplate).
+
+Example `forges:` section:
+
+```yaml
+forges:
+  github:
+    token_env: GITHUB_TOKEN
+    role: primary
+  codeberg:
+    source_id: gitea
+    host: codeberg.org
+    role: mirror
+    token_env: CODEBERG_TOKEN
+    url_template: "https://codeberg.org/queelius/{repo}.git"
+```
 
 ## Design Principles
 
 1. **Path is Identity**. Filesystem path defines a repo, not remote URL.
 2. **Database-First**. `refresh` populates SQLite; read commands query it (no live scanning).
 3. **Unix Philosophy**. Compose via pipes, JSONL streams, errors to stderr.
-4. **Namespaced Fields**. `github_stars`, `pypi_published`, `cran_version`.
-5. **Two Query Layers**. Flags for humans at the terminal; SQL (direct or via MCP `run_sql`) for anything structured. The MCP is by far the dominant consumer.
-6. **Pluggable Extensions**. Single `MetadataSource` ABC and `Exporter` ABC, discovered from `~/.repoindex/sources/*.py` and `~/.repoindex/exporters/*.py`.
+4. **Unified Forge Fields**. Repo metadata uses generic columns (`stars`, `topics`, `is_archived`, ...) with `forge_id` for provenance. Publications stay namespaced by registry.
+5. **Two Query Layers**. Flags for humans at the terminal; SQL (direct or via MCP `run_sql`) for anything structured. The MCP is the dominant consumer.
+6. **Pluggable Extensions**. `Source` family (`LocalScanner` / `GitForge` / `Registry`) and `Exporter` ABC, discovered from `~/.repoindex/sources/{scanners,forges,registries}/*.py` and `~/.repoindex/exporters/*.py`.
 
 ## Project Structure
 
 - Entry point: `cli.py:main()` | Build system: **hatchling** (not setuptools)
-- User data: `~/.repoindex/`: `config.yaml`, `index.db`, `sources/*.py`, `exporters/*.py`
+- User data: `~/.repoindex/`: `config.yaml`, `index.db`, `sources/{scanners,forges,registries}/*.py`, `exporters/*.py`
