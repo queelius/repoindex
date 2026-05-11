@@ -1694,12 +1694,8 @@ def mirror_handler(
         repoindex ops mirror --to nas-backup --force
     """
     from concurrent.futures import ThreadPoolExecutor, as_completed
-    from ..services.mirror_service import (
-        load_mirrors,
-        mirror_repo,
-        MirrorConfigError,
-        MirrorResult,
-    )
+    from ..services.forge_config import ForgeConfigError, get_mirrors
+    from ..services.mirror_service import mirror_repo, MirrorResult
 
     if debug:
         import logging
@@ -1724,10 +1720,19 @@ def mirror_handler(
 
     config = load_config()
 
+    # Migration warning: the old top-level mirrors: section is gone.
+    legacy = config.get('mirrors')
+    if legacy:
+        click.echo(
+            "Warning: top-level 'mirrors:' is no longer supported. "
+            "Migrate to forges: with role: mirror. See docs/ops.md.",
+            err=True,
+        )
+
     try:
-        all_targets = load_mirrors(config)
-    except MirrorConfigError as e:
-        msg = f"invalid mirrors config: {e}"
+        all_targets = get_mirrors(config)
+    except ForgeConfigError as e:
+        msg = f"invalid forges config: {e}"
         if output_json:
             print(json.dumps({"error": msg}), file=sys.stderr, flush=True)
         else:
@@ -1735,7 +1740,10 @@ def mirror_handler(
         sys.exit(2)
 
     if not all_targets:
-        msg = "no mirrors configured (add a 'mirrors:' section to config.yaml)"
+        msg = (
+            "no mirrors configured (add forges: entries with role: mirror "
+            "to ~/.repoindex/config.yaml)"
+        )
         if output_json:
             print(json.dumps({"error": msg}), file=sys.stderr, flush=True)
         else:
@@ -2744,21 +2752,18 @@ def _resolve_sync_destination(
     if into_path:
         return str(Path(into_path).expanduser() / forge_id / repo_name)
 
-    forges_config = (config or {}).get('forges') or {}
-    entry = None
-    if isinstance(forges_config, dict):
-        entry = forges_config.get(forge_id)
-    elif isinstance(forges_config, list):
-        for e in forges_config:
-            if isinstance(e, dict) and e.get('source_id') == forge_id:
-                entry = e
-                break
-            if isinstance(e, dict) and e.get('name') == forge_id:
-                entry = e
-                break
-    sync_into = entry.get('sync_into') if isinstance(entry, dict) else None
-    if sync_into:
-        return str(Path(sync_into).expanduser() / repo_name)
+    # Look up the forge entry whose source_id matches; prefer a 'primary'
+    # entry if multiple exist for the same source_id.
+    from ..services.forge_config import load_forges, ForgeConfigError
+    try:
+        entries = load_forges(config)
+    except ForgeConfigError:
+        entries = []
+    matched = [e for e in entries if e.source_id == forge_id]
+    matched.sort(key=lambda e: 0 if e.role == 'primary' else 1)
+    for entry in matched:
+        if entry.sync_into:
+            return str(Path(entry.sync_into).expanduser() / repo_name)
 
     return str(Path('~/github/imported').expanduser() / forge_id / repo_name)
 

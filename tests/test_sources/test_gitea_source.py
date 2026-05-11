@@ -449,19 +449,26 @@ class TestGiteaSourceFetch:
         result = source.fetch('/repo', {})
         assert result is None
 
-    def test_fetch_with_token(self):
+    def test_fetch_with_token(self, monkeypatch):
         from repoindex.sources.forges.gitea import GiteaSource
         # Use a fresh instance so we can inspect its session cache
         src = GiteaSource()
+        monkeypatch.setenv('CODEBERG_TOKEN', 'my-token')
         mock_resp = self._make_api_response()
         with patch('repoindex.sources.forges.gitea.requests.Session.get', return_value=mock_resp):
             src.fetch(
                 '/repo',
                 {'remote_url': 'https://codeberg.org/user/repo.git'},
-                config={'gitea': {
-                    'hosts': ['codeberg.org'],
-                    'tokens': {'codeberg.org': 'my-token'},
-                }},
+                config={
+                    'gitea': {'hosts': ['codeberg.org']},
+                    'forges': {
+                        'codeberg': {
+                            'source_id': 'gitea',
+                            'host': 'codeberg.org',
+                            'token_env': 'CODEBERG_TOKEN',
+                        },
+                    },
+                },
             )
         session = src._client_cache[('codeberg.org', 'my-token')]
         assert session.headers['Authorization'] == 'token my-token'
@@ -588,12 +595,15 @@ class TestGiteaSourceConfig:
         hosts = s._get_hosts({'gitea': {'hosts': ['git.example.com', 'codeberg.org']}})
         assert hosts == ['git.example.com', 'codeberg.org']
 
-    def test_get_token_found(self):
+    def test_get_token_found(self, monkeypatch):
         from repoindex.sources.forges.gitea import GiteaSource
         s = GiteaSource()
+        monkeypatch.setenv('CODEBERG_TOKEN', 'abc123')
         token = s._get_token(
-            {'gitea': {'tokens': {'codeberg.org': 'abc123'}}},
-            'codeberg.org'
+            {'forges': {'codeberg': {'source_id': 'gitea',
+                                     'host': 'codeberg.org',
+                                     'token_env': 'CODEBERG_TOKEN'}}},
+            'codeberg.org',
         )
         assert token == 'abc123'
 

@@ -1,143 +1,47 @@
 """Mirror service: push git repositories to redundancy targets.
 
-Supports pushing every branch/tag (``git push --mirror``) to a set of
-named redundancy targets defined in ``~/.repoindex/config.yaml``:
+Mirrors are configured as entries in the ``forges:`` section of
+``~/.repoindex/config.yaml`` with ``role: mirror``::
 
-    mirrors:
-      - name: codeberg
+    forges:
+      codeberg:
+        source_id: gitea
+        host: codeberg.org
+        role: mirror
         url_template: "https://codeberg.org/queelius/{repo}.git"
-      - name: gitea-gdrive
-        url_template: "file:///mnt/gdrive/git-mirrors/{repo}.git"
+        token_env: CODEBERG_TOKEN
 
 Each mirror is a named git remote on every repo. If a remote with the
 mirror's name already exists on a repo, repoindex uses its configured
-URL as-is — the user's local override always wins over the template.
+URL as-is (the user's local override always wins over the template).
 If no such remote exists, repoindex adds one from ``url_template``.
 
-Safety
-------
+Safety:
+
 * Fast-forward check: before pushing, fetch the mirror and verify every
   local branch's tip is a descendant of the mirror's copy. Diverged
   branches abort the mirror unless ``--force`` is passed.
 * ``--init`` creates missing bare repos for ``file://`` URLs; without
   it, a missing target is a hard error (never silently created).
 * URL conflicts (remote with matching name but different URL) are
-  skipped with a warning — never silently rewritten.
+  skipped with a warning, never silently rewritten.
 """
 
-import re
-import string
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 from urllib.parse import urlparse
 
+from .forge_config import ForgeConfig, ForgeConfigError, get_mirrors  # noqa: F401
+
 
 # ---------------------------------------------------------------------------
-# Config: MirrorTarget
+# Mirror config is now part of the unified ``forges:`` section. See
+# repoindex/services/forge_config.py. ForgeConfig is re-exported above so
+# callers can continue to write ``from .mirror_service import ForgeConfig``
+# if they prefer the locality.
 # ---------------------------------------------------------------------------
-
-# Conservative git remote name: start with alnum or underscore, then alnum,
-# dot, dash, or underscore. Rejects empty, leading dash/dot, spaces, slashes.
-_REMOTE_NAME_RE = re.compile(r'^[A-Za-z0-9_][A-Za-z0-9_.\-]*$')
-
-
-@dataclass(frozen=True)
-class MirrorTarget:
-    """A named redundancy target.
-
-    ``name`` is used as a git remote name. ``url_template`` is a Python
-    ``str.format()`` template with a ``{repo}`` placeholder that will be
-    substituted by the repository's name.
-    """
-    name: str
-    url_template: str
-
-    def url_for(self, repo_name: str) -> str:
-        """Resolve the target URL for a given repository name."""
-        return self.url_template.format(repo=repo_name)
-
-
-class MirrorConfigError(ValueError):
-    """Raised when the ``mirrors`` config section is invalid."""
-
-
-def _template_has_only_repo_placeholder(template: str) -> bool:
-    """Validate that ``template`` contains ``{repo}`` and no other fields.
-
-    Uses ``string.Formatter`` so we parse the template exactly like
-    ``str.format`` would — no ad-hoc regex over the user's string.
-    """
-    fields = [
-        name
-        for _, name, _, _ in string.Formatter().parse(template)
-        if name is not None and name != ''
-    ]
-    if not fields:
-        return False
-    for name in fields:
-        # Reject indexed placeholders ({0}) and unrelated names.
-        if name != 'repo':
-            return False
-    return True
-
-
-def load_mirrors(config: dict) -> list[MirrorTarget]:
-    """Parse the ``mirrors`` section of a loaded config dict.
-
-    Returns an empty list if the section is missing. Raises
-    ``MirrorConfigError`` if the section is present but malformed.
-    """
-    raw = config.get('mirrors')
-    if raw is None:
-        return []
-    if not isinstance(raw, list):
-        raise MirrorConfigError(
-            f"'mirrors' must be a list, got {type(raw).__name__}"
-        )
-
-    targets: list[MirrorTarget] = []
-    seen_names: set[str] = set()
-
-    for idx, entry in enumerate(raw):
-        if not isinstance(entry, dict):
-            raise MirrorConfigError(
-                f"mirrors[{idx}] must be a mapping, got {type(entry).__name__}"
-            )
-        name = entry.get('name')
-        template = entry.get('url_template')
-
-        if not name or not isinstance(name, str):
-            raise MirrorConfigError(
-                f"mirrors[{idx}].name is required and must be a non-empty string"
-            )
-        if not _REMOTE_NAME_RE.match(name):
-            raise MirrorConfigError(
-                f"mirrors[{idx}].name {name!r} is not a valid git remote name "
-                "(alphanumeric, underscore, dot, dash; cannot start with "
-                "dash/dot)"
-            )
-        if name in seen_names:
-            raise MirrorConfigError(
-                f"mirrors[{idx}].name {name!r} is duplicated"
-            )
-        seen_names.add(name)
-
-        if not template or not isinstance(template, str):
-            raise MirrorConfigError(
-                f"mirrors[{idx}].url_template is required and must be a "
-                "non-empty string"
-            )
-        if not _template_has_only_repo_placeholder(template):
-            raise MirrorConfigError(
-                f"mirrors[{idx}].url_template {template!r} must contain a "
-                "'{repo}' placeholder (and no other placeholders)"
-            )
-
-        targets.append(MirrorTarget(name=name, url_template=template))
-
-    return targets
 
 
 # ---------------------------------------------------------------------------
@@ -263,7 +167,7 @@ def _diverged_branches(repo_path: str, mirror_name: str) -> list[str]:
 
 def mirror_repo(
     repo_path: str,
-    mirror: MirrorTarget,
+    mirror: ForgeConfig,
     force: bool = False,
     init: bool = False,
     dry_run: bool = False,

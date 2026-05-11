@@ -16,17 +16,24 @@ from repoindex.services.mirror_service import MirrorResult
 
 def _fake_config_with_mirrors():
     return {
-        'mirrors': [
-            {'name': 'codeberg',
-             'url_template': 'https://codeberg.org/queelius/{repo}.git'},
-            {'name': 'gitea-gdrive',
-             'url_template': 'file:///mnt/gdrive/git-mirrors/{repo}.git'},
-        ]
+        'forges': {
+            'codeberg': {
+                'source_id': 'gitea',
+                'host': 'codeberg.org',
+                'role': 'mirror',
+                'url_template': 'https://codeberg.org/queelius/{repo}.git',
+            },
+            'gitea-gdrive': {
+                'source_id': 'gitea',
+                'role': 'mirror',
+                'url_template': 'file:///mnt/gdrive/git-mirrors/{repo}.git',
+            },
+        }
     }
 
 
 def _fake_config_no_mirrors():
-    return {'mirrors': []}
+    return {'forges': {}}
 
 
 def _fake_repos():
@@ -87,10 +94,11 @@ class TestScoping:
         result = runner.invoke(mirror_handler, ['--to', 'codeberg'])
         assert result.exit_code == 2
 
-    def test_invalid_mirrors_config_errors(self, monkeypatch):
+    def test_invalid_forges_config_errors(self, monkeypatch):
         _patch_cli_env(
             monkeypatch,
-            config={'mirrors': [{'name': 'codeberg'}]},  # missing url_template
+            config={'forges': {'codeberg': {'role': 'mirror',
+                                            'url_template': 'no-placeholder'}}},
         )
         runner = CliRunner()
         result = runner.invoke(mirror_handler, ['--to', 'codeberg'])

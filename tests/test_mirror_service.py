@@ -1,17 +1,31 @@
-"""Tests for the mirror service (MirrorTarget / load_mirrors / mirror_repo)."""
+"""Tests for the mirror service (mirror_repo).
+
+Config-shape tests (parsing forges:, get_mirrors filtering) live in
+tests/test_services/test_forge_config.py.
+"""
 import subprocess
 from pathlib import Path
 from unittest.mock import patch, MagicMock
 
 import pytest
 
-from repoindex.services.mirror_service import (
-    MirrorTarget,
-    MirrorResult,
-    MirrorConfigError,
-    load_mirrors,
-    mirror_repo,
-)
+from repoindex.services.forge_config import ForgeConfig
+from repoindex.services.mirror_service import MirrorResult, mirror_repo
+
+
+def MirrorTarget(name: str, url_template: str) -> ForgeConfig:
+    """Test-only shim: build a ForgeConfig with the old MirrorTarget shape.
+
+    The deleted MirrorTarget dataclass only had (name, url_template). The
+    new ForgeConfig carries more fields, but mirror_repo only uses these
+    two. This shim keeps the legacy tests readable.
+    """
+    return ForgeConfig(
+        name=name,
+        source_id=name,        # arbitrary; mirror_repo doesn't read it
+        role='mirror',
+        url_template=url_template,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -44,162 +58,6 @@ def _init_git_repo(path: Path) -> Path:
         cwd=str(path), capture_output=True,
     )
     return path
-
-
-# ---------------------------------------------------------------------------
-# MirrorTarget.url_for
-# ---------------------------------------------------------------------------
-
-
-class TestMirrorTargetUrlFor:
-    def test_basic_substitution(self):
-        t = MirrorTarget(
-            name='codeberg',
-            url_template='https://codeberg.org/queelius/{repo}.git',
-        )
-        assert t.url_for('dreamlog') == 'https://codeberg.org/queelius/dreamlog.git'
-
-    def test_file_url(self):
-        t = MirrorTarget(
-            name='local',
-            url_template='file:///tmp/git/{repo}.git',
-        )
-        assert t.url_for('mcts') == 'file:///tmp/git/mcts.git'
-
-
-# ---------------------------------------------------------------------------
-# load_mirrors
-# ---------------------------------------------------------------------------
-
-
-class TestLoadMirrors:
-    def test_missing_section_returns_empty(self):
-        assert load_mirrors({}) == []
-
-    def test_empty_list_returns_empty(self):
-        assert load_mirrors({'mirrors': []}) == []
-
-    def test_valid_single_entry(self):
-        cfg = {
-            'mirrors': [
-                {'name': 'codeberg',
-                 'url_template': 'https://codeberg.org/x/{repo}.git'},
-            ]
-        }
-        targets = load_mirrors(cfg)
-        assert len(targets) == 1
-        assert targets[0].name == 'codeberg'
-        assert '{repo}' in targets[0].url_template
-
-    def test_valid_multiple_entries(self):
-        cfg = {
-            'mirrors': [
-                {'name': 'codeberg',
-                 'url_template': 'https://codeberg.org/x/{repo}.git'},
-                {'name': 'gitea-gdrive',
-                 'url_template': 'file:///mnt/gdrive/git/{repo}.git'},
-                {'name': 'nas_backup',
-                 'url_template': 'ssh://nas.local/srv/git/{repo}.git'},
-            ]
-        }
-        targets = load_mirrors(cfg)
-        assert [t.name for t in targets] == [
-            'codeberg', 'gitea-gdrive', 'nas_backup',
-        ]
-
-    def test_mirrors_not_a_list(self):
-        with pytest.raises(MirrorConfigError):
-            load_mirrors({'mirrors': 'nope'})
-
-    def test_entry_not_a_dict(self):
-        with pytest.raises(MirrorConfigError):
-            load_mirrors({'mirrors': ['just-a-string']})
-
-    def test_missing_name(self):
-        cfg = {'mirrors': [{'url_template': 'https://x/{repo}.git'}]}
-        with pytest.raises(MirrorConfigError):
-            load_mirrors(cfg)
-
-    def test_missing_template(self):
-        cfg = {'mirrors': [{'name': 'codeberg'}]}
-        with pytest.raises(MirrorConfigError):
-            load_mirrors(cfg)
-
-    def test_template_without_repo_placeholder(self):
-        cfg = {
-            'mirrors': [
-                {'name': 'codeberg', 'url_template': 'https://codeberg.org/x.git'},
-            ]
-        }
-        with pytest.raises(MirrorConfigError):
-            load_mirrors(cfg)
-
-    def test_template_with_extra_placeholder(self):
-        cfg = {
-            'mirrors': [
-                {'name': 'codeberg',
-                 'url_template': 'https://codeberg.org/{user}/{repo}.git'},
-            ]
-        }
-        with pytest.raises(MirrorConfigError):
-            load_mirrors(cfg)
-
-    def test_invalid_name_starts_with_dash(self):
-        cfg = {
-            'mirrors': [
-                {'name': '-bad', 'url_template': 'file:///x/{repo}.git'},
-            ]
-        }
-        with pytest.raises(MirrorConfigError):
-            load_mirrors(cfg)
-
-    def test_invalid_name_has_space(self):
-        cfg = {
-            'mirrors': [
-                {'name': 'bad name', 'url_template': 'file:///x/{repo}.git'},
-            ]
-        }
-        with pytest.raises(MirrorConfigError):
-            load_mirrors(cfg)
-
-    def test_invalid_name_has_slash(self):
-        cfg = {
-            'mirrors': [
-                {'name': 'a/b', 'url_template': 'file:///x/{repo}.git'},
-            ]
-        }
-        with pytest.raises(MirrorConfigError):
-            load_mirrors(cfg)
-
-    def test_empty_name_rejected(self):
-        cfg = {
-            'mirrors': [
-                {'name': '', 'url_template': 'file:///x/{repo}.git'},
-            ]
-        }
-        with pytest.raises(MirrorConfigError):
-            load_mirrors(cfg)
-
-    def test_empty_template_rejected(self):
-        cfg = {
-            'mirrors': [
-                {'name': 'codeberg', 'url_template': ''},
-            ]
-        }
-        with pytest.raises(MirrorConfigError):
-            load_mirrors(cfg)
-
-    def test_duplicate_names_rejected(self):
-        cfg = {
-            'mirrors': [
-                {'name': 'codeberg',
-                 'url_template': 'https://codeberg.org/a/{repo}.git'},
-                {'name': 'codeberg',
-                 'url_template': 'https://codeberg.org/b/{repo}.git'},
-            ]
-        }
-        with pytest.raises(MirrorConfigError):
-            load_mirrors(cfg)
 
 
 # ---------------------------------------------------------------------------

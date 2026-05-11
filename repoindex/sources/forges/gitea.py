@@ -1,22 +1,22 @@
 """Gitea / Codeberg / Forgejo metadata source for repoindex.
 
-Enriches repos hosted on Gitea-based platforms (Codeberg, Forgejo, self-hosted).
-Fetches stars, forks, watchers, issues, topics, and other metadata via Gitea REST API v1.
+Enriches repos hosted on Gitea-based platforms (Codeberg, Forgejo,
+self-hosted). Fetches stars, forks, watchers, issues, topics, and other
+metadata via the Gitea REST API v1.
 
-Configuration (in ~/.repoindex/config.yaml):
+Hosts and tokens are configured under ``forges:`` in
+``~/.repoindex/config.yaml``. Each Gitea-flavored forge entry sets
+``source_id: gitea``, the ``host`` to query, and a ``token_env``
+naming the environment variable that carries the API token. Example::
 
-    gitea:
-      hosts:
-        - codeberg.org
-        - git.mycompany.com
-      tokens:
-        codeberg.org: "your-token-here"
-        git.mycompany.com: "another-token"
+    forges:
+      codeberg:
+        source_id: gitea
+        host: codeberg.org
+        token_env: CODEBERG_TOKEN
 
-The Wave V2.C ``forges:`` section (one entry per host) is also honoured;
-each entry may set ``token_env`` to name the environment variable that
-carries the API token for that host. Per-host config wins over the
-legacy ``gitea.tokens`` map.
+Without a configured forge entry, the host falls back to the
+``GITEA_TOKEN`` environment variable.
 """
 import json
 import logging
@@ -110,35 +110,22 @@ class GiteaSource(GitForge):
 
         Resolution order:
 
-        1. ``forges:`` entry with ``host == host``: read ``token_env`` and
-           look up the named env var (Wave V2.C style).
-        2. Legacy ``gitea.tokens.<host>`` map.
-        3. Generic ``GITEA_TOKEN`` env var as a final fallback.
+        1. ``forges:`` entry with ``host == host`` and a configured
+           ``token_env``: look up the named env var.
+        2. Generic ``GITEA_TOKEN`` env var as a final fallback.
 
         Returns ``None`` when no token is configured for the host.
         """
-        forges_config = (config or {}).get('forges') or {}
-        if isinstance(forges_config, dict):
-            for entry in forges_config.values():
-                if isinstance(entry, dict) and entry.get('host') == host:
-                    env_name = entry.get('token_env')
-                    if env_name:
-                        env_token = os.environ.get(env_name)
-                        if env_token:
-                            return env_token
-        elif isinstance(forges_config, list):
-            for entry in forges_config:
-                if isinstance(entry, dict) and entry.get('host') == host:
-                    env_name = entry.get('token_env')
-                    if env_name:
-                        env_token = os.environ.get(env_name)
-                        if env_token:
-                            return env_token
-
-        # Legacy nested map: gitea.tokens.<host>
-        tokens = (config or {}).get('gitea', {}).get('tokens', {})
-        if tokens.get(host):
-            return tokens.get(host)
+        from ...services.forge_config import load_forges, ForgeConfigError
+        try:
+            entries = load_forges(config)
+        except ForgeConfigError:
+            entries = []
+        for entry in entries:
+            if entry.host == host and entry.source_id == 'gitea' and entry.token_env:
+                env_token = os.environ.get(entry.token_env)
+                if env_token:
+                    return env_token
 
         # Generic fallback
         return os.environ.get('GITEA_TOKEN')

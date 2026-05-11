@@ -84,19 +84,17 @@ def resolve_forge(remote_url: Optional[str], config: Optional[dict]) -> Optional
     if host in DEFAULT_FORGE_HOSTS:
         return (DEFAULT_FORGE_HOSTS[host], host)
 
-    # User-configured forges
-    forges_config = (config or {}).get('forges') or {}
-    if isinstance(forges_config, dict):
-        for entry_name, entry in forges_config.items():
-            if isinstance(entry, dict):
-                entry_host = entry.get('host')
-                if entry_host == host:
-                    return (entry.get('source_id', entry_name), host)
-    elif isinstance(forges_config, list):
-        # Support list-of-dicts shape too: [{'source_id': 'gitea', 'host': '...'}]
-        for entry in forges_config:
-            if isinstance(entry, dict) and entry.get('host') == host:
-                return (entry.get('source_id', entry.get('name', '')), host)
+    # User-configured forges. Both primary and mirror roles contribute to
+    # the hostname mapping: a repo cloned from a self-hosted Gitea is still
+    # a Gitea repo regardless of whether you also push it as a mirror.
+    from ..services.forge_config import load_forges, ForgeConfigError
+    try:
+        entries = load_forges(config)
+    except ForgeConfigError:
+        entries = []
+    for entry in entries:
+        if entry.host == host:
+            return (entry.source_id, host)
 
     return None
 

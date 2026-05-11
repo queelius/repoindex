@@ -143,19 +143,13 @@ class TestGiteaAuthResolution:
         config = {
             'forges': {
                 'codeberg': {
+                    'source_id': 'gitea',
                     'host': 'codeberg.org',
                     'token_env': 'MY_CODEBERG_TOKEN',
                 }
             }
         }
         assert src._get_token(config, 'codeberg.org') == 'secret-1'
-
-    def test_token_legacy_tokens_map(self):
-        src = GiteaSource()
-        config = {
-            'gitea': {'tokens': {'codeberg.org': 'legacy-token'}}
-        }
-        assert src._get_token(config, 'codeberg.org') == 'legacy-token'
 
     def test_token_generic_env_fallback(self, monkeypatch):
         src = GiteaSource()

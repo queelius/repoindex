@@ -100,16 +100,6 @@ class TestResolveForge:
             'https://gitea.example.com/team/proj.git', config
         ) == ('gitea', 'gitea.example.com')
 
-    def test_user_configured_forge_list_form(self):
-        config = {
-            'forges': [
-                {'source_id': 'gitea', 'host': 'gitea.example.com'},
-            ]
-        }
-        assert resolve_forge(
-            'https://gitea.example.com/team/proj.git', config
-        ) == ('gitea', 'gitea.example.com')
-
     def test_built_in_takes_precedence_over_user_config(self):
         """github.com always resolves to 'github' regardless of user config."""
         config = {
@@ -141,3 +131,23 @@ class TestResolveForge:
         assert resolve_forge('https://gitlab.com/u/r.git', {}) is None
         assert resolve_forge('https://gitlab.com/u/r.git', {'forges': {}}) is None
         assert resolve_forge('https://gitlab.com/u/r.git', {'forges': None}) is None
+
+    def test_mirror_role_entries_still_contribute_to_resolution(self):
+        """A repo cloned from a mirror's host is still a forge repo.
+
+        The mirror role tags the entry as a redundancy destination but does
+        not remove it from the hostname mapping used during refresh.
+        """
+        config = {
+            'forges': {
+                'codeberg': {
+                    'source_id': 'gitea',
+                    'host': 'codeberg.example',
+                    'role': 'mirror',
+                    'url_template': 'https://codeberg.example/u/{repo}.git',
+                },
+            }
+        }
+        assert resolve_forge(
+            'https://codeberg.example/team/proj.git', config
+        ) == ('gitea', 'codeberg.example')
