@@ -42,3 +42,6 @@ Thumbs.db
 
 # Accidental export dirs from misparsed CLI flags
 /--help/
+
+# Claude Code session state
+.claude/
