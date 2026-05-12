@@ -320,91 +320,71 @@ class GiteaSource(GitForge):
         Reads ``forges:`` entries for an explicit per-host ``user``,
         falling back to ``config['author']['github']``.
         """
-        forges_config = (config or {}).get('forges') or {}
-        entries: List[dict] = []
-        if isinstance(forges_config, dict):
-            entries = [e for e in forges_config.values() if isinstance(e, dict)]
-        elif isinstance(forges_config, list):
-            entries = [e for e in forges_config if isinstance(e, dict)]
-        for entry in entries:
-            if entry.get('host') == host and entry.get('user'):
-                return entry.get('user')
+        from ...services.forge_config import find_forge_for_host, ForgeConfigError
+        try:
+            entry = find_forge_for_host(host, config or {})
+        except ForgeConfigError:
+            entry = None
+        if entry and entry.user:
+            return entry.user
         return (config or {}).get('author', {}).get('github') or None
+
+    def _action(
+        self,
+        method: str,
+        path_suffix: str,
+        repo_record: dict,
+        config: dict,
+        payload: dict,
+    ) -> None:
+        """Resolve target, issue ``{method} /repos/{owner}/{name}{path_suffix}``,
+        raise on failure.
+
+        ``path_suffix`` is empty for top-level PATCH actions or a sub-path
+        like ``/topics`` for endpoint-specific PUT actions.
+        """
+        host, owner, name = self._resolve_target(repo_record, config)
+        if not host or not owner or not name:
+            raise ValueError("Cannot resolve host/owner/name for Gitea repo")
+        status, body = self._request(
+            method, host, f"/repos/{owner}/{name}{path_suffix}",
+            config, payload,
+        )
+        ok, err = self._ok(status, body)
+        if not ok:
+            raise RuntimeError(err)
 
     def set_topics(
         self, repo_record: dict, topics: List[str], config: dict
     ) -> None:
         """PUT /repos/{owner}/{name}/topics with ``{'topics': [...]}``."""
-        host, owner, name = self._resolve_target(repo_record, config)
-        if not host or not owner or not name:
-            raise ValueError("Cannot resolve host/owner/name for Gitea repo")
-        status, body = self._request(
-            'PUT', host, f"/repos/{owner}/{name}/topics",
-            config, {'topics': list(topics)},
+        self._action(
+            'PUT', '/topics', repo_record, config, {'topics': list(topics)},
         )
-        ok, err = self._ok(status, body)
-        if not ok:
-            raise RuntimeError(err)
 
     def set_description(
         self, repo_record: dict, description: str, config: dict
     ) -> None:
         """PATCH /repos/{owner}/{name} with ``description``."""
-        host, owner, name = self._resolve_target(repo_record, config)
-        if not host or not owner or not name:
-            raise ValueError("Cannot resolve host/owner/name for Gitea repo")
-        status, body = self._request(
-            'PATCH', host, f"/repos/{owner}/{name}",
-            config, {'description': description},
-        )
-        ok, err = self._ok(status, body)
-        if not ok:
-            raise RuntimeError(err)
+        self._action('PATCH', '', repo_record, config, {'description': description})
 
     def set_archived(
         self, repo_record: dict, archived: bool, config: dict
     ) -> None:
         """PATCH /repos/{owner}/{name} with ``archived``."""
-        host, owner, name = self._resolve_target(repo_record, config)
-        if not host or not owner or not name:
-            raise ValueError("Cannot resolve host/owner/name for Gitea repo")
-        status, body = self._request(
-            'PATCH', host, f"/repos/{owner}/{name}",
-            config, {'archived': bool(archived)},
-        )
-        ok, err = self._ok(status, body)
-        if not ok:
-            raise RuntimeError(err)
+        self._action('PATCH', '', repo_record, config, {'archived': bool(archived)})
 
     def set_visibility(
         self, repo_record: dict, public: bool, config: dict
     ) -> None:
         """PATCH /repos/{owner}/{name} with ``private`` (the inverse)."""
-        host, owner, name = self._resolve_target(repo_record, config)
-        if not host or not owner or not name:
-            raise ValueError("Cannot resolve host/owner/name for Gitea repo")
-        status, body = self._request(
-            'PATCH', host, f"/repos/{owner}/{name}",
-            config, {'private': not bool(public)},
-        )
-        ok, err = self._ok(status, body)
-        if not ok:
-            raise RuntimeError(err)
+        self._action('PATCH', '', repo_record, config, {'private': not bool(public)})
 
     def set_default_branch(
         self, repo_record: dict, branch: str, config: dict
     ) -> None:
         """PATCH /repos/{owner}/{name} with ``default_branch``."""
-        host, owner, name = self._resolve_target(repo_record, config)
-        if not host or not owner or not name:
-            raise ValueError("Cannot resolve host/owner/name for Gitea repo")
-        status, body = self._request(
-            'PATCH', host, f"/repos/{owner}/{name}",
-            config, {'default_branch': branch},
-        )
-        ok, err = self._ok(status, body)
-        if not ok:
-            raise RuntimeError(err)
+        self._action('PATCH', '', repo_record, config, {'default_branch': branch})
 
     def enable_pages(
         self, repo_record: dict, branch: str, path: str, config: dict

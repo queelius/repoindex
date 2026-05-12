@@ -708,6 +708,19 @@ def _no_repos_message(output_json):
         Console().print("[yellow]No repositories found matching query.[/yellow]")
 
 
+def _emit_error(msg: str, output_json: bool, exit_code: int = 2) -> None:
+    """Print an error message in the right format and exit.
+
+    JSONL output goes to stderr (consistent with the project's error
+    contract); pretty output uses ``click.echo``. Never returns.
+    """
+    if output_json:
+        print(json.dumps({"error": msg}), file=sys.stderr, flush=True)
+    else:
+        click.echo(f"Error: {msg}", err=True)
+    sys.exit(exit_code)
+
+
 # ============================================================================
 # Unified output helpers (for operations that produce OperationSummary)
 # ============================================================================
@@ -1708,20 +1721,10 @@ def mirror_handler(
 
     # --- Scoping: --to and --all are mutually exclusive -------------------
     if all_mirrors and to_mirrors:
-        msg = "--to and --all are mutually exclusive"
-        if output_json:
-            print(json.dumps({"error": msg}), file=sys.stderr, flush=True)
-        else:
-            click.echo(f"Error: {msg}", err=True)
-        sys.exit(2)
+        _emit_error("--to and --all are mutually exclusive", output_json)
 
     if not all_mirrors and not to_mirrors:
-        msg = "Specify --to <name> or --all"
-        if output_json:
-            print(json.dumps({"error": msg}), file=sys.stderr, flush=True)
-        else:
-            click.echo(f"Error: {msg}", err=True)
-        sys.exit(2)
+        _emit_error("Specify --to <name> or --all", output_json)
 
     config = load_config()
 
@@ -1737,23 +1740,14 @@ def mirror_handler(
     try:
         all_targets = get_mirrors(config)
     except ForgeConfigError as e:
-        msg = f"invalid forges config: {e}"
-        if output_json:
-            print(json.dumps({"error": msg}), file=sys.stderr, flush=True)
-        else:
-            click.echo(f"Error: {msg}", err=True)
-        sys.exit(2)
+        _emit_error(f"invalid forges config: {e}", output_json)
 
     if not all_targets:
-        msg = (
+        _emit_error(
             "no mirrors configured (add forges: entries with role: mirror "
-            "to ~/.repoindex/config.yaml)"
+            "to ~/.repoindex/config.yaml)",
+            output_json,
         )
-        if output_json:
-            print(json.dumps({"error": msg}), file=sys.stderr, flush=True)
-        else:
-            click.echo(f"Error: {msg}", err=True)
-        sys.exit(2)
 
     if all_mirrors:
         selected = list(all_targets)
@@ -1768,15 +1762,11 @@ def mirror_handler(
                 unknown.append(name)
         if unknown:
             known = ', '.join(sorted(by_name))
-            msg = (
+            _emit_error(
                 f"unknown mirror(s): {', '.join(unknown)} "
-                f"(configured: {known or 'none'})"
+                f"(configured: {known or 'none'})",
+                output_json,
             )
-            if output_json:
-                print(json.dumps({"error": msg}), file=sys.stderr, flush=True)
-            else:
-                click.echo(f"Error: {msg}", err=True)
-            sys.exit(2)
 
     # --- Resolve repos via standard flag-based query ----------------------
     repos = _get_repos_from_query(
@@ -1847,6 +1837,14 @@ def mirror_handler(
         _mirror_output_pretty(all_results, dry_run)
 
 
+def _mirror_summary(results: list) -> tuple[int, int, int]:
+    """Return (mirrored, skipped, failed) counts for mirror results."""
+    mirrored = sum(1 for r in results if r.status in ('ok', 'init+pushed', 'dry-run'))
+    skipped = sum(1 for r in results if r.status == 'skipped')
+    failed = sum(1 for r in results if r.status == 'failed')
+    return mirrored, skipped, failed
+
+
 def _mirror_output_json(results, dry_run):
     """JSONL output for ops mirror."""
     for r in results:
@@ -1860,9 +1858,7 @@ def _mirror_output_json(results, dry_run):
             "added_remote": r.added_remote,
         }), flush=True)
 
-    mirrored = sum(1 for r in results if r.status in ('ok', 'init+pushed', 'dry-run'))
-    skipped = sum(1 for r in results if r.status == 'skipped')
-    failed = sum(1 for r in results if r.status == 'failed')
+    mirrored, skipped, failed = _mirror_summary(results)
     print(json.dumps({
         "summary": {
             "mirrored": mirrored,
@@ -1906,10 +1902,7 @@ def _mirror_output_pretty(results, dry_run):
             )
         console.print(table)
 
-    mirrored = sum(1 for r in results if r.status in ('ok', 'init+pushed', 'dry-run'))
-    skipped = sum(1 for r in results if r.status == 'skipped')
-    failed = sum(1 for r in results if r.status == 'failed')
-
+    mirrored, skipped, failed = _mirror_summary(results)
     console.print(
         f"\nSummary: {mirrored} mirrored, {skipped} skipped, {failed} failed"
     )
@@ -1980,23 +1973,14 @@ def _resolve_set_repos(
     config = load_config()
 
     if repo_name and apply_all:
-        msg = "REPO and --all are mutually exclusive"
-        if output_json:
-            print(json.dumps({"error": msg}), file=sys.stderr, flush=True)
-        else:
-            click.echo(f"Error: {msg}", err=True)
-        sys.exit(2)
+        _emit_error("REPO and --all are mutually exclusive", output_json)
 
     if not repo_name and not apply_all:
-        msg = (
+        _emit_error(
             "specify a single REPO (with no --all) or --all "
-            "plus filter flags for bulk operation"
+            "plus filter flags for bulk operation",
+            output_json,
         )
-        if output_json:
-            print(json.dumps({"error": msg}), file=sys.stderr, flush=True)
-        else:
-            click.echo(f"Error: {msg}", err=True)
-        sys.exit(2)
 
     if repo_name:
         # Look up by name. Single match preferred; ambiguity is a hard error.
@@ -2004,12 +1988,7 @@ def _resolve_set_repos(
         with Database(config=config, read_only=True) as db:
             row = get_repo_by_name(db, repo_name)
         if not row:
-            msg = f"repo not found: {repo_name}"
-            if output_json:
-                print(json.dumps({"error": msg}), file=sys.stderr, flush=True)
-            else:
-                click.echo(f"Error: {msg}", err=True)
-            sys.exit(1)
+            _emit_error(f"repo not found: {repo_name}", output_json, exit_code=1)
         return config, [row]
 
     # Bulk mode
@@ -2048,79 +2027,54 @@ def _dispatch_set_action(
 
     results: list[dict] = []
 
+    def record(repo, forge_id, status, detail):
+        results.append({
+            'status': status,
+            'repo': repo.get('name', ''),
+            'path': repo.get('path', ''),
+            'forge': forge_id,
+            'detail': detail,
+        })
+
     for repo in repos:
-        name = repo.get('name', '')
-        path = repo.get('path', '')
         forge_id = repo.get('forge_id')
 
         if not forge_id:
-            results.append({
-                'status': 'skipped',
-                'repo': name,
-                'path': path,
-                'forge': None,
-                'detail': 'no forge_id (run repoindex refresh --external)',
-            })
+            record(repo, None, 'skipped',
+                   'no forge_id (run repoindex refresh --external)')
             continue
 
-        forge = lookup_repo_forge(repo, config)
+        forge = lookup_repo_forge(repo)
         if forge is None:
-            results.append({
-                'status': 'skipped',
-                'repo': name,
-                'path': path,
-                'forge': forge_id,
-                'detail': f'no GitForge source for forge_id={forge_id}',
-            })
+            record(repo, forge_id, 'skipped',
+                   f'no GitForge source for forge_id={forge_id}')
             continue
 
         if dry_run:
-            results.append({
-                'status': 'dry-run',
-                'repo': name,
-                'path': path,
-                'forge': forge_id,
-                'detail': f'would invoke {action_name}',
-            })
+            record(repo, forge_id, 'dry-run', f'would invoke {action_name}')
             continue
 
         try:
             detail = invoke(forge, repo)
-            results.append({
-                'status': 'ok',
-                'repo': name,
-                'path': path,
-                'forge': forge_id,
-                'detail': detail or action_name,
-            })
+            record(repo, forge_id, 'ok', detail or action_name)
         except NotImplementedError as e:
-            results.append({
-                'status': 'skipped',
-                'repo': name,
-                'path': path,
-                'forge': forge_id,
-                'detail': f'forge does not support {action_name}: {e}',
-            })
+            record(repo, forge_id, 'skipped',
+                   f'forge does not support {action_name}: {e}')
         except Exception as e:
-            results.append({
-                'status': 'failed',
-                'repo': name,
-                'path': path,
-                'forge': forge_id,
-                'detail': f'{type(e).__name__}: {e}',
-            })
+            record(repo, forge_id, 'failed', f'{type(e).__name__}: {e}')
 
     _set_action_output(results, action_name, dry_run, output_json)
 
 
 def _set_action_output(results, action_name, dry_run, output_json):
     """Emit per-repo rows and a summary for a set-* dispatch."""
+    ok = sum(1 for r in results if r['status'] in ('ok', 'dry-run'))
+    skipped = sum(1 for r in results if r['status'] == 'skipped')
+    failed = sum(1 for r in results if r['status'] == 'failed')
+
     if output_json:
         for r in results:
             print(json.dumps(r), flush=True)
-        ok = sum(1 for r in results if r['status'] in ('ok', 'dry-run'))
-        skipped = sum(1 for r in results if r['status'] == 'skipped')
-        failed = sum(1 for r in results if r['status'] == 'failed')
         print(json.dumps({
             'summary': {
                 'action': action_name,
@@ -2159,9 +2113,6 @@ def _set_action_output(results, action_name, dry_run, output_json):
             )
         console.print(table)
 
-    ok = sum(1 for r in results if r['status'] in ('ok', 'dry-run'))
-    skipped = sum(1 for r in results if r['status'] == 'skipped')
-    failed = sum(1 for r in results if r['status'] == 'failed')
     console.print(f"\nSummary: {ok} ok, {skipped} skipped, {failed} failed")
     if failed:
         sys.exit(1)
@@ -2566,20 +2517,10 @@ def sync_handler(
         logging.basicConfig(level=logging.DEBUG)
 
     if from_forges and all_forges:
-        msg = "--from and --all are mutually exclusive"
-        if output_json:
-            print(json.dumps({"error": msg}), file=sys.stderr, flush=True)
-        else:
-            click.echo(f"Error: {msg}", err=True)
-        sys.exit(2)
+        _emit_error("--from and --all are mutually exclusive", output_json)
 
     if not from_forges and not all_forges:
-        msg = "specify --from <name> (repeatable) or --all"
-        if output_json:
-            print(json.dumps({"error": msg}), file=sys.stderr, flush=True)
-        else:
-            click.echo(f"Error: {msg}", err=True)
-        sys.exit(2)
+        _emit_error("specify --from <name> (repeatable) or --all", output_json)
 
     config = load_config()
 
@@ -2589,15 +2530,15 @@ def sync_handler(
         wanted = set(from_forges)
         forges = [f for f in forges if f.source_id in wanted]
         if not forges:
-            msg = (
+            available = [
+                f.source_id for f in discover_sources()
+                if isinstance(f, GitForge)
+            ]
+            _emit_error(
                 f"no GitForge matches --from {list(from_forges)}; "
-                f"available: {[f.source_id for f in discover_sources() if isinstance(f, GitForge)]}"
+                f"available: {available}",
+                output_json,
             )
-            if output_json:
-                print(json.dumps({"error": msg}), file=sys.stderr, flush=True)
-            else:
-                click.echo(f"Error: {msg}", err=True)
-            sys.exit(2)
 
     # Load existing remote_urls for dedup
     existing_urls = _load_existing_remote_urls(config)
@@ -2797,37 +2738,42 @@ def _clone_one(clone_url: str, destination: str) -> tuple[bool, str]:
     return True, str(dest_path)
 
 
+def _sync_summary(results: list) -> dict:
+    """Return per-status counts used by both JSON and pretty output."""
+    skipped_statuses = {'skipped-archived', 'skipped-filter'}
+    return {
+        'pending': sum(1 for r in results if r['status'] == 'pending'),
+        'cloned': sum(1 for r in results if r['status'] == 'cloned'),
+        'failed': sum(1 for r in results if r['status'] == 'failed'),
+        'already': sum(1 for r in results if r['status'] == 'already-have'),
+        'skipped': sum(1 for r in results if r['status'] in skipped_statuses),
+    }
+
+
 def _sync_output(results, enumerate_errors, dry_run, output_json):
     """Emit per-repo rows, enumeration errors, and a summary for ops sync."""
+    counts = _sync_summary(results)
     if output_json:
         for r in results:
             print(json.dumps(r), flush=True)
         for e in enumerate_errors:
             print(json.dumps({'status': 'forge-error', **e}), flush=True)
-        pending = sum(1 for r in results if r['status'] == 'pending')
-        cloned = sum(1 for r in results if r['status'] == 'cloned')
-        failed = sum(1 for r in results if r['status'] == 'failed')
-        already = sum(1 for r in results if r['status'] == 'already-have')
-        skipped = sum(
-            1 for r in results
-            if r['status'] in ('skipped-archived', 'skipped-filter')
-        )
         print(json.dumps({
             'summary': {
-                'pending': pending,
-                'cloned': cloned,
-                'failed': failed,
-                'already_have': already,
-                'skipped': skipped,
+                'pending': counts['pending'],
+                'cloned': counts['cloned'],
+                'failed': counts['failed'],
+                'already_have': counts['already'],
+                'skipped': counts['skipped'],
                 'forge_errors': len(enumerate_errors),
                 'dry_run': dry_run,
             },
         }), flush=True)
-        if not dry_run and (cloned > 0):
+        if not dry_run and counts['cloned'] > 0:
             print(json.dumps({
                 'hint': 'run "repoindex refresh" to index newly cloned repos',
             }), flush=True)
-        if failed:
+        if counts['failed']:
             sys.exit(1)
         return
 
@@ -2867,31 +2813,24 @@ def _sync_output(results, enumerate_errors, dry_run, output_json):
             )
         console.print(table)
 
-    pending = sum(1 for r in results if r['status'] == 'pending')
-    cloned = sum(1 for r in results if r['status'] == 'cloned')
-    failed = sum(1 for r in results if r['status'] == 'failed')
-    already = sum(1 for r in results if r['status'] == 'already-have')
-    skipped = sum(
-        1 for r in results
-        if r['status'] in ('skipped-archived', 'skipped-filter')
-    )
-
     if dry_run:
         console.print(
-            f"\nSummary: {pending} would-clone, {already} already-have, "
-            f"{skipped} skipped, {len(enumerate_errors)} forge errors"
+            f"\nSummary: {counts['pending']} would-clone, "
+            f"{counts['already']} already-have, "
+            f"{counts['skipped']} skipped, "
+            f"{len(enumerate_errors)} forge errors"
         )
     else:
         console.print(
-            f"\nSummary: {cloned} cloned, {failed} failed, "
-            f"{already} already-have, {skipped} skipped, "
+            f"\nSummary: {counts['cloned']} cloned, {counts['failed']} failed, "
+            f"{counts['already']} already-have, {counts['skipped']} skipped, "
             f"{len(enumerate_errors)} forge errors"
         )
-        if cloned > 0:
+        if counts['cloned'] > 0:
             console.print(
                 "\n[dim]Hint: run [cyan]repoindex refresh[/cyan] to index "
                 "the new clones.[/dim]"
             )
 
-    if failed:
+    if counts['failed']:
         sys.exit(1)

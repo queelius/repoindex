@@ -13,17 +13,10 @@ from typing import Optional
 from ..sources import GitForge, discover_sources
 
 
-def find_forge(forge_id: str, config: Optional[dict] = None) -> Optional[GitForge]:
+def find_forge(forge_id: str) -> Optional[GitForge]:
     """Return the GitForge whose ``source_id`` matches ``forge_id``.
 
-    Args:
-        forge_id: Short identifier (e.g., ``"github"``, ``"gitea"``).
-        config: Reserved for future use (e.g., for picking among multiple
-            instances of the same forge family). Currently unused.
-
-    Returns:
-        The matching GitForge instance, or ``None`` if no source claims
-        ``forge_id``.
+    Returns ``None`` for an empty/unknown ``forge_id``.
     """
     if not forge_id:
         return None
@@ -33,9 +26,7 @@ def find_forge(forge_id: str, config: Optional[dict] = None) -> Optional[GitForg
     return None
 
 
-def lookup_repo_forge(
-    repo_record: dict, config: Optional[dict] = None
-) -> Optional[GitForge]:
+def lookup_repo_forge(repo_record: Optional[dict]) -> Optional[GitForge]:
     """Return the GitForge that owns ``repo_record``.
 
     Reads ``repo_record['forge_id']`` (set by V2.B's refresh dispatcher)
@@ -44,10 +35,7 @@ def lookup_repo_forge(
     """
     if not repo_record:
         return None
-    forge_id = repo_record.get('forge_id')
-    if not forge_id:
-        return None
-    return find_forge(forge_id, config)
+    return find_forge(repo_record.get('forge_id'))
 
 
 __all__ = ['find_forge', 'lookup_repo_forge']

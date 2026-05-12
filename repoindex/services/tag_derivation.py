@@ -16,7 +16,7 @@ attribution or flatten to just the tag strings.
 Source labels mirror what the `tags` table stores in its `source` column:
 - 'implicit' — derived from intrinsic repo state (language, has_* flags,
   is_clean, etc.)
-- the active forge_id (e.g., 'github', 'gitea') — forge-provided topics.
+- the active forge_id (e.g., 'github', 'gitea'): forge-provided topics.
   Wave V2.B: topics live in the unified ``topics`` column; provenance is
   read from the ``forge_id`` column.
 - 'pyproject' — keywords from a local file (pyproject.toml / package.json)

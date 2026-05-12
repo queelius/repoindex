@@ -72,12 +72,7 @@ class GitHubSource(GitForge):
         if not owner or not name:
             return None
 
-        config = config or {}
-        token = config.get('github', {}).get('token')
-        if not token:
-            token = os.environ.get('GITHUB_TOKEN') or os.environ.get('REPOINDEX_GITHUB_TOKEN')
-
-        client = self._get_client(token)
+        client = self._get_client(self._resolve_token(config))
         repo = client.get_repo(owner, name)
         if not repo:
             return None
@@ -172,67 +167,62 @@ class GitHubSource(GitForge):
                 description=repo.get('description'),
             )
 
+    def _client_for(
+        self, repo_record: dict, config: Optional[dict],
+    ) -> Tuple[str, str, GitHubClient]:
+        """Resolve (owner, name, client) for a write action.
+
+        Raises ``ValueError`` if owner/name can't be resolved.
+        """
+        owner, name = self._resolve_owner_name(repo_record)
+        if not owner or not name:
+            raise ValueError("Cannot resolve owner/name for GitHub repo")
+        return owner, name, self._get_client(self._resolve_token(config))
+
+    @staticmethod
+    def _check(ok: bool, err: Optional[str], action: str) -> None:
+        if not ok:
+            raise RuntimeError(err or f"{action} failed")
+
     def set_topics(
         self, repo_record: dict, topics: List[str], config: dict
     ) -> None:
         """PUT /repos/{owner}/{name}/topics with the full topic list."""
-        owner, name = self._resolve_owner_name(repo_record)
-        if not owner or not name:
-            raise ValueError("Cannot resolve owner/name for GitHub repo")
-        client = self._get_client(self._resolve_token(config))
+        owner, name, client = self._client_for(repo_record, config)
         ok, err = client.replace_topics(owner, name, list(topics))
-        if not ok:
-            raise RuntimeError(err or "set_topics failed")
+        self._check(ok, err, "set_topics")
 
     def set_description(
         self, repo_record: dict, description: str, config: dict
     ) -> None:
         """PATCH /repos/{owner}/{name} with ``description``."""
-        owner, name = self._resolve_owner_name(repo_record)
-        if not owner or not name:
-            raise ValueError("Cannot resolve owner/name for GitHub repo")
-        client = self._get_client(self._resolve_token(config))
+        owner, name, client = self._client_for(repo_record, config)
         ok, err = client.set_repo_field(owner, name, 'description', description)
-        if not ok:
-            raise RuntimeError(err or "set_description failed")
+        self._check(ok, err, "set_description")
 
     def set_archived(
         self, repo_record: dict, archived: bool, config: dict
     ) -> None:
         """PATCH /repos/{owner}/{name} with ``archived``."""
-        owner, name = self._resolve_owner_name(repo_record)
-        if not owner or not name:
-            raise ValueError("Cannot resolve owner/name for GitHub repo")
-        client = self._get_client(self._resolve_token(config))
+        owner, name, client = self._client_for(repo_record, config)
         ok, err = client.set_repo_field(owner, name, 'archived', bool(archived))
-        if not ok:
-            raise RuntimeError(err or "set_archived failed")
+        self._check(ok, err, "set_archived")
 
     def set_visibility(
         self, repo_record: dict, public: bool, config: dict
     ) -> None:
         """PATCH /repos/{owner}/{name} with ``private`` (the inverse)."""
-        owner, name = self._resolve_owner_name(repo_record)
-        if not owner or not name:
-            raise ValueError("Cannot resolve owner/name for GitHub repo")
-        client = self._get_client(self._resolve_token(config))
-        ok, err = client.set_repo_field(
-            owner, name, 'private', not bool(public)
-        )
-        if not ok:
-            raise RuntimeError(err or "set_visibility failed")
+        owner, name, client = self._client_for(repo_record, config)
+        ok, err = client.set_repo_field(owner, name, 'private', not bool(public))
+        self._check(ok, err, "set_visibility")
 
     def set_default_branch(
         self, repo_record: dict, branch: str, config: dict
     ) -> None:
         """PATCH /repos/{owner}/{name} with ``default_branch``."""
-        owner, name = self._resolve_owner_name(repo_record)
-        if not owner or not name:
-            raise ValueError("Cannot resolve owner/name for GitHub repo")
-        client = self._get_client(self._resolve_token(config))
+        owner, name, client = self._client_for(repo_record, config)
         ok, err = client.set_repo_field(owner, name, 'default_branch', branch)
-        if not ok:
-            raise RuntimeError(err or "set_default_branch failed")
+        self._check(ok, err, "set_default_branch")
 
     def enable_pages(
         self, repo_record: dict, branch: str, path: str, config: dict
@@ -242,13 +232,9 @@ class GitHubSource(GitForge):
         Falls back to PUT if Pages is already configured (handled by the
         GitHubClient layer).
         """
-        owner, name = self._resolve_owner_name(repo_record)
-        if not owner or not name:
-            raise ValueError("Cannot resolve owner/name for GitHub repo")
-        client = self._get_client(self._resolve_token(config))
+        owner, name, client = self._client_for(repo_record, config)
         ok, err = client.create_pages_site(owner, name, branch, path or '/')
-        if not ok:
-            raise RuntimeError(err or "enable_pages failed")
+        self._check(ok, err, "enable_pages")
 
 
 source = GitHubSource()

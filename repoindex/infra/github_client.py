@@ -463,6 +463,16 @@ class GitHubClient:
             body = None
         return response.status_code, body
 
+    @staticmethod
+    def _check_response(
+        status: int, body: Optional[Dict[str, Any]],
+    ) -> Tuple[bool, Optional[str]]:
+        """Translate (status, body) into (ok, error_message)."""
+        if 200 <= status < 300:
+            return True, None
+        msg = (body or {}).get('message') if isinstance(body, dict) else None
+        return False, msg or f"HTTP {status}"
+
     def set_repo_field(
         self,
         owner: str,
@@ -477,10 +487,7 @@ class GitHubClient:
         status, body = self._request(
             'PATCH', f"repos/{owner}/{name}", {field: value}
         )
-        if 200 <= status < 300:
-            return True, None
-        msg = (body or {}).get('message') if isinstance(body, dict) else None
-        return False, msg or f"HTTP {status}"
+        return self._check_response(status, body)
 
     def replace_topics(
         self,
@@ -492,10 +499,7 @@ class GitHubClient:
         status, body = self._request(
             'PUT', f"repos/{owner}/{name}/topics", {'names': topics}
         )
-        if 200 <= status < 300:
-            return True, None
-        msg = (body or {}).get('message') if isinstance(body, dict) else None
-        return False, msg or f"HTTP {status}"
+        return self._check_response(status, body)
 
     def create_pages_site(
         self,
@@ -506,23 +510,15 @@ class GitHubClient:
     ) -> Tuple[bool, Optional[str]]:
         """POST /repos/{owner}/{name}/pages to enable Pages on a branch.
 
-        If Pages is already enabled, fall back to PUT to update the source.
+        If Pages is already enabled (409 Conflict), fall back to PUT to
+        update the source.
         """
         payload = {'source': {'branch': branch, 'path': path}}
-        status, body = self._request(
-            'POST', f"repos/{owner}/{name}/pages", payload
-        )
-        if 200 <= status < 300:
-            return True, None
-        # 409 Conflict means Pages already configured; update via PUT instead.
+        endpoint = f"repos/{owner}/{name}/pages"
+        status, body = self._request('POST', endpoint, payload)
         if status == 409:
-            status, body = self._request(
-                'PUT', f"repos/{owner}/{name}/pages", payload
-            )
-            if 200 <= status < 300:
-                return True, None
-        msg = (body or {}).get('message') if isinstance(body, dict) else None
-        return False, msg or f"HTTP {status}"
+            status, body = self._request('PUT', endpoint, payload)
+        return self._check_response(status, body)
 
     def iter_user_repos(
         self,
