@@ -203,19 +203,31 @@ class RepositoryService:
 
         seen_paths: Set[str] = set()
 
-        for path in paths:
-            path = os.path.expanduser(path)
+        for raw_path in paths:
+            expanded = os.path.expanduser(raw_path)
 
-            # Handle glob patterns
-            if '**' in path or '*' in path:
+            # Common ergonomic forms: trailing /** and /* both mean "this
+            # directory and everything under it", and our own _discover_path
+            # already recurses. Strip those suffixes so we never hand them
+            # to glob (where bare ** enumerates every file at every depth
+            # before any filtering, which is millions of paths on a deep
+            # tree like ~/github/).
+            for suffix in ('/**', '/*'):
+                if expanded.endswith(suffix):
+                    expanded = expanded[: -len(suffix)]
+                    break
+
+            # Handle remaining glob metachars (e.g., ~/work/proj-*) without
+            # recursion: recursion is _discover_path's job, not glob's.
+            if '*' in expanded or '?' in expanded or '[' in expanded:
                 import glob
-                for expanded in glob.glob(path, recursive=True):
+                for match in glob.glob(expanded):
                     yield from self._discover_path(
-                        expanded, recursive, exclude, excluded_subtrees, seen_paths
+                        match, recursive, exclude, excluded_subtrees, seen_paths
                     )
             else:
                 yield from self._discover_path(
-                    path, recursive, exclude, excluded_subtrees, seen_paths
+                    expanded, recursive, exclude, excluded_subtrees, seen_paths
                 )
 
     def _discover_path(
@@ -258,10 +270,12 @@ class RepositoryService:
         if not recursive:
             return
 
-        # Search subdirectories
+        # Search subdirectories. follow_symlinks=False avoids descending
+        # into symlinked trees (e.g., ~/scratch -> /mnt/work) and possible
+        # cycles.
         try:
             for entry in os.scandir(path):
-                if not entry.is_dir():
+                if not entry.is_dir(follow_symlinks=False):
                     continue
 
                 name = entry.name

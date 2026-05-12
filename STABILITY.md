@@ -326,7 +326,9 @@ cycle:
 - **Log messages, warning text, error message wording.** Strings printed
   to stderr are for humans; their exact content is not stable.
 - **Tag derivation heuristics.** The set of implicit tags emitted from
-  `source='implicit'` or `source='forge'` during refresh (for example,
+  `source='implicit'`, `source='github'`, `source='gitea'`, or
+  `source='forge'` (forge-derived tags use the matching `forge_id` as the
+  source label, falling back to `'forge'`) during refresh (for example,
   `lang:python`, `dir:github`, `topic:machine-learning`) may grow or
   shrink. Explicit user tags (`source='user'`) are stable: a tag the user
   added continues to be present.

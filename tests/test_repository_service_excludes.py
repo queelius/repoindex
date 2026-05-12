@@ -189,3 +189,102 @@ class TestExpandExcludeSubtreesHelper:
         from repoindex.services.repository_service import _expand_exclude_subtrees
         assert _expand_exclude_subtrees([]) == set()
         assert _expand_exclude_subtrees(None) == set()
+
+
+class TestDiscoverGlobErgonomics:
+    """Glob handling in repository_directories entries.
+
+    Wave V2.A regression: ``glob.glob(path, recursive=True)`` against a
+    bare ``**`` enumerates every file at every depth before any filtering
+    runs. On a typical developer machine that is hundreds of thousands of
+    paths and minutes of CPU before the first repo is yielded. Discovery
+    now treats ``/**`` and ``/*`` as ergonomic suffixes and does its own
+    recursion in ``_discover_path``.
+    """
+
+    def test_trailing_double_star_is_treated_as_directory(self, repo_tree):
+        config = {
+            'repository_directories': [str(repo_tree) + '/**'],
+        }
+        repos = list(RepositoryService(config=config).discover(recursive=True))
+        # Same six repos as the no-glob version.
+        assert _names(repos) == [
+            'external', 'old-1', 'old-2', 'repo', 'repo-a', 'repo-b'
+        ]
+
+    def test_trailing_single_star_is_treated_as_directory(self, repo_tree):
+        config = {
+            'repository_directories': [str(repo_tree) + '/*'],
+        }
+        repos = list(RepositoryService(config=config).discover(recursive=True))
+        assert _names(repos) == [
+            'external', 'old-1', 'old-2', 'repo', 'repo-a', 'repo-b'
+        ]
+
+    def test_mid_glob_still_works(self, tmp_path):
+        """Glob metachars elsewhere in the path still expand."""
+        _make_repo(tmp_path / 'proj-alpha', 'repo')
+        _make_repo(tmp_path / 'proj-beta', 'repo')
+        _make_repo(tmp_path / 'unrelated', 'repo')
+        config = {
+            'repository_directories': [str(tmp_path / 'proj-*')],
+        }
+        repos = list(RepositoryService(config=config).discover(recursive=True))
+        # Two of three; unrelated/ is not glob-matched.
+        names = [str(Path(r.path).parent.name) for r in repos]
+        assert sorted(names) == ['proj-alpha', 'proj-beta']
+
+    def test_no_recursive_glob_at_glob_layer(self, tmp_path, monkeypatch):
+        """glob.glob must not be called with recursive=True.
+
+        The discovery walk recurses in _discover_path; passing
+        recursive=True to glob.glob explodes ~/dev/** into millions of
+        path strings before any repo is yielded.
+        """
+        calls = []
+        import glob as _glob
+        original = _glob.glob
+
+        def spy(pattern, *args, **kwargs):
+            calls.append((pattern, kwargs.get('recursive', False)))
+            return original(pattern, *args, **kwargs)
+
+        monkeypatch.setattr(_glob, 'glob', spy)
+
+        # Trigger the glob branch with a mid-glob pattern.
+        (tmp_path / 'proj-a').mkdir()
+        config = {
+            'repository_directories': [str(tmp_path / 'proj-*')],
+        }
+        list(RepositoryService(config=config).discover(recursive=True))
+
+        assert calls, 'expected at least one glob.glob call'
+        for pattern, recursive in calls:
+            assert recursive is False, (
+                f'glob.glob({pattern!r}, recursive={recursive}) is forbidden; '
+                'recursion belongs in _discover_path'
+            )
+
+    def test_double_star_does_not_explode(self, tmp_path):
+        """Smoke test that /** on a moderate tree returns fast.
+
+        Without the strip-trailing-glob fix, this same call would
+        enumerate every file at every depth via glob.glob(..., recursive=True).
+        With the fix, glob is never asked to recurse.
+        """
+        import time
+        # Build 50 subdirs, each with a repo and 20 nested non-repo dirs.
+        root = tmp_path / 'tree'
+        for i in range(50):
+            _make_repo(root / f'r{i:02d}', 'inner')
+            for j in range(20):
+                (root / f'r{i:02d}' / f'deep{j}' / 'nested').mkdir(parents=True)
+        config = {
+            'repository_directories': [str(root) + '/**'],
+        }
+        start = time.monotonic()
+        repos = list(RepositoryService(config=config).discover(recursive=True))
+        elapsed = time.monotonic() - start
+        # Should be well under a second on any sane machine.
+        assert elapsed < 5.0, f'discovery took {elapsed:.1f}s; perf regression'
+        assert len(repos) == 50

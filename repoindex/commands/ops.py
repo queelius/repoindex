@@ -1668,12 +1668,17 @@ def mirror_handler(
     """Mirror repositories to configured redundancy targets.
 
     Pushes every branch and tag (``git push --mirror``) to one or more
-    named mirrors defined in ``~/.repoindex/config.yaml``:
+    forges defined in ``~/.repoindex/config.yaml`` with ``role: mirror``:
 
-        mirrors:
-          - name: codeberg
+        forges:
+          codeberg:
+            source_id: gitea
+            host: codeberg.org
+            role: mirror
             url_template: "https://codeberg.org/queelius/{repo}.git"
-          - name: gitea-gdrive
+          gitea-gdrive:
+            source_id: gitea
+            role: mirror
             url_template: "file:///mnt/gdrive/git-mirrors/{repo}.git"
 
     For each repo x mirror, the URL is resolved from an existing git
