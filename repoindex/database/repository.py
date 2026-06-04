@@ -378,20 +378,37 @@ def get_stale_repos(db: Database) -> Generator[str, None, None]:
             yield row['path']
 
 
-def cleanup_missing_repos(db: Database) -> int:
+def cleanup_missing_repos(db: Database, chunk_size: int = 500) -> int:
     """
     Remove repos from database that no longer exist on disk.
+
+    Behavior-preserving exists()-semantics: a repo is pruned only when its
+    on-disk path is gone (NOT set-difference against a fresh scan). The
+    deletes are issued as chunked ``DELETE ... WHERE id IN (...)`` rather
+    than one statement per row.
+
+    Args:
+        db: Database connection
+        chunk_size: Maximum number of ids per DELETE statement.
 
     Returns:
         Number of repos removed
     """
     db.execute("SELECT id, path FROM repos")
-    removed = 0
+    missing_ids = [row['id'] for row in db.fetchall() if not Path(row['path']).exists()]
 
-    for row in db.fetchall():
-        if not Path(row['path']).exists():
-            delete_repo(db, row['id'])
-            removed += 1
+    if not missing_ids:
+        return 0
+
+    removed = 0
+    for start in range(0, len(missing_ids), chunk_size):
+        chunk = missing_ids[start:start + chunk_size]
+        placeholders = ', '.join('?' for _ in chunk)
+        db.execute(
+            f"DELETE FROM repos WHERE id IN ({placeholders})",
+            tuple(chunk),
+        )
+        removed += len(chunk)
 
     return removed
 

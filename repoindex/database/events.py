@@ -45,20 +45,43 @@ def insert_events(db: Database, events: List[Event], repo_id: int) -> int:
     """
     Insert multiple events efficiently.
 
+    Issues a single ``executemany`` (INSERT OR IGNORE) instead of one
+    statement per event. The returned count reflects only newly inserted
+    rows, measured via a ``conn.total_changes`` delta, so dedup-by
+    ``event_id`` does not over-count.
+
     Args:
         db: Database connection
         events: List of Event domain objects
         repo_id: ID of the associated repository
 
     Returns:
-        Number of events inserted
+        Number of events actually inserted (excludes ignored duplicates)
     """
-    inserted = 0
-    for event in events:
-        result = insert_event(db, event, repo_id)
-        if result:
-            inserted += 1
-    return inserted
+    if not events:
+        return 0
+
+    rows = [
+        (
+            repo_id,
+            event.id,  # Stable event ID for deduplication
+            event.type,
+            event.timestamp.isoformat(),
+            event.data.get('ref') or event.data.get('tag') or event.data.get('branch'),
+            event.data.get('message'),
+            event.data.get('author'),
+            json.dumps(event.data),
+        )
+        for event in events
+    ]
+
+    before = db.conn.total_changes
+    db.executemany("""
+        INSERT OR IGNORE INTO events
+        (repo_id, event_id, type, timestamp, ref, message, author, metadata)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, rows)
+    return db.conn.total_changes - before
 
 
 def get_events(

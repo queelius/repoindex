@@ -431,7 +431,26 @@ class RepositoryService:
         return 'other'
 
     def _detect_languages(self, path: str) -> tuple:
-        """Detect primary language and all languages."""
+        """Detect primary language and all languages.
+
+        Single ``os.walk`` pass that replaces the ~19 per-extension
+        ``glob`` calls. The previous implementation excluded a file when
+        any ``EXCLUDE_DIRS`` token was a *substring* of the file's full
+        path string (``any(excl in str(m) ...)``). We reproduce that
+        substring test exactly, but only against the file/directory path
+        *relative to the repo root* -- never the repo's own ancestor
+        segments. That keeps behavior byte-identical for everything below
+        the root (a directory named ``build``, a file named ``env.py``, a
+        partial-match dir like ``mybuild/``) while fixing the one
+        sanctioned divergence: a repo whose ancestor path happens to
+        contain a token (e.g. ``.../build/myproj``) is now scanned instead
+        of having all its sources dropped.
+
+        Output is otherwise byte-identical to the glob implementation,
+        including the ``.r``/``.R`` last-write-wins quirk (R is counted
+        from ``.R`` only) and the insertion-order tie-break for the
+        primary language.
+        """
         extensions = {
             '.py': 'Python',
             '.js': 'JavaScript',
@@ -454,26 +473,65 @@ class RepositoryService:
             '.pl': 'Perl',
         }
 
-        counts = {}
+        # Per-extension counts (keyed by file extension), so the
+        # subsequent per-language collapse preserves the original
+        # "last extension wins" overwrite (e.g. .R count replaces .r).
+        ext_counts = {ext: 0 for ext in extensions}
 
         try:
-            for ext, lang in extensions.items():
-                pattern = f"**/*{ext}"
-                matches = list(Path(path).glob(pattern))
-                # Exclude common non-source directories
-                matches = [
-                    m for m in matches
-                    if not any(excl in str(m) for excl in EXCLUDE_DIRS)
+            root = os.path.abspath(path)
+            for dirpath, dirnames, filenames in os.walk(path):
+                # Path of the current directory relative to the repo root.
+                # The root itself maps to '' (ancestor segments are never
+                # inspected -- the sanctioned divergence from the old
+                # full-path substring test).
+                rel_dir = os.path.relpath(os.path.abspath(dirpath), root)
+                if rel_dir == os.curdir:
+                    rel_dir = ''
+
+                # Prune child directories in place when any EXCLUDE_DIRS
+                # token is a *substring* of the child's relative path, so
+                # os.walk never descends. This reproduces the old
+                # ``any(excl in str(m) ...)`` test for directory segments
+                # (matching both exact names like ``build`` and partial
+                # names like ``mybuild``).
+                dirnames[:] = [
+                    d for d in dirnames
+                    if not any(
+                        excl in (os.path.join(rel_dir, d) if rel_dir else d)
+                        for excl in EXCLUDE_DIRS
+                    )
                 ]
-                if matches:
-                    counts[lang] = len(matches)
+
+                for fname in filenames:
+                    _, ext = os.path.splitext(fname)
+                    if ext not in ext_counts:
+                        continue
+                    rel_file = os.path.join(rel_dir, fname) if rel_dir else fname
+                    # Exclude when any token is a substring of the file's
+                    # relative path -- catches both a token in a surviving
+                    # directory segment and a token in the file name itself
+                    # (e.g. ``env.py``, ``target.rs``), exactly as the old
+                    # full-path substring test did.
+                    if any(excl in rel_file for excl in EXCLUDE_DIRS):
+                        continue
+                    ext_counts[ext] += 1
         except Exception:
             pass
+
+        # Collapse extensions to languages with the original
+        # overwrite semantics: iterate the extensions map in order and
+        # assign counts[lang] = count, so a later extension for the same
+        # language (".R" after ".r") replaces the earlier value.
+        counts: Dict[str, int] = {}
+        for ext, lang in extensions.items():
+            if ext_counts[ext]:
+                counts[lang] = ext_counts[ext]
 
         if not counts:
             return None, []
 
-        # Primary language is the one with most files
+        # Primary language is the one with most files (first on ties).
         primary = max(counts, key=counts.get)
         all_langs = sorted(counts.keys(), key=lambda x: counts[x], reverse=True)
 
