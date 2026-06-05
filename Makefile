@@ -18,8 +18,7 @@ venv:
 	@. .venv/bin/activate && pip install --upgrade pip
 
 install: venv
-	@. .venv/bin/activate && pip install -r requirements.txt
-	@. .venv/bin/activate && pip install -e .
+	@. .venv/bin/activate && pip install -e ".[dev]"
 
 test: venv
 	@. .venv/bin/activate && pytest --maxfail=3 --disable-warnings -v
