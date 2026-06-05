@@ -2966,8 +2966,9 @@ def scan_events(
                 all_events.append(event)
 
         if 'commit' in types:
-            # Limit commits per repo to avoid explosion
-            for event in scan_commits(repo_path, since, until, limit=50):
+            # No count cap: the `since` time window bounds how many commits
+            # are scanned (configurable via events.since, default 6m).
+            for event in scan_commits(repo_path, since, until, limit=None):
                 all_events.append(event)
 
         if 'branch' in types:
@@ -2975,7 +2976,7 @@ def scan_events(
                 all_events.append(event)
 
         if 'merge' in types:
-            for event in scan_merges(repo_path, since, until, limit=50):
+            for event in scan_merges(repo_path, since, until, limit=None):
                 all_events.append(event)
 
         # GitHub events (opt-in, uses gh CLI)
@@ -3126,13 +3127,14 @@ def _scan_repo_events(
         events.extend(scan_git_tags(repo_path, since, until))
 
     if 'commit' in types:
-        events.extend(scan_commits(repo_path, since, until, limit=50))
+        # No count cap: the `since` time window bounds the scan (events.since).
+        events.extend(scan_commits(repo_path, since, until, limit=None))
 
     if 'branch' in types:
         events.extend(scan_branches(repo_path, since, until, limit=20))
 
     if 'merge' in types:
-        events.extend(scan_merges(repo_path, since, until, limit=50))
+        events.extend(scan_merges(repo_path, since, until, limit=None))
 
     # Local metadata events (fast, no caching needed)
     if 'version_bump' in types:

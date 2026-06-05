@@ -120,7 +120,7 @@ def _resolve_active_sources(
 
 @click.command('refresh')
 @click.option('--full', is_flag=True, help='Force full refresh of all repos')
-@click.option('--since', default='90d', help='How far back to scan for events (e.g., 7d, 30d, 90d)')
+@click.option('--since', default=None, help='How far back to scan for events (e.g., 7d, 30d, 6m, 1y); default from config events.since (6m)')
 @click.option('--github/--no-github', default=None, help='Fetch GitHub metadata (alias for --source github)')
 @click.option('--source', '-s', 'source_names', multiple=True,
               help='Enable specific sources (e.g., --source github --source pypi)')
@@ -252,8 +252,10 @@ def refresh_handler(
         'start_time': datetime.now().isoformat(),
     }
 
-    # Parse since parameter for event scanning
-    since_datetime = _parse_since(since)
+    # Parse since parameter for event scanning. When --since is not given,
+    # fall back to the configured window (events.since, default 6m).
+    from ..config import get_events_since
+    since_datetime = _parse_since(since or get_events_since(config))
 
     if dry_run:
         click.echo("Dry run - showing what would be refreshed:", err=True)

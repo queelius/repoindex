@@ -376,6 +376,15 @@ def get_default_config():
             },
         },
 
+        # Event scanning window. Controls how far back `refresh` scans git
+        # history for events (commits, tags, merges). The time window is the
+        # cap: there is no per-repo commit-count limit, so a busy repo's full
+        # history within the window is captured. Accepts the same duration
+        # tokens as --since (e.g. "6m", "1y", "90d"); the --since flag overrides.
+        "events": {
+            "since": "6m",
+        },
+
         # NOTE: Legacy keys (registries, cache) are ignored if present in old configs
         # The SQLite database is now the canonical cache
     }
@@ -439,6 +448,12 @@ refresh:
     # pypi: false
     # cran: false
     # npm: false
+
+# How far back `refresh` scans git history for events (commits, tags, merges).
+# This time window is the only cap (no per-repo commit-count limit), so a busy
+# repo's full history within the window is captured. The --since flag overrides.
+events:
+  since: 6m   # accepts 7d, 30d, 90d, 6m, 1y, ISO date, etc.
 """
     config_path.write_text(example_content)
     logger.info(f"Example configuration saved to {config_path}")
@@ -544,6 +559,23 @@ def get_repository_directories(config: dict) -> list:
         List of directory paths/patterns (empty if not configured)
     """
     return config.get('repository_directories', [])
+
+
+def get_events_since(config: dict) -> str:
+    """
+    Get the default event-scan window from config.
+
+    This is the time window `refresh` scans git history for events when no
+    --since flag is given. It is the only cap on event scanning (there is no
+    per-repo commit-count limit). Defaults to "6m" (six months).
+
+    Args:
+        config: Configuration dictionary
+
+    Returns:
+        A duration string parseable by services.timespec.parse_since.
+    """
+    return (config.get('events') or {}).get('since') or '6m'
 
 
 def get_exclude_directories(config: dict) -> list:

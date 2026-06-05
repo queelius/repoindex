@@ -4,6 +4,15 @@ All notable changes to repoindex are documented here.
 
 ## Unreleased
 
+### Changed (behavior)
+
+- Event scanning is now bounded by a single configurable time window instead
+  of a hidden per-repo commit-count cap. The scanner previously kept only the
+  50 most recent commits per repo, so commit counts saturated at 50 and history
+  was truncated. The 50-count cap on commits and merges is removed; how far back
+  `refresh` scans is set by `events.since` in config (default `6m`), and the
+  `--since` flag overrides it.
+
 ## 2.1.0 - 2026-06-05
 
 Trust-repair and performance bundle: remove silent failures and make
