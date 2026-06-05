@@ -219,7 +219,7 @@ def refresh_handler(
         if not paths:
             click.echo(json.dumps({
                 "error": "No repository directories configured",
-                "hint": "Use 'repoindex init' or provide --dir"
+                "hint": "Use 'repoindex config init' or provide --dir"
             }))
             sys.exit(1)
 

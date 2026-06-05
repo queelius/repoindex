@@ -147,7 +147,7 @@ def _pretty_dashboard(config: dict, db_info: dict):
         elif db['repos'] == 0:
             console.print("[dim]No repositories indexed. Check your configuration with 'repoindex config show'.[/dim]")
         else:
-            console.print("[dim]Run 'repoindex query' to search your repositories.[/dim]")
+            console.print("[dim]Run 'repoindex sql' to search your repositories.[/dim]")
 
 
 def _gather_dashboard_data(config: dict, db_info: dict) -> Dict[str, Any]:

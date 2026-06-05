@@ -182,7 +182,7 @@ tags are stable (see `STABILITY.md`).
 ## Claude Code Plugin
 
 ```bash
-/plugin marketplace add queelius/claude-code-marketplace
+/plugin marketplace add queelius/claude-anvil
 /plugin install repoindex@queelius
 ```
 

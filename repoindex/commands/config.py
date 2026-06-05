@@ -131,7 +131,7 @@ def config_init(directory, yes, recursive):
     console.print("\n[bold]Next steps:[/bold]")
     console.print("  1. Run [cyan]repoindex refresh[/cyan] to populate the database")
     console.print("  2. Run [cyan]repoindex status[/cyan] to see your repositories")
-    console.print("  3. Run [cyan]repoindex query \"language == 'Python'\"[/cyan] to search")
+    console.print("  3. Run [cyan]repoindex sql \"SELECT name FROM repos WHERE language = 'Python'\"[/cyan] to search")
 
 
 @config_cmd.command("show")

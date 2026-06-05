@@ -73,7 +73,7 @@ dirty repos" tools. The schema is self-describing; SQL does the rest.
 Install the Claude Code plugin to wire the server automatically:
 
 ```bash
-/plugin marketplace add queelius/claude-code-marketplace
+/plugin marketplace add queelius/claude-anvil
 /plugin install repoindex@queelius
 ```
 
