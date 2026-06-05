@@ -34,7 +34,7 @@ def _repo_to_jsonld(repo: dict) -> dict:
     if license_key:
         obj["license"] = f"https://spdx.org/licenses/{license_key.strip()}"
 
-    doi = repo.get('citation_doi')
+    doi = repo.get('concept_doi') or repo.get('citation_doi') or repo.get('doi')
     if doi:
         if doi.startswith('http'):
             obj["identifier"] = doi

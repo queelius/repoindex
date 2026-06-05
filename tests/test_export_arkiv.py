@@ -350,3 +350,19 @@ class TestArchiveSqlite:
         n = conn.execute("SELECT COUNT(*) FROM records").fetchone()[0]
         conn.close()
         assert n == 0
+
+
+def test_publication_record_includes_concept_doi():
+    from repoindex.exporters.arkiv import _publication_to_arkiv
+    pub = {
+        'registry': 'zenodo',
+        'package_name': 'demo',
+        'current_version': '1.0.0',
+        'published': 1,
+        'doi': '10.5281/zenodo.456',
+        'concept_doi': '10.5281/zenodo.400',
+        'url': 'https://zenodo.org/records/456',
+    }
+    record = _publication_to_arkiv(pub)
+    assert record['metadata']['doi'] == '10.5281/zenodo.456'
+    assert record['metadata']['concept_doi'] == '10.5281/zenodo.400'

@@ -88,7 +88,8 @@ class TestZenodoMatch:
         )
         assert result is not None
         assert result.registry == "zenodo"
-        assert result.doi == "10.5281/zenodo.100"
+        assert result.doi == "10.5281/zenodo.123"
+        assert result.concept_doi == "10.5281/zenodo.100"
 
     def test_match_by_name(self, tmp_path):
         repo_dir = tmp_path / "my-repo"
@@ -133,6 +134,45 @@ class TestZenodoMatch:
         result = s.match(str(repo_dir))
         assert result is None
 
+    def test_match_stores_both_dois(self, tmp_path):
+        s = ZenodoSource()
+        s._records = [
+            ZenodoRecord(
+                doi="10.5281/zenodo.123",
+                concept_doi="10.5281/zenodo.100",
+                title="My Repo",
+                version="1.0.0",
+                url="https://zenodo.org/records/123",
+                github_url="https://github.com/owner/my-repo",
+            )
+        ]
+        result = s.match(
+            str(tmp_path),
+            repo_record={'remote_url': 'https://github.com/owner/my-repo', 'name': 'my-repo'},
+        )
+        assert result is not None
+        assert result.doi == "10.5281/zenodo.123"
+        assert result.concept_doi == "10.5281/zenodo.100"
+
+    def test_match_concept_doi_none_keeps_version_doi(self, tmp_path):
+        s = ZenodoSource()
+        s._records = [
+            ZenodoRecord(
+                doi="10.5281/zenodo.123",
+                concept_doi=None,
+                title="My Repo",
+                url="https://zenodo.org/records/123",
+                github_url="https://github.com/owner/my-repo",
+            )
+        ]
+        result = s.match(
+            str(tmp_path),
+            repo_record={'remote_url': 'https://github.com/owner/my-repo', 'name': 'my-repo'},
+        )
+        assert result is not None
+        assert result.doi == "10.5281/zenodo.123"
+        assert result.concept_doi is None
+
 
 class TestZenodoFetch:
     def test_fetch_returns_match_dict(self, tmp_path):
@@ -153,7 +193,8 @@ class TestZenodoFetch:
         assert result is not None
         assert result['registry'] == 'zenodo'
         assert result['name'] == 'my-repo'
-        assert result['doi'] == '10.5281/zenodo.400'
+        assert result['doi'] == '10.5281/zenodo.456'
+        assert result['concept_doi'] == '10.5281/zenodo.400'
         assert result['version'] == '2.0.0'
         assert result['published'] is True
 

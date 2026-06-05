@@ -313,3 +313,23 @@ class TestEvent:
         )
         events = {e1, e2}
         assert len(events) == 2
+
+
+class TestPackageMetadataConceptDoi:
+    def test_concept_doi_defaults_none(self):
+        from repoindex.domain.repository import PackageMetadata
+        pkg = PackageMetadata(registry='zenodo', name='x')
+        assert pkg.concept_doi is None
+
+    def test_concept_doi_set_and_serialized(self):
+        from repoindex.domain.repository import PackageMetadata
+        pkg = PackageMetadata(
+            registry='zenodo',
+            name='x',
+            doi='10.5281/zenodo.123',
+            concept_doi='10.5281/zenodo.100',
+        )
+        assert pkg.concept_doi == '10.5281/zenodo.100'
+        d = pkg.to_dict()
+        assert d['doi'] == '10.5281/zenodo.123'
+        assert d['concept_doi'] == '10.5281/zenodo.100'

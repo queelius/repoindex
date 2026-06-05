@@ -93,8 +93,9 @@ class BibTeXExporter(Exporter):
             # URL
             url = repo.get('citation_repository') or repo.get('remote_url') or ''
 
-            # DOI
-            doi = repo.get('citation_doi') or ''
+            # DOI: the concept (version-independent) DOI is what a paper cites,
+            # so prefer it, then the citation file DOI, then the publication DOI.
+            doi = repo.get('concept_doi') or repo.get('citation_doi') or repo.get('doi') or ''
 
             output.write(f"@software{{{key},\n")
             output.write(f"  title = {{{_escape_bibtex(title)}}},\n")

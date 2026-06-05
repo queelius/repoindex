@@ -105,7 +105,8 @@ class PackageMetadata:
     version: Optional[str] = None
     published: bool = False
     url: Optional[str] = None
-    doi: Optional[str] = None
+    doi: Optional[str] = None  # version-specific DOI
+    concept_doi: Optional[str] = None  # version-independent (concept) DOI
     downloads: Optional[int] = None  # lifetime total (Cargo, RubyGems, Docker pulls)
     downloads_30d: Optional[int] = None  # 30-day count (PyPI via pypistats)
     last_updated: Optional[str] = None
@@ -118,6 +119,7 @@ class PackageMetadata:
             'published': self.published,
             'url': self.url,
             'doi': self.doi,
+            'concept_doi': self.concept_doi,
             'downloads': self.downloads,
             'downloads_30d': self.downloads_30d,
             'last_updated': self.last_updated

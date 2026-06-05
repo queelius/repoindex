@@ -112,7 +112,8 @@ class ZenodoSource(Registry):
             version=record.version,
             published=True,
             url=record.url,
-            doi=record.concept_doi or record.doi,
+            doi=record.doi,
+            concept_doi=record.concept_doi,
         )
 
 

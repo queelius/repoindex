@@ -127,6 +127,24 @@ class TestBibTeXExporter:
         assert e.format_id == "bibtex"
         assert e.extension == ".bib"
 
+    def test_export_prefers_concept_doi(self):
+        e = BibTeXExporter()
+        out = io.StringIO()
+        repo = {
+            'name': 'gamma',
+            'concept_doi': '10.5281/zenodo.100',
+            'citation_doi': '10.5281/zenodo.123',
+        }
+        e.export([repo], out)
+        assert 'doi = {10.5281/zenodo.100}' in out.getvalue()
+
+    def test_export_falls_back_to_citation_doi(self):
+        e = BibTeXExporter()
+        out = io.StringIO()
+        repo = {'name': 'delta', 'citation_doi': '10.5281/zenodo.123'}
+        e.export([repo], out)
+        assert 'doi = {10.5281/zenodo.123}' in out.getvalue()
+
 
 # ============================================================================
 # CSV
@@ -387,3 +405,14 @@ class TestJSONLDExporter:
         e = JSONLDExporter()
         assert e.format_id == "jsonld"
         assert e.extension == ".jsonld"
+
+    def test_jsonld_prefers_concept_doi(self):
+        e = JSONLDExporter()
+        out = io.StringIO()
+        repo = {
+            'name': 'gamma',
+            'concept_doi': '10.5281/zenodo.100',
+            'citation_doi': '10.5281/zenodo.123',
+        }
+        e.export([repo], out)
+        assert 'https://doi.org/10.5281/zenodo.100' in out.getvalue()

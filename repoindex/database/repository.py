@@ -211,6 +211,7 @@ def _upsert_publication(db: Database, repo_id: int, package) -> None:
                 published = ?,
                 url = ?,
                 doi = ?,
+                concept_doi = ?,
                 downloads_total = ?,
                 downloads_30d = ?,
                 last_published = ?,
@@ -222,6 +223,7 @@ def _upsert_publication(db: Database, repo_id: int, package) -> None:
             package.published,
             package.url,
             getattr(package, 'doi', None),
+            getattr(package, 'concept_doi', None),
             package.downloads,
             getattr(package, 'downloads_30d', None),
             package.last_updated,
@@ -232,8 +234,9 @@ def _upsert_publication(db: Database, repo_id: int, package) -> None:
         db.execute("""
             INSERT INTO publications (
                 repo_id, registry, package_name, current_version,
-                published, url, doi, downloads_total, downloads_30d, last_published
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                published, url, doi, concept_doi,
+                downloads_total, downloads_30d, last_published
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             repo_id,
             package.registry,
@@ -242,6 +245,7 @@ def _upsert_publication(db: Database, repo_id: int, package) -> None:
             package.published,
             package.url,
             getattr(package, 'doi', None),
+            getattr(package, 'concept_doi', None),
             package.downloads,
             getattr(package, 'downloads_30d', None),
             package.last_updated

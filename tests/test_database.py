@@ -184,6 +184,61 @@ class TestSchema(unittest.TestCase):
 
         conn.close()
 
+    def test_current_version_is_10(self):
+        self.assertEqual(CURRENT_VERSION, 10)
+
+    def test_publications_has_concept_doi_column(self):
+        conn = sqlite3.connect(str(self.db_path))
+        conn.row_factory = sqlite3.Row
+        ensure_schema(conn)
+        cols = [r['name'] for r in conn.execute("PRAGMA table_info(publications)")]
+        self.assertIn('concept_doi', cols)
+        self.assertIn('doi', cols)
+        conn.close()
+
+    def test_apply_schema_preserves_external_events_and_refresh_log(self):
+        # Seed a DB, stamp it as v9, then migrate and confirm append-only
+        # external history (events + refresh_log) survives the rebuild.
+        conn = sqlite3.connect(str(self.db_path))
+        conn.row_factory = sqlite3.Row
+        ensure_schema(conn)
+        conn.execute(
+            "INSERT INTO repos (name, path) VALUES (?, ?)",
+            ('demo', '/tmp/demo'),
+        )
+        repo_id = conn.execute("SELECT id FROM repos WHERE name='demo'").fetchone()['id']
+        for ev_id, ev_type in [
+            ('gh-rel-1', 'github_release'),
+            ('gh-pr-2', 'pull_request'),
+            ('gh-star-3', 'star'),
+        ]:
+            conn.execute(
+                "INSERT INTO events (repo_id, event_id, type, timestamp, message) "
+                "VALUES (?, ?, ?, ?, ?)",
+                (repo_id, ev_id, ev_type, '2024-01-01T00:00:00', 'seed'),
+            )
+        conn.execute(
+            "INSERT INTO refresh_log (started_at, finished_at, full_scan, sources) "
+            "VALUES (?, ?, ?, ?)",
+            ('2024-01-01T00:00:00', '2024-01-01T00:01:00', 1, '["git","github"]'),
+        )
+        # Force the stored version back to 9 so apply_schema migrates.
+        conn.execute("DELETE FROM _schema_info")
+        conn.execute(
+            "INSERT INTO _schema_info (version, description) VALUES (9, 'seeded v9')"
+        )
+        conn.commit()
+
+        from repoindex.database.schema import apply_schema
+        apply_schema(conn, CURRENT_VERSION)
+
+        surviving = {r['event_id'] for r in conn.execute("SELECT event_id FROM events")}
+        self.assertEqual(surviving, {'gh-rel-1', 'gh-pr-2', 'gh-star-3'})
+        rl = conn.execute("SELECT COUNT(*) AS c FROM refresh_log").fetchone()['c']
+        self.assertEqual(rl, 1)
+        self.assertEqual(get_schema_version(conn), CURRENT_VERSION)
+        conn.close()
+
 
 class TestRepositoryOperations(unittest.TestCase):
     """Tests for repository CRUD operations."""
@@ -403,6 +458,52 @@ class TestRepositoryOperations(unittest.TestCase):
             db.execute("SELECT COUNT(*) FROM publications WHERE repo_id = ?", (repo_id,))
             count = db.fetchone()[0]
             self.assertEqual(count, 1)
+
+    def test_upsert_publication_stores_concept_doi(self):
+        package = PackageMetadata(
+            registry='zenodo',
+            name='demo',
+            version='1.0.0',
+            published=True,
+            doi='10.5281/zenodo.456',
+            concept_doi='10.5281/zenodo.400',
+        )
+        repo = Repository(
+            path=str(self.repo_path),
+            name='test-repo',
+            package=package,
+        )
+        with Database(db_path=self.db_path) as db:
+            repo_id = upsert_repo(db, repo)
+            db.execute("SELECT * FROM publications WHERE repo_id = ?", (repo_id,))
+            row = db.fetchone()
+            self.assertEqual(row['doi'], '10.5281/zenodo.456')
+            self.assertEqual(row['concept_doi'], '10.5281/zenodo.400')
+
+    def test_upsert_publication_updates_concept_doi(self):
+        repo = Repository(
+            path=str(self.repo_path),
+            name='test-repo',
+            package=PackageMetadata(
+                registry='zenodo', name='demo', doi='10.5281/zenodo.1',
+                concept_doi='10.5281/zenodo.0',
+            ),
+        )
+        with Database(db_path=self.db_path) as db:
+            repo_id = upsert_repo(db, repo)
+            repo2 = Repository(
+                path=str(self.repo_path),
+                name='test-repo',
+                package=PackageMetadata(
+                    registry='zenodo', name='demo', doi='10.5281/zenodo.2',
+                    concept_doi='10.5281/zenodo.0',
+                ),
+            )
+            upsert_repo(db, repo2)
+            db.execute("SELECT * FROM publications WHERE repo_id = ?", (repo_id,))
+            row = db.fetchone()
+            self.assertEqual(row['doi'], '10.5281/zenodo.2')
+            self.assertEqual(row['concept_doi'], '10.5281/zenodo.0')
 
 
 class TestEventOperations(unittest.TestCase):

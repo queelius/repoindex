@@ -411,7 +411,8 @@ class TestZenodoMatching:
         result = self.service.match_zenodo_record(repo, self.zenodo_records)
         assert result is not None
         assert result.registry == 'zenodo'
-        assert result.doi == "10.5281/zenodo.1234567"  # concept DOI preferred
+        assert result.doi == "10.5281/zenodo.18345659"  # version DOI
+        assert result.concept_doi == "10.5281/zenodo.1234567"  # concept DOI
         assert result.published is True
 
     def test_match_by_github_url_ssh(self):
@@ -423,7 +424,8 @@ class TestZenodoMatching:
         )
         result = self.service.match_zenodo_record(repo, self.zenodo_records)
         assert result is not None
-        assert result.doi == "10.5281/zenodo.1234567"
+        assert result.doi == "10.5281/zenodo.18345659"
+        assert result.concept_doi == "10.5281/zenodo.1234567"
 
     def test_match_by_title_fallback(self):
         """Test matching by title when no GitHub URL available."""
@@ -434,7 +436,8 @@ class TestZenodoMatching:
         )
         result = self.service.match_zenodo_record(repo, self.zenodo_records)
         assert result is not None
-        assert result.doi == "10.5281/zenodo.8888888"
+        assert result.doi == "10.5281/zenodo.99999999"
+        assert result.concept_doi == "10.5281/zenodo.8888888"
         assert result.name == "standalone-package"
 
     def test_match_by_title_case_insensitive(self):
@@ -446,7 +449,7 @@ class TestZenodoMatching:
         )
         result = self.service.match_zenodo_record(repo, self.zenodo_records)
         assert result is not None
-        assert result.doi == "10.5281/zenodo.8888888"
+        assert result.doi == "10.5281/zenodo.99999999"
 
     def test_no_match(self):
         """Test when no record matches."""
@@ -494,10 +497,11 @@ class TestZenodoMatching:
         result = self.service.match_zenodo_record(repo, records)
         assert result is not None
         # Should match by GitHub URL (record 222), not by title (record 111)
-        assert result.doi == "10.5281/zenodo.200"
+        assert result.doi == "10.5281/zenodo.222"
+        assert result.concept_doi == "10.5281/zenodo.200"
 
-    def test_concept_doi_preferred_over_record_doi(self):
-        """Test that concept DOI is used when available."""
+    def test_stores_both_version_and_concept_doi(self):
+        """Both the version DOI and the concept DOI are stored separately."""
         records = [
             ZenodoRecord(
                 doi="10.5281/zenodo.specific-version",
@@ -510,7 +514,8 @@ class TestZenodoMatching:
         repo = Repository(path="/home/user/myrepo", name="myrepo")
         result = self.service.match_zenodo_record(repo, records)
         assert result is not None
-        assert result.doi == "10.5281/zenodo.all-versions"
+        assert result.doi == "10.5281/zenodo.specific-version"
+        assert result.concept_doi == "10.5281/zenodo.all-versions"
 
     def test_record_doi_used_when_no_concept(self):
         """Test that record DOI is used when concept DOI is absent."""

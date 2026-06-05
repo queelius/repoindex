@@ -204,7 +204,7 @@ def _publication_to_arkiv(pub: dict) -> dict:
     if repo_name:
         meta['repo'] = repo_name
 
-    for key in ('doi', 'downloads_total', 'downloads_30d', 'last_published'):
+    for key in ('doi', 'concept_doi', 'downloads_total', 'downloads_30d', 'last_published'):
         val = pub.get(key)
         if val is not None and val != '':
             meta[key] = val

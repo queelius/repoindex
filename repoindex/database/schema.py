@@ -26,7 +26,9 @@ from typing import List, Tuple
 #     added generic forge_id/forge_host/topics/is_archived/stars/etc.
 #     Hard-drop migration: old columns are dropped, new columns start NULL.
 #     Run `repoindex refresh --external` after upgrade to repopulate.
-CURRENT_VERSION = 9
+# v10: preserve events + refresh_log across migration (no longer dropped);
+#      added nullable concept_doi column to publications (version-independent DOI).
+CURRENT_VERSION = 10
 
 # Schema definition as SQL statements
 SCHEMA_V1 = """
@@ -162,7 +164,8 @@ CREATE TABLE IF NOT EXISTS publications (
     current_version TEXT,
     published BOOLEAN DEFAULT 0,
     url TEXT,
-    doi TEXT,  -- DOI identifier (e.g., "10.5281/zenodo.1234567")
+    doi TEXT,  -- version-specific DOI (e.g., "10.5281/zenodo.1234567")
+    concept_doi TEXT,  -- version-independent (concept) DOI; what a paper cites
     downloads_total INTEGER,
     downloads_30d INTEGER,
     last_published TIMESTAMP,
@@ -340,12 +343,31 @@ def apply_schema(conn: sqlite3.Connection, version: int = CURRENT_VERSION) -> No
     """
     current = get_schema_version(conn)
 
-    # If schema version mismatch, drop everything and recreate
-    # No complex migration needed - this is just a cache
+    # If schema version mismatch, rebuild the cache from SCHEMA_V1 but
+    # preserve append-only history that cannot be re-derived.
     if current != 0 and current < CURRENT_VERSION:
         import logging
         logger = logging.getLogger(__name__)
         logger.info(f"Schema version {current} -> {CURRENT_VERSION}, rebuilding cache")
+
+        # Preserve append-only tables across the rebuild. Local commit/tag
+        # events re-scan from git, but external-sourced events (releases, PRs,
+        # stars, publishes) and the entire refresh_log are not recoverable, so
+        # copy them to temp tables, drop/recreate, and re-insert. INSERT OR
+        # IGNORE dedupes events by their UNIQUE event_id.
+        def _table_exists(name: str) -> bool:
+            row = conn.execute(
+                "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?",
+                (name,),
+            ).fetchone()
+            return row is not None
+
+        preserve = [t for t in ('events', 'refresh_log') if _table_exists(t)]
+        for table in preserve:
+            conn.execute(f"DROP TABLE IF EXISTS _preserve_{table}")
+            conn.execute(
+                f"CREATE TEMP TABLE _preserve_{table} AS SELECT * FROM {table}"
+            )
 
         # Drop all tables (cascade will handle FKs)
         conn.executescript("""
@@ -359,11 +381,27 @@ def apply_schema(conn: sqlite3.Connection, version: int = CURRENT_VERSION) -> No
             DROP TABLE IF EXISTS _schema_info;
         """)
 
-    # Apply current schema
+        # Recreate the current schema before re-inserting preserved rows.
+        conn.executescript(SCHEMA_V1)
+
+        for table in preserve:
+            cols = [r[1] for r in conn.execute(f"PRAGMA table_info({table})")]
+            old_cols = [
+                r[1] for r in conn.execute(f"PRAGMA table_info(_preserve_{table})")
+            ]
+            shared = [c for c in cols if c in old_cols]
+            col_list = ", ".join(shared)
+            conn.execute(
+                f"INSERT OR IGNORE INTO {table} ({col_list}) "
+                f"SELECT {col_list} FROM _preserve_{table}"
+            )
+            conn.execute(f"DROP TABLE IF EXISTS _preserve_{table}")
+
+    # Apply current schema (idempotent: CREATE ... IF NOT EXISTS)
     conn.executescript(SCHEMA_V1)
     conn.execute(
         "INSERT OR REPLACE INTO _schema_info (version, description) VALUES (?, ?)",
-        (CURRENT_VERSION, "v2.0 (Wave V2.B): unified forge schema (forge_id + generic columns)")
+        (CURRENT_VERSION, "v10: preserve events + refresh_log on migration; concept_doi on publications")
     )
 
     conn.commit()
