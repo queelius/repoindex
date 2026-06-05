@@ -29,9 +29,10 @@ documentation, packaging, and version metadata honest and self-enforcing.
 - Bulk `ops set-*` mutations (`--all`, more than one repo) now prompt for
   confirmation on an interactive TTY; add `--yes/-y` to skip. Scripted, piped,
   `--dry-run`, `--json`, and single-repo runs never prompt.
-- Schema bumped to v10. Migration now preserves external-sourced events
-  (releases, PRs, stars, publishes) and the entire `refresh_log` across the
-  rebuild instead of dropping them.
+- Schema bumped to v10 (adds a nullable `publications.concept_doi` column).
+  Consistent with the cache design, a schema-version bump drops and rebuilds
+  the database from the filesystem; run `repoindex refresh` afterward to
+  repopulate (and `refresh --external` to restore stars/releases/publications).
 
 ### Added
 
