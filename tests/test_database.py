@@ -822,3 +822,136 @@ class TestCitationDetection(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+class TestReadReadmeContent(unittest.TestCase):
+    """Tests for the truncated README reader used during upsert."""
+
+    def setUp(self):
+        self.temp_dir = tempfile.mkdtemp()
+        self.repo_path = Path(self.temp_dir)
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
+
+    def test_no_readme_returns_none(self):
+        from repoindex.database.repository import _read_readme_content
+        self.assertIsNone(_read_readme_content(self.repo_path))
+
+    def test_reads_readme_md_first(self):
+        from repoindex.database.repository import _read_readme_content
+        (self.repo_path / 'README.md').write_text('# Hello world\n')
+        self.assertEqual(_read_readme_content(self.repo_path), '# Hello world\n')
+
+    def test_prefers_md_over_plain_readme(self):
+        from repoindex.database.repository import _read_readme_content
+        (self.repo_path / 'README.md').write_text('markdown body')
+        (self.repo_path / 'README').write_text('plain body')
+        self.assertEqual(_read_readme_content(self.repo_path), 'markdown body')
+
+    def test_oversized_readme_truncated_at_cap(self):
+        from repoindex.database.repository import _read_readme_content, README_CONTENT_CAP
+        big = 'x' * (README_CONTENT_CAP + 5000)
+        (self.repo_path / 'README.md').write_text(big)
+        content = _read_readme_content(self.repo_path)
+        self.assertEqual(len(content), README_CONTENT_CAP)
+        self.assertEqual(content, 'x' * README_CONTENT_CAP)
+
+    def test_cap_is_100kb(self):
+        from repoindex.database.repository import README_CONTENT_CAP
+        self.assertEqual(README_CONTENT_CAP, 100 * 1024)
+
+    def test_unreadable_readme_returns_none(self):
+        from repoindex.database.repository import _read_readme_content
+        # A directory named README.md cannot be read as text; helper must not raise.
+        (self.repo_path / 'README.md').mkdir()
+        self.assertIsNone(_read_readme_content(self.repo_path))
+
+    def test_upsert_populates_readme_content(self):
+        from repoindex.database.repository import upsert_repo, get_repo_by_path
+        from repoindex.database.connection import Database
+        from repoindex.domain.repository import Repository
+        db_path = self.repo_path / 'idx.db'
+        repo_dir = self.repo_path / 'r1'
+        repo_dir.mkdir()
+        (repo_dir / '.git').mkdir()
+        (repo_dir / 'README.md').write_text('# Photon Toolkit\nSupercalifragilistic indexer.\n')
+        repo = Repository(path=str(repo_dir), name='r1')
+        with Database(db_path=db_path) as db:
+            upsert_repo(db, repo)
+            record = get_repo_by_path(db, str(repo_dir))
+        self.assertIsNotNone(record['readme_content'])
+        self.assertIn('Supercalifragilistic', record['readme_content'])
+
+    def test_upsert_no_readme_leaves_content_null(self):
+        from repoindex.database.repository import upsert_repo, get_repo_by_path
+        from repoindex.database.connection import Database
+        from repoindex.domain.repository import Repository
+        db_path = self.repo_path / 'idx.db'
+        repo_dir = self.repo_path / 'r2'
+        repo_dir.mkdir()
+        (repo_dir / '.git').mkdir()
+        repo = Repository(path=str(repo_dir), name='r2')
+        with Database(db_path=db_path) as db:
+            upsert_repo(db, repo)
+            record = get_repo_by_path(db, str(repo_dir))
+        self.assertIsNone(record['readme_content'])
+
+    def test_fts_match_on_readme_body_returns_repo(self):
+        from repoindex.database.repository import upsert_repo
+        from repoindex.database.connection import Database
+        from repoindex.domain.repository import Repository
+        db_path = self.repo_path / 'idx.db'
+        repo_dir = self.repo_path / 'r3'
+        repo_dir.mkdir()
+        (repo_dir / '.git').mkdir()
+        (repo_dir / 'README.md').write_text('quokkacore is a wombat indexer\n')
+        repo = Repository(path=str(repo_dir), name='r3')
+        with Database(db_path=db_path) as db:
+            upsert_repo(db, repo)
+            db.execute(
+                "SELECT r.name FROM repos r "
+                "JOIN repos_fts fts ON fts.rowid = r.id "
+                "WHERE repos_fts MATCH ?",
+                ('quokkacore',),
+            )
+            rows = db.fetchall()
+        self.assertEqual([row['name'] for row in rows], ['r3'])
+
+    def test_upsert_truncates_oversized_readme_in_db(self):
+        from repoindex.database.repository import (
+            upsert_repo, get_repo_by_path, README_CONTENT_CAP,
+        )
+        from repoindex.database.connection import Database
+        from repoindex.domain.repository import Repository
+        db_path = self.repo_path / 'idx.db'
+        repo_dir = self.repo_path / 'r4'
+        repo_dir.mkdir()
+        (repo_dir / '.git').mkdir()
+        (repo_dir / 'README.md').write_text('y' * (README_CONTENT_CAP + 4096))
+        repo = Repository(path=str(repo_dir), name='r4')
+        with Database(db_path=db_path) as db:
+            upsert_repo(db, repo)
+            record = get_repo_by_path(db, str(repo_dir))
+        self.assertEqual(len(record['readme_content']), README_CONTENT_CAP)
+
+    def test_arkiv_export_emits_readme_body(self):
+        from repoindex.database.repository import upsert_repo, get_repo_by_path
+        from repoindex.database.connection import Database
+        from repoindex.domain.repository import Repository
+        from repoindex.exporters import arkiv as arkiv_mod
+        db_path = self.repo_path / 'idx.db'
+        repo_dir = self.repo_path / 'r5'
+        repo_dir.mkdir()
+        (repo_dir / '.git').mkdir()
+        (repo_dir / 'README.md').write_text('# Narwhal\nA tusked indexer.\n')
+        repo = Repository(path=str(repo_dir), name='r5')
+        with Database(db_path=db_path) as db:
+            upsert_repo(db, repo)
+            record = get_repo_by_path(db, str(repo_dir))
+        arkiv_record = arkiv_mod._repo_to_arkiv(record)
+        self.assertEqual(
+            arkiv_record['metadata']['readme'],
+            '# Narwhal\nA tusked indexer.\n',
+        )

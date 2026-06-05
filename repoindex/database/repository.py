@@ -15,6 +15,35 @@ from ..citation import parse_citation_file
 from .connection import Database
 
 
+# README files, in preference order, checked for has_readme and read into
+# readme_content for FTS. Mirrors the candidate list in _repo_to_record.
+README_CANDIDATES = ('README.md', 'README.rst', 'README.txt', 'README')
+
+# Cap on stored readme_content (bytes of text) to bound memory and DB size.
+# The body feeds repos_fts (full-text search) and the arkiv export readme body.
+README_CONTENT_CAP = 100 * 1024
+
+
+def _read_readme_content(repo_path: Path) -> Optional[str]:
+    """
+    Read the repo's README into a truncated string for full-text indexing.
+
+    Returns the first existing README (by README_CANDIDATES preference) read
+    as UTF-8 (errors replaced), truncated to README_CONTENT_CAP characters.
+    Returns None when no README exists or it cannot be read as text.
+    """
+    for filename in README_CANDIDATES:
+        candidate = repo_path / filename
+        if not candidate.is_file():
+            continue
+        try:
+            text = candidate.read_text(encoding='utf-8', errors='replace')
+        except (OSError, UnicodeError):
+            return None
+        return text[:README_CONTENT_CAP]
+    return None
+
+
 def upsert_repo(db: Database, repo: Repository) -> int:
     """
     Insert or update a repository.
@@ -122,8 +151,11 @@ def _repo_to_record(repo: Repository) -> Dict[str, Any]:
     repo_path = Path(repo.path)
     record['has_readme'] = any(
         (repo_path / f).exists()
-        for f in ['README.md', 'README.rst', 'README.txt', 'README']
+        for f in README_CANDIDATES
     )
+    # Read README body into readme_content so the repos_fts triggers index it.
+    # Truncated to README_CONTENT_CAP; None when no README is present.
+    record['readme_content'] = _read_readme_content(repo_path)
     record['has_ci'] = any([
         (repo_path / '.github' / 'workflows').exists(),
         (repo_path / '.gitlab-ci.yml').exists(),
