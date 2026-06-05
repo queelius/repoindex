@@ -63,7 +63,7 @@ def git_cmd():
     """Git operations across multiple repositories.
 
     Push, pull, and check status across your repository collection.
-    Supports the same query filters as the query command.
+    Filter with --language/--tag/--dirty/--recent.
 
     \b
     Examples:
@@ -92,10 +92,16 @@ def query_options(f):
 def _get_repos_from_query(config, query_string: str = '', debug: bool = False, **query_flags):
     """Get repos matching the standard filter flags.
 
-    The ``query_string`` parameter is retained for signature compatibility
-    with call sites that pre-date the DSL removal; it is ignored. For complex
-    selection, use ``repoindex sql`` or the MCP ``run_sql`` tool.
+    The DSL was removed in v0.16. A non-empty ``query_string`` positional is
+    almost always a stale DSL expression that, if silently ignored, would act
+    on the WHOLE collection. Reject it loudly. For complex selection, use
+    ``repoindex sql`` or the MCP ``run_sql`` tool.
     """
+    if query_string:
+        raise click.UsageError(
+            "positional queries were removed in v0.16; use "
+            "--language/--tag/--recent or `repoindex sql`"
+        )
     return fetch_repos_by_flags(
         config,
         dirty=query_flags.get('dirty', False),
@@ -423,8 +429,6 @@ def git_push_handler(
         repoindex ops git push --language python --dry-run
         # Push repos with specific tag
         repoindex ops git push --tag "work/*" --yes
-        # Push with DSL query
-        repoindex ops git push "language == 'Python'" --dry-run
         # Parallel push (faster for many repos)
         repoindex ops git push --parallel 4 --yes
     """
@@ -506,8 +510,8 @@ def git_pull_handler(
         repoindex ops git pull --dry-run
         # Pull all repos
         repoindex ops git pull --yes
-        # Pull only clean repos (no uncommitted changes)
-        repoindex ops git pull "is_clean" --yes
+        # Pull repos with a tag
+        repoindex ops git pull --tag "work/*" --yes
         # Pull Python repos
         repoindex ops git pull --language python --yes
     """
@@ -841,8 +845,8 @@ def generate_cmd():
     Examples:
         # Generate codemeta.json for Python repos
         repoindex ops generate codemeta --language python --dry-run
-        # Generate MIT license for repos without license
-        repoindex ops generate license "not has_license" --license mit --dry-run
+        # Generate MIT license for Python repos
+        repoindex ops generate license --language python --license mit --dry-run
         # Generate .gitignore for Python repos
         repoindex ops generate gitignore --lang python --dry-run
         # Generate CODE_OF_CONDUCT.md
@@ -969,10 +973,10 @@ def generate_license_handler(
 
     \b
     Examples:
-        # Generate MIT license for repos without license
-        repoindex ops generate license "not has_license" --dry-run
-        # Generate Apache 2.0 license
-        repoindex ops generate license --license apache-2.0 "not has_license" --dry-run
+        # Generate MIT license for all repos
+        repoindex ops generate license --dry-run
+        # Generate Apache 2.0 license for Python repos
+        repoindex ops generate license --license apache-2.0 --language python --dry-run
         # With custom author name
         repoindex ops generate license --author "My Company Inc." --dry-run
         # Force overwrite existing licenses
@@ -1541,8 +1545,8 @@ def wip_snapshot_handler(
         repoindex ops wip-snapshot --dry-run
         # Only Python repos
         repoindex ops wip-snapshot --language python
-        # Specific repo
-        repoindex ops wip-snapshot "name == 'dreamlog'"
+        # Only repos with a tag
+        repoindex ops wip-snapshot --tag "work/*"
 
     Recovery:
         git fetch origin wip/<hostname>/<date>
@@ -2118,6 +2122,39 @@ def _set_action_output(results, action_name, dry_run, output_json):
         sys.exit(1)
 
 
+def _stdout_isatty() -> bool:
+    """Return whether stdout is a TTY.
+
+    Wrapped in a module-level helper so tests can patch it: ``CliRunner``
+    replaces ``sys.stdout`` at invoke time, which makes the swapped stream's
+    ``isatty()`` unpatchable from the outside.
+    """
+    return sys.stdout.isatty()
+
+
+def _confirm_bulk_set(
+    n: int,
+    dry_run: bool,
+    output_json: bool,
+    yes: bool,
+    action_name: str,
+) -> bool:
+    """Decide whether a bulk set-* action may proceed.
+
+    Returns True to proceed, False to abort. A confirmation prompt is shown
+    only for a genuine interactive bulk mutation: more than one repo, not a
+    dry run, not JSON output, an interactive TTY, and ``--yes`` not given. All
+    other cases proceed without prompting so scripted, piped, single-repo, and
+    preview invocations never hang.
+    """
+    if yes or dry_run or output_json or n <= 1 or not _stdout_isatty():
+        return True
+    if not click.confirm(f"Apply {action_name} to {n} repositories?"):
+        print("Aborted.", file=sys.stderr)
+        return False
+    return True
+
+
 @ops_cmd.command('set-topics')
 @click.argument('repo_name', required=False, metavar='REPO')
 @click.argument('topics', nargs=-1)
@@ -2125,6 +2162,7 @@ def _set_action_output(results, action_name, dry_run, output_json):
               help='Apply to all repos matching filters (bulk mode)')
 @click.option('--dry-run', is_flag=True,
               help='Preview without making API calls')
+@click.option('--yes', '-y', is_flag=True, help='Skip confirmation prompt')
 @click.option('--json', 'output_json', is_flag=True, help='Output as JSONL')
 @click.option('--debug', is_flag=True, help='Enable debug logging')
 @query_options
@@ -2133,6 +2171,7 @@ def set_topics_handler(
     topics: tuple,
     apply_all: bool,
     dry_run: bool,
+    yes: bool,
     output_json: bool,
     debug: bool,
     language: Optional[str],
@@ -2171,6 +2210,11 @@ def set_topics_handler(
         return
     config, repos = resolved
 
+    if not _confirm_bulk_set(
+        len(repos), dry_run, output_json, yes, 'set_topics',
+    ):
+        return
+
     topic_list = list(topics)
 
     def invoke(forge, repo):
@@ -2189,6 +2233,7 @@ def set_topics_handler(
               help='Apply to all repos matching filters (bulk mode)')
 @click.option('--dry-run', is_flag=True,
               help='Preview without making API calls')
+@click.option('--yes', '-y', is_flag=True, help='Skip confirmation prompt')
 @click.option('--json', 'output_json', is_flag=True, help='Output as JSONL')
 @click.option('--debug', is_flag=True, help='Enable debug logging')
 @query_options
@@ -2197,6 +2242,7 @@ def set_description_handler(
     description: Optional[str],
     apply_all: bool,
     dry_run: bool,
+    yes: bool,
     output_json: bool,
     debug: bool,
     language: Optional[str],
@@ -2231,6 +2277,11 @@ def set_description_handler(
         return
     config, repos = resolved
 
+    if not _confirm_bulk_set(
+        len(repos), dry_run, output_json, yes, 'set_description',
+    ):
+        return
+
     def invoke(forge, repo):
         forge.set_description(repo, description, config)
         return f"description set ({len(description)} chars)"
@@ -2248,6 +2299,7 @@ def set_description_handler(
               help='Apply to all repos matching filters (bulk mode)')
 @click.option('--dry-run', is_flag=True,
               help='Preview without making API calls')
+@click.option('--yes', '-y', is_flag=True, help='Skip confirmation prompt')
 @click.option('--json', 'output_json', is_flag=True, help='Output as JSONL')
 @click.option('--debug', is_flag=True, help='Enable debug logging')
 @query_options
@@ -2256,6 +2308,7 @@ def set_archived_handler(
     value: Optional[str],
     apply_all: bool,
     dry_run: bool,
+    yes: bool,
     output_json: bool,
     debug: bool,
     language: Optional[str],
@@ -2289,6 +2342,11 @@ def set_archived_handler(
         return
     config, repos = resolved
 
+    if not _confirm_bulk_set(
+        len(repos), dry_run, output_json, yes, 'set_archived',
+    ):
+        return
+
     archived = value.lower() == 'true'
 
     def invoke(forge, repo):
@@ -2308,6 +2366,7 @@ def set_archived_handler(
               help='Apply to all repos matching filters (bulk mode)')
 @click.option('--dry-run', is_flag=True,
               help='Preview without making API calls')
+@click.option('--yes', '-y', is_flag=True, help='Skip confirmation prompt')
 @click.option('--json', 'output_json', is_flag=True, help='Output as JSONL')
 @click.option('--debug', is_flag=True, help='Enable debug logging')
 @query_options
@@ -2316,6 +2375,7 @@ def set_visibility_handler(
     value: Optional[str],
     apply_all: bool,
     dry_run: bool,
+    yes: bool,
     output_json: bool,
     debug: bool,
     language: Optional[str],
@@ -2347,6 +2407,11 @@ def set_visibility_handler(
         return
     config, repos = resolved
 
+    if not _confirm_bulk_set(
+        len(repos), dry_run, output_json, yes, 'set_visibility',
+    ):
+        return
+
     public = value.lower() == 'public'
 
     def invoke(forge, repo):
@@ -2365,6 +2430,7 @@ def set_visibility_handler(
               help='Apply to all repos matching filters (bulk mode)')
 @click.option('--dry-run', is_flag=True,
               help='Preview without making API calls')
+@click.option('--yes', '-y', is_flag=True, help='Skip confirmation prompt')
 @click.option('--json', 'output_json', is_flag=True, help='Output as JSONL')
 @click.option('--debug', is_flag=True, help='Enable debug logging')
 @query_options
@@ -2373,6 +2439,7 @@ def set_default_branch_handler(
     branch: Optional[str],
     apply_all: bool,
     dry_run: bool,
+    yes: bool,
     output_json: bool,
     debug: bool,
     language: Optional[str],
@@ -2403,6 +2470,11 @@ def set_default_branch_handler(
         return
     config, repos = resolved
 
+    if not _confirm_bulk_set(
+        len(repos), dry_run, output_json, yes, 'set_default_branch',
+    ):
+        return
+
     def invoke(forge, repo):
         forge.set_default_branch(repo, branch, config)
         return f"default_branch={branch}"
@@ -2419,6 +2491,7 @@ def set_default_branch_handler(
               help='Subdirectory inside the branch')
 @click.option('--dry-run', is_flag=True,
               help='Preview without making API calls')
+@click.option('--yes', '-y', is_flag=True, help='Skip confirmation prompt')
 @click.option('--json', 'output_json', is_flag=True, help='Output as JSONL')
 @click.option('--debug', is_flag=True, help='Enable debug logging')
 def set_pages_handler(
@@ -2426,6 +2499,7 @@ def set_pages_handler(
     branch: str,
     path: str,
     dry_run: bool,
+    yes: bool,
     output_json: bool,
     debug: bool,
 ):
