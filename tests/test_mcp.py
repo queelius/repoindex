@@ -27,14 +27,62 @@ def patch_db(mock_db):
         yield mock_db
 
 
+@pytest.fixture
+def real_db(tmp_path):
+    """Build a real schema-backed DB on disk and route _open_db to it.
+
+    Unlike patch_db (which mocks the cursor), this yields the open
+    read-write Database so a test can seed rows, then patches
+    _open_db to hand the MCP _impl functions a read-only connection
+    over the same file. Needed for assertions about sqlite_master
+    contents (views, FTS shadow tables) that a MagicMock cannot fake.
+    """
+    from repoindex.database.connection import Database
+
+    db_path = tmp_path / 'index.db'
+    # Connecting read-write applies the current schema via ensure_schema.
+    seed = Database(db_path=db_path)
+    seed.__enter__()
+
+    @contextmanager
+    def _fake_open_db():
+        with Database(db_path=db_path, read_only=True) as ro:
+            yield ro, {}
+
+    patcher = patch('repoindex.mcp.server._open_db', _fake_open_db)
+    patcher.start()
+    try:
+        yield seed
+    finally:
+        patcher.stop()
+        seed.__exit__(None, None, None)
+
+
+class TestRealDbFixture:
+    def test_schema_built(self, real_db):
+        real_db.execute("SELECT COUNT(*) AS n FROM repos")
+        assert real_db.fetchone()['n'] == 0
+        from repoindex.mcp.server import _get_schema_impl
+        result = _get_schema_impl()
+        assert 'ddl' in result
+        assert len(result['ddl']) > 0
+
+
 class TestGetManifest:
     def test_structure(self, patch_db):
         patch_db.fetchone.side_effect = [
             {'count': 143}, {'count': 2841}, {'count': 312}, {'count': 28},
+            {'c': 5},   # dirty
+            {'c': 3},   # unpushed
+            {'c': 10},  # published
+            {'c': 2},   # unpublished
+            {'c': 7},   # doi_count
+            {'c': 9},   # stale
         ]
         patch_db.fetchall.side_effect = [
             [{'language': 'Python', 'cnt': 45}, {'language': 'R', 'cnt': 12}],
             [{'started_at': '2026-02-28T10:00:00'}],
+            [{'forge_id': 'github', 'c': 100}, {'forge_id': 'gitea', 'c': 20}],
         ]
         with patch('repoindex.mcp.server.get_db_path', return_value=Path('/fake/path')):
             from repoindex.mcp.server import _get_manifest_impl
@@ -49,13 +97,75 @@ class TestGetManifest:
     def test_empty_db(self, patch_db):
         patch_db.fetchone.side_effect = [
             {'count': 0}, {'count': 0}, {'count': 0}, {'count': 0},
+            {'c': 0}, {'c': 0}, {'c': 0}, {'c': 0}, {'c': 0}, {'c': 0},
         ]
-        patch_db.fetchall.side_effect = [[], []]
+        patch_db.fetchall.side_effect = [[], [], []]
         with patch('repoindex.mcp.server.get_db_path', return_value=Path('/fake/path')):
             from repoindex.mcp.server import _get_manifest_impl
             result = _get_manifest_impl()
         assert result['tables']['repos']['row_count'] == 0
         assert result['summary']['last_refresh'] is None
+
+
+class TestGetManifestAggregates:
+    def _seed(self, db):
+        # 3 repos: 2 dirty, 1 clean; 1 unpushed; forge_id mix.
+        db.execute(
+            "INSERT INTO repos (name, path, is_clean, ahead, forge_id) "
+            "VALUES ('a', '/a', 0, 0, 'github')"
+        )
+        db.execute(
+            "INSERT INTO repos (name, path, is_clean, ahead, forge_id) "
+            "VALUES ('b', '/b', 0, 2, 'github')"
+        )
+        db.execute(
+            "INSERT INTO repos (name, path, is_clean, ahead, forge_id) "
+            "VALUES ('c', '/c', 1, 0, 'gitea')"
+        )
+        # publications: 1 published+doi, 1 unpublished, no doi.
+        db.execute(
+            "INSERT INTO publications (repo_id, registry, package_name, published, doi) "
+            "VALUES (1, 'pypi', 'a', 1, '10.5281/zenodo.1')"
+        )
+        db.execute(
+            "INSERT INTO publications (repo_id, registry, package_name, published, doi) "
+            "VALUES (2, 'pypi', 'b', 0, NULL)"
+        )
+        db.commit()
+
+    def test_aggregate_keys_and_counts(self, real_db):
+        self._seed(real_db)
+        with patch('repoindex.mcp.server.get_db_path', return_value=Path('/fake/path')):
+            from repoindex.mcp.server import _get_manifest_impl
+            summary = _get_manifest_impl()['summary']
+        assert summary['dirty'] == 2
+        assert summary['unpushed'] == 1
+        assert summary['published'] == 1
+        assert summary['unpublished'] == 1
+        assert summary['doi_count'] == 1
+        # No commit events seeded, so all 3 repos are stale (v_stale_repos).
+        assert summary['stale'] == 3
+        assert summary['by_forge_id'] == {'github': 2, 'gitea': 1}
+        # Existing keys still present.
+        assert 'languages' in summary
+        assert 'last_refresh' in summary
+
+    def test_refresh_stale_true_when_no_refresh(self, real_db):
+        with patch('repoindex.mcp.server.get_db_path', return_value=Path('/fake/path')):
+            from repoindex.mcp.server import _get_manifest_impl
+            summary = _get_manifest_impl()['summary']
+        assert summary['refresh_stale'] is True
+
+    def test_refresh_stale_false_when_recent(self, real_db):
+        real_db.execute(
+            "INSERT INTO refresh_log (started_at, finished_at, full_scan, sources) "
+            "VALUES (datetime('now'), datetime('now'), 0, '[]')"
+        )
+        real_db.commit()
+        with patch('repoindex.mcp.server.get_db_path', return_value=Path('/fake/path')):
+            from repoindex.mcp.server import _get_manifest_impl
+            summary = _get_manifest_impl()['summary']
+        assert summary['refresh_stale'] is False
 
 
 class TestGetSchema:
@@ -99,6 +209,47 @@ class TestGetSchema:
         from repoindex.mcp.server import _get_schema_impl
         result = _get_schema_impl(table="repos()")
         assert 'error' in result
+
+
+class TestGetSchemaViews:
+    def test_views_present(self, real_db):
+        from repoindex.mcp.server import _get_schema_impl
+        ddl = '\n'.join(_get_schema_impl()['ddl'])
+        assert 'v_active_repos' in ddl
+        assert 'v_stale_repos' in ddl
+        assert 'v_repo_stats' in ddl
+
+    def test_core_tables_still_present(self, real_db):
+        from repoindex.mcp.server import _get_schema_impl
+        ddl = '\n'.join(_get_schema_impl()['ddl'])
+        assert 'CREATE TABLE' in ddl and 'repos' in ddl
+        assert 'events' in ddl
+        assert 'publications' in ddl
+
+    def test_sqlite_internal_tables_absent(self, real_db):
+        from repoindex.mcp.server import _get_schema_impl
+        ddl = '\n'.join(_get_schema_impl()['ddl'])
+        assert 'sqlite_sequence' not in ddl
+
+
+class TestGetSchemaFts:
+    def test_repos_fts_present(self, real_db):
+        from repoindex.mcp.server import _get_schema_impl
+        ddl = '\n'.join(_get_schema_impl()['ddl'])
+        assert 'repos_fts' in ddl
+
+    def test_fts_shadow_tables_absent(self, real_db):
+        from repoindex.mcp.server import _get_schema_impl
+        ddl = '\n'.join(_get_schema_impl()['ddl'])
+        assert 'repos_fts_data' not in ddl
+        assert 'repos_fts_idx' not in ddl
+        assert 'repos_fts_config' not in ddl
+        assert 'repos_fts_docsize' not in ddl
+
+    def test_match_hint_present(self, real_db):
+        from repoindex.mcp.server import _get_schema_impl
+        result = _get_schema_impl()
+        assert 'MATCH' in result['hint']
 
 
 class TestRunSql:
@@ -169,6 +320,30 @@ class TestRunSql:
         from repoindex.mcp.server import _run_sql_impl
         result = _run_sql_impl("  SELECT count(*) as cnt FROM repos")
         assert 'rows' in result
+
+
+class TestRunSqlDocstring:
+    def _docstring(self):
+        from repoindex.mcp.server import create_server
+        create_server()
+        import repoindex.mcp.server as mod
+        return mod.RUN_SQL_DOC
+
+    def test_mentions_match_fts(self):
+        doc = self._docstring()
+        assert 'MATCH' in doc
+        assert 'repos_fts' in doc
+
+    def test_uses_current_version_not_version(self):
+        doc = self._docstring()
+        assert 'current_version' in doc
+        assert 'p.version' not in doc
+        assert 'publications.version' not in doc
+
+    def test_has_canonical_exemplars(self):
+        doc = self._docstring()
+        assert 'published' in doc
+        assert 'citation' in doc.lower()
 
 
 class TestRefresh:

@@ -45,6 +45,19 @@ def _open_db():
         yield db, config
 
 
+def _is_refresh_stale(last_refresh) -> bool:
+    """True if the newest refresh is older than _REFRESH_STALE_DAYS (or absent)."""
+    if not last_refresh:
+        return True
+    from datetime import datetime
+    try:
+        started = datetime.fromisoformat(str(last_refresh))
+    except (ValueError, TypeError):
+        return True
+    age_days = (datetime.now() - started).total_seconds() / 86400
+    return age_days > _REFRESH_STALE_DAYS
+
+
 def _get_manifest_impl() -> dict:
     """Get overview of the repoindex database."""
     with _open_db() as (db, config):
@@ -74,6 +87,32 @@ def _get_manifest_impl() -> dict:
         refresh_rows = db.fetchall()
         last_refresh = refresh_rows[0]['started_at'] if refresh_rows else None
 
+        db.execute("SELECT COUNT(*) AS c FROM repos WHERE is_clean = 0")
+        dirty = db.fetchone()['c']
+
+        db.execute("SELECT COUNT(*) AS c FROM repos WHERE ahead > 0")
+        unpushed = db.fetchone()['c']
+
+        db.execute("SELECT COUNT(*) AS c FROM publications WHERE published = 1")
+        published = db.fetchone()['c']
+
+        db.execute("SELECT COUNT(*) AS c FROM publications WHERE COALESCE(published, 0) = 0")
+        unpublished = db.fetchone()['c']
+
+        db.execute("SELECT COUNT(*) AS c FROM publications WHERE doi IS NOT NULL")
+        doi_count = db.fetchone()['c']
+
+        db.execute("SELECT COUNT(*) AS c FROM v_stale_repos")
+        stale = db.fetchone()['c']
+
+        db.execute(
+            "SELECT forge_id, COUNT(*) AS c FROM repos "
+            "WHERE forge_id IS NOT NULL GROUP BY forge_id ORDER BY c DESC"
+        )
+        by_forge_id = {r['forge_id']: r['c'] for r in db.fetchall()}
+
+        refresh_stale = _is_refresh_stale(last_refresh)
+
     return {
         'description': 'repoindex filesystem git catalog',
         'database': str(get_db_path(config)),
@@ -81,6 +120,14 @@ def _get_manifest_impl() -> dict:
         'summary': {
             'languages': languages,
             'last_refresh': last_refresh,
+            'dirty': dirty,
+            'unpushed': unpushed,
+            'published': published,
+            'unpublished': unpublished,
+            'doi_count': doi_count,
+            'stale': stale,
+            'by_forge_id': by_forge_id,
+            'refresh_stale': refresh_stale,
         },
     }
 
@@ -107,11 +154,23 @@ def _get_schema_impl(table=None) -> dict:
             }
         else:
             db.execute(
-                "SELECT sql FROM sqlite_master WHERE type='table' "
-                "AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '%_fts%' ORDER BY name"
+                "SELECT sql FROM sqlite_master "
+                "WHERE type IN ('table','view') "
+                "AND name NOT LIKE 'sqlite_%' AND name NOT LIKE '%_fts_%' ORDER BY name"
             )
-            return {'ddl': [r['sql'] for r in db.fetchall() if r['sql']]}
+            return {
+                'ddl': [r['sql'] for r in db.fetchall() if r['sql']],
+                'hint': (
+                    'Views (v_active_repos, v_stale_repos, v_repo_stats) and the '
+                    'repos_fts full-text table are queryable. Use repos_fts MATCH '
+                    'for full-text search instead of LIKE.'
+                ),
+            }
 
+
+# A refresh older than this many days is reported as stale in get_manifest's
+# summary so an LLM knows the materialized view may be behind the filesystem.
+_REFRESH_STALE_DAYS = 7
 
 MAX_ROWS = 500
 
@@ -390,6 +449,27 @@ def _export_impl(
     )
 
 
+RUN_SQL_DOC = """Execute read-only SQL (SELECT/WITH only). Returns up to 500 rows as JSON.
+
+Full-text search: the repos_fts table is FTS5-indexed on name, description,
+and readme_content. Use MATCH, not LIKE, for text search:
+    SELECT r.name FROM repos_fts f JOIN repos r ON r.id = f.rowid
+    WHERE repos_fts MATCH 'bayesian';
+
+Canonical examples:
+- Published packages missing a citation file:
+    SELECT r.name, p.registry, p.package_name
+    FROM publications p JOIN repos r ON r.id = p.repo_id
+    WHERE p.published = 1 AND r.has_citation = 0;
+- Latest published version per repo (column is current_version):
+    SELECT r.name, p.registry, p.current_version
+    FROM publications p JOIN repos r ON r.id = p.repo_id
+    WHERE p.published = 1;
+- Stale repos (no commit in 180 days) via the v_stale_repos view:
+    SELECT name, language FROM v_stale_repos ORDER BY name;
+"""
+
+
 def create_server():
     """Create and return a FastMCP server instance."""
     try:
@@ -414,8 +494,9 @@ def create_server():
 
     @mcp.tool()
     def run_sql(query: str) -> dict:
-        """Execute read-only SQL (SELECT/WITH only). Returns up to 500 rows as JSON."""
         return _run_sql_impl(query)
+
+    run_sql.__doc__ = RUN_SQL_DOC
 
     @mcp.tool()
     def refresh(
