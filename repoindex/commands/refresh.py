@@ -677,31 +677,9 @@ def _process_repo(
 
 
 def _parse_since(since_str: str) -> datetime:
-    """Parse a since string like '7d', '30d', '90d' into a datetime."""
-    from datetime import timedelta
-
-    now = datetime.now()
-
-    if since_str.endswith('d'):
-        days = int(since_str[:-1])
-        return now - timedelta(days=days)
-    elif since_str.endswith('w'):
-        weeks = int(since_str[:-1])
-        return now - timedelta(weeks=weeks)
-    elif since_str.endswith('m'):
-        # Approximate months as 30 days
-        months = int(since_str[:-1])
-        return now - timedelta(days=months * 30)
-    elif since_str.endswith('y'):
-        years = int(since_str[:-1])
-        return now - timedelta(days=years * 365)
-    else:
-        # Try parsing as ISO date
-        try:
-            return datetime.fromisoformat(since_str)
-        except ValueError:
-            # Default to 90 days
-            return now - timedelta(days=90)
+    """Parse a since string ('7d', '30d', '6m', '1y', ISO date) into a datetime."""
+    from ..services.timespec import parse_since
+    return parse_since(since_str)
 
 
 def _format_bytes(size: int) -> str:

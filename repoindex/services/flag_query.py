@@ -49,45 +49,13 @@ def _normalize_language(language: str) -> str:
 
 
 def _parse_recent_duration(recent: str) -> datetime:
-    """Parse a duration string like '30d', '2w', '1y' into a cutoff datetime.
+    """Parse a duration string ('30d', '2w', '3m' months, '1y', ISO date) into a cutoff datetime.
 
-    Supports d (days), w (weeks), m (months ~30d), y (years ~365d), h (hours).
-    Falls back to ISO date parsing. If neither works, defaults to 30 days ago.
+    Delegates to services.timespec.parse_since (the single duration parser).
+    Raises ValueError on unparseable input: there is no silent default.
     """
-    now = datetime.now()
-    s = recent.strip().strip("'\"")
-
-    if s.endswith('d'):
-        try:
-            return now - timedelta(days=int(s[:-1]))
-        except ValueError:
-            pass
-    elif s.endswith('w'):
-        try:
-            return now - timedelta(weeks=int(s[:-1]))
-        except ValueError:
-            pass
-    elif s.endswith('m'):
-        try:
-            return now - timedelta(days=int(s[:-1]) * 30)
-        except ValueError:
-            pass
-    elif s.endswith('y'):
-        try:
-            return now - timedelta(days=int(s[:-1]) * 365)
-        except ValueError:
-            pass
-    elif s.endswith('h'):
-        try:
-            return now - timedelta(hours=int(s[:-1]))
-        except ValueError:
-            pass
-
-    # Try ISO date
-    try:
-        return datetime.fromisoformat(s)
-    except ValueError:
-        return now - timedelta(days=30)
+    from .timespec import parse_since
+    return parse_since(recent)
 
 
 def build_where_and_params(

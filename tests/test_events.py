@@ -53,13 +53,19 @@ class TestParseTimespec:
         assert abs((result - expected).total_seconds()) < 1
 
     def test_parse_minutes(self):
-        """Test parsing minute specifications."""
-        result = parse_timespec('30m')
+        """'min' parses as minutes ('m' is now months)."""
+        result = parse_timespec('30min')
         expected = datetime.now() - timedelta(minutes=30)
         assert abs((result - expected).total_seconds()) < 1
 
+    def test_parse_months_lower(self):
+        """'m' now means months (six months ~= 180 days)."""
+        result = parse_timespec('6m')
+        expected = datetime.now() - timedelta(days=6 * 30)
+        assert abs((result - expected).total_seconds()) < 1
+
     def test_parse_months(self):
-        """Test parsing month specifications (approximate)."""
+        """'M' is the months alias."""
         result = parse_timespec('1M')
         expected = datetime.now() - timedelta(days=30)
         assert abs((result - expected).total_seconds()) < 1

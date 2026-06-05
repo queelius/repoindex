@@ -15,29 +15,11 @@ from ..database import Database
 
 
 def _parse_since(since_str: str) -> datetime:
-    """Parse a --since value into a datetime."""
+    """Parse a --since value into a cutoff datetime via the shared parser."""
+    from ..services.timespec import parse_since
     if not since_str:
         return datetime.now() - timedelta(days=7)
-
-    # Check for relative formats
-    if since_str.endswith('d'):
-        days = int(since_str[:-1])
-        return datetime.now() - timedelta(days=days)
-    elif since_str.endswith('h'):
-        hours = int(since_str[:-1])
-        return datetime.now() - timedelta(hours=hours)
-    elif since_str.endswith('w'):
-        weeks = int(since_str[:-1])
-        return datetime.now() - timedelta(weeks=weeks)
-    elif since_str.endswith('m'):
-        minutes = int(since_str[:-1])
-        return datetime.now() - timedelta(minutes=minutes)
-    else:
-        # Try parsing as ISO date
-        try:
-            return datetime.fromisoformat(since_str)
-        except ValueError:
-            return datetime.now() - timedelta(days=7)
+    return parse_since(since_str)
 
 
 @click.command('events')

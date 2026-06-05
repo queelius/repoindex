@@ -201,9 +201,10 @@ def parse_timespec(spec: str) -> datetime:
     Parse a time specification into a datetime.
 
     Supports:
-        - Relative: "1h", "2d", "7d", "1w", "30m"
+        - Relative: "1h", "2d", "7d", "1w", "6m" (months), "15min", "1y"
         - ISO format: "2024-01-15", "2024-01-15T10:30:00"
-        - Date: "2024-01-15"
+
+    Note: "m" means MONTHS; use "min" for minutes. See services.timespec.
 
     Args:
         spec: Time specification string
@@ -214,37 +215,8 @@ def parse_timespec(spec: str) -> datetime:
     Raises:
         ValueError: If spec cannot be parsed
     """
-    spec = spec.strip()
-
-    # Try relative time (e.g., "1h", "2d", "7d", "30m", "1w")
-    relative_match = re.match(r'^(\d+)([mhdwM])$', spec)
-    if relative_match:
-        amount = int(relative_match.group(1))
-        unit = relative_match.group(2)
-
-        units = {
-            'm': timedelta(minutes=amount),
-            'h': timedelta(hours=amount),
-            'd': timedelta(days=amount),
-            'w': timedelta(weeks=amount),
-            'M': timedelta(days=amount * 30),  # Approximate month
-        }
-
-        return datetime.now() - units[unit]
-
-    # Try ISO format with time
-    try:
-        return datetime.fromisoformat(spec)
-    except ValueError:
-        pass
-
-    # Try date only (YYYY-MM-DD)
-    try:
-        return datetime.strptime(spec, '%Y-%m-%d')
-    except ValueError:
-        pass
-
-    raise ValueError(f"Cannot parse time specification: {spec}")
+    from ..services.timespec import parse_since
+    return parse_since(spec)
 
 
 # =============================================================================
