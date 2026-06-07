@@ -4,7 +4,7 @@ Event domain object for repoindex.
 Events represent something that happened in or related to a repository:
 - git_tag: New git tag created
 - commit: New commit pushed
-- (future) pypi_publish, github_release, etc.
+- (future) pypi_publish, release, etc.
 
 Events are timestamped, have stable IDs, and are serializable for JSONL output.
 """
@@ -59,18 +59,15 @@ class Event:
         elif self.type == 'merge':
             hash_short = self.data.get('hash', 'unknown')[:8]
             return f"merge_{self.repo_name}_{hash_short}"
-        elif self.type == 'github_release':
+        elif self.type == 'release':
             tag = self.data.get('tag', 'unknown')
-            return f"github_release_{self.repo_name}_{tag}"
-        elif self.type == 'pr':
+            return f"release_{self.repo_name}_{tag}"
+        elif self.type == 'pull_request':
             number = self.data.get('number', 'unknown')
-            return f"pr_{self.repo_name}_{number}"
+            return f"pull_request_{self.repo_name}_{number}"
         elif self.type == 'issue':
             number = self.data.get('number', 'unknown')
             return f"issue_{self.repo_name}_{number}"
-        elif self.type == 'workflow_run':
-            run_id = self.data.get('id', 'unknown')
-            return f"workflow_run_{self.repo_name}_{run_id}"
         elif self.type == 'pypi_publish':
             package = self.data.get('package', 'unknown')
             version = self.data.get('version', 'unknown')
