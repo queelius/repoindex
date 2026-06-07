@@ -224,6 +224,17 @@ class GitForge(RemoteSource):
             f"{self.source_id} does not support enable_pages"
         )
 
+    def fetch_events(self, repo_record: dict, since: "datetime", config: dict):
+        """Yield forge events (release, pull_request, issue) since the cutoff.
+
+        Returns an iterator of domain ``Event`` objects. Default raises
+        ``NotImplementedError`` so forges without event support degrade
+        gracefully, exactly like the optional ``set_*`` actions.
+        """
+        raise NotImplementedError(
+            f"{self.source_id} does not support fetch_events"
+        )
+
 
 class Registry(RemoteSource):
     """Package registry. Publishes artifacts; doesn't host source code.
