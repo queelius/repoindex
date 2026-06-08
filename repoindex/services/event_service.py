@@ -49,7 +49,7 @@ class EventService:
 
     # Event type categories (exposed for users)
     LOCAL_TYPES = events_module.LOCAL_EVENT_TYPES
-    GITHUB_TYPES = events_module.GITHUB_EVENT_TYPES
+    FORGE_TYPES = events_module.FORGE_EVENT_TYPES
     PYPI_TYPES = events_module.PYPI_EVENT_TYPES
     CRAN_TYPES = events_module.CRAN_EVENT_TYPES
     ALL_TYPES = events_module.ALL_EVENT_TYPES
@@ -140,7 +140,7 @@ class EventService:
         result = self.LOCAL_TYPES.copy()
 
         if github:
-            result.extend(self.GITHUB_TYPES)
+            result.extend(self.FORGE_TYPES)
         if pypi:
             result.extend(self.PYPI_TYPES)
         if cran:

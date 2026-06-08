@@ -19,7 +19,7 @@ Event Types:
         - git_tag, commit, branch, merge
 
     Remote (opt-in):
-        - github_release, pr, issue, workflow_run (github=True)
+        - release, pull_request, issue (forge=True, via GitForge.fetch_events)
         - pypi_publish (pypi=True)
         - cran_publish (cran=True)
 """
@@ -47,7 +47,7 @@ from .services import (
 # Event type constants
 from .events import (
     LOCAL_EVENT_TYPES,
-    GITHUB_EVENT_TYPES,
+    FORGE_EVENT_TYPES,
     PYPI_EVENT_TYPES,
     CRAN_EVENT_TYPES,
     ALL_EVENT_TYPES,
@@ -73,7 +73,7 @@ __all__ = [
     "TagService",
     # Event types
     "LOCAL_EVENT_TYPES",
-    "GITHUB_EVENT_TYPES",
+    "FORGE_EVENT_TYPES",
     "PYPI_EVENT_TYPES",
     "CRAN_EVENT_TYPES",
     "ALL_EVENT_TYPES",

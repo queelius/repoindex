@@ -91,3 +91,20 @@ class TestGiteaFetchEvents:
         assert [e.type for e in events] == ["release"]
         assert events[0].data["tag"] == "v2"
         assert events[0].id == "release_n_v2"
+
+
+class TestEventsModuleCleanup:
+    def test_no_scan_github_functions_remain(self):
+        import inspect
+        from repoindex import events as ev
+        src = inspect.getsource(ev)
+        assert "def scan_github_" not in src, "scan_github_* must be deleted"
+
+    def test_forge_event_types_are_generic(self):
+        from repoindex.events import FORGE_EVENT_TYPES
+        assert FORGE_EVENT_TYPES == ['release', 'pull_request', 'issue']
+        assert not any('github' in t for t in FORGE_EVENT_TYPES)
+
+    def test_github_event_types_constant_removed(self):
+        import repoindex.events as ev
+        assert not hasattr(ev, 'GITHUB_EVENT_TYPES')
