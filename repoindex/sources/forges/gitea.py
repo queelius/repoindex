@@ -28,6 +28,7 @@ from urllib.parse import urlparse
 import requests
 
 from .. import GitForge, RemoteRepo
+from ...domain.event import Event
 
 logger = logging.getLogger(__name__)
 
@@ -399,6 +400,101 @@ class GiteaSource(GitForge):
             "gitea does not support enable_pages "
             "(Pages mechanics vary per instance; configure manually)"
         )
+
+    @staticmethod
+    def _parse_ts(raw: Optional[str]):
+        from datetime import datetime
+        if not raw:
+            return datetime.now()
+        try:
+            return datetime.fromisoformat(raw.replace("Z", "+00:00")).replace(tzinfo=None)
+        except ValueError:
+            return datetime.now()
+
+    def _iter_list(self, host: str, path: str, config: Optional[dict]):
+        """Yield items from a paginated Gitea list endpoint (50 per page)."""
+        token = self._get_token(config, host)
+        session = self._get_session(host, token)
+        page = 1
+        while True:
+            sep = "&" if "?" in path else "?"
+            url = f"https://{host}/api/v1{path}{sep}limit=50&page={page}"
+            try:
+                resp = session.get(url, timeout=30)
+            except requests.RequestException:
+                return
+            if resp.status_code != 200:
+                return
+            try:
+                items = resp.json()
+            except ValueError:
+                return
+            if not isinstance(items, list) or not items:
+                return
+            for item in items:
+                yield item
+            if len(items) < 50:
+                return
+            page += 1
+
+    def _stop_at(self, items, ts_key: str, since):
+        """Yield items until one predates since (Gitea lists are newest-first)."""
+        from datetime import datetime
+        for item in items:
+            if since is not None:
+                raw = item.get(ts_key)
+                if raw:
+                    try:
+                        when = datetime.fromisoformat(
+                            raw.replace("Z", "+00:00")).replace(tzinfo=None)
+                        if when < since:
+                            return
+                    except (ValueError, TypeError):
+                        pass
+            yield item
+
+    def fetch_events(self, repo_record: dict, since, config: dict):
+        """Yield release/pull_request/issue Events from the Gitea API."""
+        if since is not None and getattr(since, 'tzinfo', None) is not None:
+            since = since.replace(tzinfo=None)
+        host, owner, name = self._resolve_target(repo_record, config)
+        if not host or not owner or not name:
+            return
+        repo_path = (repo_record or {}).get('path', '')
+        base = f"/repos/{owner}/{name}"
+
+        rels = self._stop_at(
+            self._iter_list(host, f"{base}/releases", config),
+            "published_at", since)
+        for rel in rels:
+            yield Event(
+                type='release', timestamp=self._parse_ts(rel.get('published_at')),
+                repo_name=name, repo_path=repo_path,
+                data={'tag': rel.get('tag_name') or rel.get('name') or 'unknown',
+                      'title': rel.get('name') or '', 'url': rel.get('html_url'),
+                      'author': (rel.get('author') or {}).get('login')})
+
+        prs = self._stop_at(
+            self._iter_list(host, f"{base}/pulls?state=all", config),
+            "created_at", since)
+        for pr in prs:
+            yield Event(
+                type='pull_request', timestamp=self._parse_ts(pr.get('created_at')),
+                repo_name=name, repo_path=repo_path,
+                data={'number': pr.get('number'), 'title': pr.get('title') or '',
+                      'state': pr.get('state'), 'url': pr.get('html_url'),
+                      'author': (pr.get('user') or {}).get('login')})
+
+        issues = self._stop_at(
+            self._iter_list(host, f"{base}/issues?state=all&type=issues", config),
+            "created_at", since)
+        for issue in issues:
+            yield Event(
+                type='issue', timestamp=self._parse_ts(issue.get('created_at')),
+                repo_name=name, repo_path=repo_path,
+                data={'number': issue.get('number'), 'title': issue.get('title') or '',
+                      'state': issue.get('state'), 'url': issue.get('html_url'),
+                      'author': (issue.get('user') or {}).get('login')})
 
 
 source = GiteaSource()

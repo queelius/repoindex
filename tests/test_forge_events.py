@@ -62,3 +62,32 @@ class TestGitHubFetchEvents:
         events = list(forge.fetch_events({"forge_id": "github"},
                                          datetime(2026, 1, 1), {}))
         assert events == []
+
+
+class TestGiteaFetchEvents:
+    def _repo(self):
+        return {"forge_id": "gitea", "forge_host": "codeberg.org",
+                "forge_owner": "o", "forge_name": "n",
+                "remote_url": "https://codeberg.org/o/n"}
+
+    def test_translates_and_filters_since(self):
+        from repoindex.sources.forges.gitea import GiteaSource
+        forge = GiteaSource()
+        releases = [{"tag_name": "v2", "name": "v2",
+                     "published_at": "2026-05-01T10:00:00Z",
+                     "html_url": "r", "author": {"login": "al"}},
+                    {"tag_name": "v1", "name": "v1",
+                     "published_at": "2026-01-01T10:00:00Z",
+                     "html_url": "r0", "author": {"login": "al"}}]
+
+        def fake_iter(host, path, config):
+            if "/releases" in path:
+                return iter(releases)
+            return iter([])
+
+        with patch.object(forge, "_iter_list", side_effect=fake_iter):
+            events = list(forge.fetch_events(self._repo(),
+                                             datetime(2026, 3, 1), {}))
+        assert [e.type for e in events] == ["release"]
+        assert events[0].data["tag"] == "v2"
+        assert events[0].id == "release_n_v2"
