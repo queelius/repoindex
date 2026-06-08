@@ -16,6 +16,8 @@ from dataclasses import dataclass
 from typing import Optional, List, Dict, Any, Tuple
 from datetime import datetime
 
+import requests
+
 logger = logging.getLogger(__name__)
 
 
@@ -397,6 +399,83 @@ class GitHubClient:
         if data and isinstance(data, list):
             return data[:limit]
         return []
+
+    def _iter_pages(self, endpoint: str, ts_key: str, since):
+        """Yield items from a paginated list endpoint, newest-first.
+
+        The endpoint MUST return items sorted by ``ts_key`` descending: the
+        first item older than ``since`` means every later one is too, so
+        pagination stops there. ``since`` may be None to fetch all pages; a
+        timezone-aware ``since`` is normalized to naive (GitHub timestamps are
+        compared as naive UTC).
+
+        On a rate-limit / forbidden response (403/429) this raises
+        RuntimeError rather than silently truncating the stream; callers (the
+        refresh dispatch) isolate it per repo. Full rate-limit backoff reuse
+        is a follow-up.
+        """
+        if since is not None and since.tzinfo is not None:
+            since = since.replace(tzinfo=None)
+        headers = {"Accept": "application/vnd.github.v3+json",
+                   "User-Agent": "repoindex"}
+        if self.token:
+            headers["Authorization"] = f"token {self.token}"
+        page = 1
+        while True:
+            sep = "&" if "?" in endpoint else "?"
+            url = f"https://api.github.com/{endpoint}{sep}per_page=100&page={page}"
+            try:
+                resp = requests.get(url, headers=headers, timeout=30)
+            except requests.RequestException:
+                return
+            if resp.status_code in (403, 429):
+                raise RuntimeError(
+                    f"GitHub rate limited or forbidden (HTTP {resp.status_code}) "
+                    f"for {endpoint}"
+                )
+            if resp.status_code != 200:
+                return
+            items = resp.json()
+            if not isinstance(items, list) or not items:
+                return
+            for item in items:
+                if since is not None:
+                    raw = item.get(ts_key)
+                    if raw:
+                        try:
+                            when = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+                            if when.replace(tzinfo=None) < since:
+                                return
+                        except (ValueError, TypeError):
+                            pass
+                yield item
+            if len(items) < 100:
+                return
+            page += 1
+
+    def iter_releases(self, owner: str, name: str, since=None):
+        """Yield release dicts for owner/name, newest-first, stopping at since.
+
+        The releases endpoint is sorted by ``created_at`` descending, so the
+        early-stop keys on ``created_at`` (not ``published_at``, which can be
+        out of order for late-published drafts and cause a false stop).
+        """
+        yield from self._iter_pages(
+            f"repos/{owner}/{name}/releases", "created_at", since)
+
+    def iter_pulls(self, owner: str, name: str, since=None):
+        """Yield pull-request dicts, newest-first by creation, stopping at since."""
+        yield from self._iter_pages(
+            f"repos/{owner}/{name}/pulls?state=all&sort=created&direction=desc",
+            "created_at", since)
+
+    def iter_issues(self, owner: str, name: str, since=None):
+        """Yield issue dicts (excluding PRs), newest-first, stopping at since."""
+        for item in self._iter_pages(
+                f"repos/{owner}/{name}/issues?state=all&sort=created&direction=desc",
+                "created_at", since):
+            if "pull_request" not in item:
+                yield item
 
     def get_pages_info(self, owner: str, name: str) -> Optional[Dict[str, Any]]:
         """
