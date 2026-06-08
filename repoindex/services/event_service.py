@@ -74,7 +74,8 @@ class EventService:
         github: bool = False,
         pypi: bool = False,
         cran: bool = False,
-        all_types: bool = False
+        all_types: bool = False,
+        forge: bool = False,
     ) -> Generator[Event, None, None]:
         """
         Scan repositories for events.
@@ -86,7 +87,8 @@ class EventService:
             until: Events before this time
             limit: Maximum total events to return
             repo_filter: Only scan repos matching this name
-            github: Include GitHub events (releases, PRs, issues, workflows)
+            forge: Include forge events (releases, PRs, issues)
+            github: Include forge events (back-compat alias for forge)
             pypi: Include PyPI publish events
             cran: Include CRAN publish events
             all_types: Include all event types
@@ -99,7 +101,7 @@ class EventService:
         until_dt = self._parse_time(until) if until else None
 
         # Build types list from flags
-        scan_types = self._build_types(types, github, pypi, cran, all_types)
+        scan_types = self._build_types(types, github, pypi, cran, all_types, forge=forge)
 
         # Convert repos to list of paths for the events module
         repos_list = list(repos)
@@ -124,10 +126,11 @@ class EventService:
     def _build_types(
         self,
         types: Optional[List[str]],
-        github: bool,
-        pypi: bool,
-        cran: bool,
-        all_types: bool
+        github: bool = False,
+        pypi: bool = False,
+        cran: bool = False,
+        all_types: bool = False,
+        forge: bool = False,
     ) -> List[str]:
         """Build list of event types from flags."""
         if types:
@@ -139,7 +142,7 @@ class EventService:
         # Start with local types (default)
         result = self.LOCAL_TYPES.copy()
 
-        if github:
+        if forge or github:  # github is a back-compat alias for forge
             result.extend(self.FORGE_TYPES)
         if pypi:
             result.extend(self.PYPI_TYPES)

@@ -108,3 +108,23 @@ class TestEventsModuleCleanup:
     def test_github_event_types_constant_removed(self):
         import repoindex.events as ev
         assert not hasattr(ev, 'GITHUB_EVENT_TYPES')
+
+
+class TestEventServiceForgeTypes:
+    def test_forge_types_constant(self):
+        from repoindex.services.event_service import EventService
+        assert EventService.FORGE_TYPES == ['release', 'pull_request', 'issue']
+
+    def test_build_types_forge_flag(self):
+        from repoindex.services.event_service import EventService
+        svc = EventService()
+        types = svc._build_types(None, github=False, pypi=False, cran=False,
+                                 all_types=False, forge=True)
+        assert 'release' in types and 'pull_request' in types
+
+    def test_build_types_github_alias_still_works(self):
+        from repoindex.services.event_service import EventService
+        svc = EventService()
+        types = svc._build_types(None, github=True, pypi=False, cran=False,
+                                 all_types=False)
+        assert 'release' in types  # github stays a back-compat alias for forge
