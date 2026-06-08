@@ -31,6 +31,10 @@ def _parse_since(since_str: str) -> datetime:
 @click.option('--until', '-u', help='Events before this time')
 @click.option('--limit', '-n', type=int, default=100,
               help='Maximum events to return (default: 100, 0 for unlimited)')
+@click.option('--forge', is_flag=True,
+              help='Include only forge events (releases, pull requests, issues)')
+@click.option('--github', is_flag=True, hidden=True,
+              help='Deprecated alias for --forge')
 @click.option('--json', 'output_json', is_flag=True,
               help='Output as JSONL (default: pretty table)')
 @click.option('--stats', is_flag=True,
@@ -41,6 +45,8 @@ def events_handler(
     since: str,
     until: Optional[str],
     limit: int,
+    forge: bool,
+    github: bool,
     output_json: bool,
     stats: bool,
 ):
@@ -69,6 +75,16 @@ def events_handler(
         repoindex events --stats
     """
     config = load_config()
+
+    # --forge (or its deprecated alias --github) restricts to forge event types
+    if forge or github:
+        from ..services.event_service import EventService
+        forge_types = tuple(EventService.FORGE_TYPES)
+        if event_types:
+            # intersect explicit types with forge types
+            event_types = tuple(t for t in event_types if t in forge_types)
+        else:
+            event_types = forge_types
 
     # Parse time filters
     since_dt = _parse_since(since)

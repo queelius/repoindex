@@ -128,3 +128,14 @@ class TestEventServiceForgeTypes:
         types = svc._build_types(None, github=True, pypi=False, cran=False,
                                  all_types=False)
         assert 'release' in types  # github stays a back-compat alias for forge
+
+
+class TestEventsForgeFlag:
+    def _handler(self):
+        import repoindex.commands.events as ev
+        return getattr(ev, 'events_handler', None) or ev.events
+
+    def test_forge_and_github_alias_accepted(self):
+        params = {p.name for p in self._handler().params}
+        assert 'forge' in params
+        assert 'github' in params  # retained hidden alias
