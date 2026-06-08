@@ -13,6 +13,7 @@ from typing import Iterator, List, Optional, Tuple
 
 from ...infra.github_client import GitHubClient
 from .. import GitForge, RemoteRepo
+from ...domain.event import Event
 
 logger = logging.getLogger(__name__)
 
@@ -235,6 +236,47 @@ class GitHubSource(GitForge):
         owner, name, client = self._client_for(repo_record, config)
         ok, err = client.create_pages_site(owner, name, branch, path or '/')
         self._check(ok, err, "enable_pages")
+
+    @staticmethod
+    def _parse_ts(raw: Optional[str]):
+        """Parse an ISO8601 GitHub timestamp into a naive datetime."""
+        from datetime import datetime
+        if not raw:
+            return datetime.now()
+        try:
+            return datetime.fromisoformat(raw.replace("Z", "+00:00")).replace(tzinfo=None)
+        except ValueError:
+            return datetime.now()
+
+    def fetch_events(self, repo_record: dict, since, config: dict):
+        """Yield release/pull_request/issue Events from the GitHub API."""
+        owner, name = self._resolve_owner_name(repo_record)
+        if not owner or not name:
+            return
+        client = self._get_client(self._resolve_token(config))
+        repo_path = (repo_record or {}).get('path', '')
+
+        for rel in client.iter_releases(owner, name, since=since):
+            yield Event(
+                type='release', timestamp=self._parse_ts(rel.get('published_at')),
+                repo_name=name, repo_path=repo_path,
+                data={'tag': rel.get('tag_name') or rel.get('name') or 'unknown',
+                      'title': rel.get('name') or '', 'url': rel.get('html_url'),
+                      'author': (rel.get('author') or {}).get('login')})
+        for pr in client.iter_pulls(owner, name, since=since):
+            yield Event(
+                type='pull_request', timestamp=self._parse_ts(pr.get('created_at')),
+                repo_name=name, repo_path=repo_path,
+                data={'number': pr.get('number'), 'title': pr.get('title') or '',
+                      'state': pr.get('state'), 'url': pr.get('html_url'),
+                      'author': (pr.get('user') or {}).get('login')})
+        for issue in client.iter_issues(owner, name, since=since):
+            yield Event(
+                type='issue', timestamp=self._parse_ts(issue.get('created_at')),
+                repo_name=name, repo_path=repo_path,
+                data={'number': issue.get('number'), 'title': issue.get('title') or '',
+                      'state': issue.get('state'), 'url': issue.get('html_url'),
+                      'author': (issue.get('user') or {}).get('login')})
 
 
 source = GitHubSource()
