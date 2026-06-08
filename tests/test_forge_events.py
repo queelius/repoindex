@@ -139,3 +139,16 @@ class TestEventsForgeFlag:
         params = {p.name for p in self._handler().params}
         assert 'forge' in params
         assert 'github' in params  # retained hidden alias
+
+
+class TestForgeEventsConfig:
+    def test_default_off(self):
+        from repoindex.config import forge_events_enabled, get_default_config
+        assert forge_events_enabled({}) is False
+        cfg = get_default_config()
+        assert cfg['refresh']['external_sources']['forge_events'] is False
+
+    def test_enabled_via_config(self):
+        from repoindex.config import forge_events_enabled
+        cfg = {'refresh': {'external_sources': {'forge_events': True}}}
+        assert forge_events_enabled(cfg) is True

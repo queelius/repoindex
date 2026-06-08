@@ -361,6 +361,7 @@ def get_default_config():
         "refresh": {
             "external_sources": {
                 "github": False,   # GitHub API (stars, topics) - moderate speed
+                "forge_events": False,  # Forge events (releases, PRs, issues) - slow
             },
             # Registry providers — enable with --provider or set to true here
             "providers": {
@@ -443,6 +444,7 @@ github:
 refresh:
   external_sources:
     github: false   # GitHub API (stars, topics) - moderate speed
+    forge_events: false  # Forge events (releases, PRs, issues) - slow, opt-in
   # Registry providers — enable with --provider or set to true here
   providers:
     # pypi: false
@@ -576,6 +578,18 @@ def get_events_since(config: dict) -> str:
         A duration string parseable by services.timespec.parse_since.
     """
     return (config.get('events') or {}).get('since') or '6m'
+
+
+def forge_events_enabled(config: dict) -> bool:
+    """Whether refresh should fetch forge events (releases, PRs, issues).
+
+    Slow (per-repo API calls), so opt-in. Default False. Enabled by the
+    config key refresh.external_sources.forge_events or the --forge-events flag.
+    """
+    return bool(
+        ((config.get('refresh') or {}).get('external_sources') or {})
+        .get('forge_events', False)
+    )
 
 
 def get_exclude_directories(config: dict) -> list:
