@@ -4,6 +4,22 @@ All notable changes to repoindex are documented here.
 
 ## Unreleased
 
+### Added
+
+- Forge events (release, pull_request, issue) are now fetched behind a
+  `GitForge.fetch_events` capability dispatched by `forge_id`, implemented for
+  GitHub and Gitea via their API token clients. Enable during refresh with
+  `--forge-events` (or config `refresh.external_sources.forge_events`); opt-in,
+  default off. Event types are generic and forge provenance is the repo's
+  `forge_id` (no schema change). The `events` command gains `--forge` (with
+  `--github` kept as a hidden alias).
+
+### Removed
+
+- The GitHub-specific `scan_github_*` functions and the `github_`-prefixed event
+  type vocabulary (`GITHUB_EVENT_TYPES`). Forge event-fetching now goes through
+  the forge abstraction; the event type constant is `FORGE_EVENT_TYPES`.
+
 ### Changed (behavior)
 
 - Event scanning is now bounded by a single configurable time window instead
