@@ -49,6 +49,7 @@ from ..services.tag_derivation import derive_persistable_tags
 from ..events import scan_events
 from ..sources import discover_sources, GitForge, LocalScanner, Registry
 from ..sources.forge_resolution import resolve_forge
+from ..services.forge_actions import lookup_repo_forge
 
 
 def _resolve_active_sources(
@@ -127,6 +128,8 @@ def _resolve_active_sources(
 @click.option('--provider', '-p', 'provider_names', multiple=True,
               help='(Deprecated: use --source) Enable specific providers', hidden=True)
 @click.option('--external', is_flag=True, help='Enable all external sources (GitHub, registries, etc.)')
+@click.option('--forge-events/--no-forge-events', 'forge_events', default=None,
+              help='Fetch forge events (releases, PRs, issues). Slow; needs forge_id from a metadata refresh. Overrides config.')
 @click.option('-d', '--dir', 'directory', type=click.Path(exists=True),
               help='Refresh specific directory instead of configured paths')
 @click.option('--dry-run', is_flag=True, help='Show what would be refreshed')
@@ -138,6 +141,7 @@ def refresh_handler(
     source_names: Tuple[str, ...],
     provider_names: Tuple[str, ...],
     external: bool,
+    forge_events: Optional[bool],
     directory: Optional[str],
     dry_run: bool,
     quiet: bool,
@@ -254,8 +258,11 @@ def refresh_handler(
 
     # Parse since parameter for event scanning. When --since is not given,
     # fall back to the configured window (events.since, default 6m).
-    from ..config import get_events_since
+    from ..config import get_events_since, forge_events_enabled
     since_datetime = _parse_since(since or get_events_since(config))
+
+    # Resolve forge events flag: CLI wins; fall back to config; default off.
+    do_forge_events = forge_events if forge_events is not None else forge_events_enabled(config)
 
     if dry_run:
         click.echo("Dry run - showing what would be refreshed:", err=True)
@@ -288,7 +295,8 @@ def refresh_handler(
                     sources=active_sources,
                     config=config,
                     dry_run=dry_run,
-                    quiet=quiet
+                    quiet=quiet,
+                    forge_events=do_forge_events,
                 )
                 progress.update(task, advance=1)
 
@@ -541,6 +549,7 @@ def _process_repo(
     config: dict,
     dry_run: bool,
     quiet: bool,
+    forge_events: bool = False,
 ):
     """Process a single repository."""
     stats['scanned'] += 1
@@ -627,6 +636,7 @@ def _process_repo(
         stats['updated'] += 1
 
         # Derive tags from all metadata (runs after sources have enriched the repo)
+        updated_record = None
         if repo_id:
             try:
                 db.execute("SELECT * FROM repos WHERE id = ?", (repo_id,))
@@ -655,6 +665,17 @@ def _process_repo(
                 if not quiet:
                     click.echo(f"Warning: Failed to scan events for {repo.name}: {e}", err=True)
 
+        # Forge events (opt-in, network): dispatch to the repo's forge.
+        # Reuses the repo row already fetched for tag derivation.
+        if repo_id and forge_events and updated_record:
+            try:
+                fe = list(_fetch_forge_events(dict(updated_record), since, config))
+                if fe:
+                    stats['events_added'] += insert_events(db, fe, repo_id)
+            except Exception as e:
+                if not quiet:
+                    click.echo(f"Warning: forge events failed for {repo.name}: {e}", err=True)
+
         if not quiet:
             click.echo(f"  Refreshed: {repo.name}", err=True)
 
@@ -676,6 +697,22 @@ def _process_repo(
         record_scan_error(db, repo.path, error_type, error_msg)
         if not quiet:
             click.echo(f"  Error: {repo.name}: {e}", err=True)
+
+
+def _fetch_forge_events(repo_record: dict, since, config: dict):
+    """Dispatch to the repo's GitForge.fetch_events; yield Events.
+
+    Yields nothing if the repo has no resolved forge or the forge does not
+    support events. Network/API errors propagate to the caller, which
+    isolates them per repo.
+    """
+    forge = lookup_repo_forge(repo_record)
+    if forge is None:
+        return
+    try:
+        yield from forge.fetch_events(repo_record, since, config)
+    except NotImplementedError:
+        return
 
 
 def _parse_since(since_str: str) -> datetime:

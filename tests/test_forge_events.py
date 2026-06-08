@@ -152,3 +152,36 @@ class TestForgeEventsConfig:
         from repoindex.config import forge_events_enabled
         cfg = {'refresh': {'external_sources': {'forge_events': True}}}
         assert forge_events_enabled(cfg) is True
+
+
+class TestRefreshForgeDispatch:
+    def test_dispatch_inserts_events_via_forge(self):
+        from repoindex.commands.refresh import _fetch_forge_events
+        forge = MagicMock()
+        ev = MagicMock()
+        forge.fetch_events.return_value = iter([ev])
+        repo_record = {"forge_id": "github", "path": "/tmp/x"}
+        with patch("repoindex.commands.refresh.lookup_repo_forge",
+                   return_value=forge):
+            out = list(_fetch_forge_events(repo_record,
+                                           datetime(2026, 1, 1), {}))
+        assert out == [ev]
+        forge.fetch_events.assert_called_once()
+
+    def test_dispatch_skips_when_no_forge(self):
+        from repoindex.commands.refresh import _fetch_forge_events
+        with patch("repoindex.commands.refresh.lookup_repo_forge",
+                   return_value=None):
+            out = list(_fetch_forge_events({"path": "/tmp/x"},
+                                           datetime(2026, 1, 1), {}))
+        assert out == []
+
+    def test_dispatch_skips_on_not_implemented(self):
+        from repoindex.commands.refresh import _fetch_forge_events
+        forge = MagicMock()
+        forge.fetch_events.side_effect = NotImplementedError
+        with patch("repoindex.commands.refresh.lookup_repo_forge",
+                   return_value=forge):
+            out = list(_fetch_forge_events({"forge_id": "x", "path": "/tmp/x"},
+                                           datetime(2026, 1, 1), {}))
+        assert out == []
