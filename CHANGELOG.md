@@ -4,6 +4,8 @@ All notable changes to repoindex are documented here.
 
 ## Unreleased
 
+## 2.2.0 - 2026-06-07
+
 ### Added
 
 - Forge events (release, pull_request, issue) are now fetched behind a

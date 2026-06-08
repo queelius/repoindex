@@ -3,7 +3,7 @@
   "@type": "SoftwareSourceCode",
   "name": "repoindex",
   "description": "A collection-aware metadata index for git repositories",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "license": "https://spdx.org/licenses/MIT",
   "codeRepository": "https://github.com/queelius/repoindex",
   "issueTracker": "https://github.com/queelius/repoindex/issues",
@@ -33,7 +33,7 @@
     }
   ],
   "dateCreated": "2024-01-01",
-  "dateModified": "2026-06-05",
+  "dateModified": "2026-06-07",
   "downloadUrl": "https://pypi.org/project/repoindex/",
-  "releaseNotes": "https://github.com/queelius/repoindex/releases/tag/v2.1.0"
+  "releaseNotes": "https://github.com/queelius/repoindex/releases/tag/v2.2.0"
 }
