@@ -675,6 +675,11 @@ def _process_repo(
             except Exception as e:
                 if not quiet:
                     click.echo(f"Warning: forge events failed for {repo.name}: {e}", err=True)
+        elif repo_id and forge_events and not updated_record:
+            # Requested but the repo row was unavailable (tag-derivation read
+            # failed); surface it rather than silently skipping.
+            if not quiet:
+                click.echo(f"Warning: skipping forge events for {repo.name}: repo row unavailable", err=True)
 
         if not quiet:
             click.echo(f"  Refreshed: {repo.name}", err=True)

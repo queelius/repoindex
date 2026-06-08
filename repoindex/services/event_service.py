@@ -7,8 +7,8 @@ Delegates to the events module scanner functions.
 Local events (fast, default):
 - git_tag, commit, branch, merge
 
-Remote events (opt-in):
-- github_release, pr, issue, workflow_run (--github)
+Forge events (opt-in):
+- release, pull_request, issue (--forge; --github is a back-compat alias)
 - pypi_publish (--pypi)
 - cran_publish (--cran)
 """

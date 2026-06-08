@@ -225,10 +225,10 @@ def _show_pretty(config: dict, event_types: tuple, repo: Optional[str],
                     details = data.get('message', '')[:50] if data.get('message') else ""
                 elif event_type == 'git_tag':
                     details = data.get('tag', '') or data.get('name', '')
-                elif event_type in ('pr', 'issue'):
+                elif event_type in ('pull_request', 'issue'):
                     details = data.get('title', '')[:40] if data.get('title') else ""
-                elif event_type == 'github_release':
-                    details = data.get('tag_name', '') or data.get('name', '')
+                elif event_type == 'release':
+                    details = data.get('tag', '') or data.get('name', '') or data.get('title', '')
                 else:
                     # Generic: show first meaningful field
                     for key in ['message', 'title', 'name', 'version', 'tag']:
