@@ -400,6 +400,27 @@ class GitHubClient:
             return data[:limit]
         return []
 
+    def _resolve_request_token(self) -> Optional[str]:
+        """Token for direct requests calls: explicit/env token, else gh CLI.
+
+        The gh CLI fallback exists so a user authenticated only via
+        ``gh auth login`` doesn't paginate unauthenticated at 60 req/hr.
+        Cached on self.token after first resolution.
+        """
+        if self.token:
+            return self.token
+        if self._use_gh_cli:
+            try:
+                result = subprocess.run(
+                    ['gh', 'auth', 'token'],
+                    capture_output=True, text=True, timeout=10
+                )
+                if result.returncode == 0 and result.stdout.strip():
+                    self.token = result.stdout.strip()
+            except (subprocess.TimeoutExpired, FileNotFoundError):
+                pass
+        return self.token
+
     def _iter_pages(self, endpoint: str, ts_key: str, since):
         """Yield items from a paginated list endpoint, newest-first.
 
@@ -409,32 +430,42 @@ class GitHubClient:
         timezone-aware ``since`` is normalized to naive (GitHub timestamps are
         compared as naive UTC).
 
-        On a rate-limit / forbidden response (403/429) this raises
-        RuntimeError rather than silently truncating the stream; callers (the
-        refresh dispatch) isolate it per repo. Full rate-limit backoff reuse
-        is a follow-up.
+        Errors raise RuntimeError rather than silently truncating the
+        stream — a truncated fetch recorded as success can never be
+        backfilled (events dedup via INSERT OR IGNORE). Callers (the refresh
+        dispatch) isolate failures per repo. 404/410 mean the endpoint has
+        nothing to list (repo gone, issues disabled) and end the stream.
+        Full rate-limit backoff reuse is a follow-up.
         """
         if since is not None and since.tzinfo is not None:
             since = since.replace(tzinfo=None)
         headers = {"Accept": "application/vnd.github.v3+json",
                    "User-Agent": "repoindex"}
-        if self.token:
-            headers["Authorization"] = f"token {self.token}"
+        token = self._resolve_request_token()
+        if token:
+            headers["Authorization"] = f"token {token}"
         page = 1
         while True:
             sep = "&" if "?" in endpoint else "?"
             url = f"https://api.github.com/{endpoint}{sep}per_page=100&page={page}"
             try:
                 resp = requests.get(url, headers=headers, timeout=30)
-            except requests.RequestException:
-                return
+            except requests.RequestException as e:
+                raise RuntimeError(
+                    f"GitHub request failed for {endpoint} (page {page}): {e}"
+                ) from e
+            self._update_rate_limit_from_headers(resp.headers)
             if resp.status_code in (403, 429):
                 raise RuntimeError(
                     f"GitHub rate limited or forbidden (HTTP {resp.status_code}) "
                     f"for {endpoint}"
                 )
-            if resp.status_code != 200:
+            if resp.status_code in (404, 410):
                 return
+            if resp.status_code != 200:
+                raise RuntimeError(
+                    f"GitHub API error (HTTP {resp.status_code}) for {endpoint}"
+                )
             items = resp.json()
             if not isinstance(items, list) or not items:
                 return

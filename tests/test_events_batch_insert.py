@@ -11,8 +11,35 @@ from pathlib import Path
 from unittest.mock import patch
 
 from repoindex.database.connection import Database
-from repoindex.database.events import insert_events, count_events
+from repoindex.database.events import insert_event, insert_events, count_events
 from repoindex.domain.event import Event
+
+
+def test_single_and_batch_insert_produce_identical_rows(tmp_path):
+    # insert_event and insert_events must share one row mapping; drift
+    # between them silently yields different ref/metadata per entry point.
+    ev = Event(
+        type="git_tag",
+        timestamp=datetime(2026, 5, 1, 10, 0, 0),
+        repo_name="test-repo",
+        repo_path="/test/path",
+        data={"tag": "v1", "message": "rel", "author": "al"},
+    )
+    row_cols = "event_id, type, timestamp, ref, message, author, metadata"
+
+    with Database(db_path=Path(tmp_path) / "single.db") as db:
+        repo_id = _seed_repo(db)
+        insert_event(db, ev, repo_id)
+        db.execute(f"SELECT {row_cols} FROM events")
+        single = tuple(db.fetchone())
+
+    with Database(db_path=Path(tmp_path) / "batch.db") as db:
+        repo_id = _seed_repo(db)
+        insert_events(db, [ev], repo_id)
+        db.execute(f"SELECT {row_cols} FROM events")
+        batch = tuple(db.fetchone())
+
+    assert single == batch
 
 
 def _commit(repo_name, h):

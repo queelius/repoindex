@@ -284,6 +284,41 @@ def _upsert_publication(db: Database, repo_id: int, package) -> None:
         ))
 
 
+def attach_publication_dois(db: Database, repos: list) -> None:
+    """Merge publication DOIs into repo dicts, in place.
+
+    The repos table has no doi/concept_doi columns — they live on
+    publications — so exporters that prefer the concept DOI need this
+    enrichment. When a repo has several publications, the registry row
+    carrying a concept DOI (what a paper cites) wins.
+    """
+    ids = [r['id'] for r in repos if r.get('id') is not None]
+    if not ids:
+        return
+
+    placeholders = ','.join('?' * len(ids))
+    db.execute(
+        f"SELECT repo_id, doi, concept_doi FROM publications "
+        f"WHERE repo_id IN ({placeholders}) "
+        f"AND (doi IS NOT NULL OR concept_doi IS NOT NULL) "
+        f"ORDER BY (concept_doi IS NOT NULL), registry",
+        tuple(ids),
+    )
+    best = {}
+    for row in db.fetchall():
+        # Concept-bearing rows sort last, so they overwrite plain-DOI rows.
+        best[row['repo_id']] = row
+
+    for repo in repos:
+        row = best.get(repo.get('id'))
+        if row is None:
+            continue
+        if row['doi']:
+            repo['doi'] = row['doi']
+        if row['concept_doi']:
+            repo['concept_doi'] = row['concept_doi']
+
+
 def _sync_tags(db: Database, repo_id: int, tags: frozenset, source: str = 'user') -> None:
     """Sync tags for a repository."""
     # Get current tags for this source

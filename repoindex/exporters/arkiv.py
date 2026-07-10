@@ -204,7 +204,19 @@ def _publication_to_arkiv(pub: dict) -> dict:
     if repo_name:
         meta['repo'] = repo_name
 
-    for key in ('doi', 'concept_doi', 'downloads_total', 'downloads_30d', 'last_published'):
+    # 'doi' has always meant the citable DOI (concept when available) to
+    # arkiv/longecho consumers; the version-specific one is version_doi.
+    concept = pub.get('concept_doi')
+    version_doi = pub.get('doi')
+    if concept:
+        meta['doi'] = concept
+        meta['concept_doi'] = concept
+        if version_doi and version_doi != concept:
+            meta['version_doi'] = version_doi
+    elif version_doi:
+        meta['doi'] = version_doi
+
+    for key in ('downloads_total', 'downloads_30d', 'last_published'):
         val = pub.get(key)
         if val is not None and val != '':
             meta[key] = val

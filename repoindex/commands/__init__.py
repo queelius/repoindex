@@ -2,7 +2,34 @@
 
 import sys
 
+import click
+
 _STALE_THRESHOLD_DAYS = 30
+
+
+class TimeSpecParam(click.ParamType):
+    """Validate --since/--recent style values at the CLI boundary.
+
+    Downstream services re-parse the raw string, so this returns the value
+    unchanged; it exists to turn parse_since's ValueError into a usage error
+    instead of a traceback.
+    """
+
+    name = 'timespec'
+
+    def convert(self, value, param, ctx):
+        if value is None:
+            return value
+        from ..services.timespec import parse_since
+
+        try:
+            parse_since(value)
+        except ValueError as exc:
+            self.fail(str(exc), param, ctx)
+        return value
+
+
+TIMESPEC = TimeSpecParam()
 
 
 def warn_if_stale(db, threshold_days: int = _STALE_THRESHOLD_DAYS) -> None:

@@ -26,8 +26,9 @@ from typing import List, Tuple
 #     added generic forge_id/forge_host/topics/is_archived/stars/etc.
 #     Hard-drop migration: old columns are dropped, new columns start NULL.
 #     Run `repoindex refresh --external` after upgrade to repopulate.
-# v10: preserve events + refresh_log across migration (no longer dropped);
-#      added nullable concept_doi column to publications (version-independent DOI).
+# v10: added nullable concept_doi column to publications (version-independent
+#      DOI). Migration still drops and rebuilds all tables — the DB is a cache;
+#      run `repoindex refresh` (and `--forge-events` if used) after upgrade.
 CURRENT_VERSION = 10
 
 # Schema definition as SQL statements

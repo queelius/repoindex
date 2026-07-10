@@ -263,6 +263,7 @@ def _refresh_impl(
     pypi: bool = False,
     cran: bool = False,
     external: bool = False,
+    forge_events: bool = False,
 ) -> dict:
     """Run the repoindex refresh command as a subprocess."""
     # Acquire lock to prevent concurrent refreshes. Any failure during
@@ -298,6 +299,8 @@ def _refresh_impl(
             cmd.extend(['--source', 'cran'])
         if external:
             cmd.append('--external')
+        if forge_events:
+            cmd.append('--forge-events')
         if full:
             cmd.append('--full')
         return _run_cli(
@@ -492,11 +495,12 @@ def create_server():
         """Get SQL DDL schema. No arg = all tables. With table name = DDL + column details."""
         return _get_schema_impl(table=table)
 
-    @mcp.tool()
+    # description= is passed explicitly: FastMCP captures the description at
+    # registration time, so a post-decoration __doc__ assignment never
+    # reaches clients.
+    @mcp.tool(description=RUN_SQL_DOC)
     def run_sql(query: str) -> dict:
         return _run_sql_impl(query)
-
-    run_sql.__doc__ = RUN_SQL_DOC
 
     @mcp.tool()
     def refresh(
@@ -504,6 +508,7 @@ def create_server():
         pypi: bool = False,
         cran: bool = False,
         external: bool = False,
+        forge_events: bool = False,
         full: bool = False,
     ) -> dict:
         """Refresh the repoindex database.
@@ -513,6 +518,8 @@ def create_server():
         - pypi=True: PyPI version, downloads
         - cran=True: CRAN version
         - external=True: ALL external sources (github + all registries + zenodo)
+        - forge_events=True: forge events (releases, pull requests, issues)
+          from the repo's forge; network-heavy, opt-in
 
         full=True: force re-scan of all repos (default: smart, only changed)
 
@@ -526,6 +533,7 @@ def create_server():
             pypi=pypi,
             cran=cran,
             external=external,
+            forge_events=forge_events,
             full=full,
         )
 

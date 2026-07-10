@@ -345,6 +345,14 @@ class TestRunSqlDocstring:
         assert 'published' in doc
         assert 'citation' in doc.lower()
 
+    def test_registered_tool_description_carries_doc(self):
+        # FastMCP captures the description at @mcp.tool() registration time;
+        # assigning __doc__ afterwards leaves clients with no docs at all.
+        from repoindex.mcp.server import create_server, RUN_SQL_DOC
+        mcp = create_server()
+        tool = mcp._tool_manager.get_tool('run_sql')
+        assert tool.description.strip() == RUN_SQL_DOC.strip()
+
 
 class TestRefresh:
     def test_runs_subprocess(self, tmp_path, monkeypatch):
@@ -394,6 +402,23 @@ class TestRefresh:
             _refresh_impl(external=True)
         cmd = mock_run.call_args[0][0]
         assert '--external' in cmd
+
+    def test_with_forge_events_flag(self, tmp_path, monkeypatch):
+        monkeypatch.setattr('repoindex.mcp.server.Path.home', lambda: tmp_path)
+        with patch('repoindex.mcp.server.subprocess.run') as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout='Done', stderr='')
+            from repoindex.mcp.server import _refresh_impl
+            _refresh_impl(forge_events=True)
+        cmd = mock_run.call_args[0][0]
+        assert '--forge-events' in cmd
+
+    def test_refresh_tool_exposes_forge_events(self):
+        # The MCP is the dominant consumer; a refresh capability that only
+        # the CLI can reach is invisible to it.
+        from repoindex.mcp.server import create_server
+        mcp = create_server()
+        tool = mcp._tool_manager.get_tool('refresh')
+        assert 'forge_events' in tool.parameters['properties']
 
     def test_with_all_sources(self, tmp_path, monkeypatch):
         monkeypatch.setattr('repoindex.mcp.server.Path.home', lambda: tmp_path)

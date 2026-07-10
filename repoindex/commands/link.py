@@ -10,6 +10,7 @@ import sys
 from pathlib import Path
 from typing import Optional
 
+from . import TIMESPEC
 from ..config import load_config
 from ..database import Database
 from ..services.flag_query import fetch_repos_by_flags
@@ -55,7 +56,7 @@ def link_cmd():
 @click.option('--language', '-l', help='Filter by language (e.g., python, r, js)')
 @click.option('--dirty', is_flag=True, help='Repos with uncommitted changes')
 @click.option('--tag', '-t', multiple=True, help='Filter by tag (supports wildcards)')
-@click.option('--recent', '-r', help='Repos with recent commits (e.g., 7d, 30d)')
+@click.option('--recent', '-r', type=TIMESPEC, help='Repos with recent commits (e.g., 7d, 30d)')
 @click.option('--debug', is_flag=True, help='Enable debug logging')
 def tree_handler(
     destination: str,

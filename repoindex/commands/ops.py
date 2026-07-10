@@ -14,6 +14,7 @@ from typing import Optional
 
 import click
 
+from . import TIMESPEC
 from ..config import load_config
 from ..database import Database
 from ..services.boilerplate_service import (
@@ -85,7 +86,7 @@ def query_options(f):
     f = click.option('--language', '-l', help='Filter by language (e.g., python, r, js)')(f)
     f = click.option('--dirty', is_flag=True, help='Repos with uncommitted changes')(f)
     f = click.option('--tag', '-t', multiple=True, help='Filter by tag (supports wildcards)')(f)
-    f = click.option('--recent', '-r', help='Repos with recent commits (e.g., 7d, 30d)')(f)
+    f = click.option('--recent', '-r', type=TIMESPEC, help='Repos with recent commits (e.g., 7d, 30d)')(f)
     return f
 
 

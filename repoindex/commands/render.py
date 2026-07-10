@@ -108,6 +108,15 @@ def export_handler(
         language=language, dirty=dirty, tag=tag, recent=recent,
     )
 
+    # Repo rows carry no DOI columns; exporters prefer the concept DOI,
+    # which lives on publications.
+    from ..database.repository import attach_publication_dois
+    try:
+        with Database(config=config, read_only=True) as db:
+            attach_publication_dois(db, repos)
+    except Exception as e:
+        click.echo(f"Warning: could not attach publication DOIs: {e}", err=True)
+
     if output_file:
         with open(output_file, 'w') as f:
             count = exporter.export(repos, f, config=config)

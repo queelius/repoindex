@@ -29,6 +29,7 @@ _REPO_COLUMN_CACHE = None
 # Local sources that run by default (fast, no HTTP)
 _LOCAL_SOURCE_IDS = frozenset({'citation_cff', 'keywords', 'local_assets'})
 
+from . import TIMESPEC
 from ..config import load_config, get_repository_directories
 from ..database import (
     Database,
@@ -46,7 +47,7 @@ from ..database import (
 from ..database.events import insert_events
 from ..services.repository_service import RepositoryService
 from ..services.tag_derivation import derive_persistable_tags
-from ..events import scan_events
+from ..events import scan_events, FORGE_EVENT_TYPES
 from ..sources import discover_sources, GitForge, LocalScanner, Registry
 from ..sources.forge_resolution import resolve_forge
 from ..services.forge_actions import lookup_repo_forge
@@ -121,7 +122,7 @@ def _resolve_active_sources(
 
 @click.command('refresh')
 @click.option('--full', is_flag=True, help='Force full refresh of all repos')
-@click.option('--since', default=None, help='How far back to scan for events (e.g., 7d, 30d, 6m, 1y); default from config events.since (6m)')
+@click.option('--since', default=None, type=TIMESPEC, help='How far back to scan for events (e.g., 7d, 30d, 6m, 1y); default from config events.since (6m)')
 @click.option('--github/--no-github', default=None, help='Fetch GitHub metadata (alias for --source github)')
 @click.option('--source', '-s', 'source_names', multiple=True,
               help='Enable specific sources (e.g., --source github --source pypi)')
@@ -259,10 +260,26 @@ def refresh_handler(
     # Parse since parameter for event scanning. When --since is not given,
     # fall back to the configured window (events.since, default 6m).
     from ..config import get_events_since, forge_events_enabled
-    since_datetime = _parse_since(since or get_events_since(config))
+    try:
+        since_datetime = _parse_since(since or get_events_since(config))
+    except ValueError as exc:
+        # --since is validated at the CLI boundary, so this is a bad
+        # config events.since value.
+        raise click.UsageError(f"Invalid events.since in config: {exc}")
 
     # Resolve forge events flag: CLI wins; fall back to config; default off.
     do_forge_events = forge_events if forge_events is not None else forge_events_enabled(config)
+
+    # Build the forge_id -> GitForge index once per run; a per-repo
+    # lookup_repo_forge() would re-scan ~/.repoindex/sources and re-import
+    # user extension modules for every repo.
+    forge_index = None
+    if do_forge_events:
+        forge_index = {
+            s.source_id: s
+            for s in discover_sources()
+            if isinstance(s, GitForge)
+        }
 
     if dry_run:
         click.echo("Dry run - showing what would be refreshed:", err=True)
@@ -287,6 +304,7 @@ def refresh_handler(
         ) as progress:
             task = progress.add_task("Refreshing repos...", total=len(repos))
 
+            forge_pending: List[tuple] = []
             for repo in repos:
                 _process_repo(
                     db, service, repo, stats,
@@ -297,8 +315,19 @@ def refresh_handler(
                     dry_run=dry_run,
                     quiet=quiet,
                     forge_events=do_forge_events,
+                    forge_pending=forge_pending,
                 )
                 progress.update(task, advance=1)
+
+        # Forge events phase: network fetches fan out in a thread pool while
+        # all DB writes stay on this thread. An explicit --since is a
+        # backfill request and is honored verbatim; otherwise each repo's
+        # window narrows to events newer than what is already stored.
+        if forge_pending and not dry_run:
+            jobs = _build_forge_jobs(
+                db, forge_pending, since_datetime, narrow=since is None)
+            _run_forge_events_phase(
+                db, jobs, config, forge_index, stats, quiet)
 
         # Cleanup repos that no longer exist
         if not dry_run:
@@ -550,6 +579,7 @@ def _process_repo(
     dry_run: bool,
     quiet: bool,
     forge_events: bool = False,
+    forge_pending: Optional[List[tuple]] = None,
 ):
     """Process a single repository."""
     stats['scanned'] += 1
@@ -558,6 +588,15 @@ def _process_repo(
         # Check if needs refresh
         if not full and not needs_refresh(db, repo.path):
             stats['skipped'] += 1
+            # Forge activity (releases, PRs, issues) never touches the local
+            # .git/index that needs_refresh keys on, so skipped repos must
+            # still be enqueued for the forge-events phase.
+            if forge_events and forge_pending is not None and not dry_run:
+                db.execute("SELECT * FROM repos WHERE path = ?", (repo.path,))
+                row = db.fetchone()
+                if row:
+                    record = dict(row)
+                    forge_pending.append((record, record['id'], repo.name))
             return
 
         if dry_run:
@@ -608,17 +647,8 @@ def _process_repo(
                     elif isinstance(source, Registry):
                         from ..database.repository import _upsert_publication
                         from ..domain.repository import PackageMetadata
-                        pkg = PackageMetadata(
-                            registry=data.get('registry', ''),
-                            name=data.get('name', ''),
-                            version=data.get('version'),
-                            published=data.get('published', False),
-                            url=data.get('url'),
-                            doi=data.get('doi'),
-                            downloads=data.get('downloads'),
-                            downloads_30d=data.get('downloads_30d'),
-                            last_updated=data.get('last_updated'),
-                        )
+                        pkg = PackageMetadata.from_dict(
+                            {'registry': '', 'name': '', **data})
                         _upsert_publication(db, repo_id, pkg)
                     else:
                         # Defensive: a custom Source subclass that doesn't
@@ -665,20 +695,14 @@ def _process_repo(
                 if not quiet:
                     click.echo(f"Warning: Failed to scan events for {repo.name}: {e}", err=True)
 
-        # Forge events (opt-in, network): dispatch to the repo's forge.
+        # Forge events (opt-in, network): enqueue for the parallel phase.
         # Reuses the repo row already fetched for tag derivation.
-        if repo_id and forge_events and updated_record:
-            try:
-                fe = list(_fetch_forge_events(dict(updated_record), since, config))
-                if fe:
-                    stats['events_added'] += insert_events(db, fe, repo_id)
-            except Exception as e:
-                if not quiet:
-                    click.echo(f"Warning: forge events failed for {repo.name}: {e}", err=True)
-        elif repo_id and forge_events and not updated_record:
-            # Requested but the repo row was unavailable (tag-derivation read
-            # failed); surface it rather than silently skipping.
-            if not quiet:
+        if repo_id and forge_events:
+            if updated_record and forge_pending is not None:
+                forge_pending.append((dict(updated_record), repo_id, repo.name))
+            elif not updated_record and not quiet:
+                # Requested but the repo row was unavailable (tag-derivation
+                # read failed); surface it rather than silently skipping.
                 click.echo(f"Warning: skipping forge events for {repo.name}: repo row unavailable", err=True)
 
         if not quiet:
@@ -704,14 +728,106 @@ def _process_repo(
             click.echo(f"  Error: {repo.name}: {e}", err=True)
 
 
-def _fetch_forge_events(repo_record: dict, since, config: dict):
+def _forge_events_since(db, repo_id: int, since: datetime) -> datetime:
+    """Per-repo fetch cutoff: skip re-fetching events already stored.
+
+    Uses the newest stored forge event as the cutoff when it is later than
+    the configured window. Everything at or before that instant was captured
+    by a prior successful fetch (a failed fetch inserts nothing for the
+    repo), and INSERT OR IGNORE absorbs the boundary overlap.
+    """
+    placeholders = ','.join('?' * len(FORGE_EVENT_TYPES))
+    db.execute(
+        f"SELECT MAX(timestamp) AS ts FROM events "
+        f"WHERE repo_id = ? AND type IN ({placeholders})",
+        (repo_id, *FORGE_EVENT_TYPES),
+    )
+    row = db.fetchone()
+    raw = row['ts'] if row else None
+    if not raw:
+        return since
+    try:
+        last = datetime.fromisoformat(raw)
+    except (TypeError, ValueError):
+        return since
+    return max(since, last) if since else last
+
+
+def _build_forge_jobs(db, pending: List[tuple], since: datetime,
+                      narrow: bool) -> List[tuple]:
+    """Attach the per-repo fetch cutoff to each pending forge entry."""
+    return [
+        (record, repo_id, name,
+         _forge_events_since(db, repo_id, since) if narrow else since)
+        for record, repo_id, name in pending
+    ]
+
+
+def _collect_forge_events(record: dict, since, config: dict,
+                          forges: Optional[dict]) -> list:
+    """Worker-thread body: fully drain one repo's forge event stream."""
+    return list(_fetch_forge_events(record, since, config, forges=forges))
+
+
+def _run_forge_events_phase(db, jobs: List[tuple], config: dict,
+                            forges: Optional[dict], stats: dict,
+                            quiet: bool) -> None:
+    """Fetch forge events for all pending repos in parallel.
+
+    Network I/O fans out in worker threads; every DB write stays on the
+    caller's thread (the SQLite connection must not be shared across
+    threads). Failures are isolated per repo.
+    """
+    if not jobs:
+        return
+
+    def _insert(fut, repo_id, name):
+        try:
+            fe = fut.result()
+        except Exception as e:
+            if not quiet:
+                click.echo(f"Warning: forge events failed for {name}: {e}", err=True)
+            return
+        if fe:
+            stats['events_added'] += insert_events(db, fe, repo_id)
+
+    with ThreadPoolExecutor(max_workers=min(len(jobs), _PROVIDER_WORKERS)) as pool:
+        futures = {
+            pool.submit(_collect_forge_events, record, repo_since, config, forges):
+            (repo_id, name)
+            for record, repo_id, name, repo_since in jobs
+        }
+        if quiet:
+            for fut in as_completed(futures):
+                _insert(fut, *futures[fut])
+        else:
+            from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                BarColumn(),
+                TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+            ) as progress:
+                task = progress.add_task("Fetching forge events...", total=len(futures))
+                for fut in as_completed(futures):
+                    _insert(fut, *futures[fut])
+                    progress.update(task, advance=1)
+
+
+def _fetch_forge_events(repo_record: dict, since, config: dict,
+                        forges: Optional[dict] = None):
     """Dispatch to the repo's GitForge.fetch_events; yield Events.
 
-    Yields nothing if the repo has no resolved forge or the forge does not
-    support events. Network/API errors propagate to the caller, which
-    isolates them per repo.
+    ``forges`` is the forge_id -> GitForge index built once per refresh
+    run; without it each call would re-discover sources. Yields nothing if
+    the repo has no resolved forge or the forge does not support events.
+    Network/API errors propagate to the caller, which isolates them per
+    repo.
     """
-    forge = lookup_repo_forge(repo_record)
+    if forges is not None:
+        forge = forges.get((repo_record or {}).get('forge_id'))
+    else:
+        forge = lookup_repo_forge(repo_record)
     if forge is None:
         return
     try:

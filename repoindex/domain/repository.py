@@ -5,6 +5,7 @@ Repository represents a git repository with its metadata.
 It's designed to be immutable and serializable for JSONL output.
 """
 
+import dataclasses
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Any, FrozenSet
 from pathlib import Path
@@ -124,6 +125,17 @@ class PackageMetadata:
             'downloads_30d': self.downloads_30d,
             'last_updated': self.last_updated
         }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> 'PackageMetadata':
+        """Rebuild from a to_dict()-shaped dict, ignoring unknown keys.
+
+        Derived from the dataclass fields so a new field survives the
+        Registry round-trip (source fetch → dict → DB upsert) without a
+        parallel key list to keep in sync.
+        """
+        names = {f.name for f in dataclasses.fields(cls)}
+        return cls(**{k: v for k, v in data.items() if k in names})
 
 
 @dataclass(frozen=True)

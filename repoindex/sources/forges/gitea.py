@@ -28,7 +28,6 @@ from urllib.parse import urlparse
 import requests
 
 from .. import GitForge, RemoteRepo
-from ...domain.event import Event
 
 logger = logging.getLogger(__name__)
 
@@ -401,16 +400,6 @@ class GiteaSource(GitForge):
             "(Pages mechanics vary per instance; configure manually)"
         )
 
-    @staticmethod
-    def _parse_ts(raw: Optional[str]):
-        from datetime import datetime
-        if not raw:
-            return datetime.now()
-        try:
-            return datetime.fromisoformat(raw.replace("Z", "+00:00")).replace(tzinfo=None)
-        except ValueError:
-            return datetime.now()
-
     def _iter_list(self, host: str, path: str, config: Optional[dict]):
         """Yield items from a paginated Gitea list endpoint (50 per page)."""
         token = self._get_token(config, host)
@@ -463,38 +452,19 @@ class GiteaSource(GitForge):
         repo_path = (repo_record or {}).get('path', '')
         base = f"/repos/{owner}/{name}"
 
-        rels = self._stop_at(
-            self._iter_list(host, f"{base}/releases", config),
-            "published_at", since)
-        for rel in rels:
-            yield Event(
-                type='release', timestamp=self._parse_ts(rel.get('published_at')),
-                repo_name=name, repo_path=repo_path,
-                data={'tag': rel.get('tag_name') or rel.get('name') or 'unknown',
-                      'title': rel.get('name') or '', 'url': rel.get('html_url'),
-                      'author': (rel.get('author') or {}).get('login')})
-
-        prs = self._stop_at(
-            self._iter_list(host, f"{base}/pulls?state=all", config),
-            "created_at", since)
-        for pr in prs:
-            yield Event(
-                type='pull_request', timestamp=self._parse_ts(pr.get('created_at')),
-                repo_name=name, repo_path=repo_path,
-                data={'number': pr.get('number'), 'title': pr.get('title') or '',
-                      'state': pr.get('state'), 'url': pr.get('html_url'),
-                      'author': (pr.get('user') or {}).get('login')})
-
-        issues = self._stop_at(
-            self._iter_list(host, f"{base}/issues?state=all&type=issues", config),
-            "created_at", since)
-        for issue in issues:
-            yield Event(
-                type='issue', timestamp=self._parse_ts(issue.get('created_at')),
-                repo_name=name, repo_path=repo_path,
-                data={'number': issue.get('number'), 'title': issue.get('title') or '',
-                      'state': issue.get('state'), 'url': issue.get('html_url'),
-                      'author': (issue.get('user') or {}).get('login')})
+        # All three lists are in creation order; published_at can be out of
+        # order (late-published drafts), so every early-stop keys on
+        # created_at — same as GitHubClient's iterators.
+        endpoints = [
+            ('release', f"{base}/releases"),
+            ('pull_request', f"{base}/pulls?state=all"),
+            ('issue', f"{base}/issues?state=all&type=issues"),
+        ]
+        for event_type, path in endpoints:
+            items = self._stop_at(
+                self._iter_list(host, path, config), "created_at", since)
+            for item in items:
+                yield self._item_to_event(event_type, item, name, repo_path)
 
 
 source = GiteaSource()

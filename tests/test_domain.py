@@ -333,3 +333,22 @@ class TestPackageMetadataConceptDoi:
         d = pkg.to_dict()
         assert d['doi'] == '10.5281/zenodo.123'
         assert d['concept_doi'] == '10.5281/zenodo.100'
+
+
+class TestPackageMetadataFromDict:
+    def test_round_trip_is_lossless(self):
+        from repoindex.domain.repository import PackageMetadata
+        pkg = PackageMetadata(
+            registry='zenodo', name='x', version='1.2', published=True,
+            url='https://example', doi='10.5281/zenodo.123',
+            concept_doi='10.5281/zenodo.100', downloads=5,
+            downloads_30d=2, last_updated='2026-01-01',
+        )
+        assert PackageMetadata.from_dict(pkg.to_dict()) == pkg
+
+    def test_unknown_keys_ignored(self):
+        from repoindex.domain.repository import PackageMetadata
+        pkg = PackageMetadata.from_dict(
+            {'registry': 'pypi', 'name': 'p', 'not_a_field': 1})
+        assert pkg.registry == 'pypi'
+        assert pkg.name == 'p'

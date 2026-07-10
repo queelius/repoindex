@@ -21,7 +21,7 @@ pytest -k "test_status" -v                           # Pattern match
 pytest --cov=repoindex --cov-report=html             # Coverage (ALWAYS after changes)
 ```
 
-All `make` targets auto-activate `.venv/`. Test suite has **~1840 tests** in `tests/`.
+All `make` targets auto-activate `.venv/`. Test suite has **~2050 tests** in `tests/`.
 
 ## Architecture
 
@@ -82,7 +82,7 @@ where, params = build_where_and_params(language='Python', dirty=True)
 repos = fetch_repos_by_flags(config, language='Python', recent='7d')
 ```
 
-Schema v9, migrations in `database/schema.py`. See **SQL Data Model** below for table details.
+Schema v10, migrations in `database/schema.py` (the DB is a cache: a version bump drops and rebuilds all tables). See **SQL Data Model** below for table details.
 
 ### Other Key Modules
 
@@ -137,9 +137,9 @@ mock_run_command.return_value = (None, 1)        # Failure
 ```
 repoindex
 ├── status             Health dashboard
-├── events             Query git events from database
+├── events             Query events from database (--forge for forge events only)
 ├── sql                Raw SQL + DB maintenance (--info, --schema, --reset, --vacuum)
-├── refresh            Sync DB from filesystem (--github, --pypi, --cran, --external)
+├── refresh            Sync DB from filesystem (--github, --pypi, --cran, --external, --forge-events)
 ├── show               Detailed single-repo view
 ├── digest             Summarize recent activity (conventional commit breakdown)
 ├── export             Longecho-compliant arkiv archive (default) or format plugins
@@ -185,9 +185,9 @@ can't express belongs in `repoindex sql` or an MCP `run_sql` query.
 ## SQL Data Model
 
 - **repos**: Identity (`path` UNIQUE), git status, metadata, license, citation, plus unified forge fields populated by the active GitForge: `forge_id`, `forge_host`, `forge_owner`, `forge_name`, `forge_description`, `topics` (JSON array as TEXT), `is_archived`, `is_fork`, `is_private`, `pages_url`, `default_branch`, `stars`, `forks_count`, `watchers`, `open_issues`, `has_issues`, `has_wiki`, `has_pages`, `forge_created_at`, `forge_updated_at`, `forge_pushed_at`.
-- **events**: `repo_id` FK, `event_id` UNIQUE, type (`git_tag`/`commit`/`branch`/`merge`), timestamp, ref, message, author, metadata JSON.
+- **events**: `repo_id` FK, `event_id` UNIQUE, type (git: `git_tag`/`commit`/`branch`/`merge`; forge, opt-in via `refresh --forge-events`: `release`/`pull_request`/`issue`), timestamp, ref, message, author, metadata JSON.
 - **tags**: `repo_id` FK, tag, source (`user`/`implicit`/`forge`/`pyproject`/`pypi`/`cran`/`zenodo`/...).
-- **publications**: `repo_id` FK CASCADE, registry (`pypi`/`cran`/`zenodo`/`npm`/`cargo`/`docker`/...), package_name (may differ from repo name), version, published flag, downloads, doi.
+- **publications**: `repo_id` FK CASCADE, registry (`pypi`/`cran`/`zenodo`/`npm`/`cargo`/`docker`/...), package_name (may differ from repo name), version, published flag, downloads, doi (version-specific), concept_doi (version-independent; what citations prefer).
 - **scan_errors**: Failed repos during refresh.
 - **refresh_log**: Tracks refresh runs for digest/staleness.
 - **repos_fts**: FTS5 index on name, description, readme_content.

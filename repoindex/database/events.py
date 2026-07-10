@@ -12,6 +12,27 @@ from ..domain.event import Event
 from .connection import Database
 
 
+_INSERT_EVENT_SQL = """
+    INSERT OR IGNORE INTO events
+    (repo_id, event_id, type, timestamp, ref, message, author, metadata)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+"""
+
+
+def _event_row(event: Event, repo_id: int) -> tuple:
+    """Map an Event to an events-table row (single source for the mapping)."""
+    return (
+        repo_id,
+        event.id,  # Stable event ID for deduplication
+        event.type,
+        event.timestamp.isoformat(),
+        event.data.get('ref') or event.data.get('tag') or event.data.get('branch'),
+        event.data.get('message'),
+        event.data.get('author'),
+        json.dumps(event.data),
+    )
+
+
 def insert_event(db: Database, event: Event, repo_id: int) -> int:
     """
     Insert an event.
@@ -24,20 +45,7 @@ def insert_event(db: Database, event: Event, repo_id: int) -> int:
     Returns:
         Row ID of the inserted event
     """
-    db.execute("""
-        INSERT OR IGNORE INTO events
-        (repo_id, event_id, type, timestamp, ref, message, author, metadata)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    """, (
-        repo_id,
-        event.id,  # Stable event ID for deduplication
-        event.type,
-        event.timestamp.isoformat(),
-        event.data.get('ref') or event.data.get('tag') or event.data.get('branch'),
-        event.data.get('message'),
-        event.data.get('author'),
-        json.dumps(event.data),
-    ))
+    db.execute(_INSERT_EVENT_SQL, _event_row(event, repo_id))
     return db.lastrowid or 0
 
 
@@ -61,26 +69,10 @@ def insert_events(db: Database, events: List[Event], repo_id: int) -> int:
     if not events:
         return 0
 
-    rows = [
-        (
-            repo_id,
-            event.id,  # Stable event ID for deduplication
-            event.type,
-            event.timestamp.isoformat(),
-            event.data.get('ref') or event.data.get('tag') or event.data.get('branch'),
-            event.data.get('message'),
-            event.data.get('author'),
-            json.dumps(event.data),
-        )
-        for event in events
-    ]
+    rows = [_event_row(event, repo_id) for event in events]
 
     before = db.conn.total_changes
-    db.executemany("""
-        INSERT OR IGNORE INTO events
-        (repo_id, event_id, type, timestamp, ref, message, author, metadata)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    """, rows)
+    db.executemany(_INSERT_EVENT_SQL, rows)
     return db.conn.total_changes - before
 
 

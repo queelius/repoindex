@@ -12,6 +12,7 @@ from typing import Optional, List, Dict, Any
 
 from ..config import load_config
 from ..database import Database
+from . import TIMESPEC
 
 
 def _parse_since(since_str: str) -> datetime:
@@ -24,11 +25,11 @@ def _parse_since(since_str: str) -> datetime:
 
 @click.command('events')
 @click.option('--type', '-t', 'event_types', multiple=True,
-              help='Filter by event type (e.g., commit, git_tag, pr)')
+              help='Filter by event type (e.g., commit, git_tag, release, pull_request, issue)')
 @click.option('--repo', '-r', help='Filter by repository name')
-@click.option('--since', '-s', default='7d',
+@click.option('--since', '-s', default='7d', type=TIMESPEC,
               help='Events after this time (e.g., 1h, 7d, 2024-01-01)')
-@click.option('--until', '-u', help='Events before this time')
+@click.option('--until', '-u', type=TIMESPEC, help='Events before this time')
 @click.option('--limit', '-n', type=int, default=100,
               help='Maximum events to return (default: 100, 0 for unlimited)')
 @click.option('--forge', is_flag=True,
@@ -81,8 +82,15 @@ def events_handler(
         from ..services.event_service import EventService
         forge_types = tuple(EventService.FORGE_TYPES)
         if event_types:
-            # intersect explicit types with forge types
+            non_forge = tuple(t for t in event_types if t not in forge_types)
             event_types = tuple(t for t in event_types if t in forge_types)
+            if not event_types:
+                # An empty IN-filter downstream means "no filter", which would
+                # return every event type — the opposite of the request.
+                raise click.UsageError(
+                    f"--type {', '.join(non_forge)} is not a forge event type; "
+                    f"--forge covers: {', '.join(forge_types)}"
+                )
         else:
             event_types = forge_types
 

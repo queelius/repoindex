@@ -235,6 +235,48 @@ class GitForge(RemoteSource):
             f"{self.source_id} does not support fetch_events"
         )
 
+    @staticmethod
+    def _parse_event_ts(raw: Optional[str]):
+        """Parse an ISO8601 forge timestamp into a naive datetime."""
+        from datetime import datetime
+        if not raw:
+            return datetime.now()
+        try:
+            return datetime.fromisoformat(
+                raw.replace("Z", "+00:00")).replace(tzinfo=None)
+        except ValueError:
+            return datetime.now()
+
+    def _item_to_event(self, event_type: str, item: dict,
+                       repo_name: str, repo_path: str):
+        """Translate a forge API list item into a domain Event.
+
+        This defines the cross-forge event payload contract consumed by
+        the events table and display code: releases carry
+        ``tag/title/url/author``; pull_requests and issues carry
+        ``number/title/state/url/author``. Gitea mirrors GitHub's JSON
+        field names, so one mapping serves every forge.
+        """
+        from ..domain.event import Event
+        if event_type == 'release':
+            return Event(
+                type='release',
+                timestamp=self._parse_event_ts(item.get('published_at')),
+                repo_name=repo_name, repo_path=repo_path,
+                data={'tag': item.get('tag_name') or item.get('name') or 'unknown',
+                      'title': item.get('name') or '',
+                      'url': item.get('html_url'),
+                      'author': (item.get('author') or {}).get('login')})
+        return Event(
+            type=event_type,
+            timestamp=self._parse_event_ts(item.get('created_at')),
+            repo_name=repo_name, repo_path=repo_path,
+            data={'number': item.get('number'),
+                  'title': item.get('title') or '',
+                  'state': item.get('state'),
+                  'url': item.get('html_url'),
+                  'author': (item.get('user') or {}).get('login')})
+
 
 class Registry(RemoteSource):
     """Package registry. Publishes artifacts; doesn't host source code.

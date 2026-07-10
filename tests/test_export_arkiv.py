@@ -352,7 +352,10 @@ class TestArchiveSqlite:
         assert n == 0
 
 
-def test_publication_record_includes_concept_doi():
+def test_publication_doi_keeps_concept_semantics():
+    # Every pre-2.2 export emitted the concept DOI under 'doi' (the citable
+    # one); existing arkiv/longecho consumers read that key. The
+    # version-specific DOI is exposed separately as version_doi.
     from repoindex.exporters.arkiv import _publication_to_arkiv
     pub = {
         'registry': 'zenodo',
@@ -364,5 +367,19 @@ def test_publication_record_includes_concept_doi():
         'url': 'https://zenodo.org/records/456',
     }
     record = _publication_to_arkiv(pub)
-    assert record['metadata']['doi'] == '10.5281/zenodo.456'
+    assert record['metadata']['doi'] == '10.5281/zenodo.400'
     assert record['metadata']['concept_doi'] == '10.5281/zenodo.400'
+    assert record['metadata']['version_doi'] == '10.5281/zenodo.456'
+
+
+def test_publication_doi_without_concept_is_version_doi():
+    from repoindex.exporters.arkiv import _publication_to_arkiv
+    pub = {
+        'registry': 'zenodo',
+        'package_name': 'demo',
+        'doi': '10.5281/zenodo.456',
+        'concept_doi': None,
+    }
+    record = _publication_to_arkiv(pub)
+    assert record['metadata']['doi'] == '10.5281/zenodo.456'
+    assert 'concept_doi' not in record['metadata']
