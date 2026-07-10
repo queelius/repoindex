@@ -24,7 +24,7 @@ Event Types:
         - cran_publish (cran=True)
 """
 
-__version__ = "2.2.0"
+__version__ = "2.2.1"
 
 # Domain objects
 from .domain import (

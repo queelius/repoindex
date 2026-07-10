@@ -4,6 +4,66 @@ All notable changes to repoindex are documented here.
 
 ## Unreleased
 
+## 2.2.1 - 2026-07-10
+
+Post-release code-review remediation: 16 verified findings across the 2.1/2.2
+feature bundles, plus two performance improvements to forge-event fetching.
+
+### Fixed
+
+- `refresh --forge-events` now fetches events for repos the incremental skip
+  leaves untouched. The skip keys on `.git/index` mtime, which forge activity
+  (releases, PRs, issues) never changes, so in steady state the flag fetched
+  nothing unless `--full` was passed.
+- The concept-DOI feature works end-to-end. Refresh no longer drops
+  `concept_doi` when storing registry results (`PackageMetadata.from_dict`
+  derives the round-trip from the dataclass fields), and the format-export
+  path now merges publication DOIs into repo rows, so the bibtex/jsonld
+  preference for the concept DOI actually fires.
+- Arkiv archives emit the citable concept DOI under `doi` again (as every
+  pre-2.2 export did); the version-specific DOI moved to a new `version_doi`
+  key instead of silently changing the meaning of `doi`.
+- `events --forge` combined with a non-forge `--type` (e.g. `commit`) is a
+  clean usage error. Previously the empty type intersection was treated as
+  "no filter" and returned every event type. The `--type` help text no longer
+  advertises the removed `pr` type.
+- Invalid `--since`/`--until`/`--recent` values produce a usage error instead
+  of a Python traceback, across events, refresh, copy, link, export, and all
+  `ops` subcommands (shared click param type). An unparseable config
+  `events.since` reports cleanly too.
+- GitHub event pagination no longer truncates silently: network errors and
+  unexpected HTTP statuses raise (surfaced as per-repo warnings) instead of
+  ending the stream as if complete, which permanently hid the missing events
+  behind `INSERT OR IGNORE` dedup. Pagination also authenticates via
+  `gh auth token` when no token env var is set, and feeds rate-limit headers
+  into the client's tracker.
+- Gitea release pagination early-stops on `created_at` (the list order)
+  rather than `published_at`, avoiding false stops on late-published or
+  backdated releases: the same hazard the GitHub client already handled.
+- The MCP `run_sql` tool has its description again. FastMCP captures the
+  description at registration time, so the post-decoration `__doc__`
+  assignment shipped an empty string to every client.
+- The schema v10 history comment no longer claims events/refresh_log survive
+  migration (the DB is a cache; a version bump drops and rebuilds).
+
+### Added
+
+- MCP `refresh` tool accepts `forge_events=true`, making the forge-events
+  capability reachable by the MCP (its dominant consumer), not just the CLI.
+
+### Changed (internal)
+
+- Forge-event fetches run as a second phase after the repo loop: network
+  requests fan out in a thread pool while all database writes stay on the
+  main thread. With the default config window, each repo's fetch now narrows
+  to events newer than what the database already holds (an explicit `--since`
+  is honored verbatim for backfills).
+- The GitHub and Gitea event translations share one `GitForge` helper (the
+  cross-forge payload contract lives in one place), single-row and batched
+  event inserts share one SQL statement and row mapping, and the
+  forge-dispatch index is built once per refresh run instead of re-importing
+  source modules per repo.
+
 ## 2.2.0 - 2026-06-07
 
 ### Added
