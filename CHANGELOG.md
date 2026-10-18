@@ -11,6 +11,11 @@ All notable changes to repoindex are documented here.
   interpreter (`python -m repoindex`) from a trusted working directory, so a
   `repoindex.py` or `repoindex/` in the caller's directory cannot shadow the
   real package.
+- `v_repo_stats` works again in databases upgraded from before schema v9.
+  The version-bump rebuild dropped tables but not views, so the old view
+  (selecting the removed `github_stars` column) survived and every query on
+  it failed. Views now live in `schema.VIEWS` and are synced to the code on
+  every writable open, without a cache rebuild.
 
 ## 2.2.1 - 2026-07-10
 

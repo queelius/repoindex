@@ -243,6 +243,165 @@ class TestSchema(unittest.TestCase):
         conn.close()
 
 
+# The v_repo_stats definition shipped through schema v8, before v9 renamed
+# github_stars/github_forks to stars/forks_count. Abbreviated to the columns
+# that matter: it is the shape that survived in upgraded databases.
+_PRE_V9_REPO_STATS_VIEW = """
+CREATE VIEW v_repo_stats AS
+SELECT r.id AS repo_id, r.name, r.github_stars, r.github_forks
+FROM repos r
+"""
+
+
+class TestSchemaViews(unittest.TestCase):
+    """Views are derived definitions and must always match the code.
+
+    Tables are versioned (a version bump rebuilds the cache), but views
+    created with CREATE VIEW IF NOT EXISTS used to survive that rebuild, so
+    a pre-v9 v_repo_stats kept selecting the dropped github_stars column.
+    """
+
+    def setUp(self):
+        self.temp_dir = tempfile.mkdtemp()
+        self.db_path = Path(self.temp_dir) / "test.db"
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.temp_dir, ignore_errors=True)
+
+    def _connect(self):
+        conn = sqlite3.connect(str(self.db_path))
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA foreign_keys = ON")
+        return conn
+
+    def _view_names(self, conn):
+        return sorted(
+            r['name'] for r in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='view'"
+            )
+        )
+
+    def _assert_all_views_queryable(self, conn):
+        names = self._view_names(conn)
+        self.assertIn('v_repo_stats', names)
+        for name in names:
+            conn.execute(f'SELECT * FROM "{name}"').fetchall()
+
+    def _repo_stats_columns(self, conn):
+        cur = conn.execute("SELECT * FROM v_repo_stats LIMIT 0")
+        return [d[0] for d in cur.description]
+
+    def test_fresh_database_views_are_queryable(self):
+        conn = get_connection(db_path=self.db_path)
+        try:
+            self._assert_all_views_queryable(conn)
+            cols = self._repo_stats_columns(conn)
+            self.assertIn('stars', cols)
+            self.assertIn('forks_count', cols)
+        finally:
+            conn.close()
+
+    def test_view_definitions_match_schema_module(self):
+        from repoindex.database.schema import VIEWS
+        conn = get_connection(db_path=self.db_path)
+        try:
+            self.assertEqual(self._view_names(conn), sorted(VIEWS))
+        finally:
+            conn.close()
+
+    def test_pre_v9_database_upgrades_to_working_view(self):
+        # Build a v8-shaped database: repos still has github_stars and the
+        # view selects it.
+        conn = self._connect()
+        conn.executescript("""
+            CREATE TABLE _schema_info (
+                version INTEGER PRIMARY KEY,
+                applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                description TEXT
+            );
+            INSERT INTO _schema_info (version, description) VALUES (8, 'v8');
+            CREATE TABLE repos (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                path TEXT UNIQUE NOT NULL,
+                github_stars INTEGER,
+                github_forks INTEGER
+            );
+        """ + _PRE_V9_REPO_STATS_VIEW)
+        conn.commit()
+        conn.execute("SELECT * FROM v_repo_stats").fetchall()  # valid at v8
+        conn.close()
+
+        conn = get_connection(db_path=self.db_path)
+        try:
+            self.assertEqual(get_schema_version(conn), CURRENT_VERSION)
+            self._assert_all_views_queryable(conn)
+            self.assertIn('stars', self._repo_stats_columns(conn))
+        finally:
+            conn.close()
+
+    def test_current_version_database_with_stale_view_is_repaired(self):
+        # A database already at CURRENT_VERSION whose v_repo_stats predates
+        # v9 (the view survived the v8->v9 rebuild). Opening it writable must
+        # repair the view without discarding cached rows or user tags.
+        conn = self._connect()
+        ensure_schema(conn)
+        conn.execute(
+            "INSERT INTO repos (name, path, stars) VALUES ('demo', '/tmp/demo', 7)"
+        )
+        repo_id = conn.execute("SELECT id FROM repos").fetchone()['id']
+        conn.execute(
+            "INSERT INTO tags (repo_id, tag, source) VALUES (?, 'work/active', 'user')",
+            (repo_id,),
+        )
+        conn.execute("DROP VIEW v_repo_stats")
+        conn.execute(_PRE_V9_REPO_STATS_VIEW)
+        conn.commit()
+        with self.assertRaises(sqlite3.OperationalError):
+            conn.execute("SELECT * FROM v_repo_stats").fetchall()
+        conn.close()
+
+        conn = get_connection(db_path=self.db_path)
+        try:
+            self._assert_all_views_queryable(conn)
+            row = conn.execute(
+                "SELECT name, stars FROM v_repo_stats"
+            ).fetchone()
+            self.assertEqual((row['name'], row['stars']), ('demo', 7))
+            self.assertEqual(
+                conn.execute("SELECT tag FROM tags").fetchone()['tag'],
+                'work/active',
+            )
+        finally:
+            conn.close()
+
+    def test_obsolete_view_is_dropped(self):
+        conn = self._connect()
+        ensure_schema(conn)
+        conn.execute("CREATE VIEW v_obsolete AS SELECT github_stars FROM repos")
+        conn.commit()
+        conn.close()
+
+        conn = get_connection(db_path=self.db_path)
+        try:
+            self.assertNotIn('v_obsolete', self._view_names(conn))
+            self._assert_all_views_queryable(conn)
+        finally:
+            conn.close()
+
+    def test_views_untouched_when_already_current(self):
+        # Re-syncing current views must not rewrite the schema (which would
+        # bump the schema cookie and invalidate other connections' caches).
+        conn = self._connect()
+        ensure_schema(conn)
+        before = conn.execute("PRAGMA schema_version").fetchone()[0]
+        ensure_schema(conn)
+        after = conn.execute("PRAGMA schema_version").fetchone()[0]
+        self.assertEqual(before, after)
+        conn.close()
+
+
 class TestRepositoryOperations(unittest.TestCase):
     """Tests for repository CRUD operations."""
 

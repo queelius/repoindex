@@ -82,7 +82,7 @@ where, params = build_where_and_params(language='Python', dirty=True)
 repos = fetch_repos_by_flags(config, language='Python', recent='7d')
 ```
 
-Schema v10, migrations in `database/schema.py` (the DB is a cache: a version bump drops and rebuilds all tables). See **SQL Data Model** below for table details.
+Schema v10, migrations in `database/schema.py` (the DB is a cache: a version bump drops and rebuilds all tables). Views are not versioned: they live in `schema.VIEWS` and `sync_views()` replaces any stale ones on every writable open. See **SQL Data Model** below for table details.
 
 ### Other Key Modules
 

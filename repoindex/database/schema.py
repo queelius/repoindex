@@ -10,7 +10,8 @@ The schema is designed to:
 """
 
 import sqlite3
-from typing import List, Tuple
+from functools import lru_cache
+from typing import Dict, List, Tuple
 
 # Current schema version - increment when schema changes
 # v1: Initial schema
@@ -254,11 +255,21 @@ CREATE TRIGGER IF NOT EXISTS repos_fts_update AFTER UPDATE ON repos BEGIN
     INSERT INTO repos_fts(rowid, name, description, readme_content)
     VALUES (NEW.id, NEW.name, NEW.description, NEW.readme_content);
 END;
+"""
 
--- Computed views for common queries
 
--- Active repos (committed to in last 30 days)
-CREATE VIEW IF NOT EXISTS v_active_repos AS
+# Computed views for common queries, as {name: SELECT body}.
+#
+# Views are derived definitions, not cached data, so they are NOT versioned
+# with the tables: sync_views() makes the database's views equal this mapping
+# on every writable open. Before this, views were created with
+# CREATE VIEW IF NOT EXISTS inside SCHEMA_V1 and the version-bump rebuild
+# dropped only tables, so a pre-v9 v_repo_stats selecting the dropped
+# github_stars column survived every upgrade. Edit a view here and every
+# existing database picks up the new definition without a cache rebuild.
+VIEWS: Dict[str, str] = {
+    # Active repos (committed to in last 30 days)
+    'v_active_repos': """
 SELECT DISTINCT r.*
 FROM repos r
 WHERE EXISTS (
@@ -266,10 +277,10 @@ WHERE EXISTS (
     WHERE e.repo_id = r.id
     AND e.type = 'commit'
     AND e.timestamp > datetime('now', '-30 days')
-);
-
--- Stale repos (no commits in 180 days)
-CREATE VIEW IF NOT EXISTS v_stale_repos AS
+)
+""",
+    # Stale repos (no commits in 180 days)
+    'v_stale_repos': """
 SELECT r.*
 FROM repos r
 WHERE NOT EXISTS (
@@ -277,10 +288,10 @@ WHERE NOT EXISTS (
     WHERE e.repo_id = r.id
     AND e.type = 'commit'
     AND e.timestamp > datetime('now', '-180 days')
-);
-
--- Repo stats view (aggregated metrics)
-CREATE VIEW IF NOT EXISTS v_repo_stats AS
+)
+""",
+    # Repo stats (aggregated metrics)
+    'v_repo_stats': """
 SELECT
     r.id as repo_id,
     r.name,
@@ -317,8 +328,71 @@ LEFT JOIN (
     WHERE type = 'git_tag' AND timestamp > datetime('now', '-90 days')
     GROUP BY repo_id
 ) tags_90d ON tags_90d.repo_id = r.id
-GROUP BY r.id;
-"""
+GROUP BY r.id
+""",
+}
+
+
+def _quote_identifier(name: str) -> str:
+    """Quote an SQLite identifier (double quotes, embedded quotes doubled)."""
+    return '"' + name.replace('"', '""') + '"'
+
+
+def _view_ddl(name: str, select: str) -> str:
+    return f"CREATE VIEW {_quote_identifier(name)} AS\n{select.strip()}"
+
+
+def _installed_views(conn: sqlite3.Connection) -> Dict[str, str]:
+    """Map of view name to its stored CREATE VIEW text in ``conn``."""
+    return {
+        row[0]: row[1]
+        for row in conn.execute(
+            "SELECT name, sql FROM sqlite_master WHERE type = 'view'"
+        )
+    }
+
+
+@lru_cache(maxsize=1)
+def _expected_views() -> Dict[str, str]:
+    """VIEWS as SQLite itself would store them in sqlite_master.
+
+    Created in a scratch in-memory database so the comparison in
+    sync_views() uses SQLite's own normalization of the DDL text rather
+    than an assumption about it. (Views are not bound to their tables at
+    creation, so no tables are needed.)
+    """
+    scratch = sqlite3.connect(":memory:")
+    try:
+        for name, select in VIEWS.items():
+            scratch.execute(_view_ddl(name, select))
+        return _installed_views(scratch)
+    finally:
+        scratch.close()
+
+
+def sync_views(conn: sqlite3.Connection) -> None:
+    """Make the database's views exactly the ones defined in VIEWS.
+
+    Drops views that are stale or no longer defined and creates the current
+    definitions, atomically. A no-op (no schema write) when the stored views
+    already match, so it is cheap to run on every writable open.
+    """
+    installed = _installed_views(conn)
+    expected = _expected_views()
+    if installed == expected:
+        return
+
+    conn.execute("SAVEPOINT sync_views")
+    try:
+        for name in installed:
+            conn.execute(f"DROP VIEW {_quote_identifier(name)}")
+        for name, select in VIEWS.items():
+            conn.execute(_view_ddl(name, select))
+    except Exception:
+        conn.execute("ROLLBACK TO sync_views")
+        conn.execute("RELEASE sync_views")
+        raise
+    conn.execute("RELEASE sync_views")
 
 
 def get_schema_version(conn: sqlite3.Connection) -> int:
@@ -381,6 +455,10 @@ def apply_schema(conn: sqlite3.Connection, version: int = CURRENT_VERSION) -> No
 
     conn.commit()
 
+    # Views are not versioned with the tables; replace any that predate the
+    # rebuild (they survive DROP TABLE and may name dropped columns).
+    sync_views(conn)
+
 
 def ensure_schema(conn: sqlite3.Connection) -> None:
     """Ensure database has current schema, migrating if necessary."""
@@ -388,6 +466,10 @@ def ensure_schema(conn: sqlite3.Connection) -> None:
 
     if current < CURRENT_VERSION:
         apply_schema(conn, CURRENT_VERSION)
+    else:
+        # Repairs views in databases already at CURRENT_VERSION, e.g. a
+        # pre-v9 v_repo_stats that survived the v8 -> v9 rebuild.
+        sync_views(conn)
 
 
 def get_migrations() -> List[Tuple[int, str, str]]:
