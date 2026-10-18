@@ -1,10 +1,16 @@
 """Tests for the MCP server tools."""
 import subprocess
+import sys
 from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
 from unittest.mock import MagicMock, patch
+
+# The MCP server must invoke the CLI of the installation it is running from,
+# not whatever `repoindex` happens to be on PATH (which may be absent or a
+# different install when Claude Code launches the server with a minimal PATH).
+SELF_CLI = [sys.executable, '-m', 'repoindex']
 
 
 @pytest.fixture
@@ -354,7 +360,74 @@ class TestRunSqlDocstring:
         assert tool.description.strip() == RUN_SQL_DOC.strip()
 
 
+class TestSelfInvocation:
+    """The CLI subprocess must come from the server's own interpreter."""
+
+    def test_cli_command_prefix(self):
+        from repoindex.mcp.server import _cli_command
+        assert _cli_command('refresh', '--full') == [*SELF_CLI, 'refresh', '--full']
+
+    def test_cli_command_runs_this_installation(self):
+        # End to end: the constructed argv must actually start the CLI, with
+        # no reliance on a `repoindex` executable on PATH.
+        from repoindex.mcp.server import _cli_command
+        result = subprocess.run(
+            _cli_command('--help'), capture_output=True, text=True, timeout=60,
+            env={'PATH': '', 'HOME': str(Path.home())},
+        )
+        assert result.returncode == 0, result.stderr
+        assert 'refresh' in result.stdout
+
+    @pytest.mark.parametrize('layout', ['module', 'package'])
+    def test_cwd_shadow_module_is_not_imported(self, tmp_path, monkeypatch, layout):
+        # `python -m` puts the child's cwd first on sys.path, so a planted
+        # repoindex.py (or repoindex/ package) in whatever directory the
+        # server was started from, or in $HOME, must not be what runs.
+        shadow_dir = tmp_path / 'project'
+        shadow_dir.mkdir()
+        marker = tmp_path / 'shadow-ran'
+        payload = (
+            "import pathlib, sys\n"
+            f"pathlib.Path({str(marker)!r}).write_text('pwned')\n"
+            "print('SHADOW-SENTINEL')\n"
+            "sys.exit(0)\n"
+        )
+        if layout == 'module':
+            (shadow_dir / 'repoindex.py').write_text(payload)
+        else:
+            pkg = shadow_dir / 'repoindex'
+            pkg.mkdir()
+            (pkg / '__init__.py').write_text(payload)
+            (pkg / '__main__.py').write_text(payload)
+        monkeypatch.chdir(shadow_dir)
+        monkeypatch.setattr('repoindex.mcp.server.Path.home', lambda: shadow_dir)
+
+        from repoindex.mcp.server import _run_cli
+        result = _run_cli(['--help'], timeout=60, timeout_msg='timed out')
+
+        assert not marker.exists()
+        assert result['status'] == 'ok', result
+        assert 'SHADOW-SENTINEL' not in result['output']
+        assert 'refresh' in result['output']
+
+    def test_python_dash_m_repoindex_help(self):
+        result = subprocess.run(
+            [*SELF_CLI, '--help'], capture_output=True, text=True, timeout=60,
+        )
+        assert result.returncode == 0, result.stderr
+        assert 'Usage' in result.stdout
+
+
 class TestRefresh:
+    def test_command_uses_own_interpreter(self, tmp_path, monkeypatch):
+        monkeypatch.setattr('repoindex.mcp.server.Path.home', lambda: tmp_path)
+        with patch('repoindex.mcp.server.subprocess.run') as mock_run:
+            mock_run.return_value = MagicMock(returncode=0, stdout='Done', stderr='')
+            from repoindex.mcp.server import _refresh_impl
+            _refresh_impl(github=True)
+        cmd = mock_run.call_args[0][0]
+        assert cmd == [*SELF_CLI, 'refresh', '--github']
+
     def test_runs_subprocess(self, tmp_path, monkeypatch):
         monkeypatch.setattr('repoindex.mcp.server.Path.home', lambda: tmp_path)
         with patch('repoindex.mcp.server.subprocess.run') as mock_run:
@@ -524,7 +597,7 @@ class TestTag:
         assert result['status'] == 'ok'
         assert result['action'] == 'add'
         cmd = mock_run.call_args[0][0]
-        assert cmd == ['repoindex', 'tag', 'add', 'myrepo', 'work/active']
+        assert cmd == [*SELF_CLI, 'tag', 'add', 'myrepo', 'work/active']
 
     def test_remove_tag(self):
         from repoindex.mcp.server import _tag_impl
@@ -600,7 +673,7 @@ class TestExport:
         assert result['status'] == 'ok'
         assert '42' in result['output']
         cmd = mock_run.call_args[0][0]
-        assert cmd == ['repoindex', 'export', '-o', str(target.resolve())]
+        assert cmd == [*SELF_CLI, 'export', '-o', str(target.resolve())]
 
     def test_export_with_filters(self, tmp_path):
         """Filter flags translate to matching CLI args."""
@@ -617,7 +690,7 @@ class TestExport:
             )
         cmd = mock_run.call_args[0][0]
         assert cmd == [
-            'repoindex', 'export',
+            *SELF_CLI, 'export',
             '-o', str(target.resolve()),
             '--language', 'Python',
             '--dirty',

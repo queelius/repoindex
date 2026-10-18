@@ -4,6 +4,14 @@ All notable changes to repoindex are documented here.
 
 ## Unreleased
 
+### Fixed
+
+- The MCP `refresh`, `tag`, and `export` tools no longer require a
+  `repoindex` executable on PATH. They run the CLI through the server's own
+  interpreter (`python -m repoindex`) from a trusted working directory, so a
+  `repoindex.py` or `repoindex/` in the caller's directory cannot shadow the
+  real package.
+
 ## 2.2.1 - 2026-07-10
 
 Post-release code-review remediation: 16 verified findings across the 2.1/2.2

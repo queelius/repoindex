@@ -17,12 +17,15 @@ messages, not a security boundary.
 """
 
 import fcntl
+import os
 import re
 import subprocess
+import sys
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Optional
 
+import repoindex as _repoindex_pkg
 from ..config import load_config
 from ..database.connection import Database, get_db_path
 
@@ -175,22 +178,65 @@ _REFRESH_STALE_DAYS = 7
 MAX_ROWS = 500
 
 
-def _run_cli(cmd: list, timeout: int, timeout_msg: str,
-             ok_extra: Optional[dict] = None) -> dict:
-    """Invoke a repoindex CLI subcommand and shape the result as an MCP dict.
+def _cli_command(*args: str) -> list:
+    """Build the argv that runs a repoindex CLI subcommand.
 
-    Collapses the identical subprocess-run + status/error shaping used by
-    ``_refresh_impl``, ``_tag_impl``, and ``_export_impl``. On timeout,
+    Invokes the CLI through the interpreter running this server
+    (``python -m repoindex``) rather than a bare ``repoindex`` looked up on
+    PATH. The MCP server is often launched with a minimal PATH (Claude Code,
+    a venv's python), where the console script is absent or belongs to a
+    different installation. A subprocess, rather than an in-process call, is
+    deliberate: the CLI prints to stdout, which on the stdio transport is the
+    MCP protocol channel, and it gives refresh/export a hard timeout.
+
+    Run it only through ``_run_cli``, which supplies the trusted cwd and
+    environment that keep ``-m`` from importing a shadowing module.
+    """
+    return [sys.executable, '-m', 'repoindex', *args]
+
+
+def _cli_cwd() -> Path:
+    """Trusted working directory for the CLI subprocess.
+
+    ``python -m`` prepends the child's cwd to sys.path, so a ``repoindex.py``
+    or ``repoindex/`` package in an untrusted cwd (the user's project, or
+    $HOME) would run instead of the CLI. Running from the directory that
+    contains this installation's ``repoindex`` package makes that sys.path
+    entry resolve to this very package, on every supported Python. (The CLI
+    resolves its paths from config and absolute arguments, not the cwd.)
+    """
+    return Path(_repoindex_pkg.__file__).resolve().parent.parent
+
+
+def _cli_env() -> dict:
+    """Environment for the CLI subprocess.
+
+    PYTHONSAFEPATH=1 (Python 3.11+) stops the cwd from being prepended to
+    sys.path at all; it is defense in depth next to ``_cli_cwd``, which is
+    what protects Python 3.10, where the variable is ignored.
+    """
+    return {**os.environ, 'PYTHONSAFEPATH': '1'}
+
+
+def _run_cli(args: list, timeout: int, timeout_msg: str,
+             ok_extra: Optional[dict] = None) -> dict:
+    """Run a repoindex CLI subcommand and shape the result as an MCP dict.
+
+    The single place that builds and runs CLI subprocesses (via
+    ``_cli_command``, ``_cli_cwd``, ``_cli_env``) for ``_refresh_impl``,
+    ``_tag_impl``, and ``_export_impl``. ``args`` is the subcommand argv
+    without the program, e.g. ``['tag', 'add', repo, tag]``. On timeout,
     returns ``timeout_msg`` so each caller can phrase its own message.
     On other exceptions, returns a sanitized ``{type.__name__}: {e}``.
 
-    ok_extra is merged into the ok-branch dict — callers that need
-    ``output`` or echo-back fields set them there.
+    ok_extra is merged into the ok-branch dict; callers that need
+    echo-back fields set them there.
     """
+    cmd = _cli_command(*args)
     try:
         result = subprocess.run(
             cmd, capture_output=True, text=True,
-            timeout=timeout, cwd=str(Path.home()),
+            timeout=timeout, cwd=str(_cli_cwd()), env=_cli_env(),
         )
     except subprocess.TimeoutExpired:
         return {'status': 'error', 'error': timeout_msg}
@@ -290,7 +336,7 @@ def _refresh_impl(
         }
 
     try:
-        cmd = ['repoindex', 'refresh']
+        cmd = ['refresh']
         if github:
             cmd.append('--github')
         if pypi:
@@ -346,19 +392,13 @@ def _tag_impl(repo: str, action: str, tag: str = "") -> dict:
                 'error': 'Repository and tag must not start with "-" (would be parsed as a flag).'
             }
 
-    # add/remove via subprocess (writes to DB)
-    cmd = ['repoindex', 'tag', action, repo, tag]
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-        if result.returncode == 0:
-            return {'status': 'ok', 'action': action, 'repo': repo, 'tag': tag}
-        else:
-            return {
-                'status': 'error',
-                'error': result.stderr.strip() or result.stdout.strip(),
-            }
-    except Exception as e:
-        return {'status': 'error', 'error': _sanitize_error(str(e))}
+    # add/remove via the CLI (writes to DB)
+    return _run_cli(
+        ['tag', action, repo, tag],
+        timeout=30,
+        timeout_msg='Tag operation timed out after 30 seconds',
+        ok_extra={'action': action, 'repo': repo, 'tag': tag},
+    )
 
 
 def _export_impl(
@@ -429,7 +469,7 @@ def _export_impl(
                 }
 
     # CLI signature: repoindex export [FORMAT_ID] -o DIR [FLAGS]
-    cmd = ['repoindex', 'export', '-o', str(p)]
+    cmd = ['export', '-o', str(p)]
     if language:
         if language.startswith('-'):
             return {'status': 'error', 'error': 'language must not start with "-".'}
