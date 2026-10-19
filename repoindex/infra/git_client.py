@@ -226,7 +226,7 @@ class GitClient:
             List of GitTag objects, sorted newest first
         """
         cmd = '''git for-each-ref --sort=-creatordate \
-                 --format='%(refname:short)|%(creatordate:iso8601)|%(objectname:short)|%(taggeremail)|%(subject)' \
+                 --format='%(refname:short)|%(creatordate:iso-strict)|%(objectname:short)|%(taggeremail)|%(subject)' \
                  refs/tags'''
 
         if limit:
@@ -253,9 +253,8 @@ class GitClient:
 
             # Parse date
             try:
-                date = datetime.fromisoformat(
-                    date_str.replace(' ', 'T').replace(' +', '+').replace(' -', '-')
-                )
+                # iso-strict is real ISO 8601, the same form commits use (%aI)
+                date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
                 if date.tzinfo:
                     date = date.replace(tzinfo=None)
             except (ValueError, AttributeError):

@@ -203,8 +203,8 @@ class TestScanGitTags:
     def test_scan_tags_basic(self, mock_run):
         """Test basic tag scanning."""
         mock_run.return_value = (
-            "v1.0.0|2024-01-15 10:30:00 -0500|abc123|user@example.com|Release v1.0.0\n"
-            "v0.9.0|2024-01-10 09:00:00 -0500|def456|user@example.com|Beta release",
+            "v1.0.0|2024-01-15T10:30:00-05:00|abc123|user@example.com|Release v1.0.0\n"
+            "v0.9.0|2024-01-10T09:00:00-05:00|def456|user@example.com|Beta release",
             0
         )
 
@@ -219,8 +219,8 @@ class TestScanGitTags:
     def test_scan_tags_with_since(self, mock_run):
         """Test tag scanning with since filter."""
         mock_run.return_value = (
-            "v1.0.0|2024-01-15 10:30:00 -0500|abc123||Release v1.0.0\n"
-            "v0.9.0|2024-01-01 09:00:00 -0500|def456||Old release",
+            "v1.0.0|2024-01-15T10:30:00-05:00|abc123||Release v1.0.0\n"
+            "v0.9.0|2024-01-01T09:00:00-05:00|def456||Old release",
             0
         )
 
@@ -235,9 +235,9 @@ class TestScanGitTags:
     def test_scan_tags_with_limit(self, mock_run):
         """Test tag scanning with limit."""
         mock_run.return_value = (
-            "v1.0.0|2024-01-15 10:30:00 -0500|abc123||Release\n"
-            "v0.9.0|2024-01-10 09:00:00 -0500|def456||Beta\n"
-            "v0.8.0|2024-01-05 08:00:00 -0500|ghi789||Alpha",
+            "v1.0.0|2024-01-15T10:30:00-05:00|abc123||Release\n"
+            "v0.9.0|2024-01-10T09:00:00-05:00|def456||Beta\n"
+            "v0.8.0|2024-01-05T08:00:00-05:00|ghi789||Alpha",
             0
         )
 

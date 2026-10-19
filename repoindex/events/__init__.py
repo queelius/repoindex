@@ -233,7 +233,7 @@ def scan_git_tags(
     # Get tags with metadata
     # Format: tag_name|date|commit|tagger|message
     cmd = '''git for-each-ref --sort=-creatordate \
-             --format='%(refname:short)|%(creatordate:iso8601)|%(objectname:short)|%(taggeremail)|%(subject)' \
+             --format='%(refname:short)|%(creatordate:iso-strict)|%(objectname:short)|%(taggeremail)|%(subject)' \
              refs/tags'''
 
     if limit:
@@ -261,8 +261,8 @@ def scan_git_tags(
 
         # Parse date
         try:
-            # Handle git's ISO format with timezone
-            tag_date = datetime.fromisoformat(date_str.replace(' ', 'T').replace(' +', '+').replace(' -', '-'))
+            # iso-strict is real ISO 8601, the same form commits use (%aI)
+            tag_date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
             # Convert to naive datetime for comparison
             if tag_date.tzinfo:
                 tag_date = tag_date.replace(tzinfo=None)
