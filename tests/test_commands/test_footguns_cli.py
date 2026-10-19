@@ -182,6 +182,7 @@ class TestConfirmBulkSetHelper:
         confirm.assert_called_once()
 
 
+@pytest.mark.usefixtures("empty_index")
 class TestSetTopicsConfirmation:
     def _bulk_patches(self):
         fake = MagicMock()

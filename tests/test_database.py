@@ -60,6 +60,12 @@ class TestDatabaseConnection(unittest.TestCase):
     def setUp(self):
         self.temp_dir = tempfile.mkdtemp()
         self.db_path = Path(self.temp_dir) / 'test.db'
+        # These tests exercise config-based path resolution, which the
+        # REPOINDEX_DB that conftest sets for isolation would override.
+        env = patch.dict(os.environ)
+        env.start()
+        self.addCleanup(env.stop)
+        os.environ.pop('REPOINDEX_DB', None)
 
     def tearDown(self):
         import shutil

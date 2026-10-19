@@ -12,6 +12,9 @@ from unittest.mock import MagicMock, patch
 import pytest
 from click.testing import CliRunner
 
+# The set-* handlers open the index read-only before the stubbed lookup.
+pytestmark = pytest.mark.usefixtures("empty_index")
+
 
 def _runner():
     return CliRunner()
