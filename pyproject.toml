@@ -21,7 +21,7 @@ text = "MIT"
 
 [project.optional-dependencies]
 test = [ "pytest>=6.0", "pytest-cov>=2.0", "coverage>=5.0",]
-dev = [ "pytest>=6.0", "pytest-cov>=2.0", "coverage>=5.0", "black>=21.0", "flake8>=3.9", "mypy>=0.812",]
+dev = [ "pytest>=6.0", "pytest-cov>=2.0", "coverage>=5.0", "black>=21.0", "flake8>=3.9", "mypy>=0.812", "pyfakefs>=5.0",]
 docs = [ "mkdocs>=1.4.0", "mkdocs-material>=9.0.0", "ghp-import>=2.1.0",]
 export = [ "weasyprint>=54.0",]
 network = [ "numpy>=1.20.0",]
