@@ -315,7 +315,7 @@ def scan_commits(
     repo_name = Path(repo_path).name
 
     # Build git log command
-    cmd = 'git log --format="%H|%aI|%an|%ae|%s"'
+    cmd = 'git log --format="%H|%aI|%aN|%aE|%s"'
 
     if since:
         cmd += f' --since="{since.isoformat()}"'
@@ -489,7 +489,7 @@ def scan_merges(
     repo_name = Path(repo_path).name
 
     # Get merge commits (commits with more than one parent)
-    cmd = 'git log --merges --format="%H|%aI|%an|%ae|%s"'
+    cmd = 'git log --merges --format="%H|%aI|%aN|%aE|%s"'
 
     if since:
         cmd += f' --since="{since.isoformat()}"'
@@ -1133,7 +1133,7 @@ def scan_version_bumps(
 
     # Build git log command to find commits touching version files
     file_patterns = ' '.join([f'"{f}"' for f in version_files])
-    cmd = f'git log --format="%H|%aI|%an|%s" --all -- {file_patterns}'
+    cmd = f'git log --format="%H|%aI|%aN|%s" --all -- {file_patterns}'
 
     if since:
         cmd += f' --since="{since.isoformat()}"'
@@ -1238,7 +1238,7 @@ def scan_deps_updates(
 
     # Build git log command
     file_patterns = ' '.join([f'"{f}"' for f in deps_files])
-    cmd = f'git log --format="%H|%aI|%an|%s" --all -- {file_patterns}'
+    cmd = f'git log --format="%H|%aI|%aN|%s" --all -- {file_patterns}'
 
     if since:
         cmd += f' --since="{since.isoformat()}"'
@@ -1654,7 +1654,7 @@ def scan_license_changes(
     # License file patterns
     license_files = 'LICENSE LICENSE.txt LICENSE.md COPYING COPYING.txt'
 
-    cmd = f'git log --format="%H|%aI|%an|%s" --all -- {license_files}'
+    cmd = f'git log --format="%H|%aI|%aN|%s" --all -- {license_files}'
 
     if since:
         cmd += f' --since="{since.isoformat()}"'
@@ -1748,7 +1748,7 @@ def scan_ci_config_changes(
 
     # Build git log command
     file_patterns = ' '.join([f'"{p}"' for p in ci_patterns])
-    cmd = f'git log --format="%H|%aI|%an|%s" --all -- {file_patterns}'
+    cmd = f'git log --format="%H|%aI|%aN|%s" --all -- {file_patterns}'
 
     if since:
         cmd += f' --since="{since.isoformat()}"'
@@ -1853,7 +1853,7 @@ def scan_docs_changes(
     # Doc patterns (excluding README which has its own event type)
     doc_patterns = 'docs/ doc/ documentation/ "*.md" "!README.md" "!readme.md"'
 
-    cmd = f'git log --format="%H|%aI|%an|%s" --all -- {doc_patterns}'
+    cmd = f'git log --format="%H|%aI|%aN|%s" --all -- {doc_patterns}'
 
     if since:
         cmd += f' --since="{since.isoformat()}"'
@@ -1948,7 +1948,7 @@ def scan_readme_changes(
     # README file patterns
     readme_files = 'README README.md README.txt README.rst readme.md'
 
-    cmd = f'git log --format="%H|%aI|%an|%s" --all -- {readme_files}'
+    cmd = f'git log --format="%H|%aI|%aN|%s" --all -- {readme_files}'
 
     if since:
         cmd += f' --since="{since.isoformat()}"'

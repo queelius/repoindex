@@ -296,7 +296,7 @@ class GitClient:
         Returns:
             List of GitCommit objects
         """
-        cmd = f'git log --format="%H|%aI|%an|%ae|%s" -n {limit}'
+        cmd = f'git log --format="%H|%aI|%aN|%aE|%s" -n {limit}'
 
         if since:
             cmd += f' --since="{since.isoformat()}"'
